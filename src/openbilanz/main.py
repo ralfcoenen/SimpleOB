@@ -1,12 +1,12 @@
-"""
-OpenBilanz-UG
-
-Hauptprogramm
-"""
+from openbilanz.database.database import (
+    create_database
+)
 
 
 
 def main():
+
+    create_database()
 
     print(
         "OpenBilanz-UG gestartet"
