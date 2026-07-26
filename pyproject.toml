@@ -1,0 +1,11 @@
+[project]
+name = "openbilanz"
+version = "0.1.0"
+description = "Lokale Buchhaltungs- und E-Bilanz-Software"
+requires-python = ">=3.12"
+
+
+[tool.pytest.ini_options]
+testpaths = [
+    "tests"
+]

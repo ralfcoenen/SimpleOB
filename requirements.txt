@@ -1,0 +1,8 @@
+PySide6
+SQLAlchemy
+alembic
+openpyxl
+odfpy
+lxml
+reportlab
+pytest
