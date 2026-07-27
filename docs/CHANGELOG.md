@@ -1,57 +1,84 @@
+# Datei: `CHANGELOG.md`
+
+```markdown
 # Changelog
 
+Alle wesentlichen Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
-## Version 0.1.0
+## [v0.4.0-apha2.0] - 2026-07-27
 
-Initiale Projektstruktur
+### Changed 
 
-- Python-Projekt angelegt
-- Verzeichnisstruktur erstellt
-- Dokumentation vorbereitet
-
-
-Alle wesentlichen Änderungen an **OpenBilanz-UG** werden in dieser Datei dokumentiert.
-
-Das Projekt orientiert sich an den Empfehlungen von *Keep a Changelog* und verwendet *Semantic Versioning*.
-
----
-
-## [v0.3.0-alpha2.0] - 2026-07-27
-
-### Added
-
-* Einführung des zustandslosen `PostingService`
-* Übertragung von `Booking`-Objekten in das `Ledger`
-* Unterstützung von Splittbuchungen
-
-  * eine Sollzeile auf mehrere Habenzeilen
-  * mehrere Sollzeilen auf eine Habenzeile
-  * mehrere Soll- und Habenzeilen
-* Interne Paarbildung von Soll- und Habenzeilen zur Erzeugung elementarer Buchungen
-* Unit-Tests für den `PostingService`
-* Testabdeckung für:
-
-  * einfache Buchungen
-  * Splittbuchungen
-  * Mehrfachbuchungen
-  * ungültige Parameter
-  * Unveränderlichkeit der `Booking`
-
-### Changed
-
-* Klare Trennung zwischen Domänenmodell (`Booking`) und buchhalterischer Verarbeitung (`PostingService`)
-* `Ledger` bleibt ausschließlich für die Kontoführung verantwortlich.
-* Die fachliche Übersetzung einer Buchung in elementare Soll-/Haben-Buchungen erfolgt ausschließlich im `PostingService`.
+- TrialBalanceEntry wieder entfernt.
+- TrialBalanceRow als einziges Modell einer Summen- und Saldenlistenzeile festgelegt.
+- Öffentliche API bereinigt.
+- Doppelte Modellierung beseitigt.
 
 ### Quality
 
-* Gesamter Testbestand erfolgreich ausgeführt
-* **154 Tests erfolgreich**
-* Keine Regressionen festgestellt
-* Architektur der Schichten erfolgreich validiert
+161 passed
+
+
+
+## [v0.4.0-alpha1.0] - 2026-07-27
+
+### Added
+
+- Added immutable `Account` domain model.
+- Added `AccountType` enumeration.
+- Added validation for account number, account name and account type.
+- Added string representation for accounts.
+- Added comprehensive unit tests for the account domain model.
+
+### Changed
+
+- Prepared the domain model for future reporting components such as
+  Trial Balance, Balance Sheet and Profit & Loss Statement.
+
+### Quality
+
+- All tests passed successfully.
+- No regressions detected.
 
 ---
 
-## Frühere Versionen
+## [v0.3.0-alpha3.0]
 
-Siehe Git-Historie und Tags.
+### Added
+
+- Added immutable `Journal` domain collection.
+- Added insertion-order preserving storage.
+- Added iteration support.
+- Added membership operator (`in`).
+- Added comprehensive unit tests.
+
+### Changed
+
+- Extended the domain model with a journal abstraction.
+
+### Quality
+
+- All tests passed successfully.
+- No regressions detected.
+
+---
+
+## [v0.3.0-alpha2.0]
+
+### Added
+
+- Added `PostingService`.
+- Added support for split debit and credit bookings.
+- Added extensive PostingService unit tests.
+
+### Changed
+
+- Separated booking processing from the ledger implementation.
+
+### Quality
+
+- Complete regression test suite passed successfully.
+```
+
+---
+

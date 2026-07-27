@@ -1,182 +1,102 @@
-# OpenBilanz-UG – Public API
+# Datei: `API.md`
 
-## Einleitung
+````markdown
+# Public API
 
-Dieses Dokument beschreibt die öffentliche Programmierschnittstelle (API) von **OpenBilanz-UG**.
+## Domain
 
-Alle hier aufgeführten Klassen und Methoden gehören zur öffentlichen API und können von Anwendungen verwendet werden. Nicht dokumentierte Klassen, Methoden oder Attribute sind interne Implementierungsdetails und können sich zwischen Versionen ändern.
+### EntrySide
 
----
-
-# Paketübersicht
-
-```
-openbilanz
-├── accounting
-├── domain
-└── services
-```
+Represents the debit or credit side of a booking line.
 
 ---
 
-# Domain
+### BookingLine
 
-Die Domänenschicht beschreibt die fachlichen Objekte der Buchhaltung. Sie enthält keine Logik zur Kontoführung.
+Represents a single booking line.
 
-## EntrySide
+---
 
-Kennzeichnet die Buchungsseite.
+### Booking
 
-### Werte
+Represents a balanced accounting transaction.
+
+Properties
+
+- debit_total
+- credit_total
+- debit_lines
+- credit_lines
+- is_balanced
+
+---
+
+### Journal
+
+Chronological collection of bookings.
+
+Public API
 
 ```python
-EntrySide.DEBIT
-EntrySide.CREDIT
-```
+journal = Journal()
+
+journal.add(booking)
+
+journal.bookings
+
+len(journal)
+
+for booking in journal:
+
+booking in journal
+````
 
 ---
 
-## BookingLine
+### Account
 
-Repräsentiert eine einzelne Buchungszeile.
+Represents a ledger account.
 
-### Konstruktor
+Public API
 
 ```python
-BookingLine(
-    account_no,
-    side,
-    amount,
+Account(
+    number: str,
+    name: str,
+    account_type: AccountType,
 )
 ```
 
-### Eigenschaften
+Properties
 
-* `account_no`
-* `side`
-* `amount`
+* number
+* name
+* account_type
 
----
-
-## Booking
-
-Repräsentiert einen vollständigen Buchungssatz.
-
-Eine Buchung
-
-* ist unveränderlich (immutable),
-* besitzt mindestens zwei Buchungszeilen,
-* enthält mindestens eine Soll- und eine Habenzeile,
-* ist immer ausgeglichen.
-
-### Konstruktor
+Behaviour
 
 ```python
-Booking(
-    booking_date,
-    lines,
-    voucher_no=None,
-    description=None,
-)
-```
-
-### Eigenschaften
-
-```python
-booking.booking_id
-booking.booking_date
-booking.lines
-booking.voucher_no
-booking.description
-```
-
-### Berechnete Eigenschaften
-
-```python
-booking.debit_total
-booking.credit_total
-booking.is_balanced
-booking.debit_lines
-booking.credit_lines
+str(account)
 ```
 
 ---
 
-## Journal
+### AccountType
 
-Sammlung mehrerer Buchungen.
+Values
 
-> Status: vorgesehen, noch nicht implementiert.
-
----
-
-# Accounting
-
-Die Accounting-Schicht bildet die eigentliche Buchführung ab.
+* ASSET
+* LIABILITY
+* EXPENSE
+* REVENUE
 
 ---
 
-## AccountBalance
+## Services
 
-Verwaltet die Bewegungen eines einzelnen Kontos.
+### PostingService
 
-### Eigenschaften
-
-* Sollsaldo
-* Habensaldo
-* Kontosaldo
-
----
-
-## Ledger
-
-Repräsentiert das Hauptbuch.
-
-### Methoden
-
-```python
-ledger.post(
-    debit_account,
-    credit_account,
-    amount,
-)
-```
-
-```python
-ledger.get_account(
-    account_no,
-)
-```
-
-### Eigenschaften
-
-```python
-ledger.debit_total
-ledger.credit_total
-ledger.is_balanced
-```
-
----
-
-## TrialBalance
-
-Summen- und Saldenliste.
-
-> Status: vorgesehen, noch nicht implementiert.
-
----
-
-# Services
-
-Die Service-Schicht enthält die Geschäftslogik.
-
----
-
-## PostingService
-
-Überträgt fachliche Buchungen in das Hauptbuch.
-
-### Methoden
+Processes balanced bookings and posts them to a ledger.
 
 ```python
 PostingService().post_booking(
@@ -185,50 +105,25 @@ PostingService().post_booking(
 )
 ```
 
-Der Service
-
-* validiert die Parameter,
-* zerlegt Splittbuchungen in elementare Soll-/Haben-Buchungen,
-* überträgt diese an das Ledger,
-* verändert die ursprüngliche Buchung nicht.
-
 ---
 
-# Architektur
+## Accounting
 
-Die öffentliche Architektur besteht aus drei Schichten.
+### Ledger
+
+Stores postings and account balances.
+
+### AccountBalance
+
+Represents the balance of one account.
+
+### TrialBalance
+
+Planned.
+
+### TrialBalanceService
+
+Planned.
 
 ```
-Domain
-│
-├── Booking
-├── BookingLine
-├── EntrySide
-└── Journal
-
-        │
-
-Services
-│
-└── PostingService
-
-        │
-
-Accounting
-│
-├── Ledger
-├── AccountBalance
-└── TrialBalance
 ```
-
-Abhängigkeiten sind ausschließlich in Pfeilrichtung zulässig.
-
----
-
-# Grundsätze
-
-* Domänenobjekte sind unveränderlich.
-* Fachliche Geschäftslogik befindet sich ausschließlich in Services.
-* Kontoführung erfolgt ausschließlich im Ledger.
-* Interne Methoden (beginnend mit `_`) gehören nicht zur öffentlichen API.
-* Änderungen der öffentlichen API erfolgen gemäß Semantic Versioning.

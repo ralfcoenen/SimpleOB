@@ -7,7 +7,6 @@ from typing import Iterator
 from openbilanz.accounting.account_balance import ZERO
 from openbilanz.accounting.ledger import Ledger
 
-
 @dataclass(frozen=True, slots=True)
 class TrialBalanceRow:
     """
