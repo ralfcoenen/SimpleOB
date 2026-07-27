@@ -5,6 +5,22 @@
 
 Alle wesentlichen Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## v0.5.0-alpha1
+
+### Added
+
+* Neues Domänenobjekt `FiscalYear`
+* Unterstützung für kalendergleiche und abweichende Geschäftsjahre
+* Validierung von Datumsbereichen und Datentypen
+* Berechnete Eigenschaften `duration_days` und `calendar_years`
+* Methode `contains()` zur Prüfung, ob ein Datum innerhalb des Geschäftsjahres liegt
+
+### Quality
+
+* Gesamter Testbestand erfolgreich
+* **183 Tests bestanden**
+
+
 ## [v0.4.0-apha2.0] - 2026-07-27
 
 ### Changed 

@@ -52,6 +52,20 @@ Represents the identity of a ledger account.
 
 The account is intentionally immutable and forms the central domain object for future accounting reports.
 
+
+## Domain Model
+
+```
+Domain
+├── EntrySide
+├── Booking
+├── BookingLine
+├── Journal
+└── FiscalYear
+```
+
+`FiscalYear` ist ein unveränderliches Value Object und beschreibt ausschließlich den fachlichen Zeitraum eines Geschäftsjahres. Es enthält keine Workflow- oder Statusinformationen.
+
 ---
 
 ## Service Layer

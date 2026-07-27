@@ -127,3 +127,30 @@ Planned.
 
 ```
 ```
+## FiscalYear
+
+`FiscalYear` repräsentiert einen fachlich definierten Zeitraum eines Geschäftsjahres.
+
+### Konstruktor
+
+```python
+FiscalYear(
+    start_date: date,
+    end_date: date,
+)
+```
+
+### Eigenschaften
+
+* `start_date: date`
+* `end_date: date`
+* `duration_days: int`
+* `calendar_years: tuple[int, ...]`
+
+### Methoden
+
+```python
+contains(value: date) -> bool
+```
+
+Gibt `True` zurück, wenn das übergebene Datum innerhalb des Geschäftsjahres einschließlich der Grenzwerte liegt.
