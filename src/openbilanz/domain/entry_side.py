@@ -55,8 +55,7 @@ class EntrySide(str, Enum):
 
         if not isinstance(value, str):
             raise TypeError(
-                "Die Buchungsseite muss als EntrySide oder str "
-                "übergeben werden."
+                "Die Buchungsseite muss als EntrySide oder str übergeben werden."
             )
 
         normalized_value = value.strip().upper()
@@ -71,11 +70,8 @@ class EntrySide(str, Enum):
         try:
             return aliases[normalized_value]
         except KeyError as exc:
-            raise ValueError(
-                f"{value!r} ist keine gültige Buchungsseite."
-            ) from exc
+            raise ValueError(f"{value!r} ist keine gültige Buchungsseite.") from exc
 
     def __str__(self) -> str:
         """Liefert den technischen Wert der Buchungsseite."""
         return self.value
-    

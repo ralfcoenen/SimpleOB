@@ -301,4 +301,3 @@ def test_booking_lines_are_immutable_collection() -> None:
 
     with pytest.raises(TypeError):
         booking.lines[0] = create_balanced_lines()[1]  # type: ignore[index]
-        

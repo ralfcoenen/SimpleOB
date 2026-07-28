@@ -135,5 +135,3 @@ class TestJournal:
 
         assert journal.bookings == original_bookings
         assert len(journal) == 1
-        
-        

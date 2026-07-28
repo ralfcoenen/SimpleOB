@@ -12,7 +12,6 @@ from openbilanz.domain.booking import Booking
 from openbilanz.domain.booking_line import BookingLine
 from openbilanz.domain.entry_side import EntrySide
 from openbilanz.services.posting_service import PostingService
-
 from tests.factories import create_booking
 
 
@@ -33,15 +32,9 @@ class TestPostingService:
         assert ledger.credit_total == Decimal("100.00")
         assert ledger.is_balanced
 
-        assert (
-            ledger.get_account("1200").debit
-            == Decimal("100.00")
-        )
+        assert ledger.get_account("1200").debit == Decimal("100.00")
 
-        assert (
-            ledger.get_account("8400").credit
-            == Decimal("100.00")
-        )
+        assert ledger.get_account("8400").credit == Decimal("100.00")
 
     def test_post_booking_transfers_split_credit_booking(self) -> None:
         """Eine Sollzeile wird auf mehrere Habenzeilen verteilt."""
@@ -79,20 +72,11 @@ class TestPostingService:
         assert ledger.credit_total == Decimal("150.00")
         assert ledger.is_balanced
 
-        assert (
-            ledger.get_account("1200").debit
-            == Decimal("150.00")
-        )
+        assert ledger.get_account("1200").debit == Decimal("150.00")
 
-        assert (
-            ledger.get_account("8400").credit
-            == Decimal("100.00")
-        )
+        assert ledger.get_account("8400").credit == Decimal("100.00")
 
-        assert (
-            ledger.get_account("8300").credit
-            == Decimal("50.00")
-        )
+        assert ledger.get_account("8300").credit == Decimal("50.00")
 
     def test_post_booking_transfers_split_debit_booking(self) -> None:
         """Mehrere Sollzeilen werden einer Habenzeile zugeordnet."""
@@ -130,20 +114,11 @@ class TestPostingService:
         assert ledger.credit_total == Decimal("100.00")
         assert ledger.is_balanced
 
-        assert (
-            ledger.get_account("1200").debit
-            == Decimal("70.00")
-        )
+        assert ledger.get_account("1200").debit == Decimal("70.00")
 
-        assert (
-            ledger.get_account("1400").debit
-            == Decimal("30.00")
-        )
+        assert ledger.get_account("1400").debit == Decimal("30.00")
 
-        assert (
-            ledger.get_account("8400").credit
-            == Decimal("100.00")
-        )
+        assert ledger.get_account("8400").credit == Decimal("100.00")
 
     def test_post_booking_transfers_multiple_debit_and_credit_lines(
         self,
@@ -188,25 +163,13 @@ class TestPostingService:
         assert ledger.credit_total == Decimal("100.00")
         assert ledger.is_balanced
 
-        assert (
-            ledger.get_account("1200").debit
-            == Decimal("70.00")
-        )
+        assert ledger.get_account("1200").debit == Decimal("70.00")
 
-        assert (
-            ledger.get_account("1400").debit
-            == Decimal("30.00")
-        )
+        assert ledger.get_account("1400").debit == Decimal("30.00")
 
-        assert (
-            ledger.get_account("8400").credit
-            == Decimal("60.00")
-        )
+        assert ledger.get_account("8400").credit == Decimal("60.00")
 
-        assert (
-            ledger.get_account("8300").credit
-            == Decimal("40.00")
-        )
+        assert ledger.get_account("8300").credit == Decimal("40.00")
 
     @pytest.mark.parametrize(
         "invalid_booking",
@@ -282,4 +245,3 @@ class TestPostingService:
             booking.debit_total,
             booking.credit_total,
         ) == original_state
-        

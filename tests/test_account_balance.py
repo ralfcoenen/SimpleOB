@@ -104,5 +104,3 @@ def test_negative_initial_debit_is_rejected() -> None:
 def test_negative_initial_credit_is_rejected() -> None:
     with pytest.raises(ValueError, match="Habenumsatz"):
         AccountBalance(account_no="1200", credit=Decimal("-1.00"))
-        
-        

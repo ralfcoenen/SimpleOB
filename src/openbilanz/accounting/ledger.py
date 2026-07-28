@@ -4,8 +4,8 @@ from decimal import Decimal
 from typing import Iterator
 
 from openbilanz.accounting.account_balance import (
-    AccountBalance,
     ZERO,
+    AccountBalance,
     to_decimal,
 )
 
@@ -50,9 +50,7 @@ class Ledger:
         decimal_amount = to_decimal(amount)
 
         if debit_account_no == credit_account_no:
-            raise ValueError(
-                "Sollkonto und Habenkonto müssen verschieden sein."
-            )
+            raise ValueError("Sollkonto und Habenkonto müssen verschieden sein.")
 
         if decimal_amount <= ZERO:
             raise ValueError("Ein Buchungsbetrag muss größer als 0,00 sein.")
@@ -126,8 +124,7 @@ class Ledger:
             Unveränderliche Folge der vorhandenen Konten.
         """
         return tuple(
-            self._accounts[account_no]
-            for account_no in sorted(self._accounts)
+            self._accounts[account_no] for account_no in sorted(self._accounts)
         )
 
     @property

@@ -6,8 +6,8 @@ Testobjekte bereit. Dadurch bleiben die Unit-Tests kurz, lesbar und
 verwenden konsistente Testdaten.
 """
 
-from decimal import Decimal
 from datetime import date
+from decimal import Decimal
 
 from openbilanz.domain.booking import Booking
 from openbilanz.domain.booking_line import BookingLine
@@ -54,4 +54,3 @@ def create_booking() -> Booking:
             ),
         ),
     )
-    

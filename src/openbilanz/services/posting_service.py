@@ -6,7 +6,6 @@ from decimal import Decimal
 from openbilanz.accounting.ledger import Ledger
 from openbilanz.domain.booking import Booking
 
-
 PostingPair = tuple[str, str, Decimal]
 
 
@@ -46,9 +45,7 @@ class PostingService:
         if not isinstance(ledger, Ledger):
             raise TypeError("ledger muss ein Ledger sein.")
 
-        for debit_account, credit_account, amount in self._pair_lines(
-            booking
-        ):
+        for debit_account, credit_account, amount in self._pair_lines(booking):
             ledger.post(
                 debit_account=debit_account,
                 credit_account=credit_account,
@@ -73,22 +70,13 @@ class PostingService:
         Yields:
             Tupel aus Sollkonto, Habenkonto und Buchungsbetrag.
         """
-        debit_lines = [
-            [line.account_no, line.amount]
-            for line in booking.debit_lines
-        ]
-        credit_lines = [
-            [line.account_no, line.amount]
-            for line in booking.credit_lines
-        ]
+        debit_lines = [[line.account_no, line.amount] for line in booking.debit_lines]
+        credit_lines = [[line.account_no, line.amount] for line in booking.credit_lines]
 
         debit_index = 0
         credit_index = 0
 
-        while (
-            debit_index < len(debit_lines)
-            and credit_index < len(credit_lines)
-        ):
+        while debit_index < len(debit_lines) and credit_index < len(credit_lines):
             debit_account = debit_lines[debit_index][0]
             debit_remaining = debit_lines[debit_index][1]
 
@@ -110,4 +98,3 @@ class PostingService:
 
             if credit_remaining == Decimal("0.00"):
                 credit_index += 1
-                

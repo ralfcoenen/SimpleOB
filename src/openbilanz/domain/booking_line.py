@@ -65,4 +65,3 @@ class BookingLine:
             raise ValueError("Die Kontonummer darf nicht leer sein.")
 
         return normalized_account_no
-    

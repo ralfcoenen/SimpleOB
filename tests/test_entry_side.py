@@ -87,4 +87,3 @@ def test_invalid_string_is_rejected(value: str) -> None:
 def test_invalid_type_is_rejected(value: object) -> None:
     with pytest.raises(TypeError, match="EntrySide oder str"):
         EntrySide.from_value(value)  # type: ignore[arg-type]
-        

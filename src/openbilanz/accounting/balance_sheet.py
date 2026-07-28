@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+
 @dataclass
 class AccountBalance:
     account_no: str
@@ -10,5 +11,3 @@ class AccountBalance:
     @property
     def balance(self):
         return self.debit - self.credit
-    
-    

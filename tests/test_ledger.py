@@ -105,9 +105,7 @@ def test_balances_are_sorted_by_account_number() -> None:
     ledger.get_or_create_account("0800")
     ledger.get_or_create_account("1200")
 
-    account_numbers = [
-        account.account_no for account in ledger.balances()
-    ]
+    account_numbers = [account.account_no for account in ledger.balances()]
 
     assert account_numbers == ["0800", "1200", "8400"]
 
@@ -182,4 +180,3 @@ def test_float_amount_is_rejected() -> None:
         ledger.post("1200", "0800", 10.50)
 
     assert len(ledger) == 0
-    

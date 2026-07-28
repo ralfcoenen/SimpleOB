@@ -4,7 +4,6 @@ from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from typing import Final
 
-
 ZERO: Final[Decimal] = Decimal("0.00")
 
 
@@ -149,4 +148,3 @@ class AccountBalance:
             raise ValueError("Ein Buchungsbetrag muss größer als 0,00 sein.")
 
         return decimal_amount
-    

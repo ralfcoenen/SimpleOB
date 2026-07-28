@@ -41,9 +41,7 @@ def test_trial_balance_contains_one_row_per_account() -> None:
 def test_rows_are_sorted_by_account_number() -> None:
     trial_balance = TrialBalance(create_sample_ledger())
 
-    account_numbers = [
-        row.account_no for row in trial_balance.rows()
-    ]
+    account_numbers = [row.account_no for row in trial_balance.rows()]
 
     assert account_numbers == ["0800", "1200", "4930", "8400"]
 
@@ -51,9 +49,7 @@ def test_rows_are_sorted_by_account_number() -> None:
 def test_rows_contain_turnovers_and_balances() -> None:
     trial_balance = TrialBalance(create_sample_ledger())
 
-    rows_by_account = {
-        row.account_no: row for row in trial_balance
-    }
+    rows_by_account = {row.account_no: row for row in trial_balance}
 
     equity = rows_by_account["0800"]
     bank = rows_by_account["1200"]

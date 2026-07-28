@@ -1,13 +1,6 @@
-from openbilanz.database.database import (
-    engine,
-    create_database
-)
 from sqlalchemy import inspect
 
-
-from openbilanz.database.models import (
-    Mandant
-)
+from openbilanz.database.database import create_database, engine
 
 
 def test_database():
@@ -25,5 +18,3 @@ def test_database_creation():
     assert "mandanten" in tables
 
     assert "wirtschaftsjahre" in tables
-    
-    

@@ -187,4 +187,3 @@ def test_fiscal_year_is_hashable() -> None:
     )
 
     assert {fiscal_year} == {fiscal_year}
-    

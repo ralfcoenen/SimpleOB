@@ -7,6 +7,7 @@ from typing import Iterator
 from openbilanz.accounting.account_balance import ZERO
 from openbilanz.accounting.ledger import Ledger
 
+
 @dataclass(frozen=True, slots=True)
 class TrialBalanceRow:
     """
@@ -117,4 +118,3 @@ class TrialBalance:
     def __iter__(self) -> Iterator[TrialBalanceRow]:
         """Ermöglicht die Iteration über die Auswertungszeilen."""
         return iter(self.rows())
-    

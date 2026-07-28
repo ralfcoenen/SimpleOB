@@ -23,7 +23,7 @@ class Company:
 
         if self.name != self.name.strip():
             raise ValueError("name must not contain surrounding whitespace")
-    
+
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Company):
             return NotImplemented

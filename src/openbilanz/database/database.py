@@ -1,21 +1,12 @@
 from sqlalchemy import create_engine
-from sqlalchemy.orm import (
-    declarative_base,
-    sessionmaker
-)
+from sqlalchemy.orm import declarative_base, sessionmaker
 
 from openbilanz.core.config import DATABASE_URL
 
-
-engine = create_engine(
-    DATABASE_URL,
-    echo=False
-)
+engine = create_engine(DATABASE_URL, echo=False)
 
 
-SessionLocal = sessionmaker(
-    bind=engine
-)
+SessionLocal = sessionmaker(bind=engine)
 
 
 Base = declarative_base()
@@ -23,7 +14,4 @@ Base = declarative_base()
 
 def create_database():
 
-    Base.metadata.create_all(
-        engine
-    )
-    
+    Base.metadata.create_all(engine)

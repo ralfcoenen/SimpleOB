@@ -28,7 +28,7 @@ class FiscalYear:
             raise TypeError("value must be a date")
 
         return self.start_date <= value <= self.end_date
-    
+
     @property
     def duration_days(self) -> int:
         """Anzahl der Tage des Geschäftsjahres einschließlich Start- und Endtag."""
@@ -38,4 +38,3 @@ class FiscalYear:
     def calendar_years(self) -> tuple[int, ...]:
         """Alle vom Geschäftsjahr berührten Kalenderjahre."""
         return tuple(range(self.start_date.year, self.end_date.year + 1))
-    

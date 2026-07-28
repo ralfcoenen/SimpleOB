@@ -157,4 +157,3 @@ class TestAccount:
         )
 
         assert str(account) == "1200 – Bank"
-        

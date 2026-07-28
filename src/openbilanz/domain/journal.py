@@ -62,4 +62,3 @@ class Journal:
     def __contains__(self, booking: object) -> bool:
         """Prüft, ob eine Buchung im Journal enthalten ist."""
         return booking in self._bookings
-    

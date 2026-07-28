@@ -14,9 +14,7 @@ class TemplateAccount:
             raise ValueError("account_number must not be blank")
 
         if self.account_number != self.account_number.strip():
-            raise ValueError(
-                "account_number must not have surrounding whitespace"
-            )
+            raise ValueError("account_number must not have surrounding whitespace")
 
         if not self.account_number.isdigit():
             raise ValueError("account_number must contain digits only")
@@ -29,5 +27,3 @@ class TemplateAccount:
 
         if self.name != self.name.strip():
             raise ValueError("name must not have surrounding whitespace")
-        
-        

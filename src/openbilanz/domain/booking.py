@@ -49,37 +49,23 @@ class Booking:
             )
 
         if not any(line.side is EntrySide.DEBIT for line in lines):
-            raise ValueError(
-                "Eine Buchung muss mindestens eine Sollzeile enthalten."
-            )
+            raise ValueError("Eine Buchung muss mindestens eine Sollzeile enthalten.")
 
         if not any(line.side is EntrySide.CREDIT for line in lines):
-            raise ValueError(
-                "Eine Buchung muss mindestens eine Habenzeile enthalten."
-            )
+            raise ValueError("Eine Buchung muss mindestens eine Habenzeile enthalten.")
 
         debit_total = sum(
-            (
-                line.amount
-                for line in lines
-                if line.side is EntrySide.DEBIT
-            ),
+            (line.amount for line in lines if line.side is EntrySide.DEBIT),
             start=ZERO,
         )
 
         credit_total = sum(
-            (
-                line.amount
-                for line in lines
-                if line.side is EntrySide.CREDIT
-            ),
+            (line.amount for line in lines if line.side is EntrySide.CREDIT),
             start=ZERO,
         )
 
         if debit_total != credit_total:
-            raise ValueError(
-                "Soll- und Habensumme der Buchung müssen übereinstimmen."
-            )
+            raise ValueError("Soll- und Habensumme der Buchung müssen übereinstimmen.")
 
         object.__setattr__(self, "booking_date", booking_date)
         object.__setattr__(self, "lines", lines)
@@ -90,11 +76,7 @@ class Booking:
     def debit_total(self) -> Decimal:
         """Gibt die Summe aller Sollzeilen zurück."""
         return sum(
-            (
-                line.amount
-                for line in self.lines
-                if line.side is EntrySide.DEBIT
-            ),
+            (line.amount for line in self.lines if line.side is EntrySide.DEBIT),
             start=ZERO,
         )
 
@@ -102,11 +84,7 @@ class Booking:
     def credit_total(self) -> Decimal:
         """Gibt die Summe aller Habenzeilen zurück."""
         return sum(
-            (
-                line.amount
-                for line in self.lines
-                if line.side is EntrySide.CREDIT
-            ),
+            (line.amount for line in self.lines if line.side is EntrySide.CREDIT),
             start=ZERO,
         )
 
@@ -118,20 +96,12 @@ class Booking:
     @property
     def debit_lines(self) -> tuple[BookingLine, ...]:
         """Gibt alle Sollzeilen zurück."""
-        return tuple(
-            line
-            for line in self.lines
-            if line.side is EntrySide.DEBIT
-        )
+        return tuple(line for line in self.lines if line.side is EntrySide.DEBIT)
 
     @property
     def credit_lines(self) -> tuple[BookingLine, ...]:
         """Gibt alle Habenzeilen zurück."""
-        return tuple(
-            line
-            for line in self.lines
-            if line.side is EntrySide.CREDIT
-        )
+        return tuple(line for line in self.lines if line.side is EntrySide.CREDIT)
 
     def __iter__(self):
         """Ermöglicht die Iteration über die Buchungszeilen."""
@@ -156,21 +126,16 @@ class Booking:
         """Normalisiert die Buchungszeilen zu einem Tupel."""
         if isinstance(value, (str, bytes)):
             raise TypeError(
-                "Die Buchungszeilen müssen eine Sammlung "
-                "von BookingLine-Objekten sein."
+                "Die Buchungszeilen müssen eine Sammlung von BookingLine-Objekten sein."
             )
 
         try:
             lines = tuple(value)
         except TypeError as exc:
-            raise TypeError(
-                "Die Buchungszeilen müssen iterierbar sein."
-            ) from exc
+            raise TypeError("Die Buchungszeilen müssen iterierbar sein.") from exc
 
         if not all(isinstance(line, BookingLine) for line in lines):
-            raise TypeError(
-                "Alle Buchungszeilen müssen BookingLine-Objekte sein."
-            )
+            raise TypeError("Alle Buchungszeilen müssen BookingLine-Objekte sein.")
 
         return lines
 
@@ -193,4 +158,3 @@ class Booking:
             return None
 
         return normalized_value
-    

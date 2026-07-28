@@ -218,5 +218,3 @@ def test_template_account_can_be_used_in_a_set() -> None:
     accounts = {account}
 
     assert account in accounts
-    
-    

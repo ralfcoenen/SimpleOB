@@ -192,4 +192,3 @@ def test_company_can_be_created_with_known_uuid() -> None:
     )
 
     assert company.company_id == company_id
-    
