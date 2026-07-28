@@ -17,3 +17,6 @@ data/*.sqlite
 
 # macOS
 .DS_Store
+
+# Python package metadata
+*.egg-info/
