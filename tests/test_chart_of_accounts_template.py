@@ -2,19 +2,18 @@ from collections.abc import Iterator
 
 import pytest
 
-from openbilanz.domain.chart_of_accounts_template import (
-    ChartOfAccountsTemplate,
-)
-from openbilanz.domain.template_account import TemplateAccount
+from openbilanz.domain import AccountType, ChartOfAccountsTemplate, TemplateAccount
 
 
 def create_account(
     account_number: str = "1200",
     name: str = "Bank",
+    account_type: AccountType = AccountType.ASSET,
 ) -> TemplateAccount:
     return TemplateAccount(
         account_number=account_number,
         name=name,
+        account_type=account_type,
     )
 
 

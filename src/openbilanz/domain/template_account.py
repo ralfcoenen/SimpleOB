@@ -1,10 +1,13 @@
 from dataclasses import dataclass
 
+from openbilanz.domain.account_type import AccountType
 
-@dataclass(frozen=True)
+
+@dataclass(frozen=True, slots=True)
 class TemplateAccount:
     account_number: str
     name: str
+    account_type: AccountType
 
     def __post_init__(self) -> None:
         if not isinstance(self.account_number, str):
@@ -27,3 +30,6 @@ class TemplateAccount:
 
         if self.name != self.name.strip():
             raise ValueError("name must not have surrounding whitespace")
+
+        if not isinstance(self.account_type, AccountType):
+            raise TypeError("account_type must be an AccountType")

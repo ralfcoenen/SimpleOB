@@ -1,35 +1,32 @@
 from dataclasses import dataclass
-from enum import Enum, auto
 
-
-class AccountType(Enum):
-    ASSET = auto()
-    LIABILITY = auto()
-    EXPENSE = auto()
-    REVENUE = auto()
+from openbilanz.domain.account_type import AccountType
+from openbilanz.domain.template_account import TemplateAccount
 
 
 @dataclass(frozen=True, slots=True)
 class Account:
-    number: str
-    name: str
-    account_type: AccountType
+    template: TemplateAccount
+    is_active: bool = True
 
     def __post_init__(self) -> None:
-        if not isinstance(self.number, str):
-            raise TypeError("account number must be a string")
+        if not isinstance(self.template, TemplateAccount):
+            raise TypeError("template must be a TemplateAccount")
 
-        if not self.number.strip():
-            raise ValueError("account number must not be empty")
+        if not isinstance(self.is_active, bool):
+            raise TypeError("is_active must be a bool")
 
-        if not isinstance(self.name, str):
-            raise TypeError("account name must be a string")
+    @property
+    def number(self) -> str:
+        return self.template.account_number
 
-        if not self.name.strip():
-            raise ValueError("account name must not be empty")
+    @property
+    def name(self) -> str:
+        return self.template.name
 
-        if not isinstance(self.account_type, AccountType):
-            raise TypeError("account_type must be an AccountType")
+    @property
+    def account_type(self) -> AccountType:
+        return self.template.account_type
 
     def __str__(self) -> str:
         return f"{self.number} – {self.name}"

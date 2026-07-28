@@ -5,6 +5,25 @@
 
 Alle wesentlichen Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+# Changelog
+
+## v0.5.1-alpha1 - 2026-07-28
+
+### Added
+- ChartOfAccountsTemplate als neues Value Object
+- Validierung von Name und Kontenliste
+- Collection-API (`len`, Iteration, `contains`, `get`)
+- 40 Unit-Tests für ChartOfAccountsTemplate
+
+### Changed
+- Ruff vollständig integriert
+- Codebasis einheitlich formatiert
+
+### Quality
+- 285 Unit-Tests erfolgreich
+- GitHub Actions erfolgreich
+
+
 ## v0.5.0-alpha3
 
 ### Added

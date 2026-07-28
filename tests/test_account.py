@@ -1,6 +1,14 @@
 import pytest
 
-from openbilanz.domain.account import Account, AccountType
+from openbilanz.domain import Account, AccountType, TemplateAccount
+
+
+def make_template() -> TemplateAccount:
+    return TemplateAccount(
+        account_number="1200",
+        name="Bank",
+        account_type=AccountType.ASSET,
+    )
 
 
 class TestAccountType:
@@ -19,141 +27,129 @@ class TestAccountType:
 
 class TestAccount:
     def test_create_account(self) -> None:
-        account = Account(
-            number="1200",
-            name="Bank",
-            account_type=AccountType.ASSET,
-        )
+        account = Account(template=make_template())
 
         assert account.number == "1200"
         assert account.name == "Bank"
         assert account.account_type is AccountType.ASSET
 
-    def test_account_is_immutable(self) -> None:
+    def test_account_exposes_template(self) -> None:
+        template = make_template()
+
+        account = Account(template=template)
+
+        assert account.template is template
+
+    def test_account_is_active_by_default(self) -> None:
+        account = Account(template=make_template())
+
+        assert account.is_active is True
+
+    def test_account_can_be_inactive(self) -> None:
         account = Account(
-            number="1200",
-            name="Bank",
-            account_type=AccountType.ASSET,
+            template=make_template(),
+            is_active=False,
         )
+
+        assert account.is_active is False
+
+    def test_account_is_immutable(self) -> None:
+        account = Account(template=make_template())
 
         with pytest.raises(AttributeError):
-            account.name = "Geschäftskonto"  # type: ignore[misc]
+            account.is_active = False  # type: ignore[misc]
 
     def test_accounts_with_equal_values_are_equal(self) -> None:
-        first = Account(
-            number="1200",
-            name="Bank",
-            account_type=AccountType.ASSET,
-        )
-        second = Account(
-            number="1200",
-            name="Bank",
-            account_type=AccountType.ASSET,
-        )
+        first = Account(template=make_template())
+        second = Account(template=make_template())
 
         assert first == second
 
-    def test_accounts_with_different_numbers_are_not_equal(self) -> None:
+    def test_accounts_with_different_templates_are_not_equal(self) -> None:
+        first = Account(template=make_template())
+        second = Account(
+            template=TemplateAccount(
+                account_number="1210",
+                name="Bank 2",
+                account_type=AccountType.ASSET,
+            )
+        )
+
+        assert first != second
+
+    def test_accounts_with_different_active_states_are_not_equal(self) -> None:
         first = Account(
-            number="1200",
-            name="Bank",
-            account_type=AccountType.ASSET,
+            template=make_template(),
+            is_active=True,
         )
         second = Account(
-            number="1210",
-            name="Bank",
-            account_type=AccountType.ASSET,
+            template=make_template(),
+            is_active=False,
         )
 
         assert first != second
 
     def test_account_is_hashable(self) -> None:
-        account = Account(
-            number="1200",
-            name="Bank",
-            account_type=AccountType.ASSET,
-        )
+        account = Account(template=make_template())
 
         accounts = {account}
 
         assert account in accounts
 
-    @pytest.mark.parametrize(
-        "number",
-        [
-            "",
-            " ",
-            "   ",
-        ],
-    )
-    def test_rejects_empty_account_number(self, number: str) -> None:
-        with pytest.raises(
-            ValueError,
-            match="account number must not be empty",
-        ):
-            Account(
-                number=number,
-                name="Bank",
-                account_type=AccountType.ASSET,
-            )
+    def test_equal_accounts_have_equal_hashes(self) -> None:
+        first = Account(template=make_template())
+        second = Account(template=make_template())
 
-    def test_rejects_non_string_account_number(self) -> None:
-        with pytest.raises(
-            TypeError,
-            match="account number must be a string",
-        ):
-            Account(
-                number=1200,  # type: ignore[arg-type]
-                name="Bank",
-                account_type=AccountType.ASSET,
-            )
+        assert hash(first) == hash(second)
 
     @pytest.mark.parametrize(
-        "name",
+        "invalid_template",
         [
-            "",
-            " ",
-            "   ",
+            None,
+            "1200",
+            1200,
+            True,
+            [],
+            {},
         ],
     )
-    def test_rejects_empty_account_name(self, name: str) -> None:
-        with pytest.raises(
-            ValueError,
-            match="account name must not be empty",
-        ):
-            Account(
-                number="1200",
-                name=name,
-                account_type=AccountType.ASSET,
-            )
-
-    def test_rejects_non_string_account_name(self) -> None:
+    def test_rejects_invalid_template(
+        self,
+        invalid_template: object,
+    ) -> None:
         with pytest.raises(
             TypeError,
-            match="account name must be a string",
+            match="template must be a TemplateAccount",
         ):
             Account(
-                number="1200",
-                name=123,  # type: ignore[arg-type]
-                account_type=AccountType.ASSET,
+                template=invalid_template,  # type: ignore[arg-type]
             )
 
-    def test_rejects_invalid_account_type(self) -> None:
+    @pytest.mark.parametrize(
+        "invalid_is_active",
+        [
+            None,
+            0,
+            1,
+            "True",
+            [],
+            {},
+        ],
+    )
+    def test_rejects_non_boolean_is_active(
+        self,
+        invalid_is_active: object,
+    ) -> None:
         with pytest.raises(
             TypeError,
-            match="account_type must be an AccountType",
+            match="is_active must be a bool",
         ):
             Account(
-                number="1200",
-                name="Bank",
-                account_type="ASSET",  # type: ignore[arg-type]
+                template=make_template(),
+                is_active=invalid_is_active,  # type: ignore[arg-type]
             )
 
     def test_str_returns_number_and_name(self) -> None:
-        account = Account(
-            number="1200",
-            name="Bank",
-            account_type=AccountType.ASSET,
-        )
+        account = Account(template=make_template())
 
         assert str(account) == "1200 – Bank"
