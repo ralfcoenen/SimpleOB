@@ -2,7 +2,7 @@ Metadata-Version: 2.4
 Name: openbilanz
 Version: 0.1.0
 Summary: Lokale Buchhaltungs- und E-Bilanz-Software
-Requires-Python: >=3.12
+Requires-Python: <3.13,>=3.12
 License-File: LICENSE
 Requires-Dist: PySide6
 Requires-Dist: SQLAlchemy

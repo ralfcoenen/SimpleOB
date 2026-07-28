@@ -154,3 +154,28 @@ contains(value: date) -> bool
 ```
 
 Gibt `True` zurück, wenn das übergebene Datum innerhalb des Geschäftsjahres einschließlich der Grenzwerte liegt.
+
+
+## Company
+
+`Company` repräsentiert ein Unternehmen als Domänenentität.
+
+### Konstruktor
+
+```python
+Company(
+    company_id: UUID,
+    name: str,
+)
+```
+
+### Eigenschaften
+
+* `company_id: UUID`
+* `name: str`
+
+### Identität
+
+Die Gleichheit zweier `Company`-Objekte richtet sich ausschließlich nach `company_id`.
+
+Der Unternehmensname gehört **nicht** zur Identität und beeinflusst weder `==` noch den Hashwert.

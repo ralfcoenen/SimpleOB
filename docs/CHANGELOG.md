@@ -5,6 +5,35 @@
 
 Alle wesentlichen Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## v0.5.0-alpha3
+
+### Added
+
+- Introduced immutable `TemplateAccount` value object.
+- Added validation for account numbers and account names.
+- Added equality and hash semantics based on value equality.
+- Added comprehensive unit tests for construction, validation,
+  immutability, equality and hashing.
+
+### Quality
+
+- All tests passing.
+
+## v0.5.0-alpha2
+
+### Added
+
+* Neue Domänenentität `Company`
+* Stabile Identität über `UUID`
+* Validierung von Unternehmensname und Identität
+* Gleichheit und Hashwert basieren ausschließlich auf `company_id`
+
+### Quality
+
+* Gesamter Testbestand erfolgreich
+* **209 Tests bestanden**
+
+
 ## v0.5.0-alpha1
 
 ### Added
