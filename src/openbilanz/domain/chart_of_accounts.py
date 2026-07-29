@@ -1,7 +1,7 @@
 from dataclasses import dataclass
-from typing import Iterable
 
 from openbilanz.domain.account import Account
+from openbilanz.domain.chart_of_accounts_template import ChartOfAccountsTemplate
 
 
 @dataclass(frozen=True, slots=True)
@@ -14,6 +14,18 @@ class ChartOfAccounts:
 
         if not all(isinstance(account, Account) for account in self.accounts):
             raise TypeError("all accounts must be Account instances")
+
+    @classmethod
+    def from_template(
+        cls,
+        template: ChartOfAccountsTemplate,
+    ) -> "ChartOfAccounts":
+        return cls(
+            accounts=tuple(
+                Account(template=template_account)
+                for template_account in template.accounts
+            )
+        )
 
     def __len__(self) -> int:
         return len(self.accounts)

@@ -1,6 +1,42 @@
 from openbilanz.domain import Account, AccountType, ChartOfAccounts, TemplateAccount
 import pytest
 
+from openbilanz.domain import (
+    Account,
+    AccountType,
+    ChartOfAccounts,
+    ChartOfAccountsTemplate,
+    TemplateAccount,
+)
+
+
+def test_creates_chart_of_accounts_from_template() -> None:
+    template = ChartOfAccountsTemplate(
+        name="SKR03",
+        accounts=(
+            TemplateAccount(
+                account_number="1000",
+                name="Kasse",
+                account_type=AccountType.ASSET,
+            ),
+            TemplateAccount(
+                account_number="1200",
+                name="Bank",
+                account_type=AccountType.ASSET,
+            ),
+        ),
+    )
+    
+    chart = ChartOfAccounts.from_template(template)
+
+    assert len(chart) == 2
+
+    assert chart.accounts[0].number == "1000"
+    assert chart.accounts[0].name == "Kasse"
+
+    assert chart.accounts[1].number == "1200"
+    assert chart.accounts[1].name == "Bank"
+
 
 def make_account(
     account_number: str = "1200",
