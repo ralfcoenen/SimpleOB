@@ -19,14 +19,21 @@ class ChartOfAccounts:
     def from_template(
         cls,
         template: ChartOfAccountsTemplate,
-    ) -> "ChartOfAccounts":
+        ) -> "ChartOfAccounts":
         return cls(
             accounts=tuple(
                 Account(template=template_account)
                 for template_account in template.accounts
             )
         )
+        
+    def account(self, account_number: str) -> Account:
+        for account in self.accounts:
+            if account.number == account_number:
+                return account
 
+        raise KeyError(account_number)
+    
     def __len__(self) -> int:
         return len(self.accounts)
     
