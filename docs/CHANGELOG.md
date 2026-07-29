@@ -7,6 +7,15 @@ Alle wesentlichen Änderungen an diesem Projekt werden in dieser Datei dokumenti
 
 # Changelog
 
+## v0.6.0
+- Added BookingValidator
+- Validate account existence
+- Added domain exceptions
+
+## v0.5.0
+- Introduced chart of accounts
+- Added account factories
+
 ## v0.5.1-alpha1 - 2026-07-28
 
 ### Added

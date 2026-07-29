@@ -9,6 +9,8 @@ from openbilanz.domain.fiscal_year import FiscalYear
 from openbilanz.domain.journal import Journal
 from openbilanz.domain.template_account import TemplateAccount
 from openbilanz.domain.chart_of_accounts import ChartOfAccounts
+from openbilanz.domain.errors import DomainError
+from openbilanz.domain.errors import UnknownAccountError
 
 __all__ = [
     "Account",
@@ -22,4 +24,6 @@ __all__ = [
     "FiscalYear",
     "Journal",
     "TemplateAccount",
+    "DomainError",
+    "UnknownAccountError",
 ]
