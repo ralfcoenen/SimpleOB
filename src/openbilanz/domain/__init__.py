@@ -8,6 +8,7 @@ from openbilanz.domain.entry_side import EntrySide
 from openbilanz.domain.fiscal_year import FiscalYear
 from openbilanz.domain.journal import Journal
 from openbilanz.domain.template_account import TemplateAccount
+from openbilanz.domain.chart_of_accounts import ChartOfAccounts
 
 __all__ = [
     "Account",
@@ -15,6 +16,7 @@ __all__ = [
     "Booking",
     "BookingLine",
     "ChartOfAccountsTemplate",
+    "ChartOfAccounts",
     "Company",
     "EntrySide",
     "FiscalYear",
