@@ -1,5 +1,6 @@
 from openbilanz.domain.booking import Booking
 from openbilanz.domain.chart_of_accounts import ChartOfAccounts
+from openbilanz.domain.errors import UnknownAccountError
 
 
 class BookingValidator:
@@ -9,4 +10,15 @@ class BookingValidator:
         self._chart_of_accounts = chart_of_accounts
 
     def validate(self, booking: Booking) -> None:
-        """Akzeptiert zunächst jede Buchung."""
+        """
+        Prüft, ob alle in der Buchung verwendeten Konten
+        im Kontenplan vorhanden sind.
+        """
+        for line in booking.lines:
+            try:
+                self._chart_of_accounts.account(line.account_no)
+            except KeyError as error:
+                raise UnknownAccountError(
+                    f"unknown account: {line.account_no}"
+                ) from error
+                
