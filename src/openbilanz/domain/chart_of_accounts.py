@@ -15,6 +15,18 @@ class ChartOfAccounts:
         if not all(isinstance(account, Account) for account in self.accounts):
             raise TypeError("all accounts must be Account instances")
 
+        account_numbers: set[str] = set()
+
+        for account in self.accounts:
+            if account.number in account_numbers:
+                raise ValueError(
+                    f"duplicate account number: {account.number}"
+                )
+            account_numbers.add(account.number)
+            
+    def __iter__(self):
+        return iter(self.accounts)
+    
     @classmethod
     def from_template(
         cls,
