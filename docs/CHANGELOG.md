@@ -5,6 +5,17 @@ Alle wesentlichen Änderungen an diesem Projekt werden in dieser Datei dokumenti
 
 # Changelog
 
+## v0.10.0-dev
+- Kontenmodell und Kontenplan
+
+## v0.9.0 – Reporting 
+
+- Kontoblatt, 
+- ReportingService
+
+## v0.8.0 – Accounting
+
+
 ## v0.6.0
 - Added BookingValidator
 - Validate account existence
