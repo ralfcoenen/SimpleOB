@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 from openbilanz.domain.account import Account
 from openbilanz.domain.chart_of_accounts_template import ChartOfAccountsTemplate
+from openbilanz.domain.errors import UnknownAccountError
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,7 +45,8 @@ class ChartOfAccounts:
             if account.number == account_number:
                 return account
 
-        raise KeyError(account_number)
+        raise UnknownAccountError(account_number)
+    
     
     def __len__(self) -> int:
         return len(self.accounts)

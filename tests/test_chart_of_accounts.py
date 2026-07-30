@@ -1,3 +1,4 @@
+
 import pytest
 
 from openbilanz.domain import (
@@ -6,6 +7,7 @@ from openbilanz.domain import (
     ChartOfAccounts,
     ChartOfAccountsTemplate,
     TemplateAccount,
+    UnknownAccountError,
 )
 
 
@@ -119,7 +121,7 @@ def test_returns_account_by_number() -> None:
     assert account.name == "Bank"
 
 
-def test_raises_key_error_for_unknown_account_number() -> None:
+def test_raises_unknown_account_error_for_unknown_account_number() -> None:
     account = make_account(
         number="1000",
         name="Kasse",
@@ -127,7 +129,7 @@ def test_raises_key_error_for_unknown_account_number() -> None:
 
     chart = make_chart(account)
 
-    with pytest.raises(KeyError, match="1200"):
+    with pytest.raises(UnknownAccountError, match="1200"):
         chart.account("1200")
 
 
@@ -195,4 +197,5 @@ def test_does_not_contain_unknown_account() -> None:
     chart = make_chart(account)
 
     assert unknown_account not in chart
-    
+
+
