@@ -33,7 +33,7 @@ class Journal:
             Ein unveränderliches Tupel mit allen enthaltenen Buchungen.
         """
         return self._bookings
-
+    
     def add(self, booking: Booking) -> None:
         """
         Fügt dem Journal eine Buchung hinzu.
@@ -45,11 +45,22 @@ class Journal:
         Raises:
             TypeError:
                 Wenn booking kein Booking-Objekt ist.
+            ValueError:
+                Wenn die Buchungs-ID bereits im Journal vorhanden ist.
         """
         if not isinstance(booking, Booking):
-            raise TypeError("booking muss eine Booking sein.")
+            raise TypeError("booking muss ein Booking-Objekt sein.")
+
+        if any(
+            existing_booking.booking_id == booking.booking_id
+            for existing_booking in self._bookings
+        ):
+            raise ValueError(
+                "Die Buchungs-ID ist bereits im Journal enthalten."
+            )
 
         self._bookings += (booking,)
+                
 
     def __len__(self) -> int:
         """Gibt die Anzahl der enthaltenen Buchungen zurück."""
