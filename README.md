@@ -11,7 +11,7 @@ Lokale Buchhaltungs- und E-Bilanz-Software für kleine Kapitalgesellschaften.
 
 ## Status
 
-Version 0.1.0
+Version 0.6.0
 
 ## Ziel
 

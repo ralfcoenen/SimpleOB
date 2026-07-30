@@ -11,6 +11,7 @@ from openbilanz.accounting.ledger import Ledger
 from openbilanz.domain.booking import Booking
 from openbilanz.domain.booking_line import BookingLine
 from openbilanz.domain.entry_side import EntrySide
+from openbilanz.domain.journal import Journal
 from openbilanz.services.posting_service import PostingService
 from tests.factories import create_booking
 
@@ -245,3 +246,90 @@ class TestPostingService:
             booking.debit_total,
             booking.credit_total,
         ) == original_state
+        
+    def test_post_booking_adds_booking_to_journal(self) -> None:
+        """
+        Eine verbuchte Buchung wird in das Journal aufgenommen.
+        """
+        booking = create_booking()
+        journal = Journal()
+        ledger = Ledger()
+
+        PostingService().post_booking(
+            booking=booking,
+            journal=journal,
+            ledger=ledger,
+        )
+
+        assert journal.bookings == (booking,)
+        
+
+    @pytest.mark.parametrize(
+        "invalid_journal",
+        [
+            object(),
+            123,
+            "journal",
+        ],
+    )
+    def test_post_booking_rejects_invalid_journal(
+        self,
+        invalid_journal: object,
+    ) -> None:
+        """Ungültige Journal-Objekte werden zurückgewiesen."""
+        with pytest.raises(
+            TypeError,
+            match="journal muss ein Journal sein",
+        ):
+            PostingService().post_booking(
+                booking=create_booking(),
+                journal=invalid_journal,
+                ledger=Ledger(),
+            )
+            
+    def test_duplicate_booking_does_not_modify_ledger(self) -> None:
+        """
+        Eine bereits journalisierte Buchung wird nicht erneut
+        in das Ledger übertragen.
+        """
+        booking = create_booking()
+        journal = Journal()
+        ledger = Ledger()
+        service = PostingService()
+
+        service.post_booking(
+            booking=booking,
+            journal=journal,
+            ledger=ledger,
+        )
+
+        original_debit_total = ledger.debit_total
+        original_credit_total = ledger.credit_total
+        original_account_1200_debit = ledger.get_account("1200").debit
+        original_account_8400_credit = ledger.get_account("8400").credit
+
+        with pytest.raises(
+            ValueError,
+            match="Buchungs-ID ist bereits im Journal enthalten",
+        ):
+            service.post_booking(
+                booking=booking,
+                journal=journal,
+                ledger=ledger,
+            )
+
+        assert len(journal) == 1
+
+        assert ledger.debit_total == original_debit_total
+        assert ledger.credit_total == original_credit_total
+
+        assert (
+            ledger.get_account("1200").debit
+            == original_account_1200_debit
+        )
+
+        assert (
+            ledger.get_account("8400").credit
+            == original_account_8400_credit
+        )
+

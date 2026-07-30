@@ -5,6 +5,8 @@ from decimal import Decimal
 
 from openbilanz.accounting.ledger import Ledger
 from openbilanz.domain.booking import Booking
+from openbilanz.domain.journal import Journal
+
 
 PostingPair = tuple[str, str, Decimal]
 
@@ -20,8 +22,10 @@ class PostingService:
 
     def post_booking(
         self,
+        *,
         booking: Booking,
         ledger: Ledger,
+        journal: Journal | None = None,
     ) -> None:
         """
         Überträgt eine vollständige Buchung in das Hauptbuch.
@@ -44,6 +48,12 @@ class PostingService:
 
         if not isinstance(ledger, Ledger):
             raise TypeError("ledger muss ein Ledger sein.")
+        
+        if journal is not None and not isinstance(journal, Journal):
+            raise TypeError("journal muss ein Journal sein.")
+        
+        if journal is not None:
+            journal.add(booking)
 
         for debit_account, credit_account, amount in self._pair_lines(booking):
             ledger.post(

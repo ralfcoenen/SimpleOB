@@ -1,6 +1,3 @@
-# Datei: `ARCHITECTURE.md`
-
-````markdown
 # Architecture
 
 ## Philosophy
@@ -133,42 +130,3 @@ Planned
 - TrialBalanceService
 - Balance Sheet
 - Profit & Loss Statement
-````
-
----
-
-# OpenBilanz – Architekturprinzipien
-
-## Ziel
-OpenBilanz modelliert die Buchhaltung fachlich korrekt.
-Die Fachlichkeit bestimmt die Architektur, nicht umgekehrt.
-
-## Grundsätze
-
-1. Test Driven Development
-   - Red
-   - Green
-   - Refactor
-
-2. Domain Driven Design
-   - Fachsprache verwenden.
-   - Fachliche Operationen vor technischen Hilfsmethoden.
-
-3. YAGNI
-   - Keine spekulativen Attribute.
-   - Keine spekulativen Klassen.
-
-4. Immutability
-   - Domänenobjekte sind nach Möglichkeit unveränderlich.
-
-5. Kapselung
-   - Interne Datenstrukturen bleiben verborgen.
-
-6. Kleine Commits
-   - Jeder Commit enthält genau einen fachlichen Schritt.
-
-7. Hohe Testabdeckung
-   - Neue Funktionalität entsteht immer aus einem Test.
-
-8. Lesbarkeit vor Cleverness
-   - Einfacher Code schlägt komplizierten Code.
