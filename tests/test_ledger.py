@@ -5,6 +5,12 @@ from decimal import Decimal
 import pytest
 
 from openbilanz.accounting import Ledger
+from datetime import date
+from decimal import Decimal
+from uuid import uuid4
+
+from openbilanz.accounting.ledger_entry import LedgerEntry
+from openbilanz.domain.entry_side import EntrySide
 
 
 def test_new_ledger_is_empty() -> None:
@@ -180,3 +186,166 @@ def test_float_amount_is_rejected() -> None:
         ledger.post("1200", "0800", 10.50)
 
     assert len(ledger) == 0
+
+
+def test_add_entry_stores_ledger_entry() -> None:
+    """Ein LedgerEntry wird im Hauptbuch gespeichert."""
+    ledger = Ledger()
+
+    entry = LedgerEntry(
+        booking_id=uuid4(),
+        booking_date=date(2026, 1, 15),
+        voucher_no="RE-1",
+        description="Ausgangsrechnung",
+        account_no="1200",
+        side=EntrySide.DEBIT,
+        amount=Decimal("100.00"),
+    )
+
+    ledger.add_entry(entry)
+
+    assert ledger.entries() == (entry,)
+    
+@pytest.mark.parametrize(
+    "entry",
+    [
+        None,
+        "not-an-entry",
+        123,
+    ],
+)
+def test_add_entry_rejects_invalid_type(entry: object) -> None:
+    """Nur LedgerEntry-Objekte dürfen gespeichert werden."""
+    ledger = Ledger()
+
+    with pytest.raises(
+        TypeError,
+        match="entry muss ein LedgerEntry sein",
+    ):
+        ledger.add_entry(entry)  # type: ignore[arg-type]
+
+def test_add_entry_updates_debit_account_balance() -> None:
+    """Ein Soll-Eintrag erhöht den Sollumsatz des Kontos."""
+    ledger = Ledger()
+
+    entry = LedgerEntry(
+        booking_id=uuid4(),
+        booking_date=date(2026, 1, 15),
+        voucher_no="RE-1",
+        description="Ausgangsrechnung",
+        account_no="1200",
+        side=EntrySide.DEBIT,
+        amount=Decimal("100.00"),
+    )
+
+    ledger.add_entry(entry)
+
+    account = ledger.get_account("1200")
+
+    assert account.debit == Decimal("100.00")
+    assert account.credit == Decimal("0.00")
+    assert account.balance == Decimal("100.00")
+    
+def test_add_entry_updates_credit_account_balance() -> None:
+    """Ein Haben-Eintrag erhöht den Habenumsatz des Kontos."""
+    ledger = Ledger()
+
+    entry = LedgerEntry(
+        booking_id=uuid4(),
+        booking_date=date(2026, 1, 15),
+        voucher_no="RE-1",
+        description="Ausgangsrechnung",
+        account_no="8400",
+        side=EntrySide.CREDIT,
+        amount=Decimal("100.00"),
+    )
+
+    ledger.add_entry(entry)
+
+    account = ledger.get_account("8400")
+
+    assert account.debit == Decimal("0.00")
+    assert account.credit == Decimal("100.00")
+    assert account.balance == Decimal("-100.00")
+    
+def test_invalid_entry_does_not_modify_ledger() -> None:
+    """Ein ungültiger Eintrag verändert weder Historie noch Konten."""
+    ledger = Ledger()
+
+    with pytest.raises(
+        TypeError,
+        match="entry muss ein LedgerEntry sein",
+    ):
+        ledger.add_entry(None)  # type: ignore[arg-type]
+
+    assert ledger.entries() == ()
+    assert len(ledger) == 0
+    assert ledger.debit_total == Decimal("0.00")
+    assert ledger.credit_total == Decimal("0.00")
+    
+def test_add_entry_rejects_duplicate_entry() -> None:
+    """Derselbe Hauptbucheintrag darf nicht doppelt gespeichert werden."""
+    ledger = Ledger()
+
+    entry = LedgerEntry(
+        booking_id=uuid4(),
+        booking_date=date(2026, 1, 15),
+        voucher_no="RE-1",
+        description="Ausgangsrechnung",
+        account_no="1200",
+        side=EntrySide.DEBIT,
+        amount=Decimal("100.00"),
+    )
+
+    ledger.add_entry(entry)
+
+    with pytest.raises(
+        ValueError,
+        match="Der Hauptbucheintrag ist bereits vorhanden",
+    ):
+        ledger.add_entry(entry)
+
+    assert ledger.entries() == (entry,)
+    assert ledger.get_account("1200").debit == Decimal("100.00")
+    
+def test_entries_for_account_returns_matching_entries() -> None:
+    """Liefert nur die Hauptbucheinträge eines bestimmten Kontos."""
+    ledger = Ledger()
+
+    debit_entry = LedgerEntry(
+        booking_id=uuid4(),
+        booking_date=date(2026, 1, 15),
+        voucher_no="RE-1",
+        description="Ausgangsrechnung",
+        account_no="1200",
+        side=EntrySide.DEBIT,
+        amount=Decimal("100.00"),
+    )
+    credit_entry = LedgerEntry(
+        booking_id=uuid4(),
+        booking_date=date(2026, 1, 15),
+        voucher_no="RE-1",
+        description="Ausgangsrechnung",
+        account_no="8400",
+        side=EntrySide.CREDIT,
+        amount=Decimal("100.00"),
+    )
+    second_debit_entry = LedgerEntry(
+        booking_id=uuid4(),
+        booking_date=date(2026, 1, 16),
+        voucher_no="RE-2",
+        description="Zweite Ausgangsrechnung",
+        account_no="1200",
+        side=EntrySide.DEBIT,
+        amount=Decimal("50.00"),
+    )
+
+    ledger.add_entry(debit_entry)
+    ledger.add_entry(credit_entry)
+    ledger.add_entry(second_debit_entry)
+
+    assert ledger.entries_for_account("1200") == (
+        debit_entry,
+        second_debit_entry,
+    )
+    

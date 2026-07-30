@@ -9,6 +9,9 @@ from openbilanz.accounting.account_balance import (
     to_decimal,
 )
 
+from openbilanz.accounting.ledger_entry import LedgerEntry
+from openbilanz.domain.entry_side import EntrySide
+
 
 class Ledger:
     """
@@ -20,6 +23,7 @@ class Ledger:
     def __init__(self) -> None:
         """Erzeugt ein leeres Hauptbuch."""
         self._accounts: dict[str, AccountBalance] = {}
+        self._entries: list[LedgerEntry] = []
 
     def post(
         self,
@@ -115,6 +119,64 @@ class Ledger:
         """
         normalized_account_no = self._normalize_account_no(account_no)
         return normalized_account_no in self._accounts
+    
+    def add_entry(self, entry: LedgerEntry) -> None:
+        """
+        Speichert einen Hauptbucheintrag und aktualisiert den Kontostand.
+
+        Raises:
+            TypeError:
+                Wenn kein LedgerEntry übergeben wird.
+            ValueError:
+                Wenn der Hauptbucheintrag bereits vorhanden ist.
+        """
+        if not isinstance(entry, LedgerEntry):
+            raise TypeError("entry muss ein LedgerEntry sein.")
+
+        if entry in self._entries:
+            raise ValueError("Der Hauptbucheintrag ist bereits vorhanden.")
+
+        account = self.get_or_create_account(entry.account_no)
+
+        if entry.side is EntrySide.DEBIT:
+            account.add_debit(entry.amount)
+        else:
+            account.add_credit(entry.amount)
+
+        self._entries.append(entry)
+        
+    def entries(self) -> tuple[LedgerEntry, ...]:
+        """
+        Liefert alle Hauptbucheinträge in ihrer Einfügereihenfolge.
+
+        Returns:
+            Unveränderliche Folge der gespeicherten LedgerEntries.
+        """
+        return tuple(self._entries)
+    
+    def entries_for_account(
+        self,
+        account_no: str,
+    ) -> tuple[LedgerEntry, ...]:
+        """
+        Liefert alle Hauptbucheinträge eines Kontos.
+
+        Die Einträge bleiben in ihrer ursprünglichen Einfügereihenfolge.
+
+        Args:
+            account_no:
+                Kontonummer des gesuchten Kontos.
+
+        Returns:
+            Unveränderliche Folge der passenden Hauptbucheinträge.
+        """
+        normalized_account_no = self._normalize_account_no(account_no)
+
+        return tuple(
+            entry
+            for entry in self._entries
+            if entry.account_no == normalized_account_no
+        )
 
     def balances(self) -> tuple[AccountBalance, ...]:
         """
