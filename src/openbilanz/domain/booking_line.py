@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from decimal import Decimal
 
-from openbilanz.accounting.account_balance import ZERO, to_decimal
+from openbilanz.domain.money import ZERO, to_decimal
 from openbilanz.domain.entry_side import EntrySide
 
 
