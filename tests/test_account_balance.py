@@ -4,7 +4,8 @@ from decimal import Decimal
 
 import pytest
 
-from openbilanz.accounting import AccountBalance, to_decimal
+from openbilanz.accounting import AccountBalance
+from openbilanz.domain.money import to_decimal
 
 
 def test_new_account_has_zero_balances() -> None:
