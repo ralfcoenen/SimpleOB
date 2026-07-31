@@ -1,10 +1,9 @@
 """Kontensalden für den Buchhaltungskern von OpenBilanz-UG."""
 
 from dataclasses import dataclass, field
-from decimal import Decimal, InvalidOperation
-from typing import Final
+from decimal import Decimal
 
-ZERO: Final[Decimal] = Decimal("0.00")
+from openbilanz.domain.money import ZERO, to_decimal
 
 
 def to_decimal(value: Decimal | str | int) -> Decimal:
