@@ -33,4 +33,15 @@ class BalancePosition:
             )
 
         return self.amount
-        
+
+
+@dataclass(frozen=True, slots=True)
+class BalanceSection:
+    name: str
+    positions: tuple[BalancePosition, ...] = field(default_factory=tuple)
+
+    def total(self) -> Decimal:
+        return sum(
+            (position.total() for position in self.positions),
+            start=Decimal("0.00"),
+        )
