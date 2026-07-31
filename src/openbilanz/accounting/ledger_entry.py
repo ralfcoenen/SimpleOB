@@ -8,6 +8,7 @@ from uuid import UUID
 from openbilanz.domain.entry_side import EntrySide
 from openbilanz.domain.money import ZERO, to_decimal
 
+
 @dataclass(frozen=True, slots=True)
 class LedgerEntry:
     """Repräsentiert eine einzelne Kontenbewegung im Hauptbuch."""
@@ -16,7 +17,7 @@ class LedgerEntry:
     booking_date: date
     voucher_no: str
     description: str
-    account_no: str
+    account_number: str
     side: EntrySide
     amount: Decimal
 
@@ -38,7 +39,7 @@ class LedgerEntry:
         if not isinstance(self.description, str):
             raise TypeError("Der Buchungstext muss eine Zeichenkette sein.")
 
-        if not isinstance(self.account_no, str):
+        if not isinstance(self.account_number, str):
             raise TypeError("Die Kontonummer muss eine Zeichenkette sein.")
 
         normalized_voucher_no = self.voucher_no.strip()
@@ -51,9 +52,9 @@ class LedgerEntry:
         if not normalized_description:
             raise ValueError("Der Buchungstext darf nicht leer sein.")
 
-        normalized_account_no = self.account_no.strip()
+        normalized_account_number = self.account_number.strip()
 
-        if not normalized_account_no:
+        if not normalized_account_number:
             raise ValueError("Die Kontonummer darf nicht leer sein.")
 
         decimal_amount = to_decimal(self.amount)
@@ -61,9 +62,12 @@ class LedgerEntry:
         if decimal_amount <= ZERO:
             raise ValueError("Ein Buchungsbetrag muss größer als 0,00 sein.")
 
-        object.__setattr__(self, "account_no", normalized_account_no)
+        object.__setattr__(
+            self,
+            "account_number",
+            normalized_account_number,
+        )
         object.__setattr__(self, "amount", decimal_amount)
         object.__setattr__(self, "voucher_no", normalized_voucher_no)
-        object.__setattr__(self, "description", normalized_description) 
-        
+        object.__setattr__(self, "description", normalized_description)
         

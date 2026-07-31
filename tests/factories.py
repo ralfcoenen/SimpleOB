@@ -19,7 +19,7 @@ from openbilanz.domain.template_account import TemplateAccount
 
 
 def create_booking_line(
-    account_no: str = "1200",
+    account_number: str = "1200",
     side: EntrySide = EntrySide.DEBIT,
     amount: Decimal = Decimal("100.00"),
 ) -> BookingLine:
@@ -27,7 +27,7 @@ def create_booking_line(
     Erzeugt eine einzelne Buchungszeile.
     """
     return BookingLine(
-        account_no=account_no,
+        account_number=account_number,
         side=side,
         amount=amount,
     )
@@ -86,11 +86,11 @@ def create_booking() -> Booking:
         description="Testbuchung",
         lines=(
             create_booking_line(
-                account_no="1200",
+                account_number="1200",
                 side=EntrySide.DEBIT,
             ),
             create_booking_line(
-                account_no="8400",
+                account_number="8400",
                 side=EntrySide.CREDIT,
             ),
         ),

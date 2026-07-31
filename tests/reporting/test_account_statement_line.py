@@ -20,7 +20,7 @@ def test_account_statement_line_stores_entry_and_running_balance() -> None:
         booking_date=date(2026, 1, 15),
         voucher_no="RE-1",
         description="Ausgangsrechnung",
-        account_no="1200",
+        account_number="1200",
         side=EntrySide.DEBIT,
         amount=Decimal("100.00"),
     )
@@ -48,7 +48,7 @@ def test_account_statement_line_requires_decimal_running_balance() -> None:
         booking_date=date(2026, 1, 15),
         voucher_no="RE-1",
         description="Ausgangsrechnung",
-        account_no="1200",
+        account_number="1200",
         side=EntrySide.DEBIT,
         amount=Decimal("100.00"),
     )

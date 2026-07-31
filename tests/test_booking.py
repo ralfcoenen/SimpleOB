@@ -4,23 +4,27 @@ from dataclasses import FrozenInstanceError
 from datetime import date
 from decimal import Decimal
 from uuid import UUID, uuid4
-from openbilanz.domain import UnbalancedBookingError
 
 import pytest
 
-from openbilanz.domain import Booking, BookingLine, EntrySide
+from openbilanz.domain import (
+Booking,
+BookingLine,
+EntrySide,
+UnbalancedBookingError,
+)
 
 
 def create_balanced_lines() -> tuple[BookingLine, BookingLine]:
     """Erzeugt einen einfachen ausgeglichenen Buchungssatz."""
     return (
         BookingLine(
-            account_no="1200",
+            account_number="1200",
             side=EntrySide.DEBIT,
             amount="119.00",
         ),
         BookingLine(
-            account_no="1600",
+            account_number="1600",
             side=EntrySide.CREDIT,
             amount="119.00",
         ),
@@ -80,17 +84,17 @@ def test_booking_supports_split_booking() -> None:
         booking_date=date(2026, 7, 27),
         lines=(
             BookingLine(
-                account_no="1200",
+                account_number="1200",
                 side=EntrySide.DEBIT,
                 amount="119.00",
             ),
             BookingLine(
-                account_no="8400",
+                account_number="8400",
                 side=EntrySide.CREDIT,
                 amount="100.00",
             ),
             BookingLine(
-                account_no="1776",
+                account_number="1776",
                 side=EntrySide.CREDIT,
                 amount="19.00",
             ),
@@ -156,12 +160,12 @@ def test_unbalanced_booking_is_rejected() -> None:
             booking_date=date(2026, 7, 27),
             lines=(
                 BookingLine(
-                    account_no="1200",
+                    account_number="1200",
                     side=EntrySide.DEBIT,
                     amount="100.00",
                 ),
                 BookingLine(
-                    account_no="1600",
+                    account_number="1600",
                     side=EntrySide.CREDIT,
                     amount="90.00",
                 ),
@@ -178,7 +182,7 @@ def test_booking_with_less_than_two_lines_is_rejected() -> None:
             booking_date=date(2026, 7, 27),
             lines=(
                 BookingLine(
-                    account_no="1200",
+                    account_number="1200",
                     side=EntrySide.DEBIT,
                     amount="100.00",
                 ),
@@ -195,12 +199,12 @@ def test_booking_without_debit_line_is_rejected() -> None:
             booking_date=date(2026, 7, 27),
             lines=(
                 BookingLine(
-                    account_no="1600",
+                    account_number="1600",
                     side=EntrySide.CREDIT,
                     amount="50.00",
                 ),
                 BookingLine(
-                    account_no="8400",
+                    account_number="8400",
                     side=EntrySide.CREDIT,
                     amount="50.00",
                 ),
@@ -217,12 +221,12 @@ def test_booking_without_credit_line_is_rejected() -> None:
             booking_date=date(2026, 7, 27),
             lines=(
                 BookingLine(
-                    account_no="1200",
+                    account_number="1200",
                     side=EntrySide.DEBIT,
                     amount="50.00",
                 ),
                 BookingLine(
-                    account_no="1400",
+                    account_number="1400",
                     side=EntrySide.DEBIT,
                     amount="50.00",
                 ),

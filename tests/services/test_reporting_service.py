@@ -23,7 +23,7 @@ def test_reporting_service_returns_entries_for_account() -> None:
         booking_date=date(2026, 1, 15),
         voucher_no="RE-1",
         description="Ausgangsrechnung",
-        account_no="1200",
+        account_number="1200",
         side=EntrySide.DEBIT,
         amount=Decimal("100.00"),
     )
@@ -34,7 +34,7 @@ def test_reporting_service_returns_entries_for_account() -> None:
 
     statement = service.account_statement(
         ledger=ledger,
-        account_no="1200",
+        account_number="1200",
     )
 
     assert len(statement.lines) == 1
@@ -49,11 +49,11 @@ def test_reporting_service_creates_empty_account_statement() -> None:
 
     statement = service.account_statement(
         ledger=Ledger(),
-        account_no="1200",
+        account_number="1200",
     )
 
     assert isinstance(statement, AccountStatement)
-    assert statement.account_no == "1200"
+    assert statement.account_number == "1200"
     assert statement.lines == ()
     
 def test_account_statement_calculates_running_balance_for_debit() -> None:
@@ -66,7 +66,7 @@ def test_account_statement_calculates_running_balance_for_debit() -> None:
         booking_date=date(2026, 1, 15),
         voucher_no="RE-1",
         description="Ausgangsrechnung",
-        account_no="1200",
+        account_number="1200",
         side=EntrySide.DEBIT,
         amount=Decimal("100.00"),
     )
@@ -75,7 +75,7 @@ def test_account_statement_calculates_running_balance_for_debit() -> None:
 
     statement = ReportingService().account_statement(
         ledger=ledger,
-        account_no="1200",
+        account_number="1200",
     )
 
     assert statement.lines[0].running_balance == Decimal("100.00")
@@ -90,7 +90,7 @@ def test_account_statement_calculates_running_balance_for_multiple_debits() -> N
         booking_date=date(2026, 1, 15),
         voucher_no="RE-1",
         description="Erste Buchung",
-        account_no="1200",
+        account_number="1200",
         side=EntrySide.DEBIT,
         amount=Decimal("100.00"),
     )
@@ -100,7 +100,7 @@ def test_account_statement_calculates_running_balance_for_multiple_debits() -> N
         booking_date=date(2026, 1, 16),
         voucher_no="RE-2",
         description="Zweite Buchung",
-        account_no="1200",
+        account_number="1200",
         side=EntrySide.DEBIT,
         amount=Decimal("50.00"),
     )
@@ -110,7 +110,7 @@ def test_account_statement_calculates_running_balance_for_multiple_debits() -> N
 
     statement = ReportingService().account_statement(
         ledger=ledger,
-        account_no="1200",
+        account_number="1200",
     )
 
     assert len(statement.lines) == 2
@@ -127,7 +127,7 @@ def test_account_statement_calculates_running_balance_for_credit() -> None:
         booking_date=date(2026, 1, 15),
         voucher_no="RE-1",
         description="Zahlung",
-        account_no="1200",
+        account_number="1200",
         side=EntrySide.CREDIT,
         amount=Decimal("100.00"),
     )
@@ -136,7 +136,7 @@ def test_account_statement_calculates_running_balance_for_credit() -> None:
 
     statement = ReportingService().account_statement(
         ledger=ledger,
-        account_no="1200",
+        account_number="1200",
     )
 
     assert len(statement.lines) == 1
@@ -152,7 +152,7 @@ def test_account_statement_calculates_running_balance_for_mixed_entries() -> Non
         booking_date=date(2026, 1, 15),
         voucher_no="RE-1",
         description="Erste Sollbuchung",
-        account_no="1200",
+        account_number="1200",
         side=EntrySide.DEBIT,
         amount=Decimal("100.00"),
     )
@@ -162,7 +162,7 @@ def test_account_statement_calculates_running_balance_for_mixed_entries() -> Non
         booking_date=date(2026, 1, 16),
         voucher_no="ZA-1",
         description="Zahlungseingang",
-        account_no="1200",
+        account_number="1200",
         side=EntrySide.CREDIT,
         amount=Decimal("40.00"),
     )
@@ -172,7 +172,7 @@ def test_account_statement_calculates_running_balance_for_mixed_entries() -> Non
         booking_date=date(2026, 1, 17),
         voucher_no="RE-2",
         description="Zweite Sollbuchung",
-        account_no="1200",
+        account_number="1200",
         side=EntrySide.DEBIT,
         amount=Decimal("25.00"),
     )
@@ -183,7 +183,7 @@ def test_account_statement_calculates_running_balance_for_mixed_entries() -> Non
 
     statement = ReportingService().account_statement(
         ledger=ledger,
-        account_no="1200",
+        account_number="1200",
     )
 
     assert len(statement.lines) == 3
@@ -201,7 +201,7 @@ def test_account_statement_contains_only_requested_account() -> None:
         booking_date=date(2026, 1, 15),
         voucher_no="RE-1",
         description="Konto 1200",
-        account_no="1200",
+        account_number="1200",
         side=EntrySide.DEBIT,
         amount=Decimal("100.00"),
     )
@@ -211,7 +211,7 @@ def test_account_statement_contains_only_requested_account() -> None:
         booking_date=date(2026, 1, 16),
         voucher_no="RE-2",
         description="Konto 1400",
-        account_no="1400",
+        account_number="1400",
         side=EntrySide.DEBIT,
         amount=Decimal("50.00"),
     )
@@ -221,7 +221,7 @@ def test_account_statement_contains_only_requested_account() -> None:
 
     statement = ReportingService().account_statement(
         ledger=ledger,
-        account_no="1200",
+        account_number="1200",
     )
 
     assert len(statement.lines) == 1

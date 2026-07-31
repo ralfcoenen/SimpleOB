@@ -41,7 +41,7 @@ def test_trial_balance_contains_one_row_per_account() -> None:
 def test_rows_are_sorted_by_account_number() -> None:
     trial_balance = TrialBalance(create_sample_ledger())
 
-    account_numbers = [row.account_no for row in trial_balance.rows()]
+    account_numbers = [row.account_number for row in trial_balance.rows()]
 
     assert account_numbers == ["0800", "1200", "4930", "8400"]
 
@@ -49,7 +49,7 @@ def test_rows_are_sorted_by_account_number() -> None:
 def test_rows_contain_turnovers_and_balances() -> None:
     trial_balance = TrialBalance(create_sample_ledger())
 
-    rows_by_account = {row.account_no: row for row in trial_balance}
+    rows_by_account = {row.account_number: row for row in trial_balance}
 
     equity = rows_by_account["0800"]
     bank = rows_by_account["1200"]
@@ -57,7 +57,7 @@ def test_rows_contain_turnovers_and_balances() -> None:
     revenue = rows_by_account["8400"]
 
     assert equity == TrialBalanceRow(
-        account_no="0800",
+        account_number="0800",
         debit_turnover=Decimal("0.00"),
         credit_turnover=Decimal("1000.00"),
         debit_balance=Decimal("0.00"),
@@ -65,7 +65,7 @@ def test_rows_contain_turnovers_and_balances() -> None:
     )
 
     assert bank == TrialBalanceRow(
-        account_no="1200",
+        account_number="1200",
         debit_turnover=Decimal("1250.00"),
         credit_turnover=Decimal("150.00"),
         debit_balance=Decimal("1100.00"),
@@ -73,7 +73,7 @@ def test_rows_contain_turnovers_and_balances() -> None:
     )
 
     assert expense == TrialBalanceRow(
-        account_no="4930",
+        account_number="4930",
         debit_turnover=Decimal("150.00"),
         credit_turnover=Decimal("0.00"),
         debit_balance=Decimal("150.00"),
@@ -81,7 +81,7 @@ def test_rows_contain_turnovers_and_balances() -> None:
     )
 
     assert revenue == TrialBalanceRow(
-        account_no="8400",
+        account_number="8400",
         debit_turnover=Decimal("0.00"),
         credit_turnover=Decimal("250.00"),
         debit_balance=Decimal("0.00"),
@@ -108,7 +108,7 @@ def test_balance_totals_are_balanced() -> None:
 def test_trial_balance_is_iterable() -> None:
     trial_balance = TrialBalance(create_sample_ledger())
 
-    account_numbers = [row.account_no for row in trial_balance]
+    account_numbers = [row.account_number for row in trial_balance]
 
     assert account_numbers == ["0800", "1200", "4930", "8400"]
 

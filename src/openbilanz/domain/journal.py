@@ -18,11 +18,7 @@ class Journal:
     Die Buchungen werden in der Reihenfolge gespeichert, in der sie dem
     Journal hinzugefügt wurden.
     
-    Raises:
-    TypeError:
-        Wenn booking kein Booking-Objekt ist.
-    DuplicateBookingError:
-        Wenn die Buchungs-ID bereits im Journal vorhanden ist.
+    
     """
 
     _bookings: tuple[Booking, ...] = field(
@@ -54,7 +50,10 @@ class Journal:
                 Wenn booking kein Booking-Objekt ist.
             ValueError:
                 Wenn die Buchungs-ID bereits im Journal vorhanden ist.
+            DuplicateBookingError:
+                Wenn die Buchungs-ID bereits im Journal enthalten ist.
         """
+        
         if not isinstance(booking, Booking):
             raise TypeError("booking muss ein Booking-Objekt sein.")
 

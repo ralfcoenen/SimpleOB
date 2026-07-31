@@ -3,8 +3,8 @@
 from dataclasses import dataclass
 from decimal import Decimal
 
-from openbilanz.domain.money import ZERO, to_decimal
 from openbilanz.domain.entry_side import EntrySide
+from openbilanz.domain.money import ZERO, to_decimal
 
 
 @dataclass(frozen=True, slots=True)
@@ -16,13 +16,15 @@ class BookingLine:
     im Haben steht, wird ausschließlich durch ``side`` bestimmt.
     """
 
-    account_no: str
+    account_number: str
     side: EntrySide
     amount: Decimal
 
     def __post_init__(self) -> None:
         """Validiert und normalisiert die Buchungszeile."""
-        account_no = self._normalize_account_no(self.account_no)
+        account_number = self._normalize_account_number(
+            self.account_number
+        )
         side = EntrySide.from_value(self.side)
         amount = to_decimal(self.amount)
 
@@ -31,7 +33,11 @@ class BookingLine:
                 "Der Betrag einer Buchungszeile muss größer als 0,00 sein."
             )
 
-        object.__setattr__(self, "account_no", account_no)
+        object.__setattr__(
+            self,
+            "account_number",
+            account_number,
+        )
         object.__setattr__(self, "side", side)
         object.__setattr__(self, "amount", amount)
 
@@ -46,7 +52,9 @@ class BookingLine:
         return self.side is EntrySide.CREDIT
 
     @staticmethod
-    def _normalize_account_no(account_no: str) -> str:
+    def _normalize_account_number(
+        account_number: str,
+    ) -> str:
         """
         Prüft und normalisiert die Kontonummer.
 
@@ -56,12 +64,16 @@ class BookingLine:
             ValueError:
                 Wenn die Kontonummer leer ist.
         """
-        if not isinstance(account_no, str):
-            raise TypeError("Die Kontonummer muss eine Zeichenkette sein.")
+        if not isinstance(account_number, str):
+            raise TypeError(
+                "Die Kontonummer muss eine Zeichenkette sein."
+            )
 
-        normalized_account_no = account_no.strip()
+        normalized_account_number = account_number.strip()
 
-        if not normalized_account_no:
-            raise ValueError("Die Kontonummer darf nicht leer sein.")
+        if not normalized_account_number:
+            raise ValueError(
+                "Die Kontonummer darf nicht leer sein."
+            )
 
-        return normalized_account_no
+        return normalized_account_number

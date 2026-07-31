@@ -19,15 +19,15 @@ class AccountBalance:
         negativer Saldo = Habensaldo
     """
 
-    account_no: str
+    account_number: str
     debit: Decimal = field(default_factory=lambda: ZERO)
     credit: Decimal = field(default_factory=lambda: ZERO)
 
     def __post_init__(self) -> None:
         """Validiert und normalisiert die Anfangswerte."""
-        self.account_no = self.account_no.strip()
+        self.account_number = self.account_number.strip()
 
-        if not self.account_no:
+        if not self.account_number:
             raise ValueError("Die Kontonummer darf nicht leer sein.")
 
         self.debit = to_decimal(self.debit)

@@ -16,9 +16,9 @@ class BookingValidator:
         """
         for line in booking.lines:
             try:
-                self._chart_of_accounts.account(line.account_no)
+                self._chart_of_accounts.account(line.account_number)
             except KeyError as error:
                 raise UnknownAccountError(
-                    f"unknown account: {line.account_no}"
+                    f"unknown account: {line.account_number}"
                 ) from error
                 

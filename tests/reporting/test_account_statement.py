@@ -14,7 +14,7 @@ from openbilanz.reporting.account_statement_line import (
 import pytest
 
 
-def test_account_statement_stores_account_no_and_lines() -> None:
+def test_account_statement_stores_account_number_and_lines() -> None:
     """Ein Kontoblatt speichert Kontonummer und Zeilen."""
 
     entry = LedgerEntry(
@@ -22,7 +22,7 @@ def test_account_statement_stores_account_no_and_lines() -> None:
         booking_date=date(2026, 1, 15),
         voucher_no="RE-1",
         description="Ausgangsrechnung",
-        account_no="1200",
+        account_number="1200",
         side=EntrySide.DEBIT,
         amount=Decimal("100.00"),
     )
@@ -33,50 +33,50 @@ def test_account_statement_stores_account_no_and_lines() -> None:
     )
 
     statement = AccountStatement(
-        account_no="1200",
+        account_number="1200",
         lines=(line,),
     )
 
-    assert statement.account_no == "1200"
+    assert statement.account_number == "1200"
     assert statement.lines == (line,)
     
-def test_account_statement_requires_string_account_no() -> None:
+def test_account_statement_requires_string_account_number() -> None:
     """Die Kontonummer muss eine Zeichenkette sein."""
 
     with pytest.raises(TypeError):
         AccountStatement(
-            account_no=1200,
+            account_number=1200,
             lines=(),
         )
 
-@pytest.mark.parametrize("account_no", ["", "   "])
-def test_account_statement_rejects_empty_account_no(
-    account_no: str,
+@pytest.mark.parametrize("account_number", ["", "   "])
+def test_account_statement_rejects_empty_account_number(
+    account_number: str,
 ) -> None:
     """Die Kontonummer darf nicht leer sein."""
 
     with pytest.raises(ValueError):
         AccountStatement(
-            account_no=account_no,
+            account_number=account_number,
             lines=(),
         )
 
-def test_account_statement_strips_account_no() -> None:
+def test_account_statement_strips_account_number() -> None:
     """Die Kontonummer wird von äußeren Leerzeichen bereinigt."""
 
     statement = AccountStatement(
-        account_no="  1200  ",
+        account_number="  1200  ",
         lines=(),
     )
 
-    assert statement.account_no == "1200"
+    assert statement.account_number == "1200"
     
 def test_account_statement_requires_tuple_lines() -> None:
     """Die Kontoblattzeilen müssen als Tupel übergeben werden."""
 
     with pytest.raises(TypeError):
         AccountStatement(
-            account_no="1200",
+            account_number="1200",
             lines=[],
         )
         
@@ -85,7 +85,7 @@ def test_account_statement_requires_account_statement_lines() -> None:
 
     with pytest.raises(TypeError):
         AccountStatement(
-            account_no="1200",
+            account_number="1200",
             lines=("keine Zeile",),
         )
         

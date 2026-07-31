@@ -8,7 +8,7 @@ from openbilanz.accounting.ledger_entry import LedgerEntry
 from openbilanz.domain.entry_side import EntrySide
 import pytest
 
-def test_ledger_entry_rejects_empty_account_no() -> None:
+def test_ledger_entry_rejects_empty_account_number() -> None:
     """Eine leere Kontonummer ist nicht zulässig."""
     with pytest.raises(
         ValueError,
@@ -19,7 +19,7 @@ def test_ledger_entry_rejects_empty_account_no() -> None:
             booking_date=date(2026, 1, 15),
             voucher_no="RE-2026-001",
             description="Ausgangsrechnung",
-            account_no="   ",
+            account_number="   ",
             side=EntrySide.DEBIT,
             amount=Decimal("100.00"),
         )
@@ -33,7 +33,7 @@ def test_ledger_entry_stores_account_movement() -> None:
         booking_date=date(2026, 1, 15),
         voucher_no="RE-2026-001",
         description="Ausgangsrechnung",
-        account_no="1200",
+        account_number="1200",
         side=EntrySide.DEBIT,
         amount=Decimal("100.00"),
     )
@@ -43,23 +43,23 @@ def test_ledger_entry_stores_account_movement() -> None:
     assert entry.booking_date == date(2026, 1, 15)
     assert entry.voucher_no == "RE-2026-001"
     assert entry.description == "Ausgangsrechnung"
-    assert entry.account_no == "1200"
+    assert entry.account_number == "1200"
     assert entry.side is EntrySide.DEBIT
     assert entry.amount == Decimal("100.00")
     
-def test_ledger_entry_normalizes_account_no_and_amount() -> None:
+def test_ledger_entry_normalizes_account_number_and_amount() -> None:
     """Kontonummer und Geldbetrag werden normalisiert."""
     entry = LedgerEntry(
         booking_id=uuid4(),
         booking_date=date(2026, 1, 15),
         voucher_no="RE-2026-001",
         description="Ausgangsrechnung",
-        account_no=" 1200 ",
+        account_number=" 1200 ",
         side=EntrySide.DEBIT,
         amount=Decimal("100.123"),
     )
 
-    assert entry.account_no == "1200"
+    assert entry.account_number == "1200"
     assert entry.amount == Decimal("100.12")  
     
 @pytest.mark.parametrize(
@@ -82,7 +82,7 @@ def test_ledger_entry_rejects_non_positive_amount(
             booking_date=date(2026, 1, 15),
             voucher_no="RE-2026-001",
             description="Ausgangsrechnung",
-            account_no="1200",
+            account_number="1200",
             side=EntrySide.DEBIT,
             amount=amount,
         )
@@ -107,7 +107,7 @@ def test_ledger_entry_rejects_invalid_booking_id(
             booking_date=date(2026, 1, 15),
             voucher_no="RE-2026-001",
             description="Ausgangsrechnung",
-            account_no="1200",
+            account_number="1200",
             side=EntrySide.DEBIT,
             amount=Decimal("100.00"),
         )
@@ -133,7 +133,7 @@ def test_ledger_entry_rejects_invalid_booking_date(
             booking_date=booking_date,  # type: ignore[arg-type]
             voucher_no="RE-2026-001",
             description="Ausgangsrechnung",
-            account_no="1200",
+            account_number="1200",
             side=EntrySide.DEBIT,
             amount=Decimal("100.00"),
         )
@@ -160,7 +160,7 @@ def test_ledger_entry_rejects_invalid_side(
             booking_date=date(2026, 1, 15),
             voucher_no="RE-2026-001",
             description="Ausgangsrechnung",
-            account_no="1200",
+            account_number="1200",
             side=side,  # type: ignore[arg-type]
             amount=Decimal("100.00"),
         )
@@ -185,7 +185,7 @@ def test_ledger_entry_rejects_empty_voucher_no(
             booking_date=date(2026, 1, 15),
             voucher_no=voucher_no,
             description="Ausgangsrechnung",
-            account_no="1200",
+            account_number="1200",
             side=EntrySide.DEBIT,
             amount=Decimal("100.00"),
         )
@@ -210,7 +210,7 @@ def test_ledger_entry_rejects_empty_description(
             booking_date=date(2026, 1, 15),
             voucher_no="RE-2026-001",
             description=description,
-            account_no="1200",
+            account_number="1200",
             side=EntrySide.DEBIT,
             amount=Decimal("100.00"),
         )
@@ -222,7 +222,7 @@ def test_ledger_entry_normalizes_voucher_no_and_description() -> None:
         booking_date=date(2026, 1, 15),
         voucher_no=" RE-2026-001 ",
         description=" Ausgangsrechnung ",
-        account_no="1200",
+        account_number="1200",
         side=EntrySide.DEBIT,
         amount=Decimal("100.00"),
     )
@@ -244,7 +244,7 @@ def test_ledger_entry_normalizes_voucher_no_and_description() -> None:
             "Der Buchungstext muss eine Zeichenkette sein",
         ),
         (
-            "account_no",
+            "account_number",
             None,
             "Die Kontonummer muss eine Zeichenkette sein",
         ),
@@ -261,7 +261,7 @@ def test_ledger_entry_rejects_invalid_text_types(
         "booking_date": date(2026, 1, 15),
         "voucher_no": "RE-2026-001",
         "description": "Ausgangsrechnung",
-        "account_no": "1200",
+        "account_number": "1200",
         "side": EntrySide.DEBIT,
         "amount": Decimal("100.00"),
     }

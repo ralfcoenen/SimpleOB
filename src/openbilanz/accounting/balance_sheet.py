@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 @dataclass
 class AccountBalance:
-    account_no: str
+    account_number: str
 
     debit: float = 0.0
     credit: float = 0.0

@@ -14,11 +14,11 @@ class ReportingService:
     def account_statement(
         self,
         ledger: Ledger,
-        account_no: str,
+        account_number: str,
     ) -> AccountStatement:
         """Erzeugt ein Kontoblatt für ein Konto."""
 
-        entries = ledger.entries_for_account(account_no)
+        entries = ledger.entries_for_account(account_number)
 
         running_balance = Decimal("0")
         lines: list[AccountStatementLine] = []
@@ -37,7 +37,7 @@ class ReportingService:
             )
 
         return AccountStatement(
-            account_no=account_no,
+            account_number=account_number,
             lines=tuple(lines),
         )
 

@@ -38,7 +38,7 @@ def test_rejects_booking_with_unknown_account() -> None:
     booking = create_booking()
 
     unknown_line = create_booking_line(
-        account_no="9999",
+        account_number="9999",
         side=booking.lines[0].side,
         amount=booking.lines[0].amount,
     )

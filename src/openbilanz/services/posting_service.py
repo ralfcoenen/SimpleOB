@@ -80,8 +80,8 @@ class PostingService:
         Yields:
             Tupel aus Sollkonto, Habenkonto und Buchungsbetrag.
         """
-        debit_lines = [[line.account_no, line.amount] for line in booking.debit_lines]
-        credit_lines = [[line.account_no, line.amount] for line in booking.credit_lines]
+        debit_lines = [[line.account_number, line.amount] for line in booking.debit_lines]
+        credit_lines = [[line.account_number, line.amount] for line in booking.credit_lines]
 
         debit_index = 0
         credit_index = 0

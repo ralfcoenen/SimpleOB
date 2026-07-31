@@ -9,9 +9,9 @@ from openbilanz.domain.money import to_decimal
 
 
 def test_new_account_has_zero_balances() -> None:
-    account = AccountBalance(account_no="1200")
+    account = AccountBalance(account_number="1200")
 
-    assert account.account_no == "1200"
+    assert account.account_number == "1200"
     assert account.debit == Decimal("0.00")
     assert account.credit == Decimal("0.00")
     assert account.balance == Decimal("0.00")
@@ -20,13 +20,13 @@ def test_new_account_has_zero_balances() -> None:
 
 
 def test_account_number_is_trimmed() -> None:
-    account = AccountBalance(account_no=" 1200 ")
+    account = AccountBalance(account_number=" 1200 ")
 
-    assert account.account_no == "1200"
+    assert account.account_number == "1200"
 
 
 def test_debit_posting_creates_debit_balance() -> None:
-    account = AccountBalance(account_no="1200")
+    account = AccountBalance(account_number="1200")
 
     account.add_debit("1000.00")
 
@@ -38,7 +38,7 @@ def test_debit_posting_creates_debit_balance() -> None:
 
 
 def test_credit_posting_creates_credit_balance() -> None:
-    account = AccountBalance(account_no="0800")
+    account = AccountBalance(account_number="0800")
 
     account.add_credit("1000.00")
 
@@ -50,7 +50,7 @@ def test_credit_posting_creates_credit_balance() -> None:
 
 
 def test_debit_and_credit_are_offset() -> None:
-    account = AccountBalance(account_no="1200")
+    account = AccountBalance(account_number="1200")
 
     account.add_debit("1500.00")
     account.add_credit("400.00")
@@ -63,7 +63,7 @@ def test_debit_and_credit_are_offset() -> None:
 
 
 def test_integer_amount_is_converted_to_decimal() -> None:
-    account = AccountBalance(account_no="1200")
+    account = AccountBalance(account_number="1200")
 
     account.add_debit(100)
 
@@ -77,21 +77,21 @@ def test_amount_is_rounded_to_two_decimal_places() -> None:
 
 def test_empty_account_number_is_rejected() -> None:
     with pytest.raises(ValueError, match="Kontonummer"):
-        AccountBalance(account_no="   ")
+        AccountBalance(account_number="   ")
 
 
 @pytest.mark.parametrize("amount", ["0.00", "-1.00", -10])
 def test_non_positive_posting_amount_is_rejected(
     amount: str | int,
 ) -> None:
-    account = AccountBalance(account_no="1200")
+    account = AccountBalance(account_number="1200")
 
     with pytest.raises(ValueError, match="größer als 0,00"):
         account.add_debit(amount)
 
 
 def test_float_amount_is_rejected() -> None:
-    account = AccountBalance(account_no="1200")
+    account = AccountBalance(account_number="1200")
 
     with pytest.raises(TypeError, match="Float"):
         account.add_debit(10.50)
@@ -99,9 +99,9 @@ def test_float_amount_is_rejected() -> None:
 
 def test_negative_initial_debit_is_rejected() -> None:
     with pytest.raises(ValueError, match="Sollumsatz"):
-        AccountBalance(account_no="1200", debit=Decimal("-1.00"))
+        AccountBalance(account_number="1200", debit=Decimal("-1.00"))
 
 
 def test_negative_initial_credit_is_rejected() -> None:
     with pytest.raises(ValueError, match="Habenumsatz"):
-        AccountBalance(account_no="1200", credit=Decimal("-1.00"))
+        AccountBalance(account_number="1200", credit=Decimal("-1.00"))

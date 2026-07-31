@@ -17,7 +17,7 @@ class TrialBalanceRow:
     Dadurch enthält jede Zeile höchstens auf einer Saldo-Seite einen Betrag.
     """
 
-    account_no: str
+    account_number: str
     debit_turnover: Decimal
     credit_turnover: Decimal
     debit_balance: Decimal
@@ -60,7 +60,7 @@ class TrialBalance:
         """
         return tuple(
             TrialBalanceRow(
-                account_no=account.account_no,
+                account_number=account.account_number,
                 debit_turnover=account.debit,
                 credit_turnover=account.credit,
                 debit_balance=account.debit_balance,

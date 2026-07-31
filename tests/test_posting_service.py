@@ -46,17 +46,17 @@ class TestPostingService:
             description="Splittbuchung Haben",
             lines=(
                 BookingLine(
-                    account_no="1200",
+                    account_number="1200",
                     side=EntrySide.DEBIT,
                     amount=Decimal("150.00"),
                 ),
                 BookingLine(
-                    account_no="8400",
+                    account_number="8400",
                     side=EntrySide.CREDIT,
                     amount=Decimal("100.00"),
                 ),
                 BookingLine(
-                    account_no="8300",
+                    account_number="8300",
                     side=EntrySide.CREDIT,
                     amount=Decimal("50.00"),
                 ),
@@ -88,17 +88,17 @@ class TestPostingService:
             description="Splittbuchung Soll",
             lines=(
                 BookingLine(
-                    account_no="1200",
+                    account_number="1200",
                     side=EntrySide.DEBIT,
                     amount=Decimal("70.00"),
                 ),
                 BookingLine(
-                    account_no="1400",
+                    account_number="1400",
                     side=EntrySide.DEBIT,
                     amount=Decimal("30.00"),
                 ),
                 BookingLine(
-                    account_no="8400",
+                    account_number="8400",
                     side=EntrySide.CREDIT,
                     amount=Decimal("100.00"),
                 ),
@@ -132,22 +132,22 @@ class TestPostingService:
             description="Mehrseitige Splittbuchung",
             lines=(
                 BookingLine(
-                    account_no="1200",
+                    account_number="1200",
                     side=EntrySide.DEBIT,
                     amount=Decimal("70.00"),
                 ),
                 BookingLine(
-                    account_no="1400",
+                    account_number="1400",
                     side=EntrySide.DEBIT,
                     amount=Decimal("30.00"),
                 ),
                 BookingLine(
-                    account_no="8400",
+                    account_number="8400",
                     side=EntrySide.CREDIT,
                     amount=Decimal("60.00"),
                 ),
                 BookingLine(
-                    account_no="8300",
+                    account_number="8300",
                     side=EntrySide.CREDIT,
                     amount=Decimal("40.00"),
                 ),

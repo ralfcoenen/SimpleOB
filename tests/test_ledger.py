@@ -98,7 +98,7 @@ def test_get_or_create_account_creates_empty_account() -> None:
 
     account = ledger.get_or_create_account("1000")
 
-    assert account.account_no == "1000"
+    assert account.account_number == "1000"
     assert account.debit == Decimal("0.00")
     assert account.credit == Decimal("0.00")
     assert len(ledger) == 1
@@ -111,7 +111,7 @@ def test_balances_are_sorted_by_account_number() -> None:
     ledger.get_or_create_account("0800")
     ledger.get_or_create_account("1200")
 
-    account_numbers = [account.account_no for account in ledger.balances()]
+    account_numbers = [account.account_number for account in ledger.balances()]
 
     assert account_numbers == ["0800", "1200", "8400"]
 
@@ -123,7 +123,7 @@ def test_ledger_is_iterable_in_account_order() -> None:
     ledger.get_or_create_account("1200")
     ledger.get_or_create_account("0800")
 
-    account_numbers = [account.account_no for account in ledger]
+    account_numbers = [account.account_number for account in ledger]
 
     assert account_numbers == ["0800", "1200", "8400"]
 
@@ -197,7 +197,7 @@ def test_add_entry_stores_ledger_entry() -> None:
         booking_date=date(2026, 1, 15),
         voucher_no="RE-1",
         description="Ausgangsrechnung",
-        account_no="1200",
+        account_number="1200",
         side=EntrySide.DEBIT,
         amount=Decimal("100.00"),
     )
@@ -233,7 +233,7 @@ def test_add_entry_updates_debit_account_balance() -> None:
         booking_date=date(2026, 1, 15),
         voucher_no="RE-1",
         description="Ausgangsrechnung",
-        account_no="1200",
+        account_number="1200",
         side=EntrySide.DEBIT,
         amount=Decimal("100.00"),
     )
@@ -255,7 +255,7 @@ def test_add_entry_updates_credit_account_balance() -> None:
         booking_date=date(2026, 1, 15),
         voucher_no="RE-1",
         description="Ausgangsrechnung",
-        account_no="8400",
+        account_number="8400",
         side=EntrySide.CREDIT,
         amount=Decimal("100.00"),
     )
@@ -292,7 +292,7 @@ def test_add_entry_rejects_duplicate_entry() -> None:
         booking_date=date(2026, 1, 15),
         voucher_no="RE-1",
         description="Ausgangsrechnung",
-        account_no="1200",
+        account_number="1200",
         side=EntrySide.DEBIT,
         amount=Decimal("100.00"),
     )
@@ -317,7 +317,7 @@ def test_entries_for_account_returns_matching_entries() -> None:
         booking_date=date(2026, 1, 15),
         voucher_no="RE-1",
         description="Ausgangsrechnung",
-        account_no="1200",
+        account_number="1200",
         side=EntrySide.DEBIT,
         amount=Decimal("100.00"),
     )
@@ -326,7 +326,7 @@ def test_entries_for_account_returns_matching_entries() -> None:
         booking_date=date(2026, 1, 15),
         voucher_no="RE-1",
         description="Ausgangsrechnung",
-        account_no="8400",
+        account_number="8400",
         side=EntrySide.CREDIT,
         amount=Decimal("100.00"),
     )
@@ -335,7 +335,7 @@ def test_entries_for_account_returns_matching_entries() -> None:
         booking_date=date(2026, 1, 16),
         voucher_no="RE-2",
         description="Zweite Ausgangsrechnung",
-        account_no="1200",
+        account_number="1200",
         side=EntrySide.DEBIT,
         amount=Decimal("50.00"),
     )

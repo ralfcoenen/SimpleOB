@@ -49,48 +49,48 @@ class Ledger:
             TypeError:
                 Wenn ein nicht unterstützter Betragstyp verwendet wird.
         """
-        debit_account_no = self._normalize_account_no(debit_account)
-        credit_account_no = self._normalize_account_no(credit_account)
+        debit_account_number = self._normalize_account_number(debit_account)
+        credit_account_number = self._normalize_account_number(credit_account)
         decimal_amount = to_decimal(amount)
 
-        if debit_account_no == credit_account_no:
+        if debit_account_number == credit_account_number:
             raise ValueError("Sollkonto und Habenkonto müssen verschieden sein.")
 
         if decimal_amount <= ZERO:
             raise ValueError("Ein Buchungsbetrag muss größer als 0,00 sein.")
 
-        debit = self.get_or_create_account(debit_account_no)
-        credit = self.get_or_create_account(credit_account_no)
+        debit = self.get_or_create_account(debit_account_number)
+        credit = self.get_or_create_account(credit_account_number)
 
         debit.add_debit(decimal_amount)
         credit.add_credit(decimal_amount)
 
-    def get_or_create_account(self, account_no: str) -> AccountBalance:
+    def get_or_create_account(self, account_number: str) -> AccountBalance:
         """
         Liefert ein vorhandenes Konto oder legt es neu an.
 
         Args:
-            account_no:
+            account_number:
                 Kontonummer.
 
         Returns:
             Das zugehörige AccountBalance-Objekt.
         """
-        normalized_account_no = self._normalize_account_no(account_no)
+        normalized_account_number = self._normalize_account_number(account_number)
 
-        if normalized_account_no not in self._accounts:
-            self._accounts[normalized_account_no] = AccountBalance(
-                account_no=normalized_account_no
+        if normalized_account_number not in self._accounts:
+            self._accounts[normalized_account_number] = AccountBalance(
+                account_number=normalized_account_number
             )
 
-        return self._accounts[normalized_account_no]
+        return self._accounts[normalized_account_number]
 
-    def get_account(self, account_no: str) -> AccountBalance:
+    def get_account(self, account_number: str) -> AccountBalance:
         """
         Liefert ein vorhandenes Konto.
 
         Args:
-            account_no:
+            account_number:
                 Kontonummer.
 
         Returns:
@@ -100,26 +100,26 @@ class Ledger:
             KeyError:
                 Wenn das Konto nicht im Hauptbuch vorhanden ist.
         """
-        normalized_account_no = self._normalize_account_no(account_no)
+        normalized_account_number = self._normalize_account_number(account_number)
 
         try:
-            return self._accounts[normalized_account_no]
+            return self._accounts[normalized_account_number]
         except KeyError as exc:
             raise KeyError(
-                f"Das Konto {normalized_account_no!r} ist nicht vorhanden."
+                f"Das Konto {normalized_account_number!r} ist nicht vorhanden."
             ) from exc
 
-    def has_account(self, account_no: str) -> bool:
+    def has_account(self, account_number: str) -> bool:
         """
         Prüft, ob ein Konto vorhanden ist.
 
         Args:
-            account_no:
+            account_number:
                 Kontonummer.
         """
-        normalized_account_no = self._normalize_account_no(account_no)
-        return normalized_account_no in self._accounts
-    
+        normalized_account_number = self._normalize_account_number(account_number)
+        return normalized_account_number in self._accounts
+
     def add_entry(self, entry: LedgerEntry) -> None:
         """
         Speichert einen Hauptbucheintrag und aktualisiert den Kontostand.
@@ -136,7 +136,7 @@ class Ledger:
         if entry in self._entries:
             raise ValueError("Der Hauptbucheintrag ist bereits vorhanden.")
 
-        account = self.get_or_create_account(entry.account_no)
+        account = self.get_or_create_account(entry.account_number)
 
         if entry.side is EntrySide.DEBIT:
             account.add_debit(entry.amount)
@@ -144,7 +144,7 @@ class Ledger:
             account.add_credit(entry.amount)
 
         self._entries.append(entry)
-        
+
     def entries(self) -> tuple[LedgerEntry, ...]:
         """
         Liefert alle Hauptbucheinträge in ihrer Einfügereihenfolge.
@@ -153,10 +153,10 @@ class Ledger:
             Unveränderliche Folge der gespeicherten LedgerEntries.
         """
         return tuple(self._entries)
-    
+
     def entries_for_account(
         self,
-        account_no: str,
+        account_number: str,
     ) -> tuple[LedgerEntry, ...]:
         """
         Liefert alle Hauptbucheinträge eines Kontos.
@@ -164,18 +164,18 @@ class Ledger:
         Die Einträge bleiben in ihrer ursprünglichen Einfügereihenfolge.
 
         Args:
-            account_no:
+            account_number:
                 Kontonummer des gesuchten Kontos.
 
         Returns:
             Unveränderliche Folge der passenden Hauptbucheinträge.
         """
-        normalized_account_no = self._normalize_account_no(account_no)
+        normalized_account_number = self._normalize_account_number(account_number)
 
         return tuple(
             entry
             for entry in self._entries
-            if entry.account_no == normalized_account_no
+            if entry.account_number == normalized_account_number
         )
 
     def balances(self) -> tuple[AccountBalance, ...]:
@@ -186,7 +186,8 @@ class Ledger:
             Unveränderliche Folge der vorhandenen Konten.
         """
         return tuple(
-            self._accounts[account_no] for account_no in sorted(self._accounts)
+            self._accounts[account_number]
+            for account_number in sorted(self._accounts)
         )
 
     @property
@@ -219,7 +220,7 @@ class Ledger:
         return iter(self.balances())
 
     @staticmethod
-    def _normalize_account_no(account_no: str) -> str:
+    def _normalize_account_number(account_number: str) -> str:
         """
         Prüft und normalisiert eine Kontonummer.
 
@@ -229,12 +230,13 @@ class Ledger:
             ValueError:
                 Wenn die Kontonummer leer ist.
         """
-        if not isinstance(account_no, str):
+        if not isinstance(account_number, str):
             raise TypeError("Die Kontonummer muss eine Zeichenkette sein.")
 
-        normalized_account_no = account_no.strip()
+        normalized_account_number = account_number.strip()
 
-        if not normalized_account_no:
+        if not normalized_account_number:
             raise ValueError("Die Kontonummer darf nicht leer sein.")
 
-        return normalized_account_no
+        return normalized_account_number
+    
