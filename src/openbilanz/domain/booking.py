@@ -9,6 +9,7 @@ from uuid import UUID, uuid4
 from openbilanz.domain.money import ZERO
 from openbilanz.domain.booking_line import BookingLine
 from openbilanz.domain.entry_side import EntrySide
+from openbilanz.domain.errors import UnbalancedBookingError
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,7 +66,7 @@ class Booking:
         )
 
         if debit_total != credit_total:
-            raise ValueError("Soll- und Habensumme der Buchung müssen übereinstimmen.")
+            raise UnbalancedBookingError("Soll- und Habensumme der Buchung müssen übereinstimmen.")
 
         object.__setattr__(self, "booking_date", booking_date)
         object.__setattr__(self, "lines", lines)

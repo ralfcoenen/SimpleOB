@@ -10,4 +10,5 @@ class DomainError(Exception):
 class UnknownAccountError(DomainError):
     """Eine Buchung verwendet ein unbekanntes Konto."""
     
-  
+class UnbalancedBookingError(DomainError):
+    """Wird ausgelöst, wenn eine Buchung nicht ausgeglichen ist."""  

@@ -4,6 +4,7 @@ from dataclasses import FrozenInstanceError
 from datetime import date
 from decimal import Decimal
 from uuid import UUID, uuid4
+from openbilanz.domain import UnbalancedBookingError
 
 import pytest
 
@@ -148,7 +149,7 @@ def test_empty_optional_text_becomes_none() -> None:
 
 def test_unbalanced_booking_is_rejected() -> None:
     with pytest.raises(
-        ValueError,
+        UnbalancedBookingError,
         match="Soll- und Habensumme",
     ):
         Booking(
