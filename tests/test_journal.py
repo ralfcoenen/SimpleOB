@@ -1,5 +1,6 @@
 from openbilanz.domain.journal import Journal
 from tests.factories import create_booking
+from openbilanz.domain import DuplicateBookingError
 import pytest
 
 
@@ -79,8 +80,9 @@ def test_journal_rejects_duplicate_booking_id() -> None:
     journal.add(booking)
 
     with pytest.raises(
-        ValueError,
-        match="Buchungs-ID ist bereits im Journal enthalten",
+        DuplicateBookingError,
+        match="bereits im Journal enthalten",
     ):
         journal.add(booking)
         
+

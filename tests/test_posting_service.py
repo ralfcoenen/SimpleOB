@@ -14,6 +14,7 @@ from openbilanz.domain.entry_side import EntrySide
 from openbilanz.domain.journal import Journal
 from openbilanz.services.posting_service import PostingService
 from tests.factories import create_booking
+from openbilanz.domain import DuplicateBookingError
 
 
 class TestPostingService:
@@ -309,7 +310,7 @@ class TestPostingService:
         original_account_8400_credit = ledger.get_account("8400").credit
 
         with pytest.raises(
-            ValueError,
+            DuplicateBookingError,
             match="Buchungs-ID ist bereits im Journal enthalten",
         ):
             service.post_booking(

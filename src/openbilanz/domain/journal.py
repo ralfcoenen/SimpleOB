@@ -4,6 +4,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 
 from openbilanz.domain.booking import Booking
+from openbilanz.domain.errors import DuplicateBookingError
 
 
 @dataclass(slots=True)
@@ -16,6 +17,12 @@ class Journal:
 
     Die Buchungen werden in der Reihenfolge gespeichert, in der sie dem
     Journal hinzugefügt wurden.
+    
+    Raises:
+    TypeError:
+        Wenn booking kein Booking-Objekt ist.
+    DuplicateBookingError:
+        Wenn die Buchungs-ID bereits im Journal vorhanden ist.
     """
 
     _bookings: tuple[Booking, ...] = field(
@@ -55,7 +62,7 @@ class Journal:
             existing_booking.booking_id == booking.booking_id
             for existing_booking in self._bookings
         ):
-            raise ValueError(
+            raise DuplicateBookingError(
                 "Die Buchungs-ID ist bereits im Journal enthalten."
             )
 
