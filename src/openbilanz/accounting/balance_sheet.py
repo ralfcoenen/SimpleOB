@@ -45,3 +45,14 @@ class BalanceSection:
             (position.total() for position in self.positions),
             start=Decimal("0.00"),
         )
+
+
+@dataclass(frozen=True, slots=True)
+class BalanceSheet:
+    assets: BalanceSection
+    liabilities: BalanceSection
+
+    def is_balanced(self) -> bool:
+        return self.assets.total() == self.liabilities.total()
+    
+    
