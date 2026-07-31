@@ -1,7 +1,12 @@
 from collections.abc import Iterator
 
+from openbilanz.domain import (
+    AccountType,
+    ChartOfAccountsTemplate,
+    TemplateAccount,
+    UnknownAccountError,
+)
 
-from openbilanz.domain import AccountType, ChartOfAccountsTemplate, TemplateAccount
 import pytest
 
 
@@ -210,12 +215,21 @@ class TestGet:
 
         assert account == create_account("1200", "Bank")
 
-    def test_get_raises_key_error_for_unknown_account_number(self):
-        template = create_template()
+    def test_get_raises_unknown_account_error_for_unknown_account_number(self) -> None:
+        template = ChartOfAccountsTemplate(
+            name="SKR03",
+            accounts=(
+                TemplateAccount(
+                account_number="1000",
+                name="Kasse",
+                account_type=AccountType.ASSET,
+            ),
+        ),
+    )
 
-        with pytest.raises(KeyError, match="9999"):
-            template.get("9999")
-
+        with pytest.raises(UnknownAccountError, match="1200"):
+            template.get("1200")
+        
     def test_get_returns_original_account_instance(self):
         account = create_account("1200", "Bank")
         template = ChartOfAccountsTemplate(

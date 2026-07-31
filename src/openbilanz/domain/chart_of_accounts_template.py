@@ -2,6 +2,8 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 
 from openbilanz.domain.template_account import TemplateAccount
+from openbilanz.domain.errors import UnknownAccountError
+
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,7 +37,7 @@ class ChartOfAccountsTemplate:
             if account.account_number == account_number:
                 return account
 
-        raise KeyError(account_number)
+        raise UnknownAccountError(account_number)
 
     def _validate_name(self) -> None:
         if not isinstance(self.name, str):
