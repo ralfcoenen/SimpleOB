@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
+from openbilanz.domain.money import ZERO, to_decimal
 from uuid import UUID
 
 from openbilanz.accounting.account_balance import ZERO, to_decimal

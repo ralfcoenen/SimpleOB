@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Iterator
 
-from openbilanz.accounting.account_balance import ZERO
+from openbilanz.domain.money import ZERO
 from openbilanz.accounting.ledger import Ledger
 
 
