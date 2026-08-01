@@ -57,26 +57,18 @@ Technische Entscheidungen werden erst getroffen, nachdem die fachlichen Zusammen
 Der fachliche Kern entwickelt sich schrittweise entlang des tatsächlichen Rechnungswesens:
 
 Journal
-
 ↓
-
-Ledger
-
+Hauptbuch
 ↓
-
-TrialBalance
-
+Summen- und Saldenliste
 ↓
-
 Kontenzuordnung
-
 ↓
-
-BalanceSheet
-
+Bilanz
 ↓
-
 E-Bilanz
+
+
 
 Jede Klasse besitzt eine klar abgegrenzte fachliche Verantwortung.
 

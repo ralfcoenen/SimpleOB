@@ -130,6 +130,20 @@ Dazu gehören insbesondere:
 
 Dieser Bereich baut auf den fachlichen Grundobjekten der Domäne auf.
 
+### Modellierung des Jahresabschlusses
+
+Der handelsrechtliche Jahresabschluss wird in OpenBilanzUG durch Abschlusspositionen modelliert.
+
+Die Struktur dieser Abschlusspositionen wird unmittelbar aus den gesetzlichen Gliederungsvorschriften des Handelsgesetzbuches abgeleitet.
+
+Kontenrahmen definieren ausschließlich die Zuordnung ihrer Konten zu diesen Abschlusspositionen. Die gesetzliche Struktur des Jahresabschlusses bleibt davon unberührt.
+
+Die Hierarchie der Abschlusspositionen bestimmt zugleich deren fachliches Verhalten:
+
+* Abschlusspositionen mit Kindern aggregieren deren Werte.
+* Abschlusspositionen ohne Kinder werden unmittelbar aus den zugeordneten Kontensalden befüllt.
+
+
 **Paket:** `openbilanz.accounting`
 
 ---
@@ -311,6 +325,8 @@ Nicht jede neue Funktion benötigt Änderungen auf allen Ebenen.
 Neue Abstraktionen, Pakete oder Dienste werden nur eingeführt, wenn sie eine konkrete und klar abgegrenzte Verantwortung besitzen.
 
 ---
+
+
 
 ## 9. Architekturentscheidungen
 

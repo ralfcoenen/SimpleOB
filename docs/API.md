@@ -1,7 +1,5 @@
 # Datei: `API.md`
 
-````markdown
-# Public API
 
 ## Domain
 
