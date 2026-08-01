@@ -83,3 +83,12 @@ Dieses ADR legt noch nicht fest:
 * wie HGB- oder E-Bilanz-Taxonomien eingebunden werden.
 
 Diese Entscheidungen werden erst getroffen, wenn dafür konkrete Anforderungen vorliegen.
+
+
+## Historie
+
+Entstanden während Version 0.12.0
+Auslöser:
+Beim Entwurf des BalanceSheetBuilder wurde erkannt,
+dass der AccountType für eine fachlich korrekte
+Bilanzzuordnung nicht ausreicht.
