@@ -20,6 +20,19 @@ Die Architektur stellt sicher, dass dieser fachliche Kern unabhängig von Benutz
 
 Die Architektur verfolgt insbesondere folgende Qualitätsziele:
 
+### Gesetzliche Grundlagen
+
+Die fachliche Struktur von OpenBilanzUG orientiert sich an den gesetzlichen Vorgaben des Handelsgesetzbuches (HGB).
+
+Insbesondere bilden die Gliederungsvorschriften für die Bilanz und die Gewinn- und Verlustrechnung den fachlichen Zielzustand des Jahresabschlusses.
+
+Kontenrahmen wie SKR03 oder SKR04 stellen keine eigene fachliche Struktur dar. Sie konkretisieren die gesetzlichen Abschlusspositionen, indem sie Konten diesen Positionen zuordnen.
+
+Die Kontenzuordnung in OpenBilanzUG basiert daher auf den im Kontenrahmen definierten Zuordnungsregeln. Die eigentliche Zielstruktur wird jedoch durch die gesetzlichen Vorgaben des HGB bestimmt.
+
+Dadurch bleibt die Architektur unabhängig von einem bestimmten Kontenrahmen und kann unterschiedliche Kontenrahmen unterstützen, ohne die Struktur des Jahresabschlusses ändern zu müssen.
+
+
 ### Fachliche Korrektheit
 
 Die technische Struktur soll die Regeln und Begriffe der Buchführung und des Jahresabschlusses möglichst unmittelbar abbilden.
