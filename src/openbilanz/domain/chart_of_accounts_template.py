@@ -1,19 +1,33 @@
-from collections.abc import Iterator
 from dataclasses import dataclass
+from collections.abc import Iterator
 
-from openbilanz.domain.template_account import TemplateAccount
+from openbilanz.domain.account_mapping_rule import AccountMappingRule
 from openbilanz.domain.errors import UnknownAccountError
-
+from openbilanz.domain.template_account import TemplateAccount
 
 
 @dataclass(frozen=True, slots=True)
 class ChartOfAccountsTemplate:
     name: str
     accounts: tuple[TemplateAccount, ...]
+    account_mapping_rules: tuple[AccountMappingRule, ...] = ()
 
     def __post_init__(self) -> None:
         self._validate_name()
         self._validate_accounts()
+        self._validate_account_mapping_rules()
+        
+    def _validate_account_mapping_rules(self) -> None:
+        account_numbers = {
+            account.account_number
+            for account in self.accounts
+        }
+
+        for rule in self.account_mapping_rules:
+            if rule.account_number not in account_numbers:
+                raise ValueError(
+                    f"unknown account number: {rule.account_number}"
+                )
 
     def __len__(self) -> int:
         return len(self.accounts)

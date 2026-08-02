@@ -10,6 +10,56 @@ from openbilanz.domain import (
 import pytest
 
 
+from openbilanz.domain.account_mapping_rule import AccountMappingRule
+from openbilanz.accounting.financial_statement_position import (
+    FinancialStatementPosition,
+)
+
+def test_rejects_mapping_rule_for_unknown_account() -> None:
+    position = FinancialStatementPosition(
+        code="HGB.266.AKTIVA.B.IV",
+        name="Kassenbestand und Guthaben bei Kreditinstituten",
+    )
+
+    rule = AccountMappingRule(
+        account_number="1200",
+        debit_position=position,
+        credit_position=None,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="unknown account number",
+    ):
+        ChartOfAccountsTemplate(
+            name="SKR03",
+            accounts=(),
+            account_mapping_rules=(rule,),
+        )
+    
+
+def test_template_contains_account_mapping_rules() -> None:
+    position = FinancialStatementPosition(
+        code="HGB.266.AKTIVA.B.IV",
+        name="Kassenbestand und Guthaben bei Kreditinstituten",
+    )
+
+    rule = AccountMappingRule(
+        account_number="1200",
+        debit_position=position,
+        credit_position=None,
+    )
+
+    template = ChartOfAccountsTemplate(
+        name="SKR03",
+        accounts=(create_account("1200", "Bank"),),
+        account_mapping_rules=(rule,),
+    )
+
+    assert template.account_mapping_rules == (rule,)
+    
+  
+
 def create_account(
     account_number: str = "1200",
     name: str = "Bank",
