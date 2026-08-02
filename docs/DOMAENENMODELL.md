@@ -105,3 +105,18 @@ Besitzt sie keine Kinderpositionen, wird ihr Betrag durch die zugeordneten Konte
 Eine Abschlussposition besitzt niemals gleichzeitig einen eigenen unmittelbar zugeordneten Betrag und untergeordnete Abschlusspositionen.
 
 Eine Abschlussposition ist ein gesetzlich definierter und innerhalb des Jahresabschlusses hierarchisch eingeordneter Strukturposten. Sie besitzt selbst keinen Betrag. Endpositionen werden bei der Erstellung eines konkreten Jahresabschlusses durch zugeordnete Kontensalden zum Abschlussstichtag befüllt; übergeordnete Positionen aggregieren ausschließlich die Werte ihrer untergeordneten Positionen.
+
+## Regelbasierte Auswertungen
+
+Die Buchführung stellt den fachlichen Datenbestand des Rechnungswesens bereit. Sie bildet die Grundlage sämtlicher gesetzlicher und betriebswirtschaftlicher Auswertungen.
+
+Eine Auswertung ist kein dauerhaftes Domänenobjekt, sondern ein fachlicher Prozess. Sie wendet ein Regelwerk auf den Datenbestand der Buchführung an und erzeugt daraus ein fachlich definiertes Ergebnis.
+
+Eine Auswertung besteht aus vier fachlichen Bestandteilen:
+
+* Datenbestand (Kontensalden zum Abschlussstichtag oder für einen Zeitraum)
+* Regelwerk (Kontenzuordnungsregeln des Kontenrahmens)
+* Zielstruktur (gesetzlich definierte Abschlusspositionen)
+* Ergebnis (z. B. Bilanz oder Gewinn- und Verlustrechnung)
+
+Bilanz und Gewinn- und Verlustrechnung sind somit Ergebnisse regelbasierter Auswertungen. Sie speichern keine Primärdaten, sondern stellen die nach den gesetzlichen Vorschriften verdichteten Ergebnisse der Buchführung dar.

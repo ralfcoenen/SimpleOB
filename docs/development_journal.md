@@ -39,3 +39,17 @@ Dabei wurde festgelegt:
 * Eine Abschlussposition stellt einen gesetzlich definierten Bestandteil des Jahresabschlusses dar.
 * Gliederungspositionen und Endpositionen sind keine unterschiedlichen Domänenobjekte, sondern unterschiedliche fachliche Rollen einer Abschlussposition innerhalb der gesetzlichen Hierarchie.
 
+## 2. August 2026 Abschluss der fachlichen Analyse des Jahresabschlusses
+
+Mit Abschluss der Version 0.13 wurde die fachliche Struktur des handelsrechtlichen Jahresabschlusses vollständig beschrieben.
+
+Wesentliche Ergebnisse:
+
+* Abschlusspositionen bilden die gesetzliche Struktur des Jahresabschlusses.
+* Kontenrahmen enthalten die Kontenzuordnungsregeln.
+* Kontenzuordnungen stellen fachliche Regelwerke dar.
+* Bilanz und Gewinn- und Verlustrechnung sind Ergebnisse regelbasierter Auswertungsprozesse.
+* Auswertungen sind fachliche Prozesse und keine dauerhaft gespeicherten Domänenobjekte.
+
+Damit ist die fachliche Analyse abgeschlossen. Die folgenden Versionen konzentrieren sich auf die schrittweise Implementierung dieses Domänenmodells nach dem Test-Driven-Development-Ansatz.
+

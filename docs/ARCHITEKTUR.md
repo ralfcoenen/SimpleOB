@@ -63,6 +63,40 @@ Wesentliche Architekturentscheidungen werden als Architecture Decision Records d
 
 OpenBilanzUG besteht aus zwei übergeordneten Bereichen:
 
+### Fachlicher Datenfluss
+
+OpenBilanzUG bildet den Weg von den Geschäftsvorfällen bis zum handelsrechtlichen
+Jahresabschluss in fachlich getrennten Verarbeitungsschritten ab.
+
+Geschäftsvorfall
+        │
+        ▼
+Buchung
+        │
+        ▼
+Journal
+        │
+        ▼
+Hauptbuch
+        │
+        ▼
+Kontensalden
+        │
+        ▼
+Kontenzuordnungsregeln
+        │
+        ▼
+Abschlusspositionen
+        │
+        ▼
+Bilanz / Gewinn- und Verlustrechnung
+        │
+        ▼
+Jahresabschluss
+        │
+        ▼
+E-Bilanz
+
 ### Fachlicher Kern
 
 Der fachliche Kern modelliert Buchführung, Auswertungen, Jahresabschluss und die fachlichen Grundlagen der E-Bilanz.
@@ -336,7 +370,18 @@ Die Architekturübersicht beschreibt den aktuellen Gesamtaufbau. Die ADRs erläu
 
 ---
 
-## 10. Verwandte Dokumente
+## 10. Fachlicher Architekturgrundsatz
+
+OpenBilanzUG unterscheidet konsequent zwischen fachlichen Zuständen, Regelwerken und Prozessen.
+
+* Domänenobjekte beschreiben dauerhaft vorhandene fachliche Zustände (z. B. Buchungen, Konten, Kontensalden oder Abschlusspositionen).
+* Regelwerke beschreiben, wie diese Zustände für unterschiedliche fachliche Zwecke auszuwerten sind (z. B. Kontenzuordnungsregeln).
+* Fachliche Prozesse wenden Regelwerke auf Domänenobjekte an und erzeugen daraus neue fachliche Ergebnisse.
+
+Bilanz, Gewinn- und Verlustrechnung sowie weitere gesetzliche oder betriebswirtschaftliche Auswertungen entstehen durch die Anwendung dieser Regelwerke auf den Datenbestand der Buchführung.
+
+
+## 11. Verwandte Dokumente
 
 * `VISION.md`
 * `ENTWICKLUNGSRICHTLINIEN.md`
