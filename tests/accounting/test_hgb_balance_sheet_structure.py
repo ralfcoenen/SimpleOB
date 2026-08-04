@@ -1,7 +1,6 @@
-from openbilanz.accounting.hgb_balance_sheet_structure import (
+from openbilanz.hgb.balance_sheet_structure import (
     create_hgb_balance_sheet_structure,
 )
-
 
 def test_hgb_balance_sheet_contains_cash_and_bank_position() -> None:
     assets, liabilities = create_hgb_balance_sheet_structure()
