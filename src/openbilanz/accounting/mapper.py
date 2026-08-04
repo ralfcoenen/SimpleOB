@@ -6,6 +6,8 @@ from openbilanz.domain.chart_of_accounts_template import (
     ChartOfAccountsTemplate,
 )
 
+from openbilanz.domain.money import ZERO
+
 
 class AccountMapper:
     def __init__(
@@ -20,7 +22,7 @@ class AccountMapper:
     ) -> FinancialStatementPosition:
         for rule in self._chart_of_accounts.account_mapping_rules:
             if rule.account_number == balance.account_number:
-                if balance.debit_balance > 0:
+                if balance.debit_balance > ZERO:
                     if rule.debit_position is None:
                         raise ValueError(
                             "no debit position defined for account "
@@ -29,7 +31,7 @@ class AccountMapper:
 
                     return rule.debit_position
                 
-                if balance.credit_balance > 0:
+                if balance.credit_balance > ZERO:
                     if rule.credit_position is None:
                         raise ValueError(
                             "no credit position defined for account "

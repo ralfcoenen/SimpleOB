@@ -48,9 +48,6 @@ def test_maps_debit_balance_to_debit_position() -> None:
     assert mapper.position_for(balance) is bank_position
 
 
-
-from decimal import Decimal
-
 def test_maps_credit_balance_to_credit_position() -> None:
     credit_position = FinancialStatementPosition(
         code="HGB.266.PASSIVA.C.2",
