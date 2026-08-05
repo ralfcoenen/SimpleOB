@@ -25,6 +25,21 @@ Entwicklung einer modularen Anwendung für:
 
 ## Versionshistorie
 
+### 0.15.0
+
+- Gewinn- und Verlustrechnung nach § 275 Abs. 2 HGB
+  im Gesamtkostenverfahren vollständig modelliert
+- GuV-Positionen fachlich als Ertrag, Aufwand oder Ergebnis kategorisiert
+- neues Domänenobjekt `IncomeStatement`
+- neuer `ClosingService` zur Ermittlung des Jahresergebnisses
+- neues unveränderliches `ClosingResult`
+- `FinancialStatementBuilder` um die Übernahme des
+  Jahresergebnisses in die Bilanz erweitert
+- erster vollständiger End-to-End-Jahresabschluss:
+  Buchungen → Journal → Ledger → Summen- und Saldenliste
+  → GuV → Jahresergebnis → Bilanz
+- Bilanzgleichheit nach Übernahme des Jahresüberschusses geprüft
+
 ### 0.14.0
 
 - Bilanzgliederung nach § 266 HGB vollständig modelliert

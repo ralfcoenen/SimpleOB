@@ -18,6 +18,8 @@ from openbilanz.domain.template_account import TemplateAccount
 from openbilanz.hgb.balance_sheet_structure import (
     create_hgb_balance_sheet_structure,
 )
+from openbilanz.services.closing_result import ClosingResult
+from openbilanz.accounting.statement_category import StatementCategory
 
 
 def test_sums_multiple_account_balances_for_same_position() -> None:
@@ -285,3 +287,29 @@ def test_aggregates_equity_positions_to_liabilities() -> None:
     assert amounts[liabilities] == Decimal("55000.00")
     
     
+def test_build_includes_closing_result_in_result_position() -> None:
+    net_income_position = FinancialStatementPosition(
+        code="HGB.266.PASSIVA.A.V",
+        name="Jahresüberschuss/Jahresfehlbetrag",
+        category=StatementCategory.RESULT,
+    )
+
+    liabilities = FinancialStatementPosition(
+        code="HGB.266.PASSIVA",
+        name="Passiva",
+        children=(net_income_position,),
+    )
+
+    builder = FinancialStatementBuilder(mapper=...)
+
+    amounts = builder.build(
+        balances=(),
+        root_positions=(liabilities,),
+        closing_result=ClosingResult(
+            net_income=Decimal("300.00"),
+        ),
+        result_position=net_income_position,
+    )
+
+    assert amounts[net_income_position] == Decimal("300.00")
+    assert amounts[liabilities] == Decimal("300.00")

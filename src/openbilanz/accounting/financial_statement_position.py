@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-
+from openbilanz.accounting.statement_category import StatementCategory
 
 @dataclass(frozen=True, slots=True)
 class FinancialStatementPosition:
@@ -8,3 +8,4 @@ class FinancialStatementPosition:
     children: tuple["FinancialStatementPosition", ...] = field(
         default_factory=tuple
     )
+    category: StatementCategory = StatementCategory.NEUTRAL

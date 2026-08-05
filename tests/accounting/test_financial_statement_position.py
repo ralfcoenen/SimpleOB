@@ -1,7 +1,7 @@
 from openbilanz.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
-
+from openbilanz.accounting.statement_category import StatementCategory
 
 def test_financial_statement_position_stores_legal_identity() -> None:
     position = FinancialStatementPosition(
@@ -21,4 +21,12 @@ def test_financial_statement_position_is_immutable() -> None:
     )
 
     assert position.children == ()
-    
+
+def test_financial_statement_position_can_have_category() -> None:
+    revenue = FinancialStatementPosition(
+        code="HGB.275.GKV.1",
+        name="Umsatzerlöse",
+        category=StatementCategory.INCOME,
+    )
+
+    assert revenue.category is StatementCategory.INCOME
