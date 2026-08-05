@@ -15,6 +15,10 @@ from openbilanz.domain.chart_of_accounts_template import (
 )
 from openbilanz.domain.template_account import TemplateAccount
 
+from openbilanz.hgb.balance_sheet_structure import (
+    create_hgb_balance_sheet_structure,
+)
+
 
 def test_sums_multiple_account_balances_for_same_position() -> None:
     bank_position = FinancialStatementPosition(
@@ -145,4 +149,139 @@ def test_aggregates_child_amounts_into_parent_position() -> None:
     assert amounts[bank_position] == Decimal("1250.00")
     assert amounts[liquid_assets_position] == Decimal("1500.00")
         
+        
+def test_aggregates_equity_positions_to_liabilities() -> None:
+    _, liabilities = create_hgb_balance_sheet_structure()
+
+    equity = next(
+        position
+        for position in liabilities.children
+        if position.code == "HGB.266.PASSIVA.A"
+    )
+
+    subscribed_capital = next(
+        position
+        for position in equity.children
+        if position.code == "HGB.266.PASSIVA.A.I"
+    )
+    capital_reserve = next(
+        position
+        for position in equity.children
+        if position.code == "HGB.266.PASSIVA.A.II"
+    )
+    retained_earnings = next(
+        position
+        for position in equity.children
+        if position.code == "HGB.266.PASSIVA.A.III"
+    )
+    profit_or_loss_carried_forward = next(
+        position
+        for position in equity.children
+        if position.code == "HGB.266.PASSIVA.A.IV"
+    )
+    net_income_or_loss = next(
+        position
+        for position in equity.children
+        if position.code == "HGB.266.PASSIVA.A.V"
+    )
+
+    statutory_reserve = next(
+        position
+        for position in retained_earnings.children
+        if position.code == "HGB.266.PASSIVA.A.III.1"
+    )
+    controlling_company_reserve = next(
+        position
+        for position in retained_earnings.children
+        if position.code == "HGB.266.PASSIVA.A.III.2"
+    )
+    articles_reserve = next(
+        position
+        for position in retained_earnings.children
+        if position.code == "HGB.266.PASSIVA.A.III.3"
+    )
+    other_retained_earnings = next(
+        position
+        for position in retained_earnings.children
+        if position.code == "HGB.266.PASSIVA.A.III.4"
+    )
+
+    positions_and_amounts = (
+        (subscribed_capital, Decimal("25000.00")),
+        (capital_reserve, Decimal("5000.00")),
+        (statutory_reserve, Decimal("2000.00")),
+        (controlling_company_reserve, Decimal("1500.00")),
+        (articles_reserve, Decimal("3000.00")),
+        (other_retained_earnings, Decimal("4500.00")),
+        (profit_or_loss_carried_forward, Decimal("4000.00")),
+        (net_income_or_loss, Decimal("10000.00")),
+    )
+
+    accounts = tuple(
+        TemplateAccount(
+            account_number=str(2000 + index),
+            name=position.name,
+            account_type=AccountType.EQUITY,
+        )
+        for index, (position, _) in enumerate(
+            positions_and_amounts,
+            start=1,
+        )
+    )
+
+    rules = tuple(
+        AccountMappingRule(
+            account_number=account.account_number,
+            debit_position=None,
+            credit_position=position,
+        )
+        for account, (position, _) in zip(
+            accounts,
+            positions_and_amounts,
+            strict=True,
+        )
+    )
+
+    balances = tuple(
+        AccountBalance(
+            account_number=account.account_number,
+            credit=amount,
+        )
+        for account, (_, amount) in zip(
+            accounts,
+            positions_and_amounts,
+            strict=True,
+        )
+    )
+
+    chart_of_accounts = ChartOfAccountsTemplate(
+        name="Eigenkapital-Testkontenrahmen",
+        accounts=accounts,
+        account_mapping_rules=rules,
+    )
+
+    builder = FinancialStatementBuilder(
+        AccountMapper(chart_of_accounts)
+    )
+
+    amounts = builder.build(
+        balances=balances,
+        root_positions=(liabilities,),
+    )
+
+    assert amounts[subscribed_capital] == Decimal("25000.00")
+    assert amounts[capital_reserve] == Decimal("5000.00")
+
+    assert amounts[statutory_reserve] == Decimal("2000.00")
+    assert amounts[controlling_company_reserve] == Decimal("1500.00")
+    assert amounts[articles_reserve] == Decimal("3000.00")
+    assert amounts[other_retained_earnings] == Decimal("4500.00")
+
+    assert amounts[retained_earnings] == Decimal("11000.00")
+    assert amounts[profit_or_loss_carried_forward] == Decimal("4000.00")
+    assert amounts[net_income_or_loss] == Decimal("10000.00")
+
+    assert amounts[equity] == Decimal("55000.00")
+    assert amounts[liabilities] == Decimal("55000.00")
+    
     

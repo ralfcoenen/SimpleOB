@@ -25,6 +25,14 @@ Entwicklung einer modularen Anwendung für:
 
 ## Versionshistorie
 
+### 0.14.0
+
+- Bilanzgliederung nach § 266 HGB vollständig modelliert
+- Aktiv- und Passivseite als hierarchische Abschlussstruktur umgesetzt
+- Mehrstufige Aggregation über den Eigenkapital-Ast abgesichert
+- HGB-Regelwerk vom allgemeinen Accounting-Code getrennt
+- Bilanzstruktur in private Fabrikfunktionen konsolidiert
+
 ### 0.13.0
 - FinancialStatementBuilder fertiggestellt
 - Aggregation von Abschlusspositionen
