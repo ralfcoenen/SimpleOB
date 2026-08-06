@@ -1,7 +1,8 @@
+import pytest
+
+from openbilanz.domain import DuplicateBookingError
 from openbilanz.domain.journal import Journal
 from tests.factories import create_booking
-from openbilanz.domain import DuplicateBookingError
-import pytest
 
 
 def test_new_journal_is_empty() -> None:

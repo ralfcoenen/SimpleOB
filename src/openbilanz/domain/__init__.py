@@ -7,10 +7,10 @@ from openbilanz.domain.chart_of_accounts_template import ChartOfAccountsTemplate
 from openbilanz.domain.company import Company
 from openbilanz.domain.entry_side import EntrySide
 from openbilanz.domain.errors import (
-        DomainError, 
-        UnknownAccountError, 
-        UnbalancedBookingError, 
+        DomainError,
         DuplicateBookingError,
+        UnbalancedBookingError,
+        UnknownAccountError,
 )
 from openbilanz.domain.fiscal_year import FiscalYear
 from openbilanz.domain.journal import Journal

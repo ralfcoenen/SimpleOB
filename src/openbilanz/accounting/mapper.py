@@ -5,7 +5,6 @@ from openbilanz.accounting.financial_statement_position import (
 from openbilanz.domain.chart_of_accounts_template import (
     ChartOfAccountsTemplate,
 )
-
 from openbilanz.domain.money import ZERO
 
 

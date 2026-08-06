@@ -4,8 +4,8 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Iterator
 
-from openbilanz.domain.money import ZERO
 from openbilanz.accounting.ledger import Ledger
+from openbilanz.domain.money import ZERO
 
 
 @dataclass(frozen=True, slots=True)

@@ -1,5 +1,5 @@
-from dataclasses import dataclass
 from collections.abc import Iterator
+from dataclasses import dataclass
 
 from openbilanz.domain.account_mapping_rule import AccountMappingRule
 from openbilanz.domain.errors import UnknownAccountError

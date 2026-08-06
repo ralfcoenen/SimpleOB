@@ -1,14 +1,12 @@
 """Tests für das Hauptbuch."""
 
-from decimal import Decimal
-
-import pytest
-
-from openbilanz.accounting import Ledger
 from datetime import date
 from decimal import Decimal
 from uuid import uuid4
 
+import pytest
+
+from openbilanz.accounting import Ledger
 from openbilanz.accounting.ledger_entry import LedgerEntry
 from openbilanz.domain.entry_side import EntrySide
 

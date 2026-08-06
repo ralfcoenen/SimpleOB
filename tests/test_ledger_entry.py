@@ -4,9 +4,11 @@ from datetime import date
 from decimal import Decimal
 from uuid import UUID, uuid4
 
+import pytest
+
 from openbilanz.accounting.ledger_entry import LedgerEntry
 from openbilanz.domain.entry_side import EntrySide
-import pytest
+
 
 def test_ledger_entry_rejects_empty_account_number() -> None:
     """Eine leere Kontonummer ist nicht zulässig."""

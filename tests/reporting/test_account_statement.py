@@ -4,14 +4,14 @@ from datetime import date
 from decimal import Decimal
 from uuid import uuid4
 
+import pytest
+
 from openbilanz.accounting.ledger_entry import LedgerEntry
 from openbilanz.domain.entry_side import EntrySide
 from openbilanz.reporting.account_statement import AccountStatement
 from openbilanz.reporting.account_statement_line import (
     AccountStatementLine,
 )
-
-import pytest
 
 
 def test_account_statement_stores_account_number_and_lines() -> None:

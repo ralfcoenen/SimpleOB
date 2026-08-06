@@ -1,19 +1,18 @@
 from collections.abc import Iterator
 
+import pytest
+
+from openbilanz.accounting.financial_statement_position import (
+    FinancialStatementPosition,
+)
 from openbilanz.domain import (
     AccountType,
     ChartOfAccountsTemplate,
     TemplateAccount,
     UnknownAccountError,
 )
-
-import pytest
-
-
 from openbilanz.domain.account_mapping_rule import AccountMappingRule
-from openbilanz.accounting.financial_statement_position import (
-    FinancialStatementPosition,
-)
+
 
 def test_rejects_mapping_rule_for_unknown_account() -> None:
     position = FinancialStatementPosition(

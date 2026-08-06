@@ -1,6 +1,7 @@
 from datetime import date
 from decimal import Decimal
 
+from openbilanz.accounting.balance_sheet import BalanceSheet
 from openbilanz.accounting.financial_statement_builder import (
     FinancialStatementBuilder,
 )
@@ -18,17 +19,14 @@ from openbilanz.domain.chart_of_accounts_template import (
 from openbilanz.domain.entry_side import EntrySide
 from openbilanz.domain.journal import Journal
 from openbilanz.domain.template_account import TemplateAccount
+from openbilanz.hgb.balance_sheet_structure import (
+    create_hgb_balance_sheet_structure,
+)
 from openbilanz.hgb.income_statement_structure import (
     create_hgb_income_statement_structure,
 )
 from openbilanz.services.closing_service import ClosingService
 from openbilanz.services.posting_service import PostingService
-
-from openbilanz.accounting.balance_sheet import BalanceSheet
-from openbilanz.hgb.balance_sheet_structure import (
-    create_hgb_balance_sheet_structure,
-)
-
 
 
 def test_year_end_closing_calculates_net_income() -> None:

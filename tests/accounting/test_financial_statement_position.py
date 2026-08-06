@@ -3,6 +3,7 @@ from openbilanz.accounting.financial_statement_position import (
 )
 from openbilanz.accounting.statement_category import StatementCategory
 
+
 def test_financial_statement_position_stores_legal_identity() -> None:
     position = FinancialStatementPosition(
         code="HGB.266.AKTIVA.B",

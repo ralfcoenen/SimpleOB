@@ -7,7 +7,6 @@ from openbilanz.accounting.ledger import Ledger
 from openbilanz.domain.booking import Booking
 from openbilanz.domain.journal import Journal
 
-
 PostingPair = tuple[str, str, Decimal]
 
 

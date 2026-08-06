@@ -6,8 +6,6 @@ from decimal import Decimal
 from openbilanz.domain.money import ZERO, to_decimal
 
 
-
-
 @dataclass(slots=True)
 class AccountBalance:
     """

@@ -8,7 +8,6 @@ from openbilanz.accounting.account_balance import (
     AccountBalance,
     to_decimal,
 )
-
 from openbilanz.accounting.ledger_entry import LedgerEntry
 from openbilanz.domain.entry_side import EntrySide
 

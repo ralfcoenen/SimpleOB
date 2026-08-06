@@ -15,17 +15,9 @@ class UnbalancedBookingError(DomainError):
     """Wird ausgelöst, wenn eine Buchung nicht ausgeglichen ist."""
 
 
-class UnknownAccountError(DomainError):
-    """Wird ausgelöst, wenn ein Konto nicht bekannt ist."""
-
 class DomainError(Exception):
     """Basisklasse aller fachlichen Fehler."""
 
 
 class UnknownAccountError(DomainError):
     """Eine Buchung verwendet ein unbekanntes Konto."""
-    
-class UnbalancedBookingError(DomainError):
-    """Wird ausgelöst, wenn eine Buchung nicht ausgeglichen ist."""  
-    
-

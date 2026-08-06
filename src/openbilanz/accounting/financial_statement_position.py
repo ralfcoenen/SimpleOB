@@ -1,5 +1,7 @@
 from dataclasses import dataclass, field
+
 from openbilanz.accounting.statement_category import StatementCategory
+
 
 @dataclass(frozen=True, slots=True)
 class FinancialStatementPosition:

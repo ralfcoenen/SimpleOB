@@ -5,15 +5,11 @@ from openbilanz.domain.booking_validator import BookingValidator
 from openbilanz.domain.errors import (
     UnknownAccountError,
 )
-
-
 from tests.factories import (
     create_booking,
     create_booking_line,
     create_chart_of_accounts,
 )
-
-
 
 
 def test_accepts_booking_when_all_accounts_exist() -> None:

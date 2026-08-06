@@ -1,15 +1,13 @@
 """Unit-Tests für ReportingService."""
 
-from openbilanz.accounting.ledger import Ledger
-from openbilanz.reporting.account_statement import AccountStatement
-from openbilanz.services.reporting_service import ReportingService
-
 from datetime import date
 from decimal import Decimal
 from uuid import uuid4
 
+from openbilanz.accounting.ledger import Ledger
 from openbilanz.accounting.ledger_entry import LedgerEntry
 from openbilanz.domain.entry_side import EntrySide
+from openbilanz.reporting.account_statement import AccountStatement
 from openbilanz.services.reporting_service import ReportingService
 
 

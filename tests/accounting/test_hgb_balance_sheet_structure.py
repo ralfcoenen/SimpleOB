@@ -1,6 +1,8 @@
 from openbilanz.hgb.balance_sheet_structure import (
     create_hgb_balance_sheet_structure,
 )
+
+
 def test_hgb_balance_sheet_contains_cash_and_bank_position() -> None:
     assets, liabilities = create_hgb_balance_sheet_structure()
 
@@ -456,43 +458,6 @@ def test_current_assets_contain_all_hgb_positions() -> None:
         assert liabilities.code == "HGB.266.PASSIVA"
         assert liabilities.name == "Passiva"
 
-
-def test_inventories_contain_all_hgb_positions() -> None:
-    assets, _ = create_hgb_balance_sheet_structure()
-
-    current_assets = next(
-        position
-        for position in assets.children
-        if position.code == "HGB.266.AKTIVA.B"
-    )
-
-    inventories = next(
-        position
-        for position in current_assets.children
-        if position.code == "HGB.266.AKTIVA.B.I"
-    )
-
-    assert tuple(
-        (child.code, child.name)
-        for child in inventories.children
-    ) == (
-        (
-            "HGB.266.AKTIVA.B.I.1",
-            "Roh-, Hilfs- und Betriebsstoffe",
-        ),
-        (
-            "HGB.266.AKTIVA.B.I.2",
-            "Unfertige Erzeugnisse, unfertige Leistungen",
-        ),
-        (
-            "HGB.266.AKTIVA.B.I.3",
-            "Fertige Erzeugnisse und Waren",
-        ),
-        (
-            "HGB.266.AKTIVA.B.I.4",
-            "Geleistete Anzahlungen",
-        ),
-    )
     
 def test_inventories_contain_all_hgb_positions() -> None:
     assets, _ = create_hgb_balance_sheet_structure()

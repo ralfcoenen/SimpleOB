@@ -6,10 +6,10 @@ from decimal import Decimal
 from typing import Iterable
 from uuid import UUID, uuid4
 
-from openbilanz.domain.money import ZERO
 from openbilanz.domain.booking_line import BookingLine
 from openbilanz.domain.entry_side import EntrySide
 from openbilanz.domain.errors import UnbalancedBookingError
+from openbilanz.domain.money import ZERO
 
 
 @dataclass(frozen=True, slots=True)

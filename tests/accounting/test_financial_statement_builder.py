@@ -8,18 +8,17 @@ from openbilanz.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
 from openbilanz.accounting.mapper import AccountMapper
+from openbilanz.accounting.statement_category import StatementCategory
 from openbilanz.domain.account_mapping_rule import AccountMappingRule
 from openbilanz.domain.account_type import AccountType
 from openbilanz.domain.chart_of_accounts_template import (
     ChartOfAccountsTemplate,
 )
 from openbilanz.domain.template_account import TemplateAccount
-
 from openbilanz.hgb.balance_sheet_structure import (
     create_hgb_balance_sheet_structure,
 )
 from openbilanz.services.closing_result import ClosingResult
-from openbilanz.accounting.statement_category import StatementCategory
 
 
 def test_sums_multiple_account_balances_for_same_position() -> None:

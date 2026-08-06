@@ -3,7 +3,27 @@
 
 Alle wesentlichen Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
-# Changelog
+
+
+## Version 0.15.0 (2026-08-05)
+
+### Highlights
+
+- Vollständige Gewinn- und Verlustrechnung (§ 275 Abs. 2 HGB, GKV)
+- Neues Domänenobjekt `IncomeStatement`
+- Einführung von `StatementCategory`
+- Neuer `ClosingService`
+- Neues Domänenobjekt `ClosingResult`
+- `FinancialStatementBuilder` unterstützt die Übernahme des Jahresüberschusses
+- Erster vollständiger HGB-Jahresabschluss aus echten Buchungen
+- End-to-End-Integrationstest vom Geschäftsvorfall bis zur ausgeglichenen Bilanz
+
+### Qualitätsstand
+
+- Alle Tests erfolgreich
+- `ruff check .` ohne Beanstandungen
+- `git diff --check` ohne Beanstandungen
+- Repository in sauberem Zustand
 
 ## v0.10.0-dev
 - Kontenmodell und Kontenplan

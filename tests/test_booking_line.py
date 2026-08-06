@@ -7,6 +7,7 @@ import pytest
 
 from openbilanz.domain import BookingLine, EntrySide
 
+
 def test_debit_booking_line_is_created() -> None:
     line = BookingLine(
     account_number="1200",

@@ -1,9 +1,9 @@
+import pytest
+
 from openbilanz.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
 from openbilanz.domain.account_mapping_rule import AccountMappingRule
-
-import pytest
 
 
 def test_account_mapping_rule_may_define_only_debit_position() -> None:

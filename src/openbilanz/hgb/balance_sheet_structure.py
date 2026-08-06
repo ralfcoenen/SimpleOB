@@ -2,6 +2,7 @@ from openbilanz.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
 
+
 def _create_fixed_assets() -> FinancialStatementPosition:
     self_created_intangibles = FinancialStatementPosition(
         code="HGB.266.AKTIVA.A.I.1",
