@@ -4,8 +4,9 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from openbilanz.domain.account import Account
-from openbilanz.domain.money import to_decimal
 from openbilanz.domain.account_type import AccountType
+from openbilanz.domain.money import to_decimal
+
 
 @dataclass(frozen=True, slots=True)
 class OpeningBalanceItem:

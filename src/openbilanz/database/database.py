@@ -5,13 +5,13 @@ from openbilanz.core.config import DATABASE_URL
 
 engine = create_engine(DATABASE_URL, echo=False)
 
-
 SessionLocal = sessionmaker(bind=engine)
-
 
 Base = declarative_base()
 
 
-def create_database():
+from openbilanz.database import models  # noqa: E402, F401
 
+
+def create_database():
     Base.metadata.create_all(engine)

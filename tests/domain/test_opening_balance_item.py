@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+import pytest
 
 from openbilanz.domain.account import Account
 from openbilanz.domain.account_type import AccountType
@@ -7,7 +8,7 @@ from openbilanz.domain.opening_balance_item import (
     OpeningBalanceItem,
 )
 from openbilanz.domain.template_account import TemplateAccount
-import pytest
+
 
 def test_create_opening_balance_item() -> None:
     account = Account(

@@ -3,25 +3,18 @@
 from dataclasses import dataclass
 from decimal import Decimal
 
+from openbilanz.domain.account_type import AccountType
 from openbilanz.domain.money import ZERO
 from openbilanz.domain.opening_balance_item import (
     OpeningBalanceItem,
 )
-from openbilanz.domain.account_type import AccountType
+
 
 @dataclass(frozen=True, slots=True)
 class OpeningBalance:
     """Eine vollständige Eröffnungsbilanz."""
 
     items: tuple[OpeningBalanceItem, ...]
-
-    @property
-    def total_assets(self) -> Decimal:
-        return ZERO
-
-    @property
-    def total_liabilities_and_equity(self) -> Decimal:
-        return ZERO
 
     @property
     def is_balanced(self) -> bool:

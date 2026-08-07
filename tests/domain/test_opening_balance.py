@@ -6,6 +6,7 @@ from openbilanz.domain.opening_balance import OpeningBalance
 from openbilanz.domain.opening_balance_item import OpeningBalanceItem
 from openbilanz.domain.template_account import TemplateAccount
 
+
 def test_empty_opening_balance_is_balanced() -> None:
     balance = OpeningBalance(
         items=(),

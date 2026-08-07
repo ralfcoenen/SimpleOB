@@ -2,11 +2,12 @@
 
 from datetime import date
 
+from openbilanz.domain.account_type import AccountType
 from openbilanz.domain.booking import Booking
 from openbilanz.domain.booking_line import BookingLine
 from openbilanz.domain.entry_side import EntrySide
 from openbilanz.domain.opening_balance import OpeningBalance
-from openbilanz.domain.account_type import AccountType
+
 
 class OpeningBalanceService:
     """Erzeugt Eröffnungsbuchungen aus einer Eröffnungsbilanz."""
