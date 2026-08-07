@@ -1,12 +1,22 @@
-from openbilanz.database.database import create_database
+"""Startpunkt der OpenBilanz-Anwendung."""
+
+import sys
+
+from PySide6.QtWidgets import QApplication
+
+from openbilanz.ui.main_window import MainWindow
 
 
-def main():
+def main() -> int:
+    """Startet OpenBilanz."""
 
-    create_database()
+    app = QApplication(sys.argv)
 
-    print("OpenBilanz-UG gestartet")
+    window = MainWindow()
+    window.show()
+
+    return app.exec()
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

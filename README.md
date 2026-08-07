@@ -11,20 +11,15 @@ Lokale Buchhaltungs- und E-Bilanz-Software für kleine Kapitalgesellschaften.
 
 ## Status
 
-Version 0.17.0
+v0.18.0: Implement opening balance workflow
 
-Version 0.17.0
-
-Der Fachkern von OpenBilanz ist funktionsfähig und umfasst:
-
-- Buchungslogik
-- Journal und Hauptbuch
-- Summen- und Saldenliste
-- Bilanz nach § 266 HGB
-- GuV nach § 275 Abs. 2 HGB
-- Jahresabschluss
-- CSV-Import eines HGB-Kontenrahmens
-
+- add OpeningBalance domain model
+- add OpeningBalanceItem
+- add OpeningBalanceService
+- validate balanced opening balances
+- create opening bookings via EBK
+- integrate with PostingService
+- add integration tests
 ## Ziel
 
 Entwicklung einer modularen Anwendung für:

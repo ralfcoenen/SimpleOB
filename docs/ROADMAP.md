@@ -1,17 +1,19 @@
-v0.17
-☐ Kontenrahmen-Importer
-☐ CSV-Importer
-☐ Importvalidierung
+1. OpenBilanz starten
 
-v0.18
-☐ Geschäftsjahre
-☐ Bilanzabschluss
-☐ Eröffnungsbuchungen
+2. Neues Unternehmen anlegen
 
-v0.19
-☐ DATEV-Import
-☐ Kontenplanverwaltung
+3. Geschäftsjahr anlegen
 
-v0.20
-☐ XBRL
-☐ E-Bilanz
+4. Standardkontenrahmen importieren
+
+5. Eröffnungsbilanz erfassen
+
+6. Eröffnungsbuchung automatisch erzeugen
+
+7. Laufende Buchungen erfassen
+
+8. Auswertungen (Journal, Hauptbuch, SuSa)
+
+9. Bilanz / GuV
+
+10. Jahresabschluss
