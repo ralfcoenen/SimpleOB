@@ -3,6 +3,16 @@
 
 Alle wesentlichen Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## v0.17.0 (2026-08-07)
+
+### Highlights
+
+- Einführung eines CSV-Kontenrahmen-Importers
+- Import von Bilanz- und GuV-Zuordnungsregeln
+- Validierung des statement_type
+- Einführung des Referenzkontenrahmens openbilanz_standard.csv
+- Integrationstest für den vollständigen Import
+- Qualitätsprüfung (pytest, ruff, git diff --check) erfolgreich
 
 ## v0.16.0 (2026-08-06)
 
