@@ -1,17 +1,17 @@
-v0.5.x
-- Account
-- ChartOfAccounts
+v0.17
+☐ Kontenrahmen-Importer
+☐ CSV-Importer
+☐ Importvalidierung
 
-v0.6.x
-- Buchungsperioden
-- Opening Balance
-- Closing Entries
+v0.18
+☐ Geschäftsjahre
+☐ Bilanzabschluss
+☐ Eröffnungsbuchungen
 
-v0.7.x
-- Bilanz
-- GuV
-- Summen- und Saldenliste
+v0.19
+☐ DATEV-Import
+☐ Kontenplanverwaltung
 
-v0.8.x
-- DATEV-Import/-Export
-- E-Bilanz-Grundlagen
+v0.20
+☐ XBRL
+☐ E-Bilanz

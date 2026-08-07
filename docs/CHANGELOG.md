@@ -4,6 +4,31 @@
 Alle wesentlichen Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
 
+## v0.16.0 (2026-08-06)
+
+### Highlights
+
+- Vollständiger automatisierter GuV-Abschluss
+- Abschluss sämtlicher Erlös- und Aufwandskonten
+- Abschluss des GuV-Kontos bei Jahresüberschuss
+- Abschluss des GuV-Kontos bei Jahresfehlbetrag
+- Neues Domänenobjekt `ClosingAccounts`
+- Gewinn- und Verlustkonten fachlich getrennt modelliert
+- `ClosingService` zum Orchestrator des Jahresabschlusses refaktoriert
+- Erste automatisierte Abschlussbuchungen erzeugt
+
+### Changed
+
+- Jahresabschlusslogik in kleine, klar abgegrenzte Methoden aufgeteilt
+- Öffentliche API des `ClosingService` konsolidiert
+
+### Quality
+
+- Gesamter Testbestand erfolgreich
+- `ruff check .` ohne Beanstandungen
+- `git diff --check` ohne Beanstandungen
+- Repository in sauberem Zustand
+
 
 ## Version 0.15.0 (2026-08-05)
 
