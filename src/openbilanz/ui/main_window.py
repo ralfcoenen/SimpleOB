@@ -296,9 +296,10 @@ class MainWindow(tk.Tk):
 
         columns = (
             "date",
+            "voucher",
             "description",
-            "debit_account",
-            "credit_account",
+            "account",
+            "side",
             "amount",
         )
 
@@ -306,7 +307,7 @@ class MainWindow(tk.Tk):
             self._journal_tab,
             columns=columns,
             show="headings",
-            height=12,
+            height=14,
         )
 
         self._journal_table.heading(
@@ -314,16 +315,20 @@ class MainWindow(tk.Tk):
             text="Datum",
         )
         self._journal_table.heading(
+            "voucher",
+            text="Beleg",
+        )
+        self._journal_table.heading(
             "description",
             text="Buchungstext",
         )
         self._journal_table.heading(
-            "debit_account",
-            text="Soll",
+            "account",
+            text="Konto",
         )
         self._journal_table.heading(
-            "credit_account",
-            text="Haben",
+            "side",
+            text="S/H",
         )
         self._journal_table.heading(
             "amount",
@@ -336,23 +341,28 @@ class MainWindow(tk.Tk):
             anchor="w",
         )
         self._journal_table.column(
+            "voucher",
+            width=100,
+            anchor="w",
+        )
+        self._journal_table.column(
             "description",
-            width=280,
+            width=230,
             anchor="w",
         )
         self._journal_table.column(
-            "debit_account",
-            width=100,
+            "account",
+            width=330,
             anchor="w",
         )
         self._journal_table.column(
-            "credit_account",
-            width=100,
-            anchor="w",
+            "side",
+            width=60,
+            anchor="center",
         )
         self._journal_table.column(
             "amount",
-            width=140,
+            width=130,
             anchor="e",
         )
 
@@ -567,36 +577,65 @@ class MainWindow(tk.Tk):
     def _refresh_journal(self) -> None:
         """Aktualisiert die Journalanzeige."""
 
-        for item in (
-            self._journal_table.get_children()
-        ):
-            self._journal_table.delete(
-                item
-            )
+        for item in self._journal_table.get_children():
+            self._journal_table.delete(item)
+
+        account_names = {
+            account.number: account.name
+            for account in self._accounts
+        }
+
+        account_names["9000"] = "Eröffnungsbilanzkonto"
 
         for booking in self._journal:
-            for (
-                debit_account,
-                credit_account,
-                amount,
-            ) in self._posting_service._pair_lines(
-                booking
-            ):
+            first_line = True
+
+            for line in booking.lines:
+                account_name = account_names.get(
+                    line.account_number,
+                    "Unbekanntes Konto",
+                )
+
+                account_display = (
+                    f"{line.account_number} – "
+                    f"{account_name}"
+                )
+
+                if line.is_debit:
+                    side = "Soll"
+                else:
+                    side = "Haben"
+
                 self._journal_table.insert(
                     "",
                     "end",
                     values=(
-                        booking.booking_date.strftime(
-                            "%d.%m.%Y"
+                        (
+                            booking.booking_date.strftime(
+                                "%d.%m.%Y"
+                            )
+                            if first_line
+                            else ""
                         ),
-                        booking.description or "",
-                        debit_account,
-                        credit_account,
+                        (
+                            booking.voucher_no or ""
+                            if first_line
+                            else ""
+                        ),
+                        (
+                            booking.description or ""
+                            if first_line
+                            else ""
+                        ),
+                        account_display,
+                        side,
                         self._format_amount(
-                            amount
+                            line.amount
                         ),
                     ),
                 )
+
+                first_line = False
 
     def _refresh_balance_sheet(self) -> None:
         """Erzeugt und aktualisiert die laufende Bilanz."""
