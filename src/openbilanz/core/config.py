@@ -10,3 +10,4 @@ DATABASE_FILE = DATA_DIR / "openbilanz.db"
 
 
 DATABASE_URL = f"sqlite:///{DATABASE_FILE}"
+

@@ -1,32 +1,79 @@
-from sqlalchemy import Column, ForeignKey, Integer, String
-from sqlalchemy.orm import relationship
+"""SQLAlchemy-Modelle für die Persistenz."""
+from datetime import date
 
-from .database import Base
+from sqlalchemy import Date, ForeignKey, Integer, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from openbilanz.database.database import Base
 
 
 class Mandant(Base):
+    """Persistierter Mandant."""
+
     __tablename__ = "mandanten"
 
-    id = Column(Integer, primary_key=True)
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+    )
 
-    name = Column(String, nullable=False)
+    company_id: Mapped[str] = mapped_column(
+        String(36),
+        unique=True,
+        nullable=False,
+    )
 
-    rechtsform = Column(String)
+    name: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
 
-    steuernummer = Column(String)
+    rechtsform: Mapped[str | None] = mapped_column(
+        String,
+        nullable=True,
+    )
 
-    finanzamt = Column(String)
+    steuernummer: Mapped[str | None] = mapped_column(
+        String,
+        nullable=True,
+    )
 
-    wirtschaftsjahre = relationship("Wirtschaftsjahr", back_populates="mandant")
+    finanzamt: Mapped[str | None] = mapped_column(
+        String,
+        nullable=True,
+    )
+
+    wirtschaftsjahre: Mapped[list["Wirtschaftsjahr"]] = relationship(
+        back_populates="mandant",
+        cascade="all, delete-orphan",
+    )
 
 
 class Wirtschaftsjahr(Base):
+    """Persistiertes Wirtschaftsjahr."""
+
     __tablename__ = "wirtschaftsjahre"
 
-    id = Column(Integer, primary_key=True)
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+    )
 
-    mandant_id = Column(Integer, ForeignKey("mandanten.id"))
+    mandant_id: Mapped[int] = mapped_column(
+        ForeignKey("mandanten.id"),
+        nullable=False,
+    )
 
-    jahr = Column(Integer, nullable=False)
+    start_date: Mapped[date] = mapped_column(
+        Date,
+        nullable=False,
+    )
 
-    mandant = relationship("Mandant", back_populates="wirtschaftsjahre")
+    end_date: Mapped[date] = mapped_column(
+        Date,
+        nullable=False,
+    )
+
+    mandant: Mapped[Mandant] = relationship(
+        back_populates="wirtschaftsjahre",
+    )
