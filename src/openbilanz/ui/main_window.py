@@ -1,7 +1,6 @@
 """Hauptfenster der OpenBilanz-Anwendung."""
 
 import tkinter as tk
-from datetime import date
 from pathlib import Path
 from tkinter import ttk
 
@@ -16,6 +15,9 @@ from openbilanz.accounting.income_statement import IncomeStatement
 from openbilanz.accounting.ledger import Ledger
 from openbilanz.accounting.mapper import AccountMapper
 from openbilanz.core.context import ApplicationContext
+from openbilanz.database.booking_repository import (
+    BookingRepository,
+)
 from openbilanz.domain.account import Account
 from openbilanz.domain.account_type import AccountType
 from openbilanz.domain.booking import Booking
@@ -56,11 +58,12 @@ class MainWindow(tk.Tk):
         self,
         *,
         context: ApplicationContext,
+        booking_repository: BookingRepository,
     ) -> None:
-        
         super().__init__()
-        
+
         self._context = context
+        self._booking_repository = booking_repository
 
         self.title("OpenBilanz")
         self.geometry("1100x700")
@@ -73,7 +76,6 @@ class MainWindow(tk.Tk):
             opening_balance_account_number="9000",
         )
         self._posting_service = PostingService()
-        
         self._closing_service = ClosingService()
 
         (
@@ -109,7 +111,11 @@ class MainWindow(tk.Tk):
             in self._chart_of_accounts.accounts
         }
 
+        self._load_bookings()
+
         self._create_ui()
+
+        self._refresh_all()
 
     def _create_ui(self) -> None:
         """Erzeugt die Benutzeroberfläche."""
@@ -481,7 +487,7 @@ class MainWindow(tk.Tk):
         self,
         booking: Booking,
     ) -> None:
-        """Verbucht eine aus der GUI übergebene Buchung."""
+        """Verbucht und speichert eine Buchung."""
 
         self._posting_service.post_booking(
             booking=booking,
@@ -489,10 +495,16 @@ class MainWindow(tk.Tk):
             journal=self._journal,
         )
 
+        self._booking_repository.add(
+            company_id=self._context.company.company_id,
+            fiscal_year=self._context.fiscal_year,
+            booking=booking,
+        )
+
         self._refresh_all()
 
     def _open_opening_balance(self) -> None:
-        """Erfasst und verbucht die Eröffnungsbilanz."""
+        """Erfasst, verbucht und speichert die Eröffnungsbilanz."""
 
         dialog = OpeningBalanceDialog(
             self
@@ -504,10 +516,9 @@ class MainWindow(tk.Tk):
             return
 
         bookings = (
-            self._opening_balance_service
-            .create_bookings(
+            self._opening_balance_service.create_bookings(
                 opening_balance=dialog.result,
-                booking_date=date.today(),
+                booking_date=self._context.fiscal_year.start_date,
             )
         )
 
@@ -518,7 +529,14 @@ class MainWindow(tk.Tk):
                 journal=self._journal,
             )
 
+            self._booking_repository.add(
+                company_id=self._context.company.company_id,
+                fiscal_year=self._context.fiscal_year,
+                booking=booking,
+            )
+
         self._refresh_all()
+
 
     def _refresh_all(self) -> None:
         """Aktualisiert alle sichtbaren Buchhaltungsdaten."""
@@ -893,3 +911,20 @@ class MainWindow(tk.Tk):
                 )
 
         return cls._format_amount(ZERO)
+
+    def _load_bookings(self) -> None:
+        """Rekonstruiert Journal und Ledger aus gespeicherten Buchungen."""
+
+        bookings = (
+            self._booking_repository.list_for_fiscal_year(
+                company_id=self._context.company.company_id,
+                fiscal_year=self._context.fiscal_year,
+            )
+        )
+
+        for booking in bookings:
+            self._posting_service.post_booking(
+                booking=booking,
+                ledger=self._ledger,
+                journal=self._journal,
+            )

@@ -2,6 +2,9 @@
 
 import tkinter as tk
 
+from openbilanz.database.booking_repository import (
+    BookingRepository,
+)
 from openbilanz.database.company_repository import (
     CompanyRepository,
 )
@@ -24,13 +27,13 @@ def main() -> None:
     session = create_session()
 
     try:
-        repository = CompanyRepository(
+        company_repository = CompanyRepository(
             session
         )
 
         dialog = StartDialog(
             root,
-            repository=repository,
+            repository=company_repository,
         )
 
         root.withdraw()
@@ -47,18 +50,21 @@ def main() -> None:
 
         context = dialog.result
 
+        root.destroy()
+
+        booking_repository = BookingRepository(
+            session
+        )
+
+        window = MainWindow(
+            context=context,
+            booking_repository=booking_repository,
+        )
+        window.mainloop()
+
     finally:
         session.close()
-
-    root.destroy()
-
-    window = MainWindow(
-        context=context,
-    )
-    window.mainloop()
 
 
 if __name__ == "__main__":
     main()
-    
-    
