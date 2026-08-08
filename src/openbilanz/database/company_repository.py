@@ -139,3 +139,25 @@ class CompanyRepository:
             )
             for model in models
         )
+    
+    def list_companies(
+        self,
+    ) -> tuple[Company, ...]:
+        """Lädt alle Unternehmen alphabetisch nach Namen."""
+
+        models = (
+            self._session.query(Mandant)
+            .order_by(
+                Mandant.name,
+                Mandant.company_id,
+            )
+            .all()
+        )
+
+        return tuple(
+            Company(
+                company_id=UUID(model.company_id),
+                name=model.name,
+            )
+            for model in models
+        )

@@ -1,31 +1,56 @@
 """Startpunkt der OpenBilanz-Anwendung."""
 
-from datetime import date
-from uuid import uuid4
+import tkinter as tk
 
-from openbilanz.core.context import ApplicationContext
-from openbilanz.domain.company import Company
-from openbilanz.domain.fiscal_year import FiscalYear
+from openbilanz.database.company_repository import (
+    CompanyRepository,
+)
+from openbilanz.database.database import (
+    create_database,
+    create_session,
+)
 from openbilanz.ui.main_window import MainWindow
+from openbilanz.ui.start_dialog import StartDialog
 
 
 def main() -> None:
     """Startet OpenBilanz."""
 
-    company = Company(
-        company_id=uuid4(),
-        name="Muster UG",
-    )
+    create_database()
 
-    fiscal_year = FiscalYear(
-        start_date=date(2026, 1, 1),
-        end_date=date(2026, 12, 31),
-    )
+    root = tk.Tk()
+    root.title("OpenBilanz")
 
-    context = ApplicationContext(
-        company=company,
-        fiscal_year=fiscal_year,
-    )
+    session = create_session()
+
+    try:
+        repository = CompanyRepository(
+            session
+        )
+
+        dialog = StartDialog(
+            root,
+            repository=repository,
+        )
+
+        root.withdraw()
+
+        dialog.deiconify()
+        dialog.lift()
+        dialog.focus_force()
+
+        root.wait_window(dialog)
+
+        if dialog.result is None:
+            root.destroy()
+            return
+
+        context = dialog.result
+
+    finally:
+        session.close()
+
+    root.destroy()
 
     window = MainWindow(
         context=context,
@@ -35,3 +60,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+    
+    

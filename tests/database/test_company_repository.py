@@ -213,3 +213,45 @@ def test_rejects_overlapping_fiscal_year() -> None:
                 overlapping_fiscal_year,
             )
 
+def test_lists_companies_alphabetically() -> None:
+    engine = create_engine(
+        "sqlite:///:memory:"
+    )
+    Base.metadata.create_all(engine)
+
+    Session = sessionmaker(
+        bind=engine
+    )
+
+    with Session() as session:
+        repository = CompanyRepository(session)
+
+        companies = (
+            Company(
+                company_id=uuid4(),
+                name="Zeta GmbH",
+            ),
+            Company(
+                company_id=uuid4(),
+                name="Alpha UG",
+            ),
+            Company(
+                company_id=uuid4(),
+                name="Muster GmbH",
+            ),
+        )
+
+        for company in companies:
+            repository.add(company)
+
+        loaded_companies = repository.list_companies()
+
+    assert tuple(
+        company.name
+        for company in loaded_companies
+    ) == (
+        "Alpha UG",
+        "Muster GmbH",
+        "Zeta GmbH",
+    )
+
