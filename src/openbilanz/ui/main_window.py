@@ -1,19 +1,25 @@
 """Hauptfenster der OpenBilanz-Anwendung."""
 
 import tkinter as tk
-from datetime import date, datetime
-from decimal import Decimal, InvalidOperation
+from datetime import date
 from pathlib import Path
 from tkinter import ttk
 
+from openbilanz.accounting.balance_sheet import BalanceSheet
+from openbilanz.accounting.financial_statement_builder import (
+    FinancialStatementBuilder,
+)
 from openbilanz.accounting.hgb_financial_statement_position_provider import (
     HgbFinancialStatementPositionProvider,
 )
 from openbilanz.accounting.ledger import Ledger
+from openbilanz.accounting.mapper import AccountMapper
 from openbilanz.domain.account import Account
+from openbilanz.domain.account_type import AccountType
 from openbilanz.domain.booking import Booking
-from openbilanz.domain.booking_line import BookingLine
-from openbilanz.domain.entry_side import EntrySide
+from openbilanz.domain.chart_of_accounts_template import (
+    ChartOfAccountsTemplate,
+)
 from openbilanz.domain.journal import Journal
 from openbilanz.domain.money import ZERO
 from openbilanz.hgb.balance_sheet_structure import (
@@ -29,6 +35,8 @@ from openbilanz.services.opening_balance_service import (
     OpeningBalanceService,
 )
 from openbilanz.services.posting_service import PostingService
+from openbilanz.ui.balance_sheet_frame import BalanceSheetFrame
+from openbilanz.ui.booking_frame import BookingFrame
 from openbilanz.ui.opening_balance_dialog import (
     OpeningBalanceDialog,
 )
@@ -41,8 +49,8 @@ class MainWindow(tk.Tk):
         super().__init__()
 
         self.title("OpenBilanz")
-        self.geometry("950x650")
-        self.minsize(750, 500)
+        self.geometry("1100x700")
+        self.minsize(850, 550)
 
         self._journal = Journal()
         self._ledger = Ledger()
@@ -52,16 +60,38 @@ class MainWindow(tk.Tk):
         )
         self._posting_service = PostingService()
 
-        self._accounts = self._load_standard_accounts()
+        (
+            self._assets,
+            self._liabilities,
+        ) = create_hgb_balance_sheet_structure()
 
-        self._accounts_by_display_name = {
-            self._account_display_name(account): account
-            for account in self._accounts
-        }
-
-        self._account_display_names = tuple(
-            self._accounts_by_display_name
+        self._income_statement = (
+            create_hgb_income_statement_structure()
         )
+
+        self._chart_of_accounts = (
+            self._load_standard_chart_of_accounts()
+        )
+
+        self._accounts = tuple(
+            Account(template=template_account)
+            for template_account
+            in self._chart_of_accounts.accounts
+        )
+
+        self._financial_statement_builder = (
+            FinancialStatementBuilder(
+                AccountMapper(
+                    self._chart_of_accounts
+                )
+            )
+        )
+
+        self._account_types = {
+            account.account_number: account.account_type
+            for account
+            in self._chart_of_accounts.accounts
+        }
 
         self._create_ui()
 
@@ -77,35 +107,34 @@ class MainWindow(tk.Tk):
             expand=True,
         )
 
-        title = ttk.Label(
+        ttk.Label(
             container,
             text="OpenBilanz",
             font=("TkDefaultFont", 24, "bold"),
-        )
-        title.pack(
+        ).pack(
             anchor="w",
         )
 
-        subtitle = ttk.Label(
+        ttk.Label(
             container,
             text="Buchhaltung und Jahresabschluss",
-        )
-        subtitle.pack(
+        ).pack(
             anchor="w",
             pady=(4, 16),
         )
 
-        opening_balance_button = ttk.Button(
+        ttk.Button(
             container,
             text="Eröffnungsbilanz erfassen",
             command=self._open_opening_balance,
-        )
-        opening_balance_button.pack(
+        ).pack(
             anchor="w",
             pady=(0, 16),
         )
 
-        self._notebook = ttk.Notebook(container)
+        self._notebook = ttk.Notebook(
+            container
+        )
         self._notebook.pack(
             fill="both",
             expand=True,
@@ -123,6 +152,10 @@ class MainWindow(tk.Tk):
             self._notebook,
             padding=16,
         )
+        self._balance_sheet_tab = ttk.Frame(
+            self._notebook,
+            padding=16,
+        )
 
         self._notebook.add(
             self._accounts_tab,
@@ -136,20 +169,24 @@ class MainWindow(tk.Tk):
             self._booking_tab,
             text="Buchen",
         )
+        self._notebook.add(
+            self._balance_sheet_tab,
+            text="Bilanz",
+        )
 
         self._create_accounts_tab()
         self._create_journal_tab()
         self._create_booking_tab()
+        self._create_balance_sheet_tab()
 
     def _create_accounts_tab(self) -> None:
         """Erzeugt den Arbeitsbereich Konten."""
 
-        title = ttk.Label(
+        ttk.Label(
             self._accounts_tab,
             text="Kontenübersicht",
             font=("TkDefaultFont", 16, "bold"),
-        )
-        title.pack(
+        ).pack(
             anchor="w",
         )
 
@@ -222,12 +259,11 @@ class MainWindow(tk.Tk):
     def _create_journal_tab(self) -> None:
         """Erzeugt den Arbeitsbereich Journal."""
 
-        title = ttk.Label(
+        ttk.Label(
             self._journal_tab,
             text="Journal",
             font=("TkDefaultFont", 16, "bold"),
-        )
-        title.pack(
+        ).pack(
             anchor="w",
         )
 
@@ -302,202 +338,81 @@ class MainWindow(tk.Tk):
     def _create_booking_tab(self) -> None:
         """Erzeugt den Arbeitsbereich Buchen."""
 
-        title = ttk.Label(
+        ttk.Label(
             self._booking_tab,
             text="Neue Buchung",
             font=("TkDefaultFont", 16, "bold"),
-        )
-        title.pack(
+        ).pack(
             anchor="w",
             pady=(0, 16),
         )
 
-        form = ttk.Frame(self._booking_tab)
-        form.pack(
+        booking_frame = BookingFrame(
+            self._booking_tab,
+            accounts=self._accounts,
+            on_booking_created=self._post_booking,
+        )
+        booking_frame.pack(
             fill="x",
-            anchor="nw",
+            expand=False,
         )
 
-        form.columnconfigure(
-            1,
-            weight=1,
-        )
-
-        self._booking_date_var = tk.StringVar(
-            value=date.today().strftime("%d.%m.%Y")
-        )
-        self._booking_description_var = tk.StringVar()
-        self._debit_account_var = tk.StringVar()
-        self._credit_account_var = tk.StringVar()
-        self._booking_amount_var = tk.StringVar()
-        self._booking_status_var = tk.StringVar()
+    def _create_balance_sheet_tab(
+        self,
+    ) -> None:
+        """Erzeugt den Arbeitsbereich Bilanz."""
 
         ttk.Label(
-            form,
-            text="Datum",
-        ).grid(
-            row=0,
-            column=0,
-            sticky="w",
-            padx=(0, 12),
-            pady=6,
+            self._balance_sheet_tab,
+            text="Bilanz nach § 266 HGB",
+            font=("TkDefaultFont", 16, "bold"),
+        ).pack(
+            anchor="w",
+            pady=(0, 12),
         )
 
-        ttk.Entry(
-            form,
-            textvariable=self._booking_date_var,
-            width=16,
-        ).grid(
-            row=0,
-            column=1,
-            sticky="w",
-            pady=6,
-        )
-
-        ttk.Label(
-            form,
-            text="Buchungstext",
-        ).grid(
-            row=1,
-            column=0,
-            sticky="w",
-            padx=(0, 12),
-            pady=6,
-        )
-
-        ttk.Entry(
-            form,
-            textvariable=self._booking_description_var,
-        ).grid(
-            row=1,
-            column=1,
-            sticky="ew",
-            pady=6,
-        )
-
-        ttk.Label(
-            form,
-            text="Sollkonto",
-        ).grid(
-            row=2,
-            column=0,
-            sticky="w",
-            padx=(0, 12),
-            pady=6,
-        )
-
-        self._debit_account_box = ttk.Combobox(
-            form,
-            textvariable=self._debit_account_var,
-            values=self._account_display_names,
-        )
-        self._debit_account_box.grid(
-            row=2,
-            column=1,
-            sticky="ew",
-            pady=6,
-        )
-
-        ttk.Label(
-            form,
-            text="Habenkonto",
-        ).grid(
-            row=3,
-            column=0,
-            sticky="w",
-            padx=(0, 12),
-            pady=6,
-        )
-
-        self._credit_account_box = ttk.Combobox(
-            form,
-            textvariable=self._credit_account_var,
-            values=self._account_display_names,
-        )
-        self._credit_account_box.grid(
-            row=3,
-            column=1,
-            sticky="ew",
-            pady=6,
-        )
-
-        ttk.Label(
-            form,
-            text="Betrag",
-        ).grid(
-            row=4,
-            column=0,
-            sticky="w",
-            padx=(0, 12),
-            pady=6,
-        )
-
-        ttk.Entry(
-            form,
-            textvariable=self._booking_amount_var,
-            justify="right",
-            width=18,
-        ).grid(
-            row=4,
-            column=1,
-            sticky="w",
-            pady=6,
-        )
-
-        self._booking_button = ttk.Button(
-            form,
-            text="Buchung übernehmen",
-            command=self._book,
-        )
-        self._booking_button.grid(
-            row=5,
-            column=1,
-            sticky="e",
-            pady=(18, 6),
-        )
-        self._booking_button.state(
-            ["disabled"]
-        )
-
-        ttk.Label(
-            form,
-            textvariable=self._booking_status_var,
-        ).grid(
-            row=6,
-            column=0,
-            columnspan=2,
-            sticky="w",
-            pady=(10, 0),
-        )
-
-        variables = (
-            self._booking_date_var,
-            self._booking_description_var,
-            self._debit_account_var,
-            self._credit_account_var,
-            self._booking_amount_var,
-        )
-
-        for variable in variables:
-            variable.trace_add(
-                "write",
-                self._on_booking_form_changed,
+        self._balance_sheet_frame = (
+            BalanceSheetFrame(
+                self._balance_sheet_tab
             )
+        )
+        self._balance_sheet_frame.pack(
+            fill="both",
+            expand=True,
+        )
 
+    def _post_booking(
+        self,
+        booking: Booking,
+    ) -> None:
+        """Verbucht eine aus der GUI übergebene Buchung."""
+
+        self._posting_service.post_booking(
+            booking=booking,
+            ledger=self._ledger,
+            journal=self._journal,
+        )
+
+        self._refresh_all()
 
     def _open_opening_balance(self) -> None:
         """Erfasst und verbucht die Eröffnungsbilanz."""
 
-        dialog = OpeningBalanceDialog(self)
+        dialog = OpeningBalanceDialog(
+            self
+        )
 
         self.wait_window(dialog)
 
         if dialog.result is None:
             return
 
-        bookings = self._opening_balance_service.create_bookings(
-            opening_balance=dialog.result,
-            booking_date=date.today(),
+        bookings = (
+            self._opening_balance_service
+            .create_bookings(
+                opening_balance=dialog.result,
+                booking_date=date.today(),
+            )
         )
 
         for booking in bookings:
@@ -509,191 +424,41 @@ class MainWindow(tk.Tk):
 
         self._refresh_all()
 
-    def _book(self) -> None:
-        """Erzeugt und verbucht eine laufende Buchung."""
-
-        debit_account = self._resolve_account(
-            self._debit_account_var.get()
-        )
-        credit_account = self._resolve_account(
-            self._credit_account_var.get()
-        )
-
-        if (
-            debit_account is None
-            or credit_account is None
-        ):
-            return
-
-        try:
-            booking_date = self._parse_booking_date(
-                self._booking_date_var.get()
-            )
-            amount = self._parse_amount(
-                self._booking_amount_var.get()
-            )
-        except ValueError:
-            return
-
-        description = (
-            self._booking_description_var.get().strip()
-        )
-
-        booking = Booking(
-            booking_date=booking_date,
-            description=description,
-            lines=(
-                BookingLine(
-                    account_number=debit_account.number,
-                    side=EntrySide.DEBIT,
-                    amount=amount,
-                ),
-                BookingLine(
-                    account_number=credit_account.number,
-                    side=EntrySide.CREDIT,
-                    amount=amount,
-                ),
-            ),
-        )
-
-        self._posting_service.post_booking(
-            booking=booking,
-            ledger=self._ledger,
-            journal=self._journal,
-        )
-
-        self._refresh_all()
-        self._clear_booking_form()
-
-        self._booking_status_var.set(
-            "Buchung wurde übernommen."
-        )
-
-    def _on_booking_form_changed(
-        self,
-        *_args: object,
-    ) -> None:
-        """Prüft, ob die Buchungsmaske vollständig ist."""
-
-        debit_account = self._resolve_account(
-            self._debit_account_var.get()
-        )
-        credit_account = self._resolve_account(
-            self._credit_account_var.get()
-        )
-
-        valid = True
-
-        try:
-            self._parse_booking_date(
-                self._booking_date_var.get()
-            )
-            self._parse_amount(
-                self._booking_amount_var.get()
-            )
-        except ValueError:
-            valid = False
-
-        if not self._booking_description_var.get().strip():
-            valid = False
-
-        if debit_account is None:
-            valid = False
-
-        if credit_account is None:
-            valid = False
-
-        if (
-            debit_account is not None
-            and credit_account is not None
-            and debit_account.number == credit_account.number
-        ):
-            valid = False
-
-        if valid:
-            self._booking_button.state(
-                ["!disabled"]
-            )
-        else:
-            self._booking_button.state(
-                ["disabled"]
-            )
-
-        self._booking_status_var.set("")
-
-    def _resolve_account(
-        self,
-        value: str,
-    ) -> Account | None:
-        """Ermittelt ein Konto aus einer Benutzereingabe."""
-
-        normalized = value.strip()
-
-        if not normalized:
-            return None
-
-        direct_match = self._accounts_by_display_name.get(
-            normalized
-        )
-
-        if direct_match is not None:
-            return direct_match
-
-        number_matches = tuple(
-            account
-            for account in self._accounts
-            if account.number == normalized
-        )
-
-        if len(number_matches) == 1:
-            return number_matches[0]
-
-        search_value = normalized.casefold()
-
-        text_matches = tuple(
-            account
-            for account in self._accounts
-            if search_value
-            in self._account_display_name(account).casefold()
-        )
-
-        if len(text_matches) == 1:
-            return text_matches[0]
-
-        return None
-
-    def _clear_booking_form(self) -> None:
-        """Leert die Buchungsmaske nach erfolgreicher Buchung."""
-
-        self._booking_description_var.set("")
-        self._debit_account_var.set("")
-        self._credit_account_var.set("")
-        self._booking_amount_var.set("")
-
     def _refresh_all(self) -> None:
         """Aktualisiert alle sichtbaren Buchhaltungsdaten."""
 
         self._refresh_overview()
         self._refresh_journal()
+        self._refresh_balance_sheet()
+
         self.update_idletasks()
 
     def _refresh_overview(self) -> None:
         """Aktualisiert die Kontenübersicht."""
 
         self._journal_status.config(
-            text=f"Journal: {len(self._journal)} Buchungen"
+            text=(
+                f"Journal: "
+                f"{len(self._journal)} Buchungen"
+            )
         )
 
-        for item in self._account_table.get_children():
-            self._account_table.delete(item)
+        for item in (
+            self._account_table.get_children()
+        ):
+            self._account_table.delete(
+                item
+            )
 
         for account in self._accounts:
             debit = ZERO
             credit = ZERO
 
             try:
-                ledger_account = self._ledger.get_account(
-                    account.number
+                ledger_account = (
+                    self._ledger.get_account(
+                        account.number
+                    )
                 )
             except KeyError:
                 pass
@@ -713,8 +478,10 @@ class MainWindow(tk.Tk):
             )
 
         try:
-            opening_account = self._ledger.get_account(
-                "9000"
+            opening_account = (
+                self._ledger.get_account(
+                    "9000"
+                )
             )
         except KeyError:
             return
@@ -725,20 +492,32 @@ class MainWindow(tk.Tk):
             values=(
                 "9000",
                 "Eröffnungsbilanzkonto",
-                self._format_amount(opening_account.debit),
-                self._format_amount(opening_account.credit),
+                self._format_amount(
+                    opening_account.debit
+                ),
+                self._format_amount(
+                    opening_account.credit
+                ),
             ),
         )
-    
+
     def _refresh_journal(self) -> None:
         """Aktualisiert die Journalanzeige."""
 
-        for item in self._journal_table.get_children():
-            self._journal_table.delete(item)
+        for item in (
+            self._journal_table.get_children()
+        ):
+            self._journal_table.delete(
+                item
+            )
 
         for booking in self._journal:
-            for debit_account, credit_account, amount in (
-                self._posting_service._pair_lines(booking)
+            for (
+                debit_account,
+                credit_account,
+                amount,
+            ) in self._posting_service._pair_lines(
+                booking
             ):
                 self._journal_table.insert(
                     "",
@@ -750,28 +529,64 @@ class MainWindow(tk.Tk):
                         booking.description or "",
                         debit_account,
                         credit_account,
-                        self._format_amount(amount),
+                        self._format_amount(
+                            amount
+                        ),
                     ),
                 )
 
-    def _load_standard_accounts(
+    def _refresh_balance_sheet(self) -> None:
+        """Erzeugt und aktualisiert die Bilanz."""
+
+        balance_sheet_account_types = (
+            AccountType.ASSET,
+            AccountType.LIABILITY,
+            AccountType.EQUITY,
+        )
+
+        balances = tuple(
+            balance
+            for balance in self._ledger.balances()
+            if self._account_types.get(
+                balance.account_number
+            )
+            in balance_sheet_account_types
+        )
+
+        amounts = (
+            self._financial_statement_builder
+            .build(
+                balances=balances,
+                root_positions=(
+                    self._assets,
+                    self._liabilities,
+                ),
+            )
+        )
+
+        balance_sheet = BalanceSheet(
+            assets=self._assets,
+            liabilities=self._liabilities,
+            amounts=amounts,
+        )
+
+        self._balance_sheet_frame.update_balance_sheet(
+            balance_sheet
+        )
+
+    def _load_standard_chart_of_accounts(
         self,
-    ) -> tuple[Account, ...]:
+    ) -> ChartOfAccountsTemplate:
         """Lädt den OpenBilanz-Standardkontenrahmen."""
 
-        assets, liabilities = (
-            create_hgb_balance_sheet_structure()
-        )
-        income_statement = (
-            create_hgb_income_statement_structure()
-        )
-
-        provider = HgbFinancialStatementPositionProvider(
-            (
-                assets,
-                liabilities,
-                income_statement,
-            ),
+        provider = (
+            HgbFinancialStatementPositionProvider(
+                (
+                    self._assets,
+                    self._liabilities,
+                    self._income_statement,
+                ),
+            )
         )
 
         csv_file = (
@@ -781,85 +596,15 @@ class MainWindow(tk.Tk):
             / "openbilanz_standard.csv"
         )
 
-        template = CsvChartOfAccountsImporter(
+        return CsvChartOfAccountsImporter(
             position_provider=provider,
         ).load(csv_file)
-
-        return tuple(
-            Account(template=template_account)
-            for template_account in template.accounts
-        )
-
-    @staticmethod
-    def _account_display_name(
-        account: Account,
-    ) -> str:
-        """Liefert die Kontendarstellung der GUI."""
-
-        return (
-            f"{account.number} – "
-            f"{account.name}"
-        )
-
-    @staticmethod
-    def _parse_booking_date(
-        value: str,
-    ) -> date:
-        """Wandelt ein deutsches Datum in date um."""
-
-        try:
-            return datetime.strptime(
-                value.strip(),
-                "%d.%m.%Y",
-            ).date()
-        except ValueError as exc:
-            raise ValueError(
-                "Ungültiges Buchungsdatum."
-            ) from exc
-
-    @staticmethod
-    def _parse_amount(
-        value: str,
-    ) -> Decimal:
-        """Wandelt einen deutschen Geldbetrag in Decimal um."""
-
-        normalized = value.strip()
-
-        if not normalized:
-            raise ValueError(
-                "Der Buchungsbetrag fehlt."
-            )
-
-        normalized = normalized.replace(
-            ".",
-            "",
-        )
-        normalized = normalized.replace(
-            ",",
-            ".",
-        )
-
-        try:
-            amount = Decimal(normalized)
-        except InvalidOperation as exc:
-            raise ValueError(
-                "Ungültiger Geldbetrag."
-            ) from exc
-
-        if amount <= ZERO:
-            raise ValueError(
-                "Der Buchungsbetrag muss größer als 0,00 sein."
-            )
-
-        return amount.quantize(
-            Decimal("0.01")
-        )
 
     @staticmethod
     def _format_amount(
         amount: object,
     ) -> str:
-        """Formatiert einen Geldbetrag für die Anzeige."""
+        """Formatiert einen Geldbetrag."""
 
         formatted = f"{amount:,.2f}"
 
