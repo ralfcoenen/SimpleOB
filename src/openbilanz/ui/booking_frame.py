@@ -50,6 +50,7 @@ class BookingFrame(ttk.Frame):
         self._booking_date_var = tk.StringVar(
             value=date.today().strftime("%d.%m.%Y")
         )
+        self._voucher_no_var = tk.StringVar()
         self._booking_description_var = tk.StringVar()
         self._debit_account_var = tk.StringVar()
         self._credit_account_var = tk.StringVar()
@@ -80,9 +81,32 @@ class BookingFrame(ttk.Frame):
 
         ttk.Label(
             self,
-            text="Buchungstext",
+            text="Belegnummer",
         ).grid(
             row=1,
+            column=0,
+            sticky="w",
+            padx=(0, 12),
+            pady=6,
+        )
+
+        self._voucher_no_entry = ttk.Entry(
+            self,
+            textvariable=self._voucher_no_var,
+            width=24,
+        )
+        self._voucher_no_entry.grid(
+            row=1,
+            column=1,
+            sticky="w",
+            pady=6,
+        )
+
+        ttk.Label(
+            self,
+            text="Buchungstext",
+        ).grid(
+            row=2,
             column=0,
             sticky="w",
             padx=(0, 12),
@@ -94,7 +118,7 @@ class BookingFrame(ttk.Frame):
             textvariable=self._booking_description_var,
         )
         self._description_entry.grid(
-            row=1,
+            row=2,
             column=1,
             sticky="ew",
             pady=6,
@@ -104,7 +128,7 @@ class BookingFrame(ttk.Frame):
             self,
             text="Sollkonto",
         ).grid(
-            row=2,
+            row=3,
             column=0,
             sticky="w",
             padx=(0, 12),
@@ -117,7 +141,7 @@ class BookingFrame(ttk.Frame):
             values=self._account_display_names,
         )
         self._debit_account_box.grid(
-            row=2,
+            row=3,
             column=1,
             sticky="ew",
             pady=6,
@@ -127,7 +151,7 @@ class BookingFrame(ttk.Frame):
             self,
             text="Habenkonto",
         ).grid(
-            row=3,
+            row=4,
             column=0,
             sticky="w",
             padx=(0, 12),
@@ -140,7 +164,7 @@ class BookingFrame(ttk.Frame):
             values=self._account_display_names,
         )
         self._credit_account_box.grid(
-            row=3,
+            row=4,
             column=1,
             sticky="ew",
             pady=6,
@@ -150,7 +174,7 @@ class BookingFrame(ttk.Frame):
             self,
             text="Betrag",
         ).grid(
-            row=4,
+            row=5,
             column=0,
             sticky="w",
             padx=(0, 12),
@@ -164,7 +188,7 @@ class BookingFrame(ttk.Frame):
             width=18,
         )
         self._amount_entry.grid(
-            row=4,
+            row=5,
             column=1,
             sticky="w",
             pady=6,
@@ -176,7 +200,7 @@ class BookingFrame(ttk.Frame):
             command=self._create_booking,
         )
         self._booking_button.grid(
-            row=5,
+            row=6,
             column=1,
             sticky="e",
             pady=(18, 6),
@@ -189,7 +213,7 @@ class BookingFrame(ttk.Frame):
             self,
             textvariable=self._status_var,
         ).grid(
-            row=6,
+            row=7,
             column=0,
             columnspan=2,
             sticky="w",
@@ -207,6 +231,7 @@ class BookingFrame(ttk.Frame):
 
         variables = (
             self._booking_date_var,
+            self._voucher_no_var,
             self._booking_description_var,
             self._debit_account_var,
             self._credit_account_var,
@@ -341,12 +366,18 @@ class BookingFrame(ttk.Frame):
         except ValueError:
             return
 
+        voucher_no = (
+            self._voucher_no_var.get().strip()
+            or None
+        )
+
         description = (
             self._booking_description_var.get().strip()
         )
 
         booking = Booking(
             booking_date=booking_date,
+            voucher_no=voucher_no,
             description=description,
             lines=(
                 BookingLine(
@@ -414,6 +445,7 @@ class BookingFrame(ttk.Frame):
     def _clear(self) -> None:
         """Leert die Buchungsfelder."""
 
+        self._voucher_no_var.set("")
         self._booking_description_var.set("")
         self._debit_account_var.set("")
         self._credit_account_var.set("")
@@ -426,7 +458,7 @@ class BookingFrame(ttk.Frame):
             values=self._account_display_names
         )
 
-        self._description_entry.focus_set()
+        self._voucher_no_entry.focus_set()
 
     @staticmethod
     def _account_display_name(
