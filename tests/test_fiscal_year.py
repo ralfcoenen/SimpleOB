@@ -187,3 +187,15 @@ def test_fiscal_year_is_hashable() -> None:
     )
 
     assert {fiscal_year} == {fiscal_year}
+    
+def test_display_name() -> None:
+    fiscal_year = FiscalYear(
+        start_date=date(2026, 1, 1),
+        end_date=date(2026, 12, 31),
+    )
+
+    assert (
+        fiscal_year.display_name
+        == "01.01.2026 – 31.12.2026"
+    )
+

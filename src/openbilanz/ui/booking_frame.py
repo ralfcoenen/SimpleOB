@@ -243,7 +243,6 @@ class BookingFrame(ttk.Frame):
                 "write",
                 self._on_form_changed,
             )
-
     def _filter_debit_accounts(
         self,
         _event: tk.Event,
@@ -254,6 +253,7 @@ class BookingFrame(ttk.Frame):
             self._debit_account_box,
             self._debit_account_var.get(),
         )
+
 
     def _filter_credit_accounts(
         self,

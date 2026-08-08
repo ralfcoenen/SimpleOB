@@ -15,6 +15,7 @@ from openbilanz.accounting.hgb_financial_statement_position_provider import (
 from openbilanz.accounting.income_statement import IncomeStatement
 from openbilanz.accounting.ledger import Ledger
 from openbilanz.accounting.mapper import AccountMapper
+from openbilanz.core.context import ApplicationContext
 from openbilanz.domain.account import Account
 from openbilanz.domain.account_type import AccountType
 from openbilanz.domain.booking import Booking
@@ -51,8 +52,15 @@ from openbilanz.ui.opening_balance_dialog import (
 class MainWindow(tk.Tk):
     """Hauptfenster von OpenBilanz."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        context: ApplicationContext,
+    ) -> None:
+        
         super().__init__()
+        
+        self._context = context
 
         self.title("OpenBilanz")
         self.geometry("1100x700")
@@ -131,6 +139,33 @@ class MainWindow(tk.Tk):
             pady=(4, 16),
         )
 
+        context_frame = ttk.Frame(
+            container,
+        )
+        context_frame.pack(
+            fill="x",
+            pady=(0, 16),
+        )
+
+        ttk.Label(
+            context_frame,
+            text=self._context.company.name,
+            font=("TkDefaultFont", 13, "bold"),
+        ).pack(
+            anchor="w",
+        )
+
+        ttk.Label(
+            context_frame,
+            text=(
+                "Geschäftsjahr: "
+                f"{self._context.fiscal_year.display_name}"
+            ),
+        ).pack(
+            anchor="w",
+            pady=(2, 0),
+        )
+        
         ttk.Button(
             container,
             text="Eröffnungsbilanz erfassen",

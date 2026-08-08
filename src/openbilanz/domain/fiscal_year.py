@@ -38,3 +38,12 @@ class FiscalYear:
     def calendar_years(self) -> tuple[int, ...]:
         """Alle vom Geschäftsjahr berührten Kalenderjahre."""
         return tuple(range(self.start_date.year, self.end_date.year + 1))
+
+    @property
+    def display_name(self) -> str:
+        """Liefert eine lesbare Bezeichnung des Geschäftsjahres."""
+
+        return (
+            f"{self.start_date:%d.%m.%Y} – "
+            f"{self.end_date:%d.%m.%Y}"
+        )
