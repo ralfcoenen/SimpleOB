@@ -221,6 +221,7 @@ class MainWindow(tk.Tk):
             "name",
             "debit",
             "credit",
+            "balance",
         )
 
         self._account_table = ttk.Treeview(
@@ -246,24 +247,33 @@ class MainWindow(tk.Tk):
             "credit",
             text="Haben",
         )
+        self._account_table.heading(
+            "balance",
+            text="Saldo",
+        )
 
         self._account_table.column(
             "account_number",
-            width=100,
+            width=90,
             anchor="w",
         )
         self._account_table.column(
             "name",
-            width=350,
+            width=330,
             anchor="w",
         )
         self._account_table.column(
             "debit",
-            width=140,
+            width=120,
             anchor="e",
         )
         self._account_table.column(
             "credit",
+            width=120,
+            anchor="e",
+        )
+        self._account_table.column(
+            "balance",
             width=140,
             anchor="e",
         )
@@ -484,28 +494,32 @@ class MainWindow(tk.Tk):
             )
         )
 
-        for item in (
-            self._account_table.get_children()
-        ):
-            self._account_table.delete(
-                item
-            )
+        for item in self._account_table.get_children():
+            self._account_table.delete(item)
 
         for account in self._accounts:
             debit = ZERO
             credit = ZERO
+            debit_balance = ZERO
+            credit_balance = ZERO
 
             try:
-                ledger_account = (
-                    self._ledger.get_account(
-                        account.number
-                    )
+                ledger_account = self._ledger.get_account(
+                    account.number
                 )
             except KeyError:
                 pass
             else:
                 debit = ledger_account.debit
                 credit = ledger_account.credit
+                debit_balance = ledger_account.debit_balance
+                credit_balance = ledger_account.credit_balance
+
+            balance = self._display_account_balance(
+                account_type=account.account_type,
+                debit_balance=debit_balance,
+                credit_balance=credit_balance,
+            )
 
             self._account_table.insert(
                 "",
@@ -515,17 +529,22 @@ class MainWindow(tk.Tk):
                     account.name,
                     self._format_amount(debit),
                     self._format_amount(credit),
+                    balance,
                 ),
             )
 
         try:
-            opening_account = (
-                self._ledger.get_account(
-                    "9000"
-                )
+            opening_account = self._ledger.get_account(
+                "9000"
             )
         except KeyError:
             return
+
+        opening_balance = (
+            opening_account.debit_balance
+            if opening_account.debit_balance > ZERO
+            else opening_account.credit_balance
+        )
 
         self._account_table.insert(
             "",
@@ -538,6 +557,9 @@ class MainWindow(tk.Tk):
                 ),
                 self._format_amount(
                     opening_account.credit
+                ),
+                self._format_amount(
+                    opening_balance
                 ),
             ),
         )
@@ -750,3 +772,50 @@ class MainWindow(tk.Tk):
             )
 
         return message
+
+    @classmethod
+    def _display_account_balance(
+        cls,
+        *,
+        account_type: AccountType,
+        debit_balance: object,
+        credit_balance: object,
+    ) -> str:
+        """Formatiert den fachlichen Kontosaldo."""
+
+        if account_type in (
+            AccountType.ASSET,
+            AccountType.EXPENSE,
+        ):
+            if debit_balance > ZERO:
+                return cls._format_amount(
+                    debit_balance
+                )
+
+            if credit_balance > ZERO:
+                return (
+                    "-"
+                    + cls._format_amount(
+                        credit_balance
+                    )
+                )
+
+        if account_type in (
+            AccountType.LIABILITY,
+            AccountType.EQUITY,
+            AccountType.REVENUE,
+        ):
+            if credit_balance > ZERO:
+                return cls._format_amount(
+                    credit_balance
+                )
+
+            if debit_balance > ZERO:
+                return (
+                    "-"
+                    + cls._format_amount(
+                        debit_balance
+                    )
+                )
+
+        return cls._format_amount(ZERO)
