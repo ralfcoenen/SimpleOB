@@ -12,6 +12,7 @@ from openbilanz.accounting.financial_statement_builder import (
 from openbilanz.accounting.hgb_financial_statement_position_provider import (
     HgbFinancialStatementPositionProvider,
 )
+from openbilanz.accounting.income_statement import IncomeStatement
 from openbilanz.accounting.ledger import Ledger
 from openbilanz.accounting.mapper import AccountMapper
 from openbilanz.domain.account import Account
@@ -31,6 +32,8 @@ from openbilanz.hgb.income_statement_structure import (
 from openbilanz.importers.csv_chart_of_accounts_importer import (
     CsvChartOfAccountsImporter,
 )
+from openbilanz.services.closing_result import ClosingResult
+from openbilanz.services.closing_service import ClosingService
 from openbilanz.services.opening_balance_service import (
     OpeningBalanceService,
 )
@@ -59,6 +62,8 @@ class MainWindow(tk.Tk):
             opening_balance_account_number="9000",
         )
         self._posting_service = PostingService()
+        
+        self._closing_service = ClosingService()
 
         (
             self._assets,
@@ -536,7 +541,7 @@ class MainWindow(tk.Tk):
                 )
 
     def _refresh_balance_sheet(self) -> None:
-        """Erzeugt und aktualisiert die Bilanz."""
+        """Erzeugt und aktualisiert die laufende Bilanz."""
 
         balance_sheet_account_types = (
             AccountType.ASSET,
@@ -544,7 +549,12 @@ class MainWindow(tk.Tk):
             AccountType.EQUITY,
         )
 
-        balances = tuple(
+        income_statement_account_types = (
+            AccountType.REVENUE,
+            AccountType.EXPENSE,
+        )
+
+        balance_sheet_balances = tuple(
             balance
             for balance in self._ledger.balances()
             if self._account_types.get(
@@ -553,16 +563,76 @@ class MainWindow(tk.Tk):
             in balance_sheet_account_types
         )
 
-        amounts = (
-            self._financial_statement_builder
-            .build(
-                balances=balances,
+        income_statement_balances = tuple(
+            balance
+            for balance in self._ledger.balances()
+            if self._account_types.get(
+                balance.account_number
+            )
+            in income_statement_account_types
+        )
+
+        income_statement_amounts = (
+            self._financial_statement_builder.build(
+                balances=income_statement_balances,
                 root_positions=(
-                    self._assets,
-                    self._liabilities,
+                    self._income_statement,
                 ),
             )
         )
+
+        income_statement = IncomeStatement(
+            income_statement=self._income_statement,
+            amounts=income_statement_amounts,
+        )
+
+        net_income = (
+            self._closing_service.calculate_net_income(
+                income_statement=income_statement,
+            )
+        )
+
+        closing_result = ClosingResult(
+            net_income=net_income,
+        )
+
+        equity = next(
+            position
+            for position in self._liabilities.children
+            if position.code == "HGB.266.PASSIVA.A"
+        )
+
+        result_position = next(
+            position
+            for position in equity.children
+            if position.code == "HGB.266.PASSIVA.A.V"
+        )
+
+        try:
+            amounts = (
+                self._financial_statement_builder.build(
+                    balances=balance_sheet_balances,
+                    root_positions=(
+                        self._assets,
+                        self._liabilities,
+                    ),
+                    closing_result=closing_result,
+                    result_position=result_position,
+                )
+            )
+        except ValueError as exc:
+            message = str(exc)
+
+            if (
+                "no debit position defined for account" not in message
+                and "no credit position defined for account" not in message
+            ):
+                raise
+
+            self._balance_sheet_frame.show_mapping_error(
+                self._format_mapping_error(message)
+            )
+            return
 
         balance_sheet = BalanceSheet(
             assets=self._assets,
@@ -573,6 +643,7 @@ class MainWindow(tk.Tk):
         self._balance_sheet_frame.update_balance_sheet(
             balance_sheet
         )
+
 
     def _load_standard_chart_of_accounts(
         self,
@@ -614,3 +685,27 @@ class MainWindow(tk.Tk):
             .replace(".", ",")
             .replace("X", ".")
         )
+
+    @staticmethod
+    def _format_mapping_error(
+        message: str,
+    ) -> str:
+        """Formatiert einen Mappingfehler für die GUI."""
+
+        if "no credit position defined for account" in message:
+            account_number = message.rsplit(" ", 1)[-1]
+
+            return (
+                f"Konto {account_number} weist einen Habensaldo auf. "
+                "Für diesen Fall ist keine Bilanzzuordnung hinterlegt."
+            )
+
+        if "no debit position defined for account" in message:
+            account_number = message.rsplit(" ", 1)[-1]
+
+            return (
+                f"Konto {account_number} weist einen Sollsaldo auf. "
+                "Für diesen Fall ist keine Bilanzzuordnung hinterlegt."
+            )
+
+        return message

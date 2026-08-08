@@ -273,3 +273,24 @@ class BalanceSheetFrame(ttk.Frame):
             .replace(".", ",")
             .replace("X", ".")
         )
+
+    def show_mapping_error(
+        self,
+        message: str,
+    ) -> None:
+        """Zeigt einen Fehler bei der Bilanzzuordnung an."""
+
+        self._clear_tree(
+            self._assets_tree
+        )
+        self._clear_tree(
+            self._liabilities_tree
+        )
+
+        self._totals_label.config(
+            text="Bilanz kann nicht vollständig ermittelt werden."
+        )
+
+        self._status_label.config(
+            text=message
+        )
