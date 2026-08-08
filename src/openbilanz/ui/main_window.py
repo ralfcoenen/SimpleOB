@@ -40,6 +40,9 @@ from openbilanz.services.opening_balance_service import (
 from openbilanz.services.posting_service import PostingService
 from openbilanz.ui.balance_sheet_frame import BalanceSheetFrame
 from openbilanz.ui.booking_frame import BookingFrame
+from openbilanz.ui.income_statement_frame import (
+    IncomeStatementFrame,
+)
 from openbilanz.ui.opening_balance_dialog import (
     OpeningBalanceDialog,
 )
@@ -161,6 +164,10 @@ class MainWindow(tk.Tk):
             self._notebook,
             padding=16,
         )
+        self._income_statement_tab = ttk.Frame(
+            self._notebook,
+            padding=16,
+        )
 
         self._notebook.add(
             self._accounts_tab,
@@ -178,11 +185,16 @@ class MainWindow(tk.Tk):
             self._balance_sheet_tab,
             text="Bilanz",
         )
+        self._notebook.add(
+            self._income_statement_tab,
+            text="GuV",
+        )
 
         self._create_accounts_tab()
         self._create_journal_tab()
         self._create_booking_tab()
         self._create_balance_sheet_tab()
+        self._create_income_statement_tab()
 
     def _create_accounts_tab(self) -> None:
         """Erzeugt den Arbeitsbereich Konten."""
@@ -382,6 +394,30 @@ class MainWindow(tk.Tk):
             )
         )
         self._balance_sheet_frame.pack(
+            fill="both",
+            expand=True,
+        )
+
+    def _create_income_statement_tab(
+        self,
+    ) -> None:
+        """Erzeugt den Arbeitsbereich GuV."""
+
+        ttk.Label(
+            self._income_statement_tab,
+            text="Gewinn- und Verlustrechnung nach § 275 HGB",
+            font=("TkDefaultFont", 16, "bold"),
+        ).pack(
+            anchor="w",
+            pady=(0, 12),
+        )
+
+        self._income_statement_frame = (
+            IncomeStatementFrame(
+                self._income_statement_tab
+            )
+        )
+        self._income_statement_frame.pack(
             fill="both",
             expand=True,
         )
@@ -590,6 +626,11 @@ class MainWindow(tk.Tk):
             self._closing_service.calculate_net_income(
                 income_statement=income_statement,
             )
+        )
+        
+        self._income_statement_frame.update_income_statement(
+            income_statement=income_statement,
+            net_income=net_income,
         )
 
         closing_result = ClosingResult(
