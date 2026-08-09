@@ -10,6 +10,9 @@ from openbilanz.domain.fiscal_year import FiscalYear
 from openbilanz.ui.new_company_dialog import (
     NewCompanyDialog,
 )
+from openbilanz.ui.new_fiscal_year_dialog import (
+    NewFiscalYearDialog,
+)
 
 
 class StartDialog(tk.Toplevel):
@@ -159,7 +162,20 @@ class StartDialog(tk.Toplevel):
         ).pack(
             side="left",
         )
-
+        
+        self._new_fiscal_year_button = ttk.Button(
+            buttons,
+            text="Neues Geschäftsjahr",
+            command=self._create_new_fiscal_year,
+        )
+        self._new_fiscal_year_button.pack(
+            side="left",
+            padx=(8, 0),
+        )
+        self._new_fiscal_year_button.state(
+            ["disabled"]
+        )
+        
         ttk.Button(
             buttons,
             text="Abbrechen",
@@ -206,6 +222,10 @@ class StartDialog(tk.Toplevel):
                 "Es ist noch keine Buchhaltung vorhanden."
             )
             return
+        
+        self._new_fiscal_year_button.state(
+            ["!disabled"]
+        )
 
         first_company_name = company_names[0]
 
@@ -331,4 +351,33 @@ class StartDialog(tk.Toplevel):
 
         self.result = dialog.result
         self.destroy()
-   
+  
+    def _create_new_fiscal_year(self) -> None:
+        """Legt für das ausgewählte Unternehmen ein Geschäftsjahr an."""
+
+        company = self._selected_company()
+
+        if company is None:
+            return
+
+        dialog = NewFiscalYearDialog(
+            self,
+            repository=self._repository,
+            company=company,
+        )
+
+        self.wait_window(dialog)
+
+        if dialog.result is None:
+            return
+
+        self._load_fiscal_years(
+            company
+        )
+
+        display_name = dialog.result.display_name
+
+        self._fiscal_year_var.set(
+            display_name
+        )
+    
