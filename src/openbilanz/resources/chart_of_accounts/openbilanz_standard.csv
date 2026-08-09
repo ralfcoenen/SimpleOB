@@ -4,6 +4,8 @@ account_number;name;account_type;statement_type;debit_position_code;credit_posit
 1576;Vorsteuer;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.II.4;
 1600;Verbindlichkeiten aus Lieferungen und Leistungen;LIABILITY;BALANCE_SHEET;;HGB.266.PASSIVA.C.4
 1800;Eigenkapital;EQUITY;BALANCE_SHEET;;HGB.266.PASSIVA.A.I
+8020;Jahresüberschuss;EQUITY;BALANCE_SHEET;;HGB.266.PASSIVA.A.V
+8021;Jahresfehlbetrag;EQUITY;BALANCE_SHEET;HGB.266.PASSIVA.A.V;
 8400;Umsatzerlöse;REVENUE;INCOME_STATEMENT;;HGB.275.GKV.1
 4930;Sonstige betriebliche Aufwendungen;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
 4980;Büromaterial;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;

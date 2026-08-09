@@ -115,7 +115,7 @@ def test_close_returns_closing_result() -> None:
 def test_close_accepts_ledger() -> None:
     service = ClosingService(
         closing_accounts=ClosingAccounts(
-            income_summary_account="9000",
+            income_summary_account="8990",
             profit_account="8020",
             loss_account="8021",
         ),
@@ -140,7 +140,7 @@ def test_close_accepts_ledger() -> None:
 
 def test_close_creates_closing_booking_for_revenue_account() -> None:
     closing_accounts = ClosingAccounts(
-        income_summary_account="9000",
+        income_summary_account="8990",
         profit_account="8020",
         loss_account="8021",
     )
@@ -194,7 +194,7 @@ def test_close_creates_closing_booking_for_revenue_account() -> None:
             amount=Decimal("500.00"),
         ),
         BookingLine(
-            account_number="9000",
+            account_number="8990",
             side=EntrySide.CREDIT,
             amount=Decimal("500.00"),
         ),
@@ -202,7 +202,7 @@ def test_close_creates_closing_booking_for_revenue_account() -> None:
 
 def test_close_creates_closing_booking_for_expense_account() -> None:
     closing_accounts = ClosingAccounts(
-        income_summary_account="9000",
+        income_summary_account="8990",
         profit_account="8020",
         loss_account="8021",
     )
@@ -251,7 +251,7 @@ def test_close_creates_closing_booking_for_expense_account() -> None:
     assert booking.description == "Abschluss des Aufwandskontos 4930"
     assert booking.lines == (
         BookingLine(
-            account_number="9000",
+            account_number="8990",
             side=EntrySide.DEBIT,
             amount=Decimal("200.00"),
         ),
@@ -264,7 +264,7 @@ def test_close_creates_closing_booking_for_expense_account() -> None:
 
 def test_close_creates_booking_for_net_income() -> None:
     ClosingAccounts(
-        income_summary_account="9000",
+        income_summary_account="8990",
         profit_account="8020",
         loss_account="8021",
     )
@@ -297,7 +297,7 @@ def test_close_creates_booking_for_net_income() -> None:
 
     result = ClosingService(
         closing_accounts=ClosingAccounts(
-            income_summary_account="9000",
+            income_summary_account="8990",
             profit_account="8020",
             loss_account="8021",
         ),
@@ -315,7 +315,7 @@ def test_close_creates_booking_for_net_income() -> None:
     assert booking.description == "Abschluss des GuV-Kontos"
     assert booking.lines == (
         BookingLine(
-            account_number="9000",
+            account_number="8990",
             side=EntrySide.DEBIT,
             amount=Decimal("300.00"),
         ),
