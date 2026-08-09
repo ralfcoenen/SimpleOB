@@ -364,4 +364,151 @@ def test_separates_bookings_by_fiscal_year() -> None:
 
     assert booking_2027 not in loaded_2026
     assert booking_2026 not in loaded_2027
-    
+
+def test_rejects_booking_for_closed_fiscal_year() -> None:
+    """In ein abgeschlossenes Geschäftsjahr darf nicht gebucht werden."""
+
+    engine = create_engine(
+        "sqlite:///:memory:"
+    )
+    Base.metadata.create_all(engine)
+
+    Session = sessionmaker(
+        bind=engine
+    )
+
+    with Session() as session:
+        company_repository = CompanyRepository(
+            session
+        )
+        booking_repository = BookingRepository(
+            session
+        )
+
+        company = Company(
+            company_id=uuid4(),
+            name="Muster UG",
+        )
+
+        fiscal_year = FiscalYear(
+            start_date=date(2026, 1, 1),
+            end_date=date(2026, 12, 31),
+        )
+
+        company_repository.add(
+            company
+        )
+
+        company_repository.add_fiscal_year(
+            company.company_id,
+            fiscal_year,
+        )
+
+        company_repository.close_fiscal_year(
+            company.company_id,
+            fiscal_year,
+        )
+
+        booking = Booking(
+            booking_date=date(2026, 12, 31),
+            description="Buchung nach Abschluss",
+            lines=(
+                BookingLine(
+                    account_number="4980",
+                    side=EntrySide.DEBIT,
+                    amount=Decimal("100.00"),
+                ),
+                BookingLine(
+                    account_number="1200",
+                    side=EntrySide.CREDIT,
+                    amount=Decimal("100.00"),
+                ),
+            ),
+        )
+
+        with pytest.raises(
+            ValueError,
+            match="Geschäftsjahr ist abgeschlossen",
+        ):
+            booking_repository.add(
+                company_id=company.company_id,
+                fiscal_year=fiscal_year,
+                booking=booking,
+            )
+
+def test_add_can_defer_commit() -> None:
+    """Eine Buchung kann ohne sofortigen Commit vorgemerkt werden."""
+
+    engine = create_engine(
+        "sqlite:///:memory:"
+    )
+    Base.metadata.create_all(engine)
+
+    Session = sessionmaker(
+        bind=engine
+    )
+
+    company = Company(
+        company_id=uuid4(),
+        name="Muster UG",
+    )
+
+    fiscal_year = FiscalYear(
+        start_date=date(2026, 1, 1),
+        end_date=date(2026, 12, 31),
+    )
+
+    booking = Booking(
+        booking_date=date(2026, 8, 8),
+        description="Testbuchung",
+        lines=(
+            BookingLine(
+                account_number="4980",
+                side=EntrySide.DEBIT,
+                amount=Decimal("100.00"),
+            ),
+            BookingLine(
+                account_number="1200",
+                side=EntrySide.CREDIT,
+                amount=Decimal("100.00"),
+            ),
+        ),
+    )
+
+    with Session() as session:
+        company_repository = CompanyRepository(
+            session
+        )
+        booking_repository = BookingRepository(
+            session
+        )
+
+        company_repository.add(company)
+        company_repository.add_fiscal_year(
+            company.company_id,
+            fiscal_year,
+        )
+
+        booking_repository.add(
+            company_id=company.company_id,
+            fiscal_year=fiscal_year,
+            booking=booking,
+            commit=False,
+        )
+
+        session.rollback()
+
+    with Session() as session:
+        booking_repository = BookingRepository(
+            session
+        )
+
+        loaded = (
+            booking_repository.list_for_fiscal_year(
+                company_id=company.company_id,
+                fiscal_year=fiscal_year,
+            )
+        )
+
+    assert loaded == ()
+

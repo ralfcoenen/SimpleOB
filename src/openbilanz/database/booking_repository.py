@@ -14,6 +14,7 @@ from openbilanz.domain.booking import Booking
 from openbilanz.domain.booking_line import BookingLine
 from openbilanz.domain.entry_side import EntrySide
 from openbilanz.domain.fiscal_year import FiscalYear
+from openbilanz.domain.fiscal_year_status import FiscalYearStatus
 
 
 class BookingRepository:
@@ -31,6 +32,7 @@ class BookingRepository:
         company_id: UUID,
         fiscal_year: FiscalYear,
         booking: Booking,
+        commit: bool = True,
     ) -> None:
         """Speichert eine Buchung."""
 
@@ -44,6 +46,14 @@ class BookingRepository:
                 "Das Geschäftsjahr ist nicht vorhanden."
             )
 
+        if (
+            fiscal_year_model.status
+            == FiscalYearStatus.CLOSED.value
+        ):
+            raise ValueError(
+                "Das Geschäftsjahr ist abgeschlossen."
+            )
+        
         if not fiscal_year.contains(
             booking.booking_date
         ):
@@ -87,7 +97,9 @@ class BookingRepository:
         ]
 
         self._session.add(model)
-        self._session.commit()
+
+        if commit:
+            self._session.commit()
 
     def list_for_fiscal_year(
         self,

@@ -74,6 +74,12 @@ class Wirtschaftsjahr(Base):
         Date,
         nullable=False,
     )
+    
+    status: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+        default="OPEN",
+    )
 
     mandant: Mapped[Mandant] = relationship(
         back_populates="wirtschaftsjahre",
@@ -82,6 +88,16 @@ class Wirtschaftsjahr(Base):
     buchungen: Mapped[list["Buchung"]] = relationship(
         back_populates="wirtschaftsjahr",
         cascade="all, delete-orphan",
+    )
+    
+    opening_source_id: Mapped[int | None] = mapped_column(
+        ForeignKey("wirtschaftsjahre.id"),
+        nullable=True,
+    )
+
+    opening_source: Mapped["Wirtschaftsjahr | None"] = relationship(
+        remote_side="Wirtschaftsjahr.id",
+        foreign_keys=[opening_source_id],
     )
     
 class Buchung(Base):

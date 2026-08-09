@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session
 from openbilanz.database.models import Mandant, Wirtschaftsjahr
 from openbilanz.domain.company import Company
 from openbilanz.domain.fiscal_year import FiscalYear
+from openbilanz.domain.fiscal_year_status import FiscalYearStatus
+from openbilanz.domain.managed_fiscal_year import ManagedFiscalYear
 
 
 class CompanyRepository:
@@ -97,6 +99,7 @@ class CompanyRepository:
             mandant_id=company_model.id,
             start_date=fiscal_year.start_date,
             end_date=fiscal_year.end_date,
+            status=FiscalYearStatus.OPEN.value,
         )
 
         self._session.add(model)
@@ -161,3 +164,176 @@ class CompanyRepository:
             )
             for model in models
         )
+
+    def get_managed_fiscal_years(
+        self,
+        company_id: UUID,
+    ) -> tuple[ManagedFiscalYear, ...]:
+        """Lädt Geschäftsjahre einschließlich ihres Status."""
+
+        company_model = (
+            self._session.query(Mandant)
+            .filter(
+                Mandant.company_id == str(company_id)
+            )
+            .one_or_none()
+        )
+
+        if company_model is None:
+            return ()
+
+        models = (
+            self._session.query(Wirtschaftsjahr)
+            .filter(
+                Wirtschaftsjahr.mandant_id
+                == company_model.id
+            )
+            .order_by(
+                Wirtschaftsjahr.start_date
+            )
+            .all()
+        )
+
+        return tuple(
+            ManagedFiscalYear(
+                fiscal_year=FiscalYear(
+                    start_date=model.start_date,
+                    end_date=model.end_date,
+                ),
+                status=FiscalYearStatus(
+                    model.status
+                ),
+                opening_source=(
+                    FiscalYear(
+                        start_date=model.opening_source.start_date,
+                        end_date=model.opening_source.end_date,
+                    )
+                    if model.opening_source is not None
+                    else None
+                ),
+            )
+            for model in models
+        )
+
+    def set_opening_source(
+        self,
+        company_id: UUID,
+        fiscal_year: FiscalYear,
+        opening_source: FiscalYear,
+        *,
+        commit: bool = True,
+    ) -> None:
+        """Speichert das Herkunftsgeschäftsjahr einer Eröffnung."""
+
+        company_model = (
+            self._session.query(Mandant)
+            .filter(
+                Mandant.company_id == str(company_id)
+            )
+            .one_or_none()
+        )
+
+        if company_model is None:
+            raise ValueError(
+                "Unternehmen wurde nicht gefunden."
+            )
+
+        fiscal_year_model = (
+            self._session.query(Wirtschaftsjahr)
+            .filter(
+                Wirtschaftsjahr.mandant_id
+                == company_model.id,
+                Wirtschaftsjahr.start_date
+                == fiscal_year.start_date,
+                Wirtschaftsjahr.end_date
+                == fiscal_year.end_date,
+            )
+            .one_or_none()
+        )
+
+        if fiscal_year_model is None:
+            raise ValueError(
+                "Geschäftsjahr wurde nicht gefunden."
+            )
+
+        opening_source_model = (
+            self._session.query(Wirtschaftsjahr)
+            .filter(
+                Wirtschaftsjahr.mandant_id
+                == company_model.id,
+                Wirtschaftsjahr.start_date
+                == opening_source.start_date,
+                Wirtschaftsjahr.end_date
+                == opening_source.end_date,
+            )
+            .one_or_none()
+        )
+
+        if opening_source_model is None:
+            raise ValueError(
+                "Herkunftsgeschäftsjahr wurde nicht gefunden."
+            )
+
+        fiscal_year_model.opening_source = (
+            opening_source_model
+        )
+
+        if commit:
+            self._session.commit()
+
+    def close_fiscal_year(
+        self,
+        company_id: UUID,
+        fiscal_year: FiscalYear,
+        *,
+        commit: bool = True,
+    ) -> None:
+        """Schließt ein Geschäftsjahr ab."""
+
+        company_model = (
+            self._session.query(Mandant)
+            .filter(
+                Mandant.company_id == str(company_id)
+            )
+            .one_or_none()
+        )
+
+        if company_model is None:
+            raise ValueError(
+                "Unternehmen wurde nicht gefunden."
+            )
+
+        fiscal_year_model = (
+            self._session.query(Wirtschaftsjahr)
+            .filter(
+                Wirtschaftsjahr.mandant_id
+                == company_model.id,
+                Wirtschaftsjahr.start_date
+                == fiscal_year.start_date,
+                Wirtschaftsjahr.end_date
+                == fiscal_year.end_date,
+            )
+            .one_or_none()
+        )
+
+        if fiscal_year_model is None:
+            raise ValueError(
+                "Geschäftsjahr wurde nicht gefunden."
+            )
+
+        if (
+            fiscal_year_model.status
+            == FiscalYearStatus.CLOSED.value
+        ):
+            raise ValueError(
+                "Geschäftsjahr ist bereits abgeschlossen."
+            )
+
+        fiscal_year_model.status = (
+            FiscalYearStatus.CLOSED.value
+        )
+
+        if commit:
+            self._session.commit()
+        
+        
