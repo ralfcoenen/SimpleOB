@@ -15,6 +15,7 @@ from openbilanz.domain.fiscal_year import FiscalYear
 from openbilanz.services.fiscal_year_transfer_service import (
     FiscalYearTransferService,
 )
+from openbilanz.services.posting_service import PostingService
 
 
 class FiscalYearOpeningWorkflow:
@@ -27,11 +28,13 @@ class FiscalYearOpeningWorkflow:
         booking_repository: BookingRepository,
         company_repository: CompanyRepository,
         transfer_service: FiscalYearTransferService,
+        posting_service: PostingService,
     ) -> None:
         self._session = session
         self._booking_repository = booking_repository
         self._company_repository = company_repository
         self._transfer_service = transfer_service
+        self._posting_service = posting_service
         
     def open(
         self,
@@ -39,7 +42,6 @@ class FiscalYearOpeningWorkflow:
         company_id: UUID,
         source_fiscal_year: FiscalYear,
         target_fiscal_year: FiscalYear,
-        source_ledger: Ledger,
         account_types: Mapping[str, AccountType],
     ) -> tuple[Booking, ...]:
         """Eröffnet ein Geschäftsjahr aus den Salden des Vorjahres."""
@@ -108,8 +110,26 @@ class FiscalYearOpeningWorkflow:
                 "Quellgeschäftsjahr geht dem Zielgeschäftsjahr "
                 "nicht unmittelbar voraus."
             )
-    
+            
+        
         try:
+            
+            source_bookings = (
+                        self._booking_repository.list_for_fiscal_year(
+                            company_id=company_id,
+                            fiscal_year=source_fiscal_year,
+                        )
+                    )
+            
+            source_ledger = Ledger()
+    
+            for booking in source_bookings:
+                self._posting_service.post_booking(
+                    booking=booking,
+                    ledger=source_ledger,
+                )
+        
+
             opening_bookings = (
                 self._transfer_service.create_opening_bookings(
                     ledger=source_ledger,
