@@ -224,3 +224,25 @@ def test_entry_point_resolves_taxonomy_family() -> None:
 
     assert entry_point.family is TaxonomyFamily.GAAP_CI
     
+def test_taxonomy_entry_point_builds_schema_ref_uri(
+    tmp_path: Path,
+) -> None:
+    """Ein Entry-Point ermittelt seine kanonische schemaRef-URI."""
+
+    entry_point = TaxonomyEntryPoint(
+        path=(
+            tmp_path
+            / "de-gaap-ci-2024-04-01-shell-fiscal.xsd"
+        ),
+        namespace=(
+            "http://www.xbrl.de/taxonomies/"
+            "de-gaap-ci-2024-04-01/shell-fiscal"
+        ),
+        schema_imports=(),
+    )
+
+    assert entry_point.schema_ref_uri == (
+        "http://www.xbrl.de/taxonomies/"
+        "de-gaap-ci-2024-04-01/"
+        "de-gaap-ci-2024-04-01-shell-fiscal.xsd"
+    )

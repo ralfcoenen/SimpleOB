@@ -16,6 +16,7 @@ class TaxonomyFact:
     amount: Decimal
     context: TaxonomyContext
     unit: TaxonomyUnit
+    decimals: int | str = 2
 
     def __post_init__(self) -> None:
         if not isinstance(
@@ -49,6 +50,17 @@ class TaxonomyFact:
             raise TypeError(
                 "unit must be a TaxonomyUnit"
             )
+            
+        if not (
+            isinstance(
+                self.decimals,
+                int,
+            )
+            or self.decimals == "INF"
+        ):
+            raise TypeError(
+                'decimals must be an int or "INF"'
+            )
 
         if not self.concept.is_numeric:
             raise ValueError(
@@ -78,3 +90,4 @@ class TaxonomyFact:
             raise ValueError(
                 "pure concept requires xbrli:pure unit"
             )
+

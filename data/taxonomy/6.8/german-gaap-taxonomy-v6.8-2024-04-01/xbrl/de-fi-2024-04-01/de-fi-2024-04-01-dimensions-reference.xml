@@ -1,0 +1,318 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--(c) XBRL Deutschland e.V. - see http://www.xbrl.de-->
+
+
+<linkbase xmlns="http://www.xbrl.org/2003/linkbase"
+          xmlns:hgbref="http://www.xbrl.de/taxonomies/de-ref-2010-02-19"
+          xmlns:ref="http://www.xbrl.org/2006/ref"
+          xmlns:xbrli="http://www.xbrl.org/2003/instance"
+          xmlns:xlink="http://www.w3.org/1999/xlink"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://www.xbrl.org/2006/ref http://www.xbrl.org/2006/ref-2006-02-27.xsd http://www.xbrl.de/taxonomies/de-ref-2010-02-19 ../de-gcd-2024-04-01/hgbref-2024-04-01.xsd">
+   <referenceLink xlink:type="extended" xlink:role="http://www.xbrl.org/2003/role/link">
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_bsBanks.ass.leaseAssetsFAT"
+           xlink:label="de-fi_bsBanks.ass.leaseAssetsFAT"/>
+      <referenceArc xlink:from="de-fi_bsBanks.ass.leaseAssetsFAT"
+                    xlink:to="reference_de-fi_bsBanks.ass.leaseAssetsFAT_1"
+                    order="1.0"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:type="arc"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_bsBanks.ass.leaseAssetsFAT_1"
+                 xlink:role="http://www.xbrl.org/2003/role/reference"
+                 id="reference_de-fi_bsBanks.ass.leaseAssetsFAT_1">
+         <ref:Name>RechKredV</ref:Name>
+         <ref:Number>1 Fußnote 14</ref:Number>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_bsBanks.ass.intanFAT"
+           xlink:label="de-fi_bsBanks.ass.intanFAT"/>
+      <referenceArc xlink:from="de-fi_bsBanks.ass.intanFAT"
+                    xlink:to="reference_de-fi_bsBanks.ass.intanFAT_1"
+                    order="1.0"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:type="arc"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_bsBanks.ass.intanFAT_1"
+                 xlink:role="http://www.xbrl.org/2003/role/reference"
+                 id="reference_de-fi_bsBanks.ass.intanFAT_1">
+         <ref:Name>RechKredV</ref:Name>
+         <ref:Paragraph>34</ref:Paragraph>
+         <ref:Subparagraph>3</ref:Subparagraph>
+         <ref:Clause>1</ref:Clause>
+      </reference>
+      <referenceArc xlink:from="de-fi_bsBanks.ass.intanFAT"
+                    xlink:to="reference_de-fi_bsBanks.ass.intanFAT_2"
+                    order="1.0"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:type="arc"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_bsBanks.ass.intanFAT_2"
+                 xlink:role="http://www.xbrl.org/2003/role/reference"
+                 id="reference_de-fi_bsBanks.ass.intanFAT_2">
+         <ref:Name>HGB</ref:Name>
+         <ref:Paragraph>284</ref:Paragraph>
+         <ref:Subparagraph>3</ref:Subparagraph>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_bsBanks.ass.tanFAT"
+           xlink:label="de-fi_bsBanks.ass.tanFAT"/>
+      <referenceArc xlink:from="de-fi_bsBanks.ass.tanFAT"
+                    xlink:to="reference_de-fi_bsBanks.ass.tanFAT_1"
+                    order="1.0"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:type="arc"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_bsBanks.ass.tanFAT_1"
+                 xlink:role="http://www.xbrl.org/2003/role/reference"
+                 id="reference_de-fi_bsBanks.ass.tanFAT_1">
+         <ref:Name>RechKredV</ref:Name>
+         <ref:Paragraph>34</ref:Paragraph>
+         <ref:Subparagraph>3</ref:Subparagraph>
+         <ref:Clause>1</ref:Clause>
+      </reference>
+      <referenceArc xlink:from="de-fi_bsBanks.ass.tanFAT"
+                    xlink:to="reference_de-fi_bsBanks.ass.tanFAT_2"
+                    order="1.0"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:type="arc"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_bsBanks.ass.tanFAT_2"
+                 xlink:role="http://www.xbrl.org/2003/role/reference"
+                 id="reference_de-fi_bsBanks.ass.tanFAT_2">
+         <ref:Name>HGB</ref:Name>
+         <ref:Paragraph>284</ref:Paragraph>
+         <ref:Subparagraph>3</ref:Subparagraph>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_bsBanks.ass.tan.landBuildingsFAT"
+           xlink:label="de-fi_bsBanks.ass.tan.landBuildingsFAT"/>
+      <referenceArc xlink:from="de-fi_bsBanks.ass.tan.landBuildingsFAT"
+                    xlink:to="reference_de-fi_bsBanks.ass.tan.landBuildingsFAT_1"
+                    order="1.0"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:type="arc"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_bsBanks.ass.tan.landBuildingsFAT_1"
+                 xlink:role="http://www.xbrl.org/2003/role/reference"
+                 id="reference_de-fi_bsBanks.ass.tan.landBuildingsFAT_1">
+         <ref:Name>HGB</ref:Name>
+         <ref:Paragraph>266</ref:Paragraph>
+         <ref:Subparagraph>2 A.II.1.</ref:Subparagraph>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_bsBanks.ass.tan.machineryFAT"
+           xlink:label="de-fi_bsBanks.ass.tan.machineryFAT"/>
+      <referenceArc xlink:from="de-fi_bsBanks.ass.tan.machineryFAT"
+                    xlink:to="reference_de-fi_bsBanks.ass.tan.machineryFAT_1"
+                    order="1.0"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:type="arc"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_bsBanks.ass.tan.machineryFAT_1"
+                 xlink:role="http://www.xbrl.org/2003/role/reference"
+                 id="reference_de-fi_bsBanks.ass.tan.machineryFAT_1">
+         <ref:Name>HGB</ref:Name>
+         <ref:Paragraph>266</ref:Paragraph>
+         <ref:Subparagraph>2 A.II.2.</ref:Subparagraph>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_bsBanks.ass.tan.otherEquipmFAT"
+           xlink:label="de-fi_bsBanks.ass.tan.otherEquipmFAT"/>
+      <referenceArc xlink:from="de-fi_bsBanks.ass.tan.otherEquipmFAT"
+                    xlink:to="reference_de-fi_bsBanks.ass.tan.otherEquipmFAT_1"
+                    order="1.0"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:type="arc"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_bsBanks.ass.tan.otherEquipmFAT_1"
+                 xlink:role="http://www.xbrl.org/2003/role/reference"
+                 id="reference_de-fi_bsBanks.ass.tan.otherEquipmFAT_1">
+         <ref:Name>HGB</ref:Name>
+         <ref:Paragraph>266</ref:Paragraph>
+         <ref:Subparagraph>2 A.II.3.</ref:Subparagraph>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_bsBanks.ass.tan.inConstrAdvPaymFAT"
+           xlink:label="de-fi_bsBanks.ass.tan.inConstrAdvPaymFAT"/>
+      <referenceArc xlink:from="de-fi_bsBanks.ass.tan.inConstrAdvPaymFAT"
+                    xlink:to="reference_de-fi_bsBanks.ass.tan.inConstrAdvPaymFAT_1"
+                    order="1.0"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:type="arc"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_bsBanks.ass.tan.inConstrAdvPaymFAT_1"
+                 xlink:role="http://www.xbrl.org/2003/role/reference"
+                 id="reference_de-fi_bsBanks.ass.tan.inConstrAdvPaymFAT_1">
+         <ref:Name>HGB</ref:Name>
+         <ref:Paragraph>266</ref:Paragraph>
+         <ref:Subparagraph>2 A.II.4.</ref:Subparagraph>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_bsBanks.ass.tan.otherFAT"
+           xlink:label="de-fi_bsBanks.ass.tan.otherFAT"/>
+      <referenceArc xlink:from="de-fi_bsBanks.ass.tan.otherFAT"
+                    xlink:to="reference_de-fi_bsBanks.ass.tan.otherFAT_1"
+                    order="1.0"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:type="arc"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_bsBanks.ass.tan.otherFAT_1"
+                 xlink:role="http://www.xbrl.org/2003/role/reference"
+                 id="reference_de-fi_bsBanks.ass.tan.otherFAT_1">
+         <ref:Name>HGB</ref:Name>
+         <ref:Paragraph>265</ref:Paragraph>
+         <ref:Subparagraph>5</ref:Subparagraph>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_bsBanks.ass.finFAT"
+           xlink:label="de-fi_bsBanks.ass.finFAT"/>
+      <referenceArc xlink:from="de-fi_bsBanks.ass.finFAT"
+                    xlink:to="reference_de-fi_bsBanks.ass.finFAT_1"
+                    order="1.0"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:type="arc"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_bsBanks.ass.finFAT_1"
+                 xlink:role="http://www.xbrl.org/2003/role/reference"
+                 id="reference_de-fi_bsBanks.ass.finFAT_1">
+         <ref:Name>HGB</ref:Name>
+         <ref:Paragraph>284</ref:Paragraph>
+         <ref:Subparagraph>3</ref:Subparagraph>
+      </reference>
+      <referenceArc xlink:from="de-fi_bsBanks.ass.finFAT"
+                    xlink:to="reference_de-fi_bsBanks.ass.finFAT_2"
+                    order="1.0"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:type="arc"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_bsBanks.ass.finFAT_2"
+                 xlink:role="http://www.xbrl.org/2003/role/reference"
+                 id="reference_de-fi_bsBanks.ass.finFAT_2">
+         <ref:Name>RechKredV</ref:Name>
+         <ref:Paragraph>34</ref:Paragraph>
+         <ref:Subparagraph>3</ref:Subparagraph>
+         <ref:Clause>1</ref:Clause>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_bsBanks.ass.fin.debtInstrumentsFAT"
+           xlink:label="de-fi_bsBanks.ass.fin.debtInstrumentsFAT"/>
+      <referenceArc xlink:from="de-fi_bsBanks.ass.fin.debtInstrumentsFAT"
+                    xlink:to="reference_de-fi_bsBanks.ass.fin.debtInstrumentsFAT_1"
+                    order="1.0"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:type="arc"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_bsBanks.ass.fin.debtInstrumentsFAT_1"
+                 xlink:role="http://www.xbrl.org/2003/role/reference"
+                 id="reference_de-fi_bsBanks.ass.fin.debtInstrumentsFAT_1">
+         <ref:Name>RechKredV</ref:Name>
+         <ref:Paragraph>16</ref:Paragraph>
+         <ref:Subparagraph>1</ref:Subparagraph>
+      </reference>
+      <referenceArc xlink:from="de-fi_bsBanks.ass.fin.debtInstrumentsFAT"
+                    xlink:to="reference_de-fi_bsBanks.ass.fin.debtInstrumentsFAT_2"
+                    order="1.0"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:type="arc"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_bsBanks.ass.fin.debtInstrumentsFAT_2"
+                 xlink:role="http://www.xbrl.org/2003/role/reference"
+                 id="reference_de-fi_bsBanks.ass.fin.debtInstrumentsFAT_2">
+         <ref:Name>RechKredV Formblatt</ref:Name>
+         <ref:Number>1</ref:Number>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_bsBanks.ass.fin.sharesFAT"
+           xlink:label="de-fi_bsBanks.ass.fin.sharesFAT"/>
+      <referenceArc xlink:from="de-fi_bsBanks.ass.fin.sharesFAT"
+                    xlink:to="reference_de-fi_bsBanks.ass.fin.sharesFAT_1"
+                    order="1.0"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:type="arc"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_bsBanks.ass.fin.sharesFAT_1"
+                 xlink:role="http://www.xbrl.org/2003/role/reference"
+                 id="reference_de-fi_bsBanks.ass.fin.sharesFAT_1">
+         <ref:Name>RechKredV</ref:Name>
+         <ref:Paragraph>17</ref:Paragraph>
+      </reference>
+      <referenceArc xlink:from="de-fi_bsBanks.ass.fin.sharesFAT"
+                    xlink:to="reference_de-fi_bsBanks.ass.fin.sharesFAT_2"
+                    order="1.0"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:type="arc"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_bsBanks.ass.fin.sharesFAT_2"
+                 xlink:role="http://www.xbrl.org/2003/role/reference"
+                 id="reference_de-fi_bsBanks.ass.fin.sharesFAT_2">
+         <ref:Name>RechKredV Formblatt</ref:Name>
+         <ref:Number>1</ref:Number>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_bsBanks.ass.fin.participFAT"
+           xlink:label="de-fi_bsBanks.ass.fin.participFAT"/>
+      <referenceArc xlink:from="de-fi_bsBanks.ass.fin.participFAT"
+                    xlink:to="reference_de-fi_bsBanks.ass.fin.participFAT_1"
+                    order="1.0"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:type="arc"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_bsBanks.ass.fin.participFAT_1"
+                 xlink:role="http://www.xbrl.org/2003/role/reference"
+                 id="reference_de-fi_bsBanks.ass.fin.participFAT_1">
+         <ref:Name>RechKredV Formblatt</ref:Name>
+         <ref:Number>1</ref:Number>
+      </reference>
+      <referenceArc xlink:from="de-fi_bsBanks.ass.fin.participFAT"
+                    xlink:to="reference_de-fi_bsBanks.ass.fin.participFAT_2"
+                    order="1.0"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:type="arc"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_bsBanks.ass.fin.participFAT_2"
+                 xlink:role="http://www.xbrl.org/2003/role/reference"
+                 id="reference_de-fi_bsBanks.ass.fin.participFAT_2">
+         <ref:Name>RechKredV</ref:Name>
+         <ref:Paragraph>18</ref:Paragraph>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_bsBanks.ass.fin.participCoopSharesFAT"
+           xlink:label="de-fi_bsBanks.ass.fin.participCoopSharesFAT"/>
+      <referenceArc xlink:from="de-fi_bsBanks.ass.fin.participCoopSharesFAT"
+                    xlink:to="reference_de-fi_bsBanks.ass.fin.participCoopSharesFAT_1"
+                    order="1.0"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:type="arc"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_bsBanks.ass.fin.participCoopSharesFAT_1"
+                 xlink:role="http://www.xbrl.org/2003/role/reference"
+                 id="reference_de-fi_bsBanks.ass.fin.participCoopSharesFAT_1">
+         <ref:Name>RechKredV Formblatt</ref:Name>
+         <ref:Number>1 Fußnote 4</ref:Number>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_bsBanks.ass.fin.sharesInAffilFAT"
+           xlink:label="de-fi_bsBanks.ass.fin.sharesInAffilFAT"/>
+      <referenceArc xlink:from="de-fi_bsBanks.ass.fin.sharesInAffilFAT"
+                    xlink:to="reference_de-fi_bsBanks.ass.fin.sharesInAffilFAT_1"
+                    order="1.0"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:type="arc"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_bsBanks.ass.fin.sharesInAffilFAT_1"
+                 xlink:role="http://www.xbrl.org/2003/role/reference"
+                 id="reference_de-fi_bsBanks.ass.fin.sharesInAffilFAT_1">
+         <ref:Name>RechKredV Formblatt</ref:Name>
+         <ref:Number>1</ref:Number>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_tableBanksF.nt.ass.net"
+           xlink:label="de-fi_tableBanksF.nt.ass.net"/>
+      <referenceArc xlink:from="de-fi_tableBanksF.nt.ass.net"
+                    xlink:to="reference_de-fi_tableBanksF.nt.ass.net_1"
+                    order="1.0"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:type="arc"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_tableBanksF.nt.ass.net_1"
+                 xlink:role="http://www.xbrl.org/2003/role/reference"
+                 id="reference_de-fi_tableBanksF.nt.ass.net_1">
+         <ref:Name>RechKredV</ref:Name>
+         <ref:Paragraph>34</ref:Paragraph>
+         <ref:Subparagraph>3</ref:Subparagraph>
+         <ref:Clause>2</ref:Clause>
+      </reference>
+   </referenceLink>
+</linkbase>

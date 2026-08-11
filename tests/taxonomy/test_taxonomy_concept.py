@@ -193,3 +193,21 @@ def test_taxonomy_concept_identifies_numeric_types(
 
     assert concept.is_numeric is expected
 
+def test_taxonomy_concept_positive_integer_is_numeric() -> None:
+    """positiveIntegerItemType ist ein numerischer XBRL-Typ."""
+
+    concept = TaxonomyConcept(
+        name="genInfo.company.id.shareholder.currentnumber",
+        concept_id=(
+            "de-gcd_genInfo.company.id.shareholder.currentnumber"
+        ),
+        type_name="xbrli:positiveIntegerItemType",
+        substitution_group="xbrli:item",
+        period_type=TaxonomyPeriodType.INSTANT,
+        balance=TaxonomyBalance.NONE,
+        abstract=False,
+        nillable=True,
+    )
+
+    assert concept.is_numeric
+    

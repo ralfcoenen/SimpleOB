@@ -225,3 +225,108 @@ def test_taxonomy_fact_rejects_non_pure_unit_for_pure_concept() -> None:
             context=context,
             unit=TaxonomyUnit.eur(),
         )
+
+def test_taxonomy_fact_stores_decimals() -> None:
+    """Ein numerischer Fact speichert seine Dezimalgenauigkeit."""
+
+    concept = TaxonomyConcept(
+        name="bs.ass.fixAss",
+        concept_id="de-gaap-ci_bs.ass.fixAss",
+        type_name="xbrli:monetaryItemType",
+        substitution_group="xbrli:item",
+        period_type=TaxonomyPeriodType.INSTANT,
+        balance=TaxonomyBalance.DEBIT,
+        abstract=False,
+        nillable=True,
+    )
+
+    fact = TaxonomyFact(
+        concept=concept,
+        amount=Decimal("125000.00"),
+        context=_instant_context(),
+        unit=_euro_unit(),
+        decimals=2,
+    )
+
+    assert fact.decimals == 2
+
+
+def test_taxonomy_fact_accepts_infinite_decimals() -> None:
+    """Ein exakter numerischer Fact kann decimals=INF verwenden."""
+
+    concept = TaxonomyConcept(
+        name="nt.other.specialKindOfShares",
+        concept_id="de-gaap-ci_nt.other.specialKindOfShares",
+        type_name="xbrli:longItemType",
+        substitution_group="xbrli:item",
+        period_type=TaxonomyPeriodType.DURATION,
+        balance=TaxonomyBalance.NONE,
+        abstract=False,
+        nillable=True,
+    )
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    fact = TaxonomyFact(
+        concept=concept,
+        amount=Decimal("3"),
+        context=context,
+        unit=TaxonomyUnit(
+            measure="xbrli:pure",
+        ),
+        decimals="INF",
+    )
+
+    assert fact.decimals == "INF"
+
+@pytest.mark.parametrize(
+    "decimals",
+    (
+        "2",
+        "exact",
+        "",
+    ),
+)
+def test_taxonomy_fact_rejects_invalid_decimals_string(
+    decimals: str,
+) -> None:
+    """Ungültige String-Werte für decimals werden abgelehnt."""
+
+    concept = TaxonomyConcept(
+        name="nt.other.specialKindOfShares",
+        concept_id="de-gaap-ci_nt.other.specialKindOfShares",
+        type_name="xbrli:longItemType",
+        substitution_group="xbrli:item",
+        period_type=TaxonomyPeriodType.DURATION,
+        balance=TaxonomyBalance.NONE,
+        abstract=False,
+        nillable=True,
+    )
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    with pytest.raises(
+        TypeError,
+        match='decimals must be an int or "INF"',
+    ):
+        TaxonomyFact(
+            concept=concept,
+            amount=Decimal("3"),
+            context=context,
+            unit=TaxonomyUnit(
+                measure="xbrli:pure",
+            ),
+            decimals=decimals,
+        )

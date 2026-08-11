@@ -142,4 +142,5 @@ class TaxonomyConcept:
             "xbrli:decimalItemType",
             "xbrli:pureItemType",
             "xbrli:longItemType",
+            "xbrli:positiveIntegerItemType",
         }

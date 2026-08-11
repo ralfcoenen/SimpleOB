@@ -1,8 +1,10 @@
 """Tests für die XBRL-Serialisierung."""
-
 from datetime import date
 from decimal import Decimal
+from pathlib import Path
 from xml.etree import ElementTree as ET
+
+import pytest
 
 from openbilanz.taxonomy.concept import (
     TaxonomyBalance,
@@ -10,7 +12,9 @@ from openbilanz.taxonomy.concept import (
     TaxonomyPeriodType,
 )
 from openbilanz.taxonomy.context import TaxonomyContext
+from openbilanz.taxonomy.entry_point import TaxonomyEntryPoint
 from openbilanz.taxonomy.fact import TaxonomyFact
+from openbilanz.taxonomy.text_fact import TaxonomyTextFact
 from openbilanz.taxonomy.unit import TaxonomyUnit
 from openbilanz.taxonomy.xbrl_writer import TaxonomyXbrlWriter
 
@@ -22,6 +26,8 @@ DE_GAAP_CI_NAMESPACE = (
 XBRLI_NAMESPACE = "http://www.xbrl.org/2003/instance"
 
 TEST_ENTITY_SCHEME = "http://www.bundesfinanzministerium.de"
+
+
 
 
 def test_xbrl_writer_serializes_instant_context() -> None:
@@ -132,6 +138,7 @@ def test_xbrl_writer_serializes_euro_unit() -> None:
 def test_xbrl_writer_serializes_fact() -> None:
     """Ein TaxonomyFact wird als XBRL-Fact serialisiert."""
 
+    
     concept = TaxonomyConcept(
         name="bs.ass.fixAss",
         concept_id="de-gaap-ci_bs.ass.fixAss",
@@ -158,6 +165,7 @@ def test_xbrl_writer_serializes_fact() -> None:
         amount=Decimal("125000.00"),
         context=context,
         unit=unit,
+        decimals=2,
     )
 
     writer = TaxonomyXbrlWriter()
@@ -177,6 +185,7 @@ def test_xbrl_writer_serializes_fact() -> None:
     assert element.attrib["contextRef"] == "ctx-2025"
     assert element.attrib["unitRef"] == "EUR"
     assert element.text == "125000.00"
+    assert element.attrib["decimals"] == "2"
 
 
 def test_xbrl_writer_builds_instance_document() -> None:
@@ -202,6 +211,17 @@ def test_xbrl_writer_builds_instance_document() -> None:
     )
 
     unit = TaxonomyUnit.eur()
+    
+    entry_point = TaxonomyEntryPoint(
+        path=Path(
+            "de-gaap-ci-2024-04-01-shell-fiscal.xsd"
+        ),
+        namespace=(
+            "http://www.xbrl.de/taxonomies/"
+            "de-gaap-ci-2024-04-01/shell-fiscal"
+        ),
+        schema_imports=(),
+    )
 
     fact = TaxonomyFact(
         concept=concept,
@@ -213,15 +233,34 @@ def test_xbrl_writer_builds_instance_document() -> None:
     writer = TaxonomyXbrlWriter()
 
     root = writer.instance_element(
-        context=context,
-        context_id="ctx-2025",
-        unit=unit,
-        unit_id="EUR",
+        contexts={
+            "ctx-2025": context,
+        },
+        units={
+            "EUR": unit,
+        },
         facts=(fact,),
         taxonomy_namespace=DE_GAAP_CI_NAMESPACE,
+        entry_points=(entry_point,),
+    )
+    
+    assert root.tag == f"{{{XBRLI_NAMESPACE}}}xbrl"
+    
+    schema_ref = root.find(
+        "{http://www.xbrl.org/2003/linkbase}schemaRef"
     )
 
-    assert root.tag == f"{{{XBRLI_NAMESPACE}}}xbrl"
+    assert schema_ref is not None
+    assert schema_ref.attrib[
+        "{http://www.w3.org/1999/xlink}type"
+    ] == "simple"
+    assert schema_ref.attrib[
+        "{http://www.w3.org/1999/xlink}href"
+    ] == (
+        "http://www.xbrl.de/taxonomies/"
+        "de-gaap-ci-2024-04-01/"
+        "de-gaap-ci-2024-04-01-shell-fiscal.xsd"
+    )
 
     contexts = root.findall(
         f"{{{XBRLI_NAMESPACE}}}context"
@@ -242,4 +281,848 @@ def test_xbrl_writer_builds_instance_document() -> None:
     assert fact_element.attrib["contextRef"] == "ctx-2025"
     assert fact_element.attrib["unitRef"] == "EUR"
     assert fact_element.text == "125000.00"
+
+def test_xbrl_writer_serializes_schema_ref() -> None:
+    """Ein Taxonomie-Entry-Point wird als schemaRef serialisiert."""
+
+    entry_point = TaxonomyEntryPoint(
+        path=Path(
+            "de-gaap-ci-2024-04-01-shell-fiscal.xsd"
+        ),
+        namespace=(
+            "http://www.xbrl.de/taxonomies/"
+            "de-gaap-ci-2024-04-01/shell-fiscal"
+        ),
+        schema_imports=(),
+    )
+
+    writer = TaxonomyXbrlWriter()
+
+    element = writer.schema_ref_element(
+        entry_point=entry_point,
+    )
+
+    assert element.tag == (
+        "{http://www.xbrl.org/2003/linkbase}"
+        "schemaRef"
+    )
+    assert element.attrib[
+        "{http://www.w3.org/1999/xlink}type"
+    ] == "simple"
+    assert element.attrib[
+        "{http://www.w3.org/1999/xlink}href"
+    ] == (
+        "http://www.xbrl.de/taxonomies/"
+        "de-gaap-ci-2024-04-01/"
+        "de-gaap-ci-2024-04-01-shell-fiscal.xsd"
+    )
+   
+def test_xbrl_writer_serializes_instance_to_xml_string() -> None:
+    """Eine XBRL-Instanz kann als XML-String serialisiert werden."""
+
+    writer = TaxonomyXbrlWriter()
+
+    root = ET.Element(
+        f"{{{XBRLI_NAMESPACE}}}xbrl"
+    )
+
+    xml = writer.to_xml_string(
+        root=root,
+    )
+
+    assert xml.startswith("<?xml version=")
+    assert "encoding='utf-8'" in xml
+    assert "xbrl" in xml
+    
+def test_xbrl_writer_serializes_required_namespaces() -> None:
+    """Die XBRL-Instanz deklariert die benötigten Standard-Namespaces."""
+
+    writer = TaxonomyXbrlWriter()
+
+    root = ET.Element(
+        f"{{{XBRLI_NAMESPACE}}}xbrl"
+    )
+
+    root.append(
+        writer.unit_element(
+            unit=TaxonomyUnit.eur(),
+            unit_id="EUR",
+        )
+    )
+
+    xml = writer.to_xml_string(
+        root=root,
+    )
+
+    assert (
+        'xmlns:xbrli="http://www.xbrl.org/2003/instance"'
+        in xml
+    )
+    assert (
+        'xmlns:iso4217="http://www.xbrl.org/2003/iso4217"'
+        in xml
+    )
+
+def test_xbrl_writer_serializes_schema_ref_namespaces() -> None:
+    """schemaRef verwendet die XBRL-Linkbase-Namespaces."""
+
+    entry_point = TaxonomyEntryPoint(
+        path=Path(
+            "de-gaap-ci-2024-04-01-shell-fiscal.xsd"
+        ),
+        namespace=(
+            "http://www.xbrl.de/taxonomies/"
+            "de-gaap-ci-2024-04-01/shell-fiscal"
+        ),
+        schema_imports=(),
+    )
+
+    writer = TaxonomyXbrlWriter()
+
+    root = ET.Element(
+        f"{{{XBRLI_NAMESPACE}}}xbrl"
+    )
+
+    root.append(
+        writer.schema_ref_element(
+            entry_point=entry_point,
+        )
+    )
+
+    xml = writer.to_xml_string(
+        root=root,
+    )
+
+    assert (
+        'xmlns:link="http://www.xbrl.org/2003/linkbase"'
+        in xml
+    )
+    assert (
+        'xmlns:xlink="http://www.w3.org/1999/xlink"'
+        in xml
+    )
+    assert "<link:schemaRef" in xml
+    assert 'xlink:type="simple"' in xml
+
+def test_xbrl_writer_builds_instance_with_multiple_schema_refs() -> None:
+    """Eine XBRL-Instanz kann mehrere schemaRefs enthalten."""
+
+    gcd_entry_point = TaxonomyEntryPoint(
+        path=Path(
+            "de-gcd-2024-04-01-shell-fiscal.xsd"
+        ),
+        namespace=(
+            "http://www.xbrl.de/taxonomies/"
+            "de-gcd-2024-04-01/shell-fiscal"
+        ),
+        schema_imports=(),
+    )
+
+    gaap_entry_point = TaxonomyEntryPoint(
+        path=Path(
+            "de-gaap-ci-2024-04-01-shell-fiscal.xsd"
+        ),
+        namespace=(
+            "http://www.xbrl.de/taxonomies/"
+            "de-gaap-ci-2024-04-01/shell-fiscal"
+        ),
+        schema_imports=(),
+    )
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.INSTANT,
+        start_date=None,
+        end_date=date(2025, 12, 31),
+    )
+
+    writer = TaxonomyXbrlWriter()
+
+    root = writer.instance_element(
+        contexts={
+            "ctx-2025": context,
+        },
+        units={
+            "EUR": TaxonomyUnit.eur(),
+        },
+        facts=(),
+        taxonomy_namespace=DE_GAAP_CI_NAMESPACE,
+        entry_points=(
+            gcd_entry_point,
+            gaap_entry_point,
+        ),
+    )
+
+    schema_refs = root.findall(
+        "{http://www.xbrl.org/2003/linkbase}schemaRef"
+    )
+
+    assert len(schema_refs) == 2
+
+    hrefs = {
+        schema_ref.attrib[
+            "{http://www.w3.org/1999/xlink}href"
+        ]
+        for schema_ref in schema_refs
+    }
+
+    assert hrefs == {
+        (
+            "http://www.xbrl.de/taxonomies/"
+            "de-gcd-2024-04-01/"
+            "de-gcd-2024-04-01-shell-fiscal.xsd"
+        ),
+        (
+            "http://www.xbrl.de/taxonomies/"
+            "de-gaap-ci-2024-04-01/"
+            "de-gaap-ci-2024-04-01-shell-fiscal.xsd"
+        ),
+    }
+
+
+def test_xbrl_writer_preserves_schema_ref_order() -> None:
+    """schemaRefs werden in der übergebenen Reihenfolge serialisiert."""
+
+    first_entry_point = TaxonomyEntryPoint(
+        path=Path(
+            "de-gcd-2024-04-01-shell-fiscal.xsd"
+        ),
+        namespace=(
+            "http://www.xbrl.de/taxonomies/"
+            "de-gcd-2024-04-01/shell-fiscal"
+        ),
+        schema_imports=(),
+    )
+
+    second_entry_point = TaxonomyEntryPoint(
+        path=Path(
+            "de-gaap-ci-2024-04-01-shell-fiscal.xsd"
+        ),
+        namespace=(
+            "http://www.xbrl.de/taxonomies/"
+            "de-gaap-ci-2024-04-01/shell-fiscal"
+        ),
+        schema_imports=(),
+    )
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.INSTANT,
+        start_date=None,
+        end_date=date(2025, 12, 31),
+    )
+
+    writer = TaxonomyXbrlWriter()
+
+    root = writer.instance_element(
+        contexts={
+            "ctx-2025": context,
+        },
+        units={
+            "EUR": TaxonomyUnit.eur(),
+        },
+        facts=(),
+        taxonomy_namespace=DE_GAAP_CI_NAMESPACE,
+        entry_points=(
+            first_entry_point,
+            second_entry_point,
+        ),
+    )
+
+    schema_refs = root.findall(
+        "{http://www.xbrl.org/2003/linkbase}schemaRef"
+    )
+
+    hrefs = [
+        schema_ref.attrib[
+            "{http://www.w3.org/1999/xlink}href"
+        ]
+        for schema_ref in schema_refs
+    ]
+
+    assert hrefs == [
+        (
+            "http://www.xbrl.de/taxonomies/"
+            "de-gcd-2024-04-01/"
+            "de-gcd-2024-04-01-shell-fiscal.xsd"
+        ),
+        (
+            "http://www.xbrl.de/taxonomies/"
+            "de-gaap-ci-2024-04-01/"
+            "de-gaap-ci-2024-04-01-shell-fiscal.xsd"
+        ),
+    ]
+
+
+def test_xbrl_writer_resolves_context_id() -> None:
+    """Ein Fact erhält die ID seines zugehörigen Contexts."""
+
+    first_context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.INSTANT,
+        start_date=None,
+        end_date=date(2024, 12, 31),
+    )
+
+    second_context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.INSTANT,
+        start_date=None,
+        end_date=date(2025, 12, 31),
+    )
+
+    writer = TaxonomyXbrlWriter()
+
+    context_id = writer.context_id_for(
+        context=second_context,
+        contexts={
+            "ctx-2024": first_context,
+            "ctx-2025": second_context,
+        },
+    )
+
+    assert context_id == "ctx-2025"
+
+
+
+def test_xbrl_writer_builds_instance_with_multiple_contexts() -> None:
+    """Mehrere Contexts werden serialisiert und Facts korrekt zugeordnet."""
+
+    first_context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.INSTANT,
+        start_date=None,
+        end_date=date(2024, 12, 31),
+    )
+
+    second_context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.INSTANT,
+        start_date=None,
+        end_date=date(2025, 12, 31),
+    )
+
+    concept = TaxonomyConcept(
+        name="bs.ass.fixAss",
+        concept_id="de-gaap-ci_bs.ass.fixAss",
+        type_name="xbrli:monetaryItemType",
+        substitution_group="xbrli:item",
+        period_type=TaxonomyPeriodType.INSTANT,
+        balance=TaxonomyBalance.DEBIT,
+        abstract=False,
+        nillable=True,
+    )
+
+    unit = TaxonomyUnit.eur()
+    
+    fact = TaxonomyFact(
+        concept=concept,
+        amount=Decimal("125000.00"),
+        context=second_context,
+        unit=unit,
+        decimals=2,
+    )
+
+    entry_point = TaxonomyEntryPoint(
+        path=Path(
+            "de-gaap-ci-2024-04-01-shell-fiscal.xsd"
+        ),
+        namespace=(
+            "http://www.xbrl.de/taxonomies/"
+            "de-gaap-ci-2024-04-01/shell-fiscal"
+        ),
+        schema_imports=(),
+    )
+
+    writer = TaxonomyXbrlWriter()
+
+    root = writer.instance_element(
+        contexts={
+            "ctx-2024": first_context,
+            "ctx-2025": second_context,
+        },
+        units={
+            "EUR": unit,
+        },
+        facts=(fact,),
+        taxonomy_namespace=DE_GAAP_CI_NAMESPACE,
+        entry_points=(entry_point,),
+    )
+
+    contexts = root.findall(
+        f"{{{XBRLI_NAMESPACE}}}context"
+    )
+
+    assert len(contexts) == 2
+    assert [
+        context.attrib["id"]
+        for context in contexts
+    ] == [
+        "ctx-2024",
+        "ctx-2025",
+    ]
+
+    fact_element = root.find(
+        f"{{{DE_GAAP_CI_NAMESPACE}}}"
+        "bs.ass.fixAss"
+    )
+
+    assert fact_element is not None
+    assert fact_element.attrib["contextRef"] == "ctx-2025"
+    
+def test_xbrl_writer_resolves_unit_id() -> None:
+    """Ein Fact erhält die ID seiner zugehörigen XBRL-Einheit."""
+
+    euro_unit = TaxonomyUnit.eur()
+
+    pure_unit = TaxonomyUnit(
+        measure="xbrli:pure",
+    )
+
+    writer = TaxonomyXbrlWriter()
+
+    unit_id = writer.unit_id_for(
+        unit=pure_unit,
+        units={
+            "EUR": euro_unit,
+            "pure": pure_unit,
+        },
+    )
+
+    assert unit_id == "pure"
+    
+def test_xbrl_writer_builds_instance_with_multiple_units() -> None:
+    """Mehrere Units werden serialisiert und Facts korrekt zugeordnet."""
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    euro_unit = TaxonomyUnit.eur()
+
+    pure_unit = TaxonomyUnit(
+        measure="xbrli:pure",
+    )
+
+    concept = TaxonomyConcept(
+        name="nt.particip.listRow.quota.direct",
+        concept_id=(
+            "de-gaap-ci_nt.particip.listRow.quota.direct"
+        ),
+        type_name="xbrli:pureItemType",
+        substitution_group="xbrli:item",
+        period_type=TaxonomyPeriodType.DURATION,
+        balance=TaxonomyBalance.NONE,
+        abstract=False,
+        nillable=True,
+    )
+
+    fact = TaxonomyFact(
+        concept=concept,
+        amount=Decimal("0.75"),
+        context=context,
+        unit=pure_unit,
+        decimals=2,
+    )
+
+    entry_point = TaxonomyEntryPoint(
+        path=Path(
+            "de-gaap-ci-2024-04-01-shell-fiscal.xsd"
+        ),
+        namespace=(
+            "http://www.xbrl.de/taxonomies/"
+            "de-gaap-ci-2024-04-01/shell-fiscal"
+        ),
+        schema_imports=(),
+    )
+
+    writer = TaxonomyXbrlWriter()
+
+    root = writer.instance_element(
+        contexts={
+            "ctx-2025": context,
+        },
+        units={
+            "EUR": euro_unit,
+            "pure": pure_unit,
+        },
+        facts=(fact,),
+        taxonomy_namespace=DE_GAAP_CI_NAMESPACE,
+        entry_points=(entry_point,),
+    )
+
+    units = root.findall(
+        f"{{{XBRLI_NAMESPACE}}}unit"
+    )
+
+    assert len(units) == 2
+
+    assert [
+        unit.attrib["id"]
+        for unit in units
+    ] == [
+        "EUR",
+        "pure",
+    ]
+
+    fact_element = root.find(
+        f"{{{DE_GAAP_CI_NAMESPACE}}}"
+        "nt.particip.listRow.quota.direct"
+    )
+
+    assert fact_element is not None
+    assert fact_element.attrib["contextRef"] == "ctx-2025"
+    assert fact_element.attrib["unitRef"] == "pure"
+def test_xbrl_writer_rejects_unregistered_unit() -> None:
+    """Eine fachlich nicht registrierte Unit besitzt keine XBRL-ID."""
+
+    registered_unit = TaxonomyUnit.eur()
+
+    unregistered_unit = TaxonomyUnit(
+        measure="xbrli:pure",
+    )
+
+    writer = TaxonomyXbrlWriter()
+
+    with pytest.raises(
+        ValueError,
+        match="unit is not registered",
+    ):
+        writer.unit_id_for(
+            unit=unregistered_unit,
+            units={
+                "EUR": registered_unit,
+            },
+        )
+  
+def test_xbrl_writer_assigns_contexts_and_units_to_multiple_facts() -> None:
+    """Mehrere Facts erhalten ihre jeweiligen Context- und Unit-Referenzen."""
+
+    instant_context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.INSTANT,
+        start_date=None,
+        end_date=date(2025, 12, 31),
+    )
+
+    duration_context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    euro_unit = TaxonomyUnit.eur()
+
+    pure_unit = TaxonomyUnit(
+        measure="xbrli:pure",
+    )
+
+    monetary_concept = TaxonomyConcept(
+        name="bs.ass.fixAss",
+        concept_id="de-gaap-ci_bs.ass.fixAss",
+        type_name="xbrli:monetaryItemType",
+        substitution_group="xbrli:item",
+        period_type=TaxonomyPeriodType.INSTANT,
+        balance=TaxonomyBalance.DEBIT,
+        abstract=False,
+        nillable=True,
+    )
+
+    pure_concept = TaxonomyConcept(
+        name="nt.particip.listRow.quota.direct",
+        concept_id=(
+            "de-gaap-ci_nt.particip.listRow.quota.direct"
+        ),
+        type_name="xbrli:pureItemType",
+        substitution_group="xbrli:item",
+        period_type=TaxonomyPeriodType.DURATION,
+        balance=TaxonomyBalance.NONE,
+        abstract=False,
+        nillable=True,
+    )
+
+    monetary_fact = TaxonomyFact(
+        concept=monetary_concept,
+        amount=Decimal("125000.00"),
+        context=instant_context,
+        unit=euro_unit,
+        decimals=2,
+    )
+
+    pure_fact = TaxonomyFact(
+        concept=pure_concept,
+        amount=Decimal("0.75"),
+        context=duration_context,
+        unit=pure_unit,
+        decimals=2,
+    )
+
+    entry_point = TaxonomyEntryPoint(
+        path=Path(
+            "de-gaap-ci-2024-04-01-shell-fiscal.xsd"
+        ),
+        namespace=(
+            "http://www.xbrl.de/taxonomies/"
+            "de-gaap-ci-2024-04-01/shell-fiscal"
+        ),
+        schema_imports=(),
+    )
+
+    writer = TaxonomyXbrlWriter()
+
+    root = writer.instance_element(
+        contexts={
+            "ctx-instant-2025": instant_context,
+            "ctx-duration-2025": duration_context,
+        },
+        units={
+            "EUR": euro_unit,
+            "pure": pure_unit,
+        },
+        facts=(
+            monetary_fact,
+            pure_fact,
+        ),
+        taxonomy_namespace=DE_GAAP_CI_NAMESPACE,
+        entry_points=(entry_point,),
+    )
+
+    monetary_element = root.find(
+        f"{{{DE_GAAP_CI_NAMESPACE}}}"
+        "bs.ass.fixAss"
+    )
+
+    pure_element = root.find(
+        f"{{{DE_GAAP_CI_NAMESPACE}}}"
+        "nt.particip.listRow.quota.direct"
+    )
+
+    assert monetary_element is not None
+    assert monetary_element.attrib["contextRef"] == "ctx-instant-2025"
+    assert monetary_element.attrib["unitRef"] == "EUR"
+    assert monetary_element.text == "125000.00"
+
+    assert pure_element is not None
+    assert pure_element.attrib["contextRef"] == "ctx-duration-2025"
+    assert pure_element.attrib["unitRef"] == "pure"
+    assert pure_element.text == "0.75"
+    
+def test_xbrl_writer_resolves_equivalent_unit() -> None:
+    """Fachlich gleiche Units werden derselben XBRL-ID zugeordnet."""
+
+    registered_unit = TaxonomyUnit.eur()
+    equivalent_unit = TaxonomyUnit.eur()
+
+    writer = TaxonomyXbrlWriter()
+
+    unit_id = writer.unit_id_for(
+        unit=equivalent_unit,
+        units={
+            "EUR": registered_unit,
+        },
+    )
+
+    assert unit_id == "EUR"
+    
+def test_xbrl_writer_distinguishes_equivalent_contexts() -> None:
+    """Inhaltlich gleiche Contexts bleiben getrennte XBRL-Contexts."""
+
+    registered_context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.INSTANT,
+        start_date=None,
+        end_date=date(2025, 12, 31),
+    )
+
+    equivalent_context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.INSTANT,
+        start_date=None,
+        end_date=date(2025, 12, 31),
+    )
+
+    writer = TaxonomyXbrlWriter()
+
+    with pytest.raises(
+        ValueError,
+        match="context is not registered",
+    ):
+        writer.context_id_for(
+            context=equivalent_context,
+            contexts={
+                "ctx-2025": registered_context,
+            },
+        )
+
+
+def test_xbrl_writer_serializes_text_fact() -> None:
+    """Ein Text-Fact wird ohne Unit und decimals serialisiert."""
+
+    concept = TaxonomyConcept(
+        name="nt.registerAgriculture",
+        concept_id="de-gaap-ci_nt.registerAgriculture",
+        type_name="xbrli:stringItemType",
+        substitution_group="xbrli:item",
+        period_type=TaxonomyPeriodType.DURATION,
+        balance=TaxonomyBalance.NONE,
+        abstract=False,
+        nillable=True,
+    )
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    fact = TaxonomyTextFact(
+        concept=concept,
+        value="Landwirtschaftlicher Betrieb",
+        context=context,
+    )
+
+    writer = TaxonomyXbrlWriter()
+
+    element = writer.text_fact_element(
+        fact=fact,
+        context_id="ctx-2025",
+        namespace=DE_GAAP_CI_NAMESPACE,
+    )
+
+    assert element.tag == (
+        f"{{{DE_GAAP_CI_NAMESPACE}}}"
+        "nt.registerAgriculture"
+    )
+
+    assert element.attrib["contextRef"] == "ctx-2025"
+    assert element.text == "Landwirtschaftlicher Betrieb"
+
+    assert "unitRef" not in element.attrib
+    assert "decimals" not in element.attrib
+
+
+def test_xbrl_writer_builds_instance_with_numeric_and_text_facts() -> None:
+    """Numerische und Text-Facts werden gemeinsam serialisiert."""
+
+    instant_context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.INSTANT,
+        start_date=None,
+        end_date=date(2025, 12, 31),
+    )
+
+    duration_context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    euro_unit = TaxonomyUnit.eur()
+
+    monetary_concept = TaxonomyConcept(
+        name="bs.ass.fixAss",
+        concept_id="de-gaap-ci_bs.ass.fixAss",
+        type_name="xbrli:monetaryItemType",
+        substitution_group="xbrli:item",
+        period_type=TaxonomyPeriodType.INSTANT,
+        balance=TaxonomyBalance.DEBIT,
+        abstract=False,
+        nillable=True,
+    )
+
+    text_concept = TaxonomyConcept(
+        name="nt.registerAgriculture",
+        concept_id="de-gaap-ci_nt.registerAgriculture",
+        type_name="xbrli:stringItemType",
+        substitution_group="xbrli:item",
+        period_type=TaxonomyPeriodType.DURATION,
+        balance=TaxonomyBalance.NONE,
+        abstract=False,
+        nillable=True,
+    )
+
+    numeric_fact = TaxonomyFact(
+        concept=monetary_concept,
+        amount=Decimal("125000.00"),
+        context=instant_context,
+        unit=euro_unit,
+        decimals=2,
+    )
+
+    text_fact = TaxonomyTextFact(
+        concept=text_concept,
+        value="Landwirtschaftlicher Betrieb",
+        context=duration_context,
+    )
+
+    entry_point = TaxonomyEntryPoint(
+        path=Path(
+            "de-gaap-ci-2024-04-01-shell-fiscal.xsd"
+        ),
+        namespace=(
+            "http://www.xbrl.de/taxonomies/"
+            "de-gaap-ci-2024-04-01/shell-fiscal"
+        ),
+        schema_imports=(),
+    )
+
+    writer = TaxonomyXbrlWriter()
+
+    root = writer.instance_element(
+        contexts={
+            "ctx-instant-2025": instant_context,
+            "ctx-duration-2025": duration_context,
+        },
+        units={
+            "EUR": euro_unit,
+        },
+        facts=(
+            numeric_fact,
+            text_fact,
+        ),
+        taxonomy_namespace=DE_GAAP_CI_NAMESPACE,
+        entry_points=(entry_point,),
+    )
+
+    numeric_element = root.find(
+        f"{{{DE_GAAP_CI_NAMESPACE}}}"
+        "bs.ass.fixAss"
+    )
+
+    text_element = root.find(
+        f"{{{DE_GAAP_CI_NAMESPACE}}}"
+        "nt.registerAgriculture"
+    )
+
+    assert numeric_element is not None
+    assert numeric_element.attrib["contextRef"] == "ctx-instant-2025"
+    assert numeric_element.attrib["unitRef"] == "EUR"
+    assert numeric_element.attrib["decimals"] == "2"
+    assert numeric_element.text == "125000.00"
+
+    assert text_element is not None
+    assert text_element.attrib["contextRef"] == "ctx-duration-2025"
+    assert text_element.text == "Landwirtschaftlicher Betrieb"
+    assert "unitRef" not in text_element.attrib
+    assert "decimals" not in text_element.attrib
     

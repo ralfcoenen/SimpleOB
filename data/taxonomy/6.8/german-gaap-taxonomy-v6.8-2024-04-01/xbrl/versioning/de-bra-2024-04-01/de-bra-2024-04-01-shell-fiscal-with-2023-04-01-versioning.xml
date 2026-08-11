@@ -1,0 +1,2126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ver:report xmlns:ver="http://xbrl.org/2013/versioning-base"
+            xmlns:vercu="http://xbrl.org/2013/versioning-concept-use"
+            xmlns:xlink="http://www.w3.org/1999/xlink"
+            xmlns:link="http://www.xbrl.org/2003/linkbase"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+            xmlns:cur_gen="http://xbrl.org/2008/generic"
+            xmlns:cur_table="http://xbrl.org/2014/table"
+            xmlns:cur_bra-shell="http://www.xbrl.de/taxonomies/de-bra-2024-04-01/shell"
+            xmlns:cur_de-gaap-ci="http://www.xbrl.de/taxonomies/de-gaap-ci-2024-04-01"
+            xmlns:cur_link="http://www.xbrl.org/2003/linkbase"
+            xmlns:cur_variable="http://xbrl.org/2008/variable"
+            xmlns:cur_label="http://xbrl.org/2008/label"
+            xmlns:cur_de-hgbrole="http://www.xbrl.de/taxonomies/hgbrole-2024-04-01"
+            xmlns:cur_xlink="http://www.w3.org/1999/xlink"
+            xmlns:cur_de-bra="http://www.xbrl.de/taxonomies/de-bra-2024-04-01"
+            xmlns:cur_bra-shell-fiscal="http://www.xbrl.de/taxonomies/de-bra-2024-04-01/shell-fiscal"
+            xmlns:cur_formula="http://xbrl.org/2008/formula"
+            xmlns:cur_xbrli="http://www.xbrl.org/2003/instance"
+            xmlns:cur_gaap-shell-fiscal="http://www.xbrl.de/taxonomies/de-gaap-ci-2024-04-01/shell-fiscal"
+            xmlns:cur_xbrldt="http://xbrl.org/2005/xbrldt"
+            xmlns:cur_gaap-shell="http://www.xbrl.de/taxonomies/de-gaap-ci-2024-04-01/shell"
+            xmlns:cur_xl="http://www.xbrl.org/2003/XLink"
+            xmlns:pre_de-gaap-ci="http://www.xbrl.de/taxonomies/de-gaap-ci-2023-04-01"
+            xmlns:pre_de-hgbrole="http://www.xbrl.de/taxonomies/hgbrole-2023-04-01"
+            xmlns:pre_gaap-shell-fiscal="http://www.xbrl.de/taxonomies/de-gaap-ci-2023-04-01/shell-fiscal"
+            xmlns:pre_gaap-shell="http://www.xbrl.de/taxonomies/de-gaap-ci-2023-04-01/shell"
+            xmlns:pre_de-bra="http://www.xbrl.de/taxonomies/de-bra-2023-04-01"
+            xmlns:pre_bra-shell-fiscal="http://www.xbrl.de/taxonomies/de-bra-2023-04-01/shell-fiscal"
+            xmlns:pre_bra-shell="http://www.xbrl.de/taxonomies/de-bra-2023-04-01/shell"
+            id="ver_100000">
+   <link:linkbaseRef xlink:type="simple"
+                     xlink:href="de-bra-2024-04-01-shell-fiscal-with-2023-04-01-label.xml"/>
+   <ver:fromDTS>
+      <link:schemaRef xlink:type="simple"
+                      xlink:href="file:///var/opt/bamboo/local-working-dir/131073/CORE-GRADLETESTER-JOB1/taxonomies/released/6.7-per-2023-04-01/xbrl/de-bra-2023-04-01/de-bra-2023-04-01-shell-fiscal.xsd"/>
+   </ver:fromDTS>
+   <ver:toDTS>
+      <link:schemaRef xlink:type="simple"
+                      xlink:href="file:///var/opt/bamboo/local-working-dir/131073/CORE-GRADLETESTER-JOB1/xbrl.de/modules/bra/build/cleanTaxonomy/de-bra-2024-04-01/de-bra-2024-04-01-shell-fiscal.xsd"/>
+   </ver:toDTS>
+   <ver:assignment id="assig_domain"/>
+   <ver:assignment id="assig_technical"/>
+   <ver:assignment id="assig_correction"/>
+   <ver:assignment id="assig_effectOnPosition"/>
+   <ver:assignment id="assig_moved"/>
+   <ver:assignment id="assig_Energiestoffe_-_Zusatzinformation_Kreditwürdigkeitsprüfung"/>
+   <ver:assignment id="assig_Soll-Ist-Vergleich"/>
+   <ver:assignment id="assig_Automatisierte_Tests"/>
+   <ver:assignment id="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+   <ver:assignment id="assig_Gezeichnetes_Kapital_bei_Aktiengesellschaften"/>
+   <ver:assignment id="assig_Umschichtungsergebnisse_bei_Stiftungen"/>
+   <ver:assignment id="assig_Untergliederung_Ausleihungen,_Forderungen_und_Verbindlichkeiten_im_Gesellschafterkontext"/>
+   <ver:assignment id="assig_Bereinigung_Rechtsformauszeichnungen"/>
+   <ver:assignment id="assig_Restlaufzeitvermerk_bis_1_Jahr_-_Forderungen_und_sonstige_Vermögensgegenstände"/>
+   <ver:assignment id="assig_validThrough_Posten_im_Zusammenhang_mit_§_38_KStG"/>
+   <ver:assignment id="assig_Einheitliche_Schreibweise_Eigenkapitalcharakter"/>
+   <ver:assignment id="assig_QS_Rechtsformauszeichnungen"/>
+   <ver:assignment id="assig_Aufstellung_unter_Ergebnisverwendung"/>
+   <ver:assignment id="assig_Anpassungsbedarf_durch_Mindeststeuergesetz"/>
+   <ver:assignment id="assig_Kapitalerhöhung_gegen_Einlagen"/>
+   <ver:assignment id="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+   <ver:assignment id="assig_Bereinigung_Duplikate_Bezeichner,_Documentation,_DefinitionGuidance"/>
+   <ver:action>
+      <ver:assignmentRef ref="assig_technical"/>
+      <ver:namespaceRename>
+         <ver:fromURI value="http://www.xbrl.de/taxonomies/de-bra-2023-04-01/shell-fiscal"/>
+         <ver:toURI value="http://www.xbrl.de/taxonomies/de-bra-2024-04-01/shell-fiscal"/>
+      </ver:namespaceRename>
+      <ver:namespaceRename>
+         <ver:fromURI value="http://www.xbrl.de/taxonomies/hgbrole-2023-04-01"/>
+         <ver:toURI value="http://www.xbrl.de/taxonomies/hgbrole-2024-04-01"/>
+      </ver:namespaceRename>
+      <ver:namespaceRename>
+         <ver:fromURI value="http://www.xbrl.de/taxonomies/de-bra-2023-04-01/shell"/>
+         <ver:toURI value="http://www.xbrl.de/taxonomies/de-bra-2024-04-01/shell"/>
+      </ver:namespaceRename>
+      <ver:namespaceRename>
+         <ver:fromURI value="http://www.xbrl.de/taxonomies/de-gaap-ci-2023-04-01/shell"/>
+         <ver:toURI value="http://www.xbrl.de/taxonomies/de-gaap-ci-2024-04-01/shell"/>
+      </ver:namespaceRename>
+      <ver:namespaceRename>
+         <ver:fromURI value="http://www.xbrl.de/taxonomies/de-gaap-ci-2023-04-01/shell-fiscal"/>
+         <ver:toURI value="http://www.xbrl.de/taxonomies/de-gaap-ci-2024-04-01/shell-fiscal"/>
+      </ver:namespaceRename>
+      <ver:namespaceRename>
+         <ver:fromURI value="http://www.xbrl.de/taxonomies/de-bra-2023-04-01"/>
+         <ver:toURI value="http://www.xbrl.de/taxonomies/de-bra-2024-04-01"/>
+      </ver:namespaceRename>
+      <ver:namespaceRename>
+         <ver:fromURI value="http://www.xbrl.de/taxonomies/de-gaap-ci-2023-04-01"/>
+         <ver:toURI value="http://www.xbrl.de/taxonomies/de-gaap-ci-2024-04-01"/>
+      </ver:namespaceRename>
+   </ver:action>
+   <ver:action id="ver_100001">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:nt.isInfo.incomeStatutoryDuties.donations.immediatelyRecognised"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100002">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_correction"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.ass.deficitNotCoveredByCapital.lossLimitedLiablePartnerS"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.ass.deficitNotCoveredByCapital.lossLimitedLiablePartnerS"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100003">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_correction"/>
+      <ver:assignmentRef ref="assig_moved"/>
+      <ver:assignmentRef ref="assig_Untergliederung_Ausleihungen,_Forderungen_und_Verbindlichkeiten_im_Gesellschafterkontext"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.ass.fixAss.fin.loansToAffil.subsidiaries"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.ass.fixAss.fin.loansToAffil.subsidiaries"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100004">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.ass.currAss.receiv.trade"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.ass.currAss.receiv.trade"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100005">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100006">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.otherOpRevenue.statutoryDuties.donations"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100007">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material.purchased.reducedRateVAT"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material.purchased.reducedRateVAT"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100008">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-bra:bs.eqLiab.liab.trade.care.upTo1year"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100009">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.otherOpRevenue.statutoryDuties.donations.received"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100010">
+      <ver:assignmentRef ref="assig_domain"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:bs.ass.currAss.receiv.other.MinSt"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100011">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.otherOpRevenue.statutoryDuties.fine"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100012">
+      <ver:assignmentRef ref="assig_domain"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.deprAmort.fixAss.specific.except.other"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.deprAmort.fixAss.specific.except.other"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100013">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingCOGS.grossOpProfit.otherRevenue.statutoryDuties.donation.immediatelyRecognised"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100014">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Gezeichnetes_Kapital_bei_Aktiengesellschaften"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:bs.eqLiab.equity.subscribed.corp.ordShares"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100015">
+      <ver:assignmentRef ref="assig_correction"/>
+      <ver:assignmentRef ref="assig_Einheitliche_Schreibweise_Eigenkapitalcharakter"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.incomeSharing.decreaseProfitPartCap"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.incomeSharing.decreaseProfitPartCap"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100016">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_correction"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingCOGS.otherCostTC.addPreTaxRes.KStG34_6e"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingCOGS.otherCostTC.addPreTaxRes.KStG34_6e"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100017">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_correction"/>
+      <ver:assignmentRef ref="assig_Bereinigung_Rechtsformauszeichnungen"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingCOGS.otherCostTC.liabilityRemunerationPartners"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingCOGS.otherCostTC.liabilityRemunerationPartners"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100018">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:nt.isInfo.incomeStatutoryDuties.other"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100019">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Gezeichnetes_Kapital_bei_Aktiengesellschaften"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:bs.eqLiab.equity.subscribed.corp.conditional"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100020">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.statutoryDuties.membershipFees"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.statutoryDuties.membershipFees"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100021">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-bra:nt.isInfo.SalesDetails.otherTrade"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100022">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-bra:bs.ass.fixAss.tan.landWithResidentialBuildingsWUV"/>
+         <vercu:toConcept name="cur_de-bra:bs.ass.fixAss.tan.landWithResidentialBuildingsWUV"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100023">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.ass.currAss.receiv.trade.above1year"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.ass.currAss.receiv.trade.above1year"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100024">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_correction"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingCOGS.staff.salaries.misc"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingCOGS.staff.salaries.misc"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100025">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-bra:bs.ass.currAss.receiv.propertySales.upto1year"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100026">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:nt.isInfo.incomeStatutoryDuties.donations.receivedDonations"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100027">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-bra:bs.ass.fixAss.tan.underConstr"/>
+         <vercu:toConcept name="cur_de-bra:bs.ass.fixAss.tan.underConstr"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100028">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_validThrough_Posten_im_Zusammenhang_mit_§_38_KStG"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.fin.netInterest.income.valueDiscount.prematRepaymentKStGs38"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.fin.netInterest.income.valueDiscount.prematRepaymentKStGs38"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100029">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.otherOpRevenue.statutoryDuties.donations.immediatelyRecognised"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100030">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.ass.currAss.receiv.trade.prepayment"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.ass.currAss.receiv.trade.prepayment"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100031">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-bra:bs.ass.currAss.receiv.lease.above1year"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100032">
+      <ver:assignmentRef ref="assig_domain"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.otherCost.leasingAll.moveable.interest"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.otherCost.leasingAll.moveable.interest"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100033">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Kapitalerhöhung_gegen_Einlagen"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:bs.eqLiab.equity.paymForCapitalIncrease.DateEntryInHR"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100034">
+      <ver:assignmentRef ref="assig_correction"/>
+      <ver:assignmentRef ref="assig_Einheitliche_Schreibweise_Eigenkapitalcharakter"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:table.kke.allKindsOfEquityAccounts.unlimitedPartners.profitParticipationCapital"/>
+         <vercu:toConcept name="cur_de-gaap-ci:table.kke.allKindsOfEquityAccounts.unlimitedPartners.profitParticipationCapital"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100035">
+      <ver:assignmentRef ref="assig_domain"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:bs.eqLiab.accruals.tax.minst"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100036">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Energiestoffe_-_Zusatzinformation_Kreditwürdigkeitsprüfung"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:AddInfoCreditScoring.is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.CoM"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100037">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-bra:nt.isInfo.SalesDetails.propertySales"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100038">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Untergliederung_Ausleihungen,_Forderungen_und_Verbindlichkeiten_im_Gesellschafterkontext"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.ass.currAss.receiv.shareholders.misc"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.ass.currAss.receiv.shareholders.misc"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100039">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Bereinigung_Rechtsformauszeichnungen"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:incomeUse.gainLoss.releaseCapital"/>
+         <vercu:toConcept name="cur_de-gaap-ci:incomeUse.gainLoss.releaseCapital"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100040">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-bra:nt.isInfo.SalesDetails.care"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100041">
+      <ver:assignmentRef ref="assig_domain"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.tax.releaseTaxProv.minst"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100042">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.ass.currAss.receiv.trade.paymentOnAccount"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.ass.currAss.receiv.trade.paymentOnAccount"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100043">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_correction"/>
+      <ver:assignmentRef ref="assig_moved"/>
+      <ver:assignmentRef ref="assig_Untergliederung_Ausleihungen,_Forderungen_und_Verbindlichkeiten_im_Gesellschafterkontext"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.ass.fixAss.fin.loansToParticip.shareholder"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.ass.fixAss.fin.loansToParticip.shareholder"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100044">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-bra:bs.eqLiab.liab.trade.propertyAcquisition.upTo1year"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100045">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingCOGS.grossOpProfit.otherRevenue.statutoryDuties.estate"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100046">
+      <ver:assignmentRef ref="assig_domain"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.ass.currAss.receiv.affilOtherForeign"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.ass.currAss.receiv.affilOtherForeign"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100047">
+      <ver:assignmentRef ref="assig_domain"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.otherCost.leasingAll.immovable.interest"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.otherCost.leasingAll.immovable.interest"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100048">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Aufstellung_unter_Ergebnisverwendung"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.eqLiab.equity.retainedEarningsPartnerships"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.eqLiab.equity.retainedEarningsPartnerships"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100049">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Kapitalerhöhung_gegen_Einlagen"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:nt.bsInfo.capIncreaseContribution"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100050">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_correction"/>
+      <ver:assignmentRef ref="assig_moved"/>
+      <ver:assignmentRef ref="assig_Umschichtungsergebnisse_bei_Stiftungen"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.eqLiab.equity.reallocationSurplus.finalPrev"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.eqLiab.equity.reallocationSurplus.finalPrev"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100051">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-bra:bs.eqLiab.liab.otherCreditors.above1year"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100052">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Mindeststeuergesetz"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:nt.genInfo.minimTax.actualTax"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100053">
+      <ver:assignmentRef ref="assig_domain"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-bra:is.netIncome.regular.operatingTC.grossTradingProfit.taxes.tax.minst"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100054">
+      <ver:assignmentRef ref="assig_domain"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-bra:is.netIncome.regular.operatingTC.grossTradingProfit.taxes.tax.prevPeriodPaid.minst"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100055">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_correction"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingCOGS.staff.salaries.minijobs"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingCOGS.staff.salaries.minijobs"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100056">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-bra:bs.eqLiab.liab.savings.above1year"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100057">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Aufstellung_unter_Ergebnisverwendung"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:dim_parentDRS22K.accGroupStatement.netProfitLoss"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100058">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Aufstellung_unter_Ergebnisverwendung"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:dim_parentDRS22K.accGroupStatement.netProfitLoss.prevYear"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100059">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingCOGS.grossOpProfit.otherRevenue.statutoryDuties.donation"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100060">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_correction"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.eqLiab.equity.subscribed.unlimitedLiablePartners"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.eqLiab.equity.subscribed.unlimitedLiablePartners"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100061">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.otherOpRevenue.statutoryDuties.estate"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100062">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-bra:bs.ass.fixAss.tan.prepayments"/>
+         <vercu:toConcept name="cur_de-bra:bs.ass.fixAss.tan.prepayments"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100063">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_correction"/>
+      <ver:assignmentRef ref="assig_moved"/>
+      <ver:assignmentRef ref="assig_Untergliederung_Ausleihungen,_Forderungen_und_Verbindlichkeiten_im_Gesellschafterkontext"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.ass.fixAss.fin.loansToAffil.shareholder"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.ass.fixAss.fin.loansToAffil.shareholder"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100064">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Kapitalerhöhung_gegen_Einlagen"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:nt.bsInfo.capIncreaseContribution.SharePremium"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100065">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingCOGS.grossOpProfit.otherRevenue.statutoryDuties"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100066">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_correction"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingCOGS.staff.social.socExp"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingCOGS.staff.social.socExp"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100067">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-bra:is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.changePropertyHeldToSale"/>
+         <vercu:toConcept name="cur_de-bra:is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.changePropertyHeldToSale"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100068">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingCOGS.grossOpProfit.otherRevenue.statutoryDuties.donation.use"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100069">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material.purchased.withoutVAT"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material.purchased.withoutVAT"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100070">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material.rawMatConsSup.generalRateVAT"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material.rawMatConsSup.generalRateVAT"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100071">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-bra:is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.netSales.grossSales.propertySales"/>
+         <vercu:toConcept name="cur_de-bra:is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.netSales.grossSales.propertySales"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100072">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingCOGS.grossOpProfit.statutoryDuties.donation"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingCOGS.grossOpProfit.statutoryDuties.donation"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100073">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:nt.isInfo.incomeStatutoryDuties.membershipFees"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100074">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-bra:bs.eqLiab.liab.trade.propertyAcquisition"/>
+         <vercu:toConcept name="cur_de-bra:bs.eqLiab.liab.trade.propertyAcquisition"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100075">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingCOGS.grossOpProfit.otherRevenue.statutoryDuties.other"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100076">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.ass.currAss.receiv.trade.misc"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.ass.currAss.receiv.trade.misc"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100077">
+      <ver:assignmentRef ref="assig_domain"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.otherCost.liabilityRemunerationPartners"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.otherCost.liabilityRemunerationPartners"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100078">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingCOGS.grossOpProfit.statutoryDuties.fines"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingCOGS.grossOpProfit.statutoryDuties.fines"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100079">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Untergliederung_Ausleihungen,_Forderungen_und_Verbindlichkeiten_im_Gesellschafterkontext"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.ass.fixAss.fin.loansToAffil.corporations"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.ass.fixAss.fin.loansToAffil.corporations"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100080">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Kapitalerhöhung_gegen_Einlagen"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:bs.eqLiab.equity.capIncreaseContributionsInclPremium.dateHR"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100081">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.otherOpRevenue.statutoryDuties.other"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100082">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material.rawMatConsSup.intraEU"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material.rawMatConsSup.intraEU"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100083">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-bra:is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.netSales.grossSales.care"/>
+         <vercu:toConcept name="cur_de-bra:is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.netSales.grossSales.care"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100084">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_correction"/>
+      <ver:assignmentRef ref="assig_Aufstellung_unter_Ergebnisverwendung"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:nt.bsInfo.profitLossInRetainedEarnings"/>
+         <vercu:toConcept name="cur_de-gaap-ci:nt.bsInfo.profitLossInRetainedEarnings"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100085">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Aufstellung_unter_Ergebnisverwendung"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.eqLiab.equity.netIncomePartnerships"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.eqLiab.equity.netIncomePartnerships"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100086">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_correction"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingCOGS.grossOpProfit.otherRevenue.releasePreTaxRes.KStG34_6e"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingCOGS.grossOpProfit.otherRevenue.releasePreTaxRes.KStG34_6e"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100087">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.eqLiab.otherSpecRes.unspentDonationFunds.statutoryUse"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.eqLiab.otherSpecRes.unspentDonationFunds.statutoryUse"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100088">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-bra:nt.isInfo.SalesDetails.propertyManagement"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100089">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.statutoryDuties.donations.immediatelyRecognised"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100090">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-bra:bs.ass.currAss.receiv.tradeOther.upto1year"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100091">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:nt.isInfo.incomeStatutoryDuties.donations.use"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100092">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:nt.isInfo.incomeStatutoryDuties.estate"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100093">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingCOGS.grossOpProfit.statutoryDuties.donation.received"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100094">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.statutoryDuties.donations"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.statutoryDuties.donations"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100095">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_moved"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-bra:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.services.otherServices"/>
+         <vercu:toConcept name="cur_de-bra:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.services.otherServices"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100096">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Untergliederung_Ausleihungen,_Forderungen_und_Verbindlichkeiten_im_Gesellschafterkontext"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.ass.fixAss.fin.loansToAffil.soleProprietor"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.ass.fixAss.fin.loansToAffil.soleProprietor"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100097">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-bra:bs.eqLiab.liab.trade.other"/>
+         <vercu:toConcept name="cur_de-bra:bs.eqLiab.liab.trade.other"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100098">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-bra:is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.netSales.grossSales.propertyManagement"/>
+         <vercu:toConcept name="cur_de-bra:is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.netSales.grossSales.propertyManagement"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100099">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.otherOpRevenue.statutoryDuties.sponsor"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100100">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material.rawMatConsSup.unknownVAT"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material.rawMatConsSup.unknownVAT"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100101">
+      <ver:assignmentRef ref="assig_domain"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.deprAmort.fixAss.specific.except.goodwill"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.deprAmort.fixAss.specific.except.goodwill"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100102">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_correction"/>
+      <ver:assignmentRef ref="assig_moved"/>
+      <ver:assignmentRef ref="assig_Umschichtungsergebnisse_bei_Stiftungen"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.eqLiab.equity.reallocationSurplus.capAdjust"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.eqLiab.equity.reallocationSurplus.capAdjust"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100103">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.group"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.group"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100104">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-bra:nt.bsInfo.operatingCostsNotYetInvoicedInWorkInProgress"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100105">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingCOGS.grossOpProfit.otherRevenue.statutoryDuties.fine"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100106">
+      <ver:assignmentRef ref="assig_domain"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-bra:is.netIncome.regular.operatingTC.grossTradingProfit.taxes.tax.releaseTaxProv.minst"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100107">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.statutoryDuties.donations.received"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100108">
+      <ver:assignmentRef ref="assig_domain"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.tax.prevPeriodPaid.minst"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100109">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_correction"/>
+      <ver:assignmentRef ref="assig_Bereinigung_Rechtsformauszeichnungen"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.incomeSubsidPaidToMinority"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.incomeSubsidPaidToMinority"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100110">
+      <ver:assignmentRef ref="assig_domain"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.eqLiab.equity.profitLossPartnershipsHGBs264c"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.eqLiab.equity.profitLossPartnershipsHGBs264c"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100111">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.ass.currAss.receiv.trade.other"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.ass.currAss.receiv.trade.other"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100112">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_moved"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-bra:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.services.propertyManagement"/>
+         <vercu:toConcept name="cur_de-bra:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.services.propertyManagement"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100113">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_correction"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.ass.deficitNotCoveredByCapital.withdrawalLimitedLiablePartner"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.ass.deficitNotCoveredByCapital.withdrawalLimitedLiablePartner"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100114">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material.purchased.inventoryChange"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material.purchased.inventoryChange"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100115">
+      <ver:assignmentRef ref="assig_domain"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.otherCost.otherRemunerationPartners"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100116">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingCOGS.grossOpProfit.statutoryDuties.membership"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingCOGS.grossOpProfit.statutoryDuties.membership"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100117">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-bra:bs.ass.fixAss.tan.buildingsThirdPartyLand"/>
+         <vercu:toConcept name="cur_de-bra:bs.ass.fixAss.tan.buildingsThirdPartyLand"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100118">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.inventoryChange.decreaseGoodsInProgress"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.inventoryChange.decreaseGoodsInProgress"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100119">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.reductionsOffset"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.reductionsOffset"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100120">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Mindeststeuergesetz"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:nt.genInfo.minimTax"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100121">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Kapitalerhöhung_gegen_Einlagen"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:nt.bsInfo.capIncreaseContribution.dateEntryHR"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100122">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_correction"/>
+      <ver:assignmentRef ref="assig_moved"/>
+      <ver:assignmentRef ref="assig_Umschichtungsergebnisse_bei_Stiftungen"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.eqLiab.equity.reallocationSurplus.changePresentYear"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.eqLiab.equity.reallocationSurplus.changePresentYear"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100123">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material.rawMatConsSup.reducedRateVAT"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material.rawMatConsSup.reducedRateVAT"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100124">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_correction"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.staff.salaries.minijobs"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.staff.salaries.minijobs"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100125">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material.purchased.generalRateVAT"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material.purchased.generalRateVAT"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100126">
+      <ver:assignmentRef ref="assig_correction"/>
+      <ver:assignmentRef ref="assig_Bereinigung_Duplikate_Bezeichner,_Documentation,_DefinitionGuidance"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:nt.bsInfo"/>
+         <vercu:toConcept name="cur_de-gaap-ci:nt.bsInfo"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100127">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material.rawMatConsSup.inventoryChange"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material.rawMatConsSup.inventoryChange"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100128">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Untergliederung_Ausleihungen,_Forderungen_und_Verbindlichkeiten_im_Gesellschafterkontext"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.ass.fixAss.fin.loansToParticip.other"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.ass.fixAss.fin.loansToParticip.other"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100129">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingCOGS.grossOpProfit.otherRevenue.statutoryDuties.grant"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100130">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.otherOpRevenue.statutoryDuties.grant"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100131">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-bra:bs.eqLiab.liab.trade.other.upTo1year"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100132">
+      <ver:assignmentRef ref="assig_domain"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.fin.netInterest.expenses.regularInterest.PartnersLoans.participationOver25pt"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.fin.netInterest.expenses.regularInterest.PartnersLoans.participationOver25pt"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100133">
+      <ver:assignmentRef ref="assig_domain"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.deprAmort.fixAss.specific.except.otherIntan"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.deprAmort.fixAss.specific.except.otherIntan"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100134">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_correction"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-bra:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material.purchased.purchased"/>
+         <vercu:toConcept name="cur_de-bra:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material.purchased.purchased"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100135">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Aufstellung_unter_Ergebnisverwendung"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:dim_parentDRS22P.accGroupStatement.netProfitLoss"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100136">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Untergliederung_Ausleihungen,_Forderungen_und_Verbindlichkeiten_im_Gesellschafterkontext"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:bs.ass.fixAss.fin.loansToParticip.soleProprietor"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100137">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_correction"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.staff.salaries.misc"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.staff.salaries.misc"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100138">
+      <ver:assignmentRef ref="assig_domain"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingCOGS.otherCostTC.otherRemunerationPartners"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100139">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-bra:bs.ass.fixAss.tan.landWithHeritableBuildingRights"/>
+         <vercu:toConcept name="cur_de-bra:bs.ass.fixAss.tan.landWithHeritableBuildingRights"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100140">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material.rawMatConsSup.misc"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material.rawMatConsSup.misc"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100141">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-bra:bs.ass.fixAss.tan.landWithBusinessBuildings"/>
+         <vercu:toConcept name="cur_de-bra:bs.ass.fixAss.tan.landWithBusinessBuildings"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100142">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Bereinigung_Rechtsformauszeichnungen"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:incomeUse.gainLoss.releaseCapitalReserve"/>
+         <vercu:toConcept name="cur_de-gaap-ci:incomeUse.gainLoss.releaseCapitalReserve"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100143">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Untergliederung_Ausleihungen,_Forderungen_und_Verbindlichkeiten_im_Gesellschafterkontext"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.ass.fixAss.fin.loansToSharehold.misc"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.ass.fixAss.fin.loansToSharehold.misc"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100144">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Untergliederung_Ausleihungen,_Forderungen_und_Verbindlichkeiten_im_Gesellschafterkontext"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.ass.fixAss.fin.loansToAffil.partnerships"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.ass.fixAss.fin.loansToAffil.partnerships"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100145">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-bra:bs.ass.currAss.receiv.lease.upto1year"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100146">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.otherOpRevenue.statutoryDuties.donations.use"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100147">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-bra:bs.eqLiab.liab.trade.lease.upTo1year"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100148">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material.rawMatConsSup"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material.rawMatConsSup"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100149">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.services.UStG13bNonDedInputTax"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.services.UStG13bNonDedInputTax"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100150">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_moved"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-bra:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.services.propertyManagement.grst"/>
+         <vercu:toConcept name="cur_de-bra:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.services.propertyManagement.grst"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100151">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-bra:bs.ass.currAss.receiv.propertySales.above1year"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100152">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:nt.isInfo.incomeStatutoryDuties"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100153">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingCOGS.grossOpProfit.otherRevenue.statutoryDuties.donation.received"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100154">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.services"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.services"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100155">
+      <ver:assignmentRef ref="assig_domain"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-bra:is.netIncome.regular.operatingTC.grossTradingProfit.taxes.tax.prevPeriodReceived.minst"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100156">
+      <ver:assignmentRef ref="assig_correction"/>
+      <ver:assignmentRef ref="assig_Automatisierte_Tests"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:dim_parentDRS22K.accGroupStatement.reserves.capRes"/>
+         <vercu:toConcept name="cur_de-gaap-ci:dim_parentDRS22K.accGroupStatement.reserves.capRes"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100157">
+      <ver:assignmentRef ref="assig_domain"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-bra:is.netIncome.regular.operatingTC.deprAmort.fixAss.specific.except.animals"/>
+         <vercu:toConcept name="cur_de-bra:is.netIncome.regular.operatingTC.deprAmort.fixAss.specific.except.animals"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100158">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:nt.isInfo.incomeStatutoryDuties.fine"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100159">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-bra:bs.ass.currAss.receiv.tradeOther.above1year"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100160">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Restlaufzeitvermerk_bis_1_Jahr_-_Forderungen_und_sonstige_Vermögensgegenstände"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:bs.ass.currAss.receiv.upto1year"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100161">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-bra:is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.netSales.grossSales.otherTradeReceivables"/>
+         <vercu:toConcept name="cur_de-bra:is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.netSales.grossSales.otherTradeReceivables"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100162">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Kapitalerhöhung_gegen_Einlagen"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:bs.eqLiab.equity.capIncreaseContributionsInclPremium"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100163">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_correction"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.ass.deficitNotCoveredByCapital.withdrawalsUnlimitedLiablePartner"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.ass.deficitNotCoveredByCapital.withdrawalsUnlimitedLiablePartner"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100164">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-bra:bs.eqLiab.liab.savingBonds.upto1year"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100165">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_validThrough_Posten_im_Zusammenhang_mit_§_38_KStG"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.fin.netInterest.expenses.valueDiscount.CITincrease"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.fin.netInterest.expenses.valueDiscount.CITincrease"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100166">
+      <ver:assignmentRef ref="assig_domain"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.deprAmort.fixAss.specific.except.tan"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.deprAmort.fixAss.specific.except.tan"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100167">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-bra:bs.eqLiab.liab.trade.care.above1year"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100168">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-bra:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.services.care"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100169">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Mindeststeuergesetz"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:nt.genInfo.minimTax.applicationEffects"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100170">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material.purchased.intraEU"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material.purchased.intraEU"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100171">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material.purchased.misc"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material.purchased.misc"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100172">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingCOGS.grossOpProfit.statutoryDuties.donation.use"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100173">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingCOGS.grossOpProfit.otherRevenue.statutoryDuties.membershipFees"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100174">
+      <ver:assignmentRef ref="assig_domain"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:fpl.additions.costOfRightsEStG4j"/>
+         <vercu:toConcept name="cur_de-gaap-ci:fpl.additions.costOfRightsEStG4j"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100175">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Aufstellung_unter_Ergebnisverwendung"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:bs.eqLiab.equity.profitLossPartnershipsHGBs264c.retainedEarnings"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100176">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_correction"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.otherOpRevenue.subsidies"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.otherOpRevenue.subsidies"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100177">
+      <ver:assignmentRef ref="assig_domain"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.tax.minst"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100178">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Untergliederung_Ausleihungen,_Forderungen_und_Verbindlichkeiten_im_Gesellschafterkontext"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.ass.fixAss.fin.loansToAffil.partnerships.sharesSilentAtyp"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.ass.fixAss.fin.loansToAffil.partnerships.sharesSilentAtyp"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100179">
+      <ver:assignmentRef ref="assig_domain"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.ass.currAss.receiv.regulatory.upTo1year"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.ass.currAss.receiv.regulatory.upTo1year"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100180">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.otherOpRevenue.statutoryDuties"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100181">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-bra:nt.isInfo.SalesDetails"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100182">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-bra:bs.ass.fixAss.tan.landWithoutBuildingsWUV"/>
+         <vercu:toConcept name="cur_de-bra:bs.ass.fixAss.tan.landWithoutBuildingsWUV"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100183">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Untergliederung_Ausleihungen,_Forderungen_und_Verbindlichkeiten_im_Gesellschafterkontext"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.ass.fixAss.fin.loansToAffil.partnerships.other"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.ass.fixAss.fin.loansToAffil.partnerships.other"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100184">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_correction"/>
+      <ver:assignmentRef ref="assig_moved"/>
+      <ver:assignmentRef ref="assig_Untergliederung_Ausleihungen,_Forderungen_und_Verbindlichkeiten_im_Gesellschafterkontext"/>
+      <ver:assignmentRef ref="assig_Bereinigung_Rechtsformauszeichnungen"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.ass.currAss.receiv.other.shareholders"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.ass.currAss.receiv.other.shareholders"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100185">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-bra:bs.eqLiab.liab.trade.lease"/>
+         <vercu:toConcept name="cur_de-bra:bs.eqLiab.liab.trade.lease"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100186">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.services.unknownVAT"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.services.unknownVAT"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100187">
+      <ver:assignmentRef ref="assig_correction"/>
+      <ver:assignmentRef ref="assig_Einheitliche_Schreibweise_Eigenkapitalcharakter"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.profitParticipationEquityNature"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.profitParticipationEquityNature"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100188">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_correction"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.otherCost.addPreTaxRes.KStG34_6e"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.otherCost.addPreTaxRes.KStG34_6e"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100189">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingCOGS.grossOpProfit.statutoryDuties.sponsor"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingCOGS.grossOpProfit.statutoryDuties.sponsor"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100190">
+      <ver:assignmentRef ref="assig_domain"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.deprAmort.fixAss.tan.lowValueAsCollItem"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.deprAmort.fixAss.tan.lowValueAsCollItem"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100191">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.inventoryChange.increaseGoodsInProgress"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.inventoryChange.increaseGoodsInProgress"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100192">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material.purchased"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material.purchased"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100193">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material.purchased.unknownVAT"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material.purchased.unknownVAT"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100194">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.misc"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.misc"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100195">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.eqLiab.otherSpecRes.unspentDonationFunds.bound"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.eqLiab.otherSpecRes.unspentDonationFunds.bound"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100196">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_moved"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-bra:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.services.landForSale"/>
+         <vercu:toConcept name="cur_de-bra:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.services.landForSale"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100197">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Aufstellung_unter_Ergebnisverwendung"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:nt.bsInfo.profitLossInCaseOfPartialAppropriation"/>
+         <vercu:toConcept name="cur_de-gaap-ci:nt.bsInfo.profitLossInCaseOfPartialAppropriation"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100198">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Untergliederung_Ausleihungen,_Forderungen_und_Verbindlichkeiten_im_Gesellschafterkontext"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.eqLiab.liab.other.shareholders"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.eqLiab.liab.other.shareholders"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100199">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Aufstellung_unter_Ergebnisverwendung"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:dim_parentDRS22P.accGroupStatement.netProfitLoss.prevYear"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100200">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.ass.currAss.receiv.trade.upTo1year"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.ass.currAss.receiv.trade.upTo1year"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100201">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_correction"/>
+      <ver:assignmentRef ref="assig_moved"/>
+      <ver:assignmentRef ref="assig_Umschichtungsergebnisse_bei_Stiftungen"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.eqLiab.equity.reallocationSurplus"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.eqLiab.equity.reallocationSurplus"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100202">
+      <ver:assignmentRef ref="assig_domain"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.ass.currAss.receiv.regulatory.above1year"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.ass.currAss.receiv.regulatory.above1year"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100203">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Bereinigung_Rechtsformauszeichnungen"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:incomeUse.gainLoss.dividensPlanned"/>
+         <vercu:toConcept name="cur_de-gaap-ci:incomeUse.gainLoss.dividensPlanned"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100204">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100205">
+      <ver:assignmentRef ref="assig_domain"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:fpl.additions.minst"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100206">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Untergliederung_Ausleihungen,_Forderungen_und_Verbindlichkeiten_im_Gesellschafterkontext"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.eqLiab.liab.shareholders.misc"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.eqLiab.liab.shareholders.misc"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100207">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Untergliederung_Ausleihungen,_Forderungen_und_Verbindlichkeiten_im_Gesellschafterkontext"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.ass.currAss.receiv.shareholders.other"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.ass.currAss.receiv.shareholders.other"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100208">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-bra:bs.eqLiab.liab.otherCreditors.upto1year"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100209">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_correction"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.ass.deficitNotCoveredByCapital.lossUnlimitedLiablePartnerS"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.ass.deficitNotCoveredByCapital.lossUnlimitedLiablePartnerS"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100210">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_correction"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.otherOpRevenue.releasePreTaxRes.KStGs34_6e"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.otherOpRevenue.releasePreTaxRes.KStGs34_6e"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100211">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_correction"/>
+      <ver:assignmentRef ref="assig_moved"/>
+      <ver:assignmentRef ref="assig_Untergliederung_Ausleihungen,_Forderungen_und_Verbindlichkeiten_im_Gesellschafterkontext"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.ass.fixAss.fin.loansToAffil.parentComp"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.ass.fixAss.fin.loansToAffil.parentComp"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100212">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-bra:bs.ass.currAss.receiv.care.above1year"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100213">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.statutoryDuties.donations.use"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100214">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material.misc"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material.misc"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100215">
+      <ver:assignmentRef ref="assig_domain"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingCOGS.otherCost.liabilityRemunerationPartners"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingCOGS.otherCost.liabilityRemunerationPartners"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100216">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.ass.currAss.receiv.trade.generalPartner"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.ass.currAss.receiv.trade.generalPartner"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100217">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-bra:bs.ass.currAss.receiv.care.upto1year"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100218">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.statutoryDuties.sponsor"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.statutoryDuties.sponsor"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100219">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-bra:bs.eqLiab.liab.trade.lease.above1year"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100220">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:nt.isInfo.incomeStatutoryDuties.donations"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100221">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-bra:bs.eqLiab.liab.savings.upto1year"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100222">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Aufstellung_unter_Ergebnisverwendung"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.eqLiab.equity.profitLossPartnerships.retainedEarnings"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.eqLiab.equity.profitLossPartnerships.retainedEarnings"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100223">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:nt.isInfo.incomeStatutoryDuties.grants"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100224">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingCOGS.grossOpProfit.otherRevenue.statutoryDuties.sponsor"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100225">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Kapitalerhöhung_gegen_Einlagen"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:nt.bsInfo.capIncreaseContribution.shareParValue"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100226">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.ass.currAss.receiv.trade.bill"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.ass.currAss.receiv.trade.bill"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100227">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.statutoryDuties.fines"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.statutoryDuties.fines"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100228">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.services.OtherNonDedInputTax"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.services.OtherNonDedInputTax"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100229">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_correction"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.staff.salaries.inKind"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.staff.salaries.inKind"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100230">
+      <ver:assignmentRef ref="assig_domain"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.tax.prevPeriodReceived.minst"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100231">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_correction"/>
+      <ver:assignmentRef ref="assig_moved"/>
+      <ver:assignmentRef ref="assig_Umschichtungsergebnisse_bei_Stiftungen"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.eqLiab.equity.reallocationSurplus.movement"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.eqLiab.equity.reallocationSurplus.movement"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100232">
+      <ver:assignmentRef ref="assig_domain"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.ass.currAss.receiv.affil.upTo1year"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.ass.currAss.receiv.affil.upTo1year"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100233">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_correction"/>
+      <ver:assignmentRef ref="assig_moved"/>
+      <ver:assignmentRef ref="assig_Kapitalerhöhung_gegen_Einlagen"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.eqLiab.equity.paymForCapitalIncrease"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.eqLiab.equity.paymForCapitalIncrease"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100234">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.inventoryChange.decreasefinished"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.inventoryChange.decreasefinished"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100235">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material.rawMatConsSup.noDeductVAT"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material.rawMatConsSup.noDeductVAT"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100236">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-bra:is.netIncome.regular.operatingTC.grossTradingProfit.costPurchasedGoodsService"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100237">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:nt.isInfo.incomeStatutoryDuties.sponsor"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100238">
+      <ver:assignmentRef ref="assig_domain"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.eqLiab.liab.particip.misc"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.eqLiab.liab.particip.misc"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100239">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.services.UStG13bDedInputTax"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.services.UStG13bDedInputTax"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100240">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.services.OtherDedInputTax"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.services.OtherDedInputTax"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100241">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Untergliederung_Ausleihungen,_Forderungen_und_Verbindlichkeiten_im_Gesellschafterkontext"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:bs.ass.fixAss.fin.otherLoans.partners"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100242">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-bra:bs.eqLiab.liab.trade.other.above1year"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100243">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_correction"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingCOGS.staff.salaries.inKind"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingCOGS.staff.salaries.inKind"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100244">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.otherOpRevenue.statutoryDuties.membershipFees"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100245">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_correction"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.staff.salaries.voluntayBenefits"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.staff.salaries.voluntayBenefits"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100246">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.eqLiab.liab.conditionalRepayableDonations"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.eqLiab.liab.conditionalRepayableDonations"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100247">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.inventoryChange.increasefinished"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.inventoryChange.increasefinished"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100248">
+      <ver:assignmentRef ref="assig_domain"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingCOGS.deprAm.fixAss.tan.lowValueAsCollItem"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingCOGS.deprAm.fixAss.tan.lowValueAsCollItem"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100249">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_correction"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.eqLiab.equity.subscribed.limitedLiablePartners"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.eqLiab.equity.subscribed.limitedLiablePartners"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100250">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.inventoryChange.decreaseConstructionInProgress"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.inventoryChange.decreaseConstructionInProgress"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100251">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_moved"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-bra:bs.eqLiab.liab.trade.care"/>
+         <vercu:toConcept name="cur_de-bra:bs.eqLiab.liab.trade.care"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100252">
+      <ver:assignmentRef ref="assig_domain"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingCOGS.otherCost.otherRemunerationPartners"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100253">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-bra:bs.eqLiab.liab.trade.propertyAcquisition.above1year"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100254">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_correction"/>
+      <ver:assignmentRef ref="assig_Energiestoffe_-_Zusatzinformation_Kreditwürdigkeitsprüfung"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:AddInfoCreditScoring.is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.CoM.CoMEnergy"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100255">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.inventoryChange.increaseConstructionInProgress"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.inventoryChange.increaseConstructionInProgress"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100256">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.inventoryChange"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.inventoryChange"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100257">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Spendenerträge_bei_Vereinen,_Stiftungen_und_gGmbHs"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingCOGS.grossOpProfit.statutoryDuties.donation.immediatelyRecognised"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100258">
+      <ver:assignmentRef ref="assig_domain"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.ass.currAss.receiv.affil.above1year"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.ass.currAss.receiv.affil.above1year"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100259">
+      <ver:assignmentRef ref="assig_correction"/>
+      <ver:assignmentRef ref="assig_Automatisierte_Tests"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:dim_parentDRS22K.accGroupStatement.reserves.revenueRes"/>
+         <vercu:toConcept name="cur_de-gaap-ci:dim_parentDRS22K.accGroupStatement.reserves.revenueRes"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100260">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptAdd physical="true">
+         <vercu:toConcept name="cur_de-bra:bs.eqLiab.liab.savingBonds.above1year"/>
+      </vercu:conceptAdd>
+   </ver:action>
+   <ver:action id="ver_100261">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Untergliederung_Ausleihungen,_Forderungen_und_Verbindlichkeiten_im_Gesellschafterkontext"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.ass.currAss.receiv.affil.partner"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.ass.currAss.receiv.affil.partner"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100262">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-bra:bs.ass.fixAss.tan.constrPrepCosts"/>
+         <vercu:toConcept name="cur_de-bra:bs.ass.fixAss.tan.constrPrepCosts"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100263">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_correction"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.ass.currAss.receiv.trade.shareholders"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.ass.currAss.receiv.trade.shareholders"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100264">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Untergliederung_Ausleihungen,_Forderungen_und_Verbindlichkeiten_im_Gesellschafterkontext"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:bs.ass.fixAss.fin.loansToAffil.other"/>
+         <vercu:toConcept name="cur_de-gaap-ci:bs.ass.fixAss.fin.loansToAffil.other"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100265">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_correction"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingCOGS.staff.salaries.voluntaryBenefits"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingCOGS.staff.salaries.voluntaryBenefits"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100266">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Anpassungsbedarf_durch_Neufassung_JAbschlWUV"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material.group"/>
+         <vercu:toConcept name="cur_de-gaap-ci:is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material.group"/>
+      </vercu:conceptRename>
+   </ver:action>
+   <ver:action id="ver_100267">
+      <ver:assignmentRef ref="assig_domain"/>
+      <ver:assignmentRef ref="assig_Bereinigung_Rechtsformauszeichnungen"/>
+      <vercu:conceptRename>
+         <vercu:fromConcept name="pre_de-gaap-ci:incomeUse.gainLoss.releaseCapReserves"/>
+         <vercu:toConcept name="cur_de-gaap-ci:incomeUse.gainLoss.releaseCapReserves"/>
+      </vercu:conceptRename>
+   </ver:action>
+</ver:report>

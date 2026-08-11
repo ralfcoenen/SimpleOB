@@ -5,7 +5,7 @@ from enum import Enum
 from pathlib import Path
 from xml.etree import ElementTree
 
-XSD_NAMESPACE = "http://www.w3.org/2001/XMLSchema"
+XSD_NAMESPACE = "http://www.w3.org/2001/XMLSchema" 
 LINK_NAMESPACE = "http://www.xbrl.org/2003/linkbase"
 XLINK_NAMESPACE = "http://www.w3.org/1999/xlink"
 
@@ -94,6 +94,15 @@ class TaxonomyEntryPoint:
         TaxonomyLinkbaseReference,
         ...
     ] = ()
+    
+    @property
+    def schema_ref_uri(self) -> str:
+        """Ermittelt die kanonische URI des Entry-Point-Schemas."""
+
+        base_namespace = self.namespace.rsplit("/", 1)[0]
+
+        return f"{base_namespace}/{self.path.name}"
+    
     @property
     def variant(self) -> TaxonomyEntryPointVariant:
         """Ermittelt die Variante des Entry Points."""

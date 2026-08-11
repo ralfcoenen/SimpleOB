@@ -1,0 +1,1277 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--(c) XBRL Deutschland e.V. - see http://www.xbrl.de-->
+
+
+<linkbase xmlns="http://www.xbrl.org/2003/linkbase"
+          xmlns:hgbref="http://www.xbrl.de/taxonomies/de-ref-2010-02-19"
+          xmlns:ref="http://www.xbrl.org/2006/ref"
+          xmlns:xbrli="http://www.xbrl.org/2003/instance"
+          xmlns:xlink="http://www.w3.org/1999/xlink"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://www.xbrl.de/taxonomies/de-ref-2010-02-19 ../de-gcd-2024-04-01/hgbref-2024-04-01.xsd">
+   <referenceLink xlink:type="extended" xlink:role="http://www.xbrl.org/2003/role/link">
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_tableBanks.nt.ass"
+           xlink:label="de-fi_tableBanks.nt.ass"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_tableBanks.nt.ass"
+                    xlink:to="reference_de-fi_tableBanks.nt.ass"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_tableBanks.nt.ass"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_tableBanks.nt.ass">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_dim_changesBanks.nt.ass"
+           xlink:label="de-fi_dim_changesBanks.nt.ass"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_dim_changesBanks.nt.ass"
+                    xlink:to="reference_de-fi_dim_changesBanks.nt.ass"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_dim_changesBanks.nt.ass"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_dim_changesBanks.nt.ass">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_cubeBanks.nt.ass.gross"
+           xlink:label="de-fi_cubeBanks.nt.ass.gross"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_cubeBanks.nt.ass.gross"
+                    xlink:to="reference_de-fi_cubeBanks.nt.ass.gross"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_cubeBanks.nt.ass.gross"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_cubeBanks.nt.ass.gross">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_bsBanks.ass.leaseAssetsFAT"
+           xlink:label="de-fi_bsBanks.ass.leaseAssetsFAT"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_bsBanks.ass.leaseAssetsFAT"
+                    xlink:to="reference_de-fi_bsBanks.ass.leaseAssetsFAT"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_bsBanks.ass.leaseAssetsFAT"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_bsBanks.ass.leaseAssetsFAT">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_bsBanks.ass.intanFAT"
+           xlink:label="de-fi_bsBanks.ass.intanFAT"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_bsBanks.ass.intanFAT"
+                    xlink:to="reference_de-fi_bsBanks.ass.intanFAT"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_bsBanks.ass.intanFAT"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_bsBanks.ass.intanFAT">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_bsBanks.ass.intan.selfmadeFAT"
+           xlink:label="de-fi_bsBanks.ass.intan.selfmadeFAT"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_bsBanks.ass.intan.selfmadeFAT"
+                    xlink:to="reference_de-fi_bsBanks.ass.intan.selfmadeFAT"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_bsBanks.ass.intan.selfmadeFAT"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_bsBanks.ass.intan.selfmadeFAT">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_bsBanks.ass.intan.concessionBrandsFAT"
+           xlink:label="de-fi_bsBanks.ass.intan.concessionBrandsFAT"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_bsBanks.ass.intan.concessionBrandsFAT"
+                    xlink:to="reference_de-fi_bsBanks.ass.intan.concessionBrandsFAT"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_bsBanks.ass.intan.concessionBrandsFAT"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_bsBanks.ass.intan.concessionBrandsFAT">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_bsBanks.ass.intan.goodwillFAT"
+           xlink:label="de-fi_bsBanks.ass.intan.goodwillFAT"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_bsBanks.ass.intan.goodwillFAT"
+                    xlink:to="reference_de-fi_bsBanks.ass.intan.goodwillFAT"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_bsBanks.ass.intan.goodwillFAT"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_bsBanks.ass.intan.goodwillFAT">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_bsBanks.ass.intan.advPaymFAT"
+           xlink:label="de-fi_bsBanks.ass.intan.advPaymFAT"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_bsBanks.ass.intan.advPaymFAT"
+                    xlink:to="reference_de-fi_bsBanks.ass.intan.advPaymFAT"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_bsBanks.ass.intan.advPaymFAT"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_bsBanks.ass.intan.advPaymFAT">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_bsBanks.ass.tanFAT"
+           xlink:label="de-fi_bsBanks.ass.tanFAT"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_bsBanks.ass.tanFAT"
+                    xlink:to="reference_de-fi_bsBanks.ass.tanFAT"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_bsBanks.ass.tanFAT"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_bsBanks.ass.tanFAT">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_bsBanks.ass.tan.landBuildingsFAT"
+           xlink:label="de-fi_bsBanks.ass.tan.landBuildingsFAT"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_bsBanks.ass.tan.landBuildingsFAT"
+                    xlink:to="reference_de-fi_bsBanks.ass.tan.landBuildingsFAT"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_bsBanks.ass.tan.landBuildingsFAT"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_bsBanks.ass.tan.landBuildingsFAT">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_bsBanks.ass.tan.machineryFAT"
+           xlink:label="de-fi_bsBanks.ass.tan.machineryFAT"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_bsBanks.ass.tan.machineryFAT"
+                    xlink:to="reference_de-fi_bsBanks.ass.tan.machineryFAT"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_bsBanks.ass.tan.machineryFAT"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_bsBanks.ass.tan.machineryFAT">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_bsBanks.ass.tan.otherEquipmFAT"
+           xlink:label="de-fi_bsBanks.ass.tan.otherEquipmFAT"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_bsBanks.ass.tan.otherEquipmFAT"
+                    xlink:to="reference_de-fi_bsBanks.ass.tan.otherEquipmFAT"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_bsBanks.ass.tan.otherEquipmFAT"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_bsBanks.ass.tan.otherEquipmFAT">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_bsBanks.ass.tan.inConstrAdvPaymFAT"
+           xlink:label="de-fi_bsBanks.ass.tan.inConstrAdvPaymFAT"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_bsBanks.ass.tan.inConstrAdvPaymFAT"
+                    xlink:to="reference_de-fi_bsBanks.ass.tan.inConstrAdvPaymFAT"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_bsBanks.ass.tan.inConstrAdvPaymFAT"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_bsBanks.ass.tan.inConstrAdvPaymFAT">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_bsBanks.ass.tan.otherFAT"
+           xlink:label="de-fi_bsBanks.ass.tan.otherFAT"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_bsBanks.ass.tan.otherFAT"
+                    xlink:to="reference_de-fi_bsBanks.ass.tan.otherFAT"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_bsBanks.ass.tan.otherFAT"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_bsBanks.ass.tan.otherFAT">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_bsBanks.ass.finFAT"
+           xlink:label="de-fi_bsBanks.ass.finFAT"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_bsBanks.ass.finFAT"
+                    xlink:to="reference_de-fi_bsBanks.ass.finFAT"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_bsBanks.ass.finFAT"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_bsBanks.ass.finFAT">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_bsBanks.ass.fin.debtInstrumentsFAT"
+           xlink:label="de-fi_bsBanks.ass.fin.debtInstrumentsFAT"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_bsBanks.ass.fin.debtInstrumentsFAT"
+                    xlink:to="reference_de-fi_bsBanks.ass.fin.debtInstrumentsFAT"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_bsBanks.ass.fin.debtInstrumentsFAT"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_bsBanks.ass.fin.debtInstrumentsFAT">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_bsBanks.ass.fin.sharesFAT"
+           xlink:label="de-fi_bsBanks.ass.fin.sharesFAT"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_bsBanks.ass.fin.sharesFAT"
+                    xlink:to="reference_de-fi_bsBanks.ass.fin.sharesFAT"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_bsBanks.ass.fin.sharesFAT"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_bsBanks.ass.fin.sharesFAT">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_bsBanks.ass.fin.securitiesFAT"
+           xlink:label="de-fi_bsBanks.ass.fin.securitiesFAT"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_bsBanks.ass.fin.securitiesFAT"
+                    xlink:to="reference_de-fi_bsBanks.ass.fin.securitiesFAT"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_bsBanks.ass.fin.securitiesFAT"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_bsBanks.ass.fin.securitiesFAT">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_bsBanks.ass.fin.participFAT"
+           xlink:label="de-fi_bsBanks.ass.fin.participFAT"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_bsBanks.ass.fin.participFAT"
+                    xlink:to="reference_de-fi_bsBanks.ass.fin.participFAT"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_bsBanks.ass.fin.participFAT"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_bsBanks.ass.fin.participFAT">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_bsBanks.ass.fin.participCoopSharesFAT"
+           xlink:label="de-fi_bsBanks.ass.fin.participCoopSharesFAT"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_bsBanks.ass.fin.participCoopSharesFAT"
+                    xlink:to="reference_de-fi_bsBanks.ass.fin.participCoopSharesFAT"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_bsBanks.ass.fin.participCoopSharesFAT"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_bsBanks.ass.fin.participCoopSharesFAT">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:kindOfFinancialInstitutionKreditgenossensch>true</hgbref:kindOfFinancialInstitutionKreditgenossensch>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_bsBanks.ass.fin.sharesInAffilFAT"
+           xlink:label="de-fi_bsBanks.ass.fin.sharesInAffilFAT"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_bsBanks.ass.fin.sharesInAffilFAT"
+                    xlink:to="reference_de-fi_bsBanks.ass.fin.sharesInAffilFAT"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_bsBanks.ass.fin.sharesInAffilFAT"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_bsBanks.ass.fin.sharesInAffilFAT">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_bsBanks.ass.fin.otherSecFAT"
+           xlink:label="de-fi_bsBanks.ass.fin.otherSecFAT"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_bsBanks.ass.fin.otherSecFAT"
+                    xlink:to="reference_de-fi_bsBanks.ass.fin.otherSecFAT"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_bsBanks.ass.fin.otherSecFAT"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_bsBanks.ass.fin.otherSecFAT">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_piTitleBanks.nt.ass.gross"
+           xlink:label="de-fi_piTitleBanks.nt.ass.gross"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_piTitleBanks.nt.ass.gross"
+                    xlink:to="reference_de-fi_piTitleBanks.nt.ass.gross"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_piTitleBanks.nt.ass.gross"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_piTitleBanks.nt.ass.gross">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:notPermittedFor>Einreichung an Finanzverwaltung</hgbref:notPermittedFor>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_allBanks"
+           xlink:label="de-fi_allBanks"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_allBanks"
+                    xlink:to="reference_de-fi_allBanks"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_allBanks"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_allBanks">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:notPermittedFor>Einreichung an Finanzverwaltung</hgbref:notPermittedFor>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_allBanks_Prev_period"
+           xlink:label="de-fi_allBanks_Prev_period"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_allBanks_Prev_period"
+                    xlink:to="reference_de-fi_allBanks_Prev_period"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_allBanks_Prev_period"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_allBanks_Prev_period">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:notPermittedFor>Einreichung an Finanzverwaltung</hgbref:notPermittedFor>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_grossBanks"
+           xlink:label="de-fi_grossBanks"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_grossBanks"
+                    xlink:to="reference_de-fi_grossBanks"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_grossBanks"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_grossBanks">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:notPermittedFor>Einreichung an Finanzverwaltung</hgbref:notPermittedFor>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_grossCostBanks.beginning"
+           xlink:label="de-fi_grossCostBanks.beginning"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_grossCostBanks.beginning"
+                    xlink:to="reference_de-fi_grossCostBanks.beginning"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_grossCostBanks.beginning"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_grossCostBanks.beginning">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:notPermittedFor>Einreichung an Finanzverwaltung</hgbref:notPermittedFor>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_grossBanks.diff"
+           xlink:label="de-fi_grossBanks.diff"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_grossBanks.diff"
+                    xlink:to="reference_de-fi_grossBanks.diff"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_grossBanks.diff"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_grossBanks.diff">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:notPermittedFor>Einreichung an Finanzverwaltung</hgbref:notPermittedFor>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_grossBanks.diff.currDiff"
+           xlink:label="de-fi_grossBanks.diff.currDiff"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_grossBanks.diff.currDiff"
+                    xlink:to="reference_de-fi_grossBanks.diff.currDiff"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_grossBanks.diff.currDiff"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_grossBanks.diff.currDiff">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:notPermittedFor>Einreichung an Finanzverwaltung</hgbref:notPermittedFor>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_grossBanks.diff.otherDiff"
+           xlink:label="de-fi_grossBanks.diff.otherDiff"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_grossBanks.diff.otherDiff"
+                    xlink:to="reference_de-fi_grossBanks.diff.otherDiff"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_grossBanks.diff.otherDiff"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_grossBanks.diff.otherDiff">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:notPermittedFor>Einreichung an Finanzverwaltung</hgbref:notPermittedFor>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_grossBanks.diff.otherDiff.comment"
+           xlink:label="de-fi_grossBanks.diff.otherDiff.comment"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_grossBanks.diff.otherDiff.comment"
+                    xlink:to="reference_de-fi_grossBanks.diff.otherDiff.comment"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_grossBanks.diff.otherDiff.comment"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_grossBanks.diff.otherDiff.comment">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:notPermittedFor>Einreichung an Finanzverwaltung</hgbref:notPermittedFor>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_grossBanks.addition"
+           xlink:label="de-fi_grossBanks.addition"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_grossBanks.addition"
+                    xlink:to="reference_de-fi_grossBanks.addition"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_grossBanks.addition"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_grossBanks.addition">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:notPermittedFor>Einreichung an Finanzverwaltung</hgbref:notPermittedFor>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_grossBanks.release"
+           xlink:label="de-fi_grossBanks.release"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_grossBanks.release"
+                    xlink:to="reference_de-fi_grossBanks.release"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_grossBanks.release"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_grossBanks.release">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:notPermittedFor>Einreichung an Finanzverwaltung</hgbref:notPermittedFor>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_grossBanks.movements"
+           xlink:label="de-fi_grossBanks.movements"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_grossBanks.movements"
+                    xlink:to="reference_de-fi_grossBanks.movements"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_grossBanks.movements"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_grossBanks.movements">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:notPermittedFor>Einreichung an Finanzverwaltung</hgbref:notPermittedFor>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_grossBanks.currChanges"
+           xlink:label="de-fi_grossBanks.currChanges"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_grossBanks.currChanges"
+                    xlink:to="reference_de-fi_grossBanks.currChanges"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_grossBanks.currChanges"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_grossBanks.currChanges">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:notPermittedFor>Einreichung an Finanzverwaltung</hgbref:notPermittedFor>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_accDeprBanks"
+           xlink:label="de-fi_accDeprBanks"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_accDeprBanks"
+                    xlink:to="reference_de-fi_accDeprBanks"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_accDeprBanks"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_accDeprBanks">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:notPermittedFor>Einreichung an Finanzverwaltung</hgbref:notPermittedFor>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_accDeprBanks.beginning"
+           xlink:label="de-fi_accDeprBanks.beginning"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_accDeprBanks.beginning"
+                    xlink:to="reference_de-fi_accDeprBanks.beginning"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_accDeprBanks.beginning"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_accDeprBanks.beginning">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:notPermittedFor>Einreichung an Finanzverwaltung</hgbref:notPermittedFor>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_accDeprBanks.diff"
+           xlink:label="de-fi_accDeprBanks.diff"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_accDeprBanks.diff"
+                    xlink:to="reference_de-fi_accDeprBanks.diff"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_accDeprBanks.diff"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_accDeprBanks.diff">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:notPermittedFor>Einreichung an Finanzverwaltung</hgbref:notPermittedFor>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_accDeprBanks.diff.currDiff"
+           xlink:label="de-fi_accDeprBanks.diff.currDiff"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_accDeprBanks.diff.currDiff"
+                    xlink:to="reference_de-fi_accDeprBanks.diff.currDiff"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_accDeprBanks.diff.currDiff"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_accDeprBanks.diff.currDiff">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:notPermittedFor>Einreichung an Finanzverwaltung</hgbref:notPermittedFor>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_accDeprBanks.diff.otherDiff"
+           xlink:label="de-fi_accDeprBanks.diff.otherDiff"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_accDeprBanks.diff.otherDiff"
+                    xlink:to="reference_de-fi_accDeprBanks.diff.otherDiff"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_accDeprBanks.diff.otherDiff"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_accDeprBanks.diff.otherDiff">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:notPermittedFor>Einreichung an Finanzverwaltung</hgbref:notPermittedFor>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_accDeprBanks.diff.otherDiff.comment"
+           xlink:label="de-fi_accDeprBanks.diff.otherDiff.comment"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_accDeprBanks.diff.otherDiff.comment"
+                    xlink:to="reference_de-fi_accDeprBanks.diff.otherDiff.comment"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_accDeprBanks.diff.otherDiff.comment"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_accDeprBanks.diff.otherDiff.comment">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:notPermittedFor>Einreichung an Finanzverwaltung</hgbref:notPermittedFor>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_accDeprBanks.DeprPeriod"
+           xlink:label="de-fi_accDeprBanks.DeprPeriod"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_accDeprBanks.DeprPeriod"
+                    xlink:to="reference_de-fi_accDeprBanks.DeprPeriod"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_accDeprBanks.DeprPeriod"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_accDeprBanks.DeprPeriod">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:notPermittedFor>Einreichung an Finanzverwaltung</hgbref:notPermittedFor>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_accDeprBanks.DeprPeriod.specific"
+           xlink:label="de-fi_accDeprBanks.DeprPeriod.specific"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_accDeprBanks.DeprPeriod.specific"
+                    xlink:to="reference_de-fi_accDeprBanks.DeprPeriod.specific"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_accDeprBanks.DeprPeriod.specific"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_accDeprBanks.DeprPeriod.specific">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:notPermittedFor>Einreichung an Finanzverwaltung</hgbref:notPermittedFor>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_accDeprBanks.addition"
+           xlink:label="de-fi_accDeprBanks.addition"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_accDeprBanks.addition"
+                    xlink:to="reference_de-fi_accDeprBanks.addition"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_accDeprBanks.addition"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_accDeprBanks.addition">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:notPermittedFor>Einreichung an Finanzverwaltung</hgbref:notPermittedFor>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_accDeprBanks.release"
+           xlink:label="de-fi_accDeprBanks.release"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_accDeprBanks.release"
+                    xlink:to="reference_de-fi_accDeprBanks.release"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_accDeprBanks.release"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_accDeprBanks.release">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:notPermittedFor>Einreichung an Finanzverwaltung</hgbref:notPermittedFor>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_accDeprBanks.movements"
+           xlink:label="de-fi_accDeprBanks.movements"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_accDeprBanks.movements"
+                    xlink:to="reference_de-fi_accDeprBanks.movements"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_accDeprBanks.movements"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_accDeprBanks.movements">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:notPermittedFor>Einreichung an Finanzverwaltung</hgbref:notPermittedFor>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_accDeprBanks.currChanges"
+           xlink:label="de-fi_accDeprBanks.currChanges"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_accDeprBanks.currChanges"
+                    xlink:to="reference_de-fi_accDeprBanks.currChanges"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_accDeprBanks.currChanges"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_accDeprBanks.currChanges">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:notPermittedFor>Einreichung an Finanzverwaltung</hgbref:notPermittedFor>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_revaluationBanks"
+           xlink:label="de-fi_revaluationBanks"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_revaluationBanks"
+                    xlink:to="reference_de-fi_revaluationBanks"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_revaluationBanks"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_revaluationBanks">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:notPermittedFor>Einreichung an Finanzverwaltung</hgbref:notPermittedFor>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_revaluationBanks.comment"
+           xlink:label="de-fi_revaluationBanks.comment"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_revaluationBanks.comment"
+                    xlink:to="reference_de-fi_revaluationBanks.comment"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_revaluationBanks.comment"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_revaluationBanks.comment">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:notPermittedFor>Einreichung an Finanzverwaltung</hgbref:notPermittedFor>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_tableBanksTanIntan.nt.ass"
+           xlink:label="de-fi_tableBanksTanIntan.nt.ass"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_tableBanksTanIntan.nt.ass"
+                    xlink:to="reference_de-fi_tableBanksTanIntan.nt.ass"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_tableBanksTanIntan.nt.ass"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_tableBanksTanIntan.nt.ass">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_cubeBanksTanIntan.nt.ass.gross"
+           xlink:label="de-fi_cubeBanksTanIntan.nt.ass.gross"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_cubeBanksTanIntan.nt.ass.gross"
+                    xlink:to="reference_de-fi_cubeBanksTanIntan.nt.ass.gross"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_cubeBanksTanIntan.nt.ass.gross"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_cubeBanksTanIntan.nt.ass.gross">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_dim_changesBanksTanIntan.nt.ass"
+           xlink:label="de-fi_dim_changesBanksTanIntan.nt.ass"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_dim_changesBanksTanIntan.nt.ass"
+                    xlink:to="reference_de-fi_dim_changesBanksTanIntan.nt.ass"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_dim_changesBanksTanIntan.nt.ass"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_dim_changesBanksTanIntan.nt.ass">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_piTitleBanksTanIntan.nt.ass.gross"
+           xlink:label="de-fi_piTitleBanksTanIntan.nt.ass.gross"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_piTitleBanksTanIntan.nt.ass.gross"
+                    xlink:to="reference_de-fi_piTitleBanksTanIntan.nt.ass.gross"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_piTitleBanksTanIntan.nt.ass.gross"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_piTitleBanksTanIntan.nt.ass.gross">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_allBanksTanIntan"
+           xlink:label="de-fi_allBanksTanIntan"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_allBanksTanIntan"
+                    xlink:to="reference_de-fi_allBanksTanIntan"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_allBanksTanIntan"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_allBanksTanIntan">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:fiscalRequirement>Summenmussfeld</hgbref:fiscalRequirement>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_allBanks_Prev_periodTanIntan"
+           xlink:label="de-fi_allBanks_Prev_periodTanIntan"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_allBanks_Prev_periodTanIntan"
+                    xlink:to="reference_de-fi_allBanks_Prev_periodTanIntan"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_allBanks_Prev_periodTanIntan"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_allBanks_Prev_periodTanIntan">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:fiscalRequirement>Mussfeld</hgbref:fiscalRequirement>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_grossBanksTanIntan"
+           xlink:label="de-fi_grossBanksTanIntan"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_grossBanksTanIntan"
+                    xlink:to="reference_de-fi_grossBanksTanIntan"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_grossBanksTanIntan"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_grossBanksTanIntan">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:fiscalRequirement>Summenmussfeld</hgbref:fiscalRequirement>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_grossCostBanksTanIntan.beginning"
+           xlink:label="de-fi_grossCostBanksTanIntan.beginning"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_grossCostBanksTanIntan.beginning"
+                    xlink:to="reference_de-fi_grossCostBanksTanIntan.beginning"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_grossCostBanksTanIntan.beginning"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_grossCostBanksTanIntan.beginning">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:fiscalRequirement>Mussfeld</hgbref:fiscalRequirement>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_grossBanksTanIntan.diff"
+           xlink:label="de-fi_grossBanksTanIntan.diff"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_grossBanksTanIntan.diff"
+                    xlink:to="reference_de-fi_grossBanksTanIntan.diff"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_grossBanksTanIntan.diff"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_grossBanksTanIntan.diff">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:fiscalRequirement>Rechnerisch notwendig, soweit vorhanden</hgbref:fiscalRequirement>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_grossBanksTanIntan.diff.currDiff"
+           xlink:label="de-fi_grossBanksTanIntan.diff.currDiff"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_grossBanksTanIntan.diff.currDiff"
+                    xlink:to="reference_de-fi_grossBanksTanIntan.diff.currDiff"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_grossBanksTanIntan.diff.currDiff"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_grossBanksTanIntan.diff.currDiff">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_grossBanksTanIntan.diff.otherDiff"
+           xlink:label="de-fi_grossBanksTanIntan.diff.otherDiff"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_grossBanksTanIntan.diff.otherDiff"
+                    xlink:to="reference_de-fi_grossBanksTanIntan.diff.otherDiff"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_grossBanksTanIntan.diff.otherDiff"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_grossBanksTanIntan.diff.otherDiff">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_grossBanksTanIntan.diff.otherDiff.comment"
+           xlink:label="de-fi_grossBanksTanIntan.diff.otherDiff.comment"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_grossBanksTanIntan.diff.otherDiff.comment"
+                    xlink:to="reference_de-fi_grossBanksTanIntan.diff.otherDiff.comment"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_grossBanksTanIntan.diff.otherDiff.comment"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_grossBanksTanIntan.diff.otherDiff.comment">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_grossBanksTanIntan.addition"
+           xlink:label="de-fi_grossBanksTanIntan.addition"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_grossBanksTanIntan.addition"
+                    xlink:to="reference_de-fi_grossBanksTanIntan.addition"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_grossBanksTanIntan.addition"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_grossBanksTanIntan.addition">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:fiscalRequirement>Mussfeld</hgbref:fiscalRequirement>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_grossBanksTanIntan.release"
+           xlink:label="de-fi_grossBanksTanIntan.release"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_grossBanksTanIntan.release"
+                    xlink:to="reference_de-fi_grossBanksTanIntan.release"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_grossBanksTanIntan.release"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_grossBanksTanIntan.release">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:fiscalRequirement>Mussfeld</hgbref:fiscalRequirement>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_grossBanksTanIntan.movements"
+           xlink:label="de-fi_grossBanksTanIntan.movements"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_grossBanksTanIntan.movements"
+                    xlink:to="reference_de-fi_grossBanksTanIntan.movements"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_grossBanksTanIntan.movements"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_grossBanksTanIntan.movements">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:fiscalRequirement>Mussfeld</hgbref:fiscalRequirement>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_grossBanksTanIntan.currChanges"
+           xlink:label="de-fi_grossBanksTanIntan.currChanges"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_grossBanksTanIntan.currChanges"
+                    xlink:to="reference_de-fi_grossBanksTanIntan.currChanges"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_grossBanksTanIntan.currChanges"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_grossBanksTanIntan.currChanges">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:fiscalRequirement>Rechnerisch notwendig, soweit vorhanden</hgbref:fiscalRequirement>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_accDeprBanksTanIntan"
+           xlink:label="de-fi_accDeprBanksTanIntan"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_accDeprBanksTanIntan"
+                    xlink:to="reference_de-fi_accDeprBanksTanIntan"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_accDeprBanksTanIntan"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_accDeprBanksTanIntan">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:fiscalRequirement>Summenmussfeld</hgbref:fiscalRequirement>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_accDeprBanksTanIntan.beginning"
+           xlink:label="de-fi_accDeprBanksTanIntan.beginning"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_accDeprBanksTanIntan.beginning"
+                    xlink:to="reference_de-fi_accDeprBanksTanIntan.beginning"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_accDeprBanksTanIntan.beginning"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_accDeprBanksTanIntan.beginning">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:fiscalRequirement>Mussfeld</hgbref:fiscalRequirement>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_accDeprBanksTanIntan.diff"
+           xlink:label="de-fi_accDeprBanksTanIntan.diff"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_accDeprBanksTanIntan.diff"
+                    xlink:to="reference_de-fi_accDeprBanksTanIntan.diff"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_accDeprBanksTanIntan.diff"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_accDeprBanksTanIntan.diff">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:fiscalRequirement>Rechnerisch notwendig, soweit vorhanden</hgbref:fiscalRequirement>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_accDeprBanksTanIntan.diff.currDiff"
+           xlink:label="de-fi_accDeprBanksTanIntan.diff.currDiff"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_accDeprBanksTanIntan.diff.currDiff"
+                    xlink:to="reference_de-fi_accDeprBanksTanIntan.diff.currDiff"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_accDeprBanksTanIntan.diff.currDiff"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_accDeprBanksTanIntan.diff.currDiff">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_accDeprBanksTanIntan.diff.otherDiff"
+           xlink:label="de-fi_accDeprBanksTanIntan.diff.otherDiff"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_accDeprBanksTanIntan.diff.otherDiff"
+                    xlink:to="reference_de-fi_accDeprBanksTanIntan.diff.otherDiff"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_accDeprBanksTanIntan.diff.otherDiff"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_accDeprBanksTanIntan.diff.otherDiff">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_accDeprBanksTanIntan.diff.otherDiff.comment"
+           xlink:label="de-fi_accDeprBanksTanIntan.diff.otherDiff.comment"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_accDeprBanksTanIntan.diff.otherDiff.comment"
+                    xlink:to="reference_de-fi_accDeprBanksTanIntan.diff.otherDiff.comment"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_accDeprBanksTanIntan.diff.otherDiff.comment"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_accDeprBanksTanIntan.diff.otherDiff.comment">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_accDeprBanksTanIntan.DeprPeriod"
+           xlink:label="de-fi_accDeprBanksTanIntan.DeprPeriod"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_accDeprBanksTanIntan.DeprPeriod"
+                    xlink:to="reference_de-fi_accDeprBanksTanIntan.DeprPeriod"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_accDeprBanksTanIntan.DeprPeriod"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_accDeprBanksTanIntan.DeprPeriod">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:fiscalRequirement>Mussfeld</hgbref:fiscalRequirement>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_accDeprBanksTanIntan.DeprPeriod.specific"
+           xlink:label="de-fi_accDeprBanksTanIntan.DeprPeriod.specific"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_accDeprBanksTanIntan.DeprPeriod.specific"
+                    xlink:to="reference_de-fi_accDeprBanksTanIntan.DeprPeriod.specific"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_accDeprBanksTanIntan.DeprPeriod.specific"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_accDeprBanksTanIntan.DeprPeriod.specific">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:fiscalRequirement>Mussfeld</hgbref:fiscalRequirement>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_accDeprBanksTanIntan.addition"
+           xlink:label="de-fi_accDeprBanksTanIntan.addition"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_accDeprBanksTanIntan.addition"
+                    xlink:to="reference_de-fi_accDeprBanksTanIntan.addition"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_accDeprBanksTanIntan.addition"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_accDeprBanksTanIntan.addition">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:fiscalRequirement>Mussfeld</hgbref:fiscalRequirement>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_accDeprBanksTanIntan.release"
+           xlink:label="de-fi_accDeprBanksTanIntan.release"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_accDeprBanksTanIntan.release"
+                    xlink:to="reference_de-fi_accDeprBanksTanIntan.release"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_accDeprBanksTanIntan.release"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_accDeprBanksTanIntan.release">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:fiscalRequirement>Mussfeld</hgbref:fiscalRequirement>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_accDeprBanksTanIntan.movements"
+           xlink:label="de-fi_accDeprBanksTanIntan.movements"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_accDeprBanksTanIntan.movements"
+                    xlink:to="reference_de-fi_accDeprBanksTanIntan.movements"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_accDeprBanksTanIntan.movements"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_accDeprBanksTanIntan.movements">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:fiscalRequirement>Mussfeld</hgbref:fiscalRequirement>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_accDeprBanksTanIntan.currChanges"
+           xlink:label="de-fi_accDeprBanksTanIntan.currChanges"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_accDeprBanksTanIntan.currChanges"
+                    xlink:to="reference_de-fi_accDeprBanksTanIntan.currChanges"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_accDeprBanksTanIntan.currChanges"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_accDeprBanksTanIntan.currChanges">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:fiscalRequirement>Rechnerisch notwendig, soweit vorhanden</hgbref:fiscalRequirement>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_revaluationBanksTanIntan"
+           xlink:label="de-fi_revaluationBanksTanIntan"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_revaluationBanksTanIntan"
+                    xlink:to="reference_de-fi_revaluationBanksTanIntan"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_revaluationBanksTanIntan"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_revaluationBanksTanIntan">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:fiscalRequirement>Mussfeld</hgbref:fiscalRequirement>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_revaluationBanksFixedAssets.comment"
+           xlink:label="de-fi_revaluationBanksFixedAssets.comment"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_revaluationBanksFixedAssets.comment"
+                    xlink:to="reference_de-fi_revaluationBanksFixedAssets.comment"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_revaluationBanksFixedAssets.comment"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_revaluationBanksFixedAssets.comment">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_tableBanksF.nt.ass.net"
+           xlink:label="de-fi_tableBanksF.nt.ass.net"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_tableBanksF.nt.ass.net"
+                    xlink:to="reference_de-fi_tableBanksF.nt.ass.net"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_tableBanksF.nt.ass.net"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_tableBanksF.nt.ass.net">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_cubeBanksF.nt.ass.net"
+           xlink:label="de-fi_cubeBanksF.nt.ass.net"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_cubeBanksF.nt.ass.net"
+                    xlink:to="reference_de-fi_cubeBanksF.nt.ass.net"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_cubeBanksF.nt.ass.net"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_cubeBanksF.nt.ass.net">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_dim_changesBanks.nt.assF"
+           xlink:label="de-fi_dim_changesBanks.nt.assF"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_dim_changesBanks.nt.assF"
+                    xlink:to="reference_de-fi_dim_changesBanks.nt.assF"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_dim_changesBanks.nt.assF"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_dim_changesBanks.nt.assF">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_piTitleBanks.nt.ass.net"
+           xlink:label="de-fi_piTitleBanks.nt.ass.net"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_piTitleBanks.nt.ass.net"
+                    xlink:to="reference_de-fi_piTitleBanks.nt.ass.net"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_piTitleBanks.nt.ass.net"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_piTitleBanks.nt.ass.net">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:notPermittedFor>Einreichung an Finanzverwaltung</hgbref:notPermittedFor>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_allBanksFAV_period"
+           xlink:label="de-fi_allBanksFAV_period"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_allBanksFAV_period"
+                    xlink:to="reference_de-fi_allBanksFAV_period"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_allBanksFAV_period"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_allBanksFAV_period">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:notPermittedFor>Einreichung an Finanzverwaltung</hgbref:notPermittedFor>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_allBanksFAV_period.prev_period"
+           xlink:label="de-fi_allBanksFAV_period.prev_period"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_allBanksFAV_period.prev_period"
+                    xlink:to="reference_de-fi_allBanksFAV_period.prev_period"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_allBanksFAV_period.prev_period"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_allBanksFAV_period.prev_period">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:notPermittedFor>Einreichung an Finanzverwaltung</hgbref:notPermittedFor>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_allBanksFAV_period.grossCostBeginning"
+           xlink:label="de-fi_allBanksFAV_period.grossCostBeginning"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_allBanksFAV_period.grossCostBeginning"
+                    xlink:to="reference_de-fi_allBanksFAV_period.grossCostBeginning"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_allBanksFAV_period.grossCostBeginning"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_allBanksFAV_period.grossCostBeginning">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:notPermittedFor>Einreichung an Finanzverwaltung</hgbref:notPermittedFor>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_allBanksFAV_period.addition"
+           xlink:label="de-fi_allBanksFAV_period.addition"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_allBanksFAV_period.addition"
+                    xlink:to="reference_de-fi_allBanksFAV_period.addition"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_allBanksFAV_period.addition"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_allBanksFAV_period.addition">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:notPermittedFor>Einreichung an Finanzverwaltung</hgbref:notPermittedFor>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_allBanksFAV_period.release"
+           xlink:label="de-fi_allBanksFAV_period.release"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_allBanksFAV_period.release"
+                    xlink:to="reference_de-fi_allBanksFAV_period.release"/>
+      <reference xlink:type="resource" xlink:label="reference_de-fi_allBanksFAV_period.release"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_allBanksFAV_period.release">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:notPermittedFor>Einreichung an Finanzverwaltung</hgbref:notPermittedFor>
+      </reference>
+      <loc xlink:type="locator"
+           xlink:href="de-fi-2024-04-01-dimensions.xsd#de-fi_allBanksFAV_period.ChangesOth"
+           xlink:label="de-fi_allBanksFAV_period.ChangesOth"/>
+      <referenceArc xlink:type="arc"
+                    xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-reference"
+                    xlink:from="de-fi_allBanksFAV_period.ChangesOth"
+                    xlink:to="reference_de-fi_allBanksFAV_period.ChangesOth"/>
+      <reference xlink:type="resource"
+                 xlink:label="reference_de-fi_allBanksFAV_period.ChangesOth"
+                 xlink:role="http://www.xbrl.org/2003/role/mandatoryDisclosureRef"
+                 id="reference_de-fi_allBanksFAV_period.ChangesOth">
+         <hgbref:legalFormPG>true</hgbref:legalFormPG>
+         <hgbref:legalFormKSt>true</hgbref:legalFormKSt>
+         <hgbref:notPermittedFor>Einreichung an Finanzverwaltung</hgbref:notPermittedFor>
+      </reference>
+   </referenceLink>
+</linkbase>
