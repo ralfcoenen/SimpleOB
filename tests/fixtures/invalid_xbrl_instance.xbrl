@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<xbrli:xbrl
+    xmlns:xbrli="http://www.xbrl.org/2003/instance"
+    xmlns:link="http://www.xbrl.org/2003/linkbase"
+    xmlns:xlink="http://www.w3.org/1999/xlink"
+    xmlns:iso4217="http://www.xbrl.org/2003/iso4217"
+    xmlns:de-gaap-ci="http://www.xbrl.de/taxonomies/de-gaap-ci-2024-04-01">
+
+    <link:schemaRef
+        xlink:type="simple"
+        xlink:href="http://www.xbrl.de/taxonomies/de-gaap-ci-2024-04-01/de-gaap-ci-2024-04-01-shell-fiscal.xsd"/>
+
+    <xbrli:unit id="EUR">
+        <xbrli:measure>iso4217:EUR</xbrli:measure>
+    </xbrli:unit>
+
+    <de-gaap-ci:bs.ass.fixAss
+        contextRef="missing-context"
+        unitRef="EUR"
+        decimals="2">
+        125000.00
+    </de-gaap-ci:bs.ass.fixAss>
+
+</xbrli:xbrl>
