@@ -5,7 +5,6 @@ from pathlib import Path
 import pytest
 from arelle import Cntlr
 
-
 ENTRY_POINT = Path(
     "/tmp/openbilanz-taxonomy/6.8/"
     "german-gaap-taxonomy-v6.8-2024-04-01/"
