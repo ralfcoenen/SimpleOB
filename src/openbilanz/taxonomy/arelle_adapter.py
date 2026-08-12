@@ -79,39 +79,41 @@ class ArelleAdapter:
         )
 
     def validate(
-        self,
-        entry_point: Path,
-    ) -> ArelleValidationResult:
-        """Validiert eine Taxonomie oder XBRL-Datei über Arelle."""
+            self,
+            entry_point: Path,
+            *,
+            internet_connectivity: str = "offline",
+        ) -> ArelleValidationResult:
+        
+            """Validiert eine Taxonomie oder XBRL-Datei über Arelle."""
 
-        options = RuntimeOptions(
-            entrypointFile=str(entry_point),
-            internetConnectivity="offline",
-            keepOpen=True,
-            validate=True,
-            logFile="logToStructuredMessage",
-        )
+            options = RuntimeOptions(
+                entrypointFile=str(entry_point),
+                internetConnectivity=internet_connectivity,
+                keepOpen=True,
+                validate=True,
+                logFile="logToStructuredMessage",
+            )  
+            self._session.run(options)
 
-        self._session.run(options)
+            models = self._session.get_models()
 
-        models = self._session.get_models()
+            if not models:
+                raise RuntimeError(
+                    "Arelle could not load document"
+                )
 
-        if not models:
-            raise RuntimeError(
-                "Arelle could not load document"
+            model_xbrl = models[-1]
+
+            errors = tuple(
+                str(error)
+                for error in model_xbrl.errors
             )
 
-        model_xbrl = models[-1]
-
-        errors = tuple(
-            str(error)
-            for error in model_xbrl.errors
-        )
-
-        return ArelleValidationResult(
-            is_valid=not errors,
-            errors=errors,
-        )
+            return ArelleValidationResult(
+                is_valid=not errors,
+                errors=errors,
+            )
 
     def concept(
         self,

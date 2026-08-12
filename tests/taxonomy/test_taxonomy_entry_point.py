@@ -246,3 +246,30 @@ def test_taxonomy_entry_point_builds_schema_ref_uri(
         "de-gaap-ci-2024-04-01/"
         "de-gaap-ci-2024-04-01-shell-fiscal.xsd"
     )
+
+def test_taxonomy_entry_point_can_use_explicit_schema_ref_uri() -> None:
+    """Ein Entry Point kann eine explizite schemaRef-URI verwenden."""
+
+    entry_point = TaxonomyEntryPoint(
+        path=Path(
+            "/tmp/openbilanz-taxonomy/6.8/"
+            "german-gaap-taxonomy-v6.8-2024-04-01/"
+            "xbrl/de-gaap-ci-2024-04-01/"
+            "de-gaap-ci-2024-04-01-shell-fiscal.xsd"
+        ),
+        namespace=(
+            "http://www.xbrl.de/taxonomies/"
+            "de-gaap-ci-2024-04-01/shell-fiscal"
+        ),
+        schema_imports=(),
+        schema_ref=(
+            "file:///tmp/openbilanz-taxonomy/6.8/"
+            "german-gaap-taxonomy-v6.8-2024-04-01/"
+            "xbrl/de-gaap-ci-2024-04-01/"
+            "de-gaap-ci-2024-04-01-shell-fiscal.xsd"
+        ),
+    )
+
+    assert entry_point.schema_ref_uri.startswith(
+        "file:///tmp/openbilanz-taxonomy/6.8/"
+    )

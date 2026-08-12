@@ -94,10 +94,14 @@ class TaxonomyEntryPoint:
         TaxonomyLinkbaseReference,
         ...
     ] = ()
+    schema_ref: str | None = None
     
     @property
     def schema_ref_uri(self) -> str:
-        """Ermittelt die kanonische URI des Entry-Point-Schemas."""
+        """Ermittelt die URI des Entry-Point-Schemas."""
+
+        if self.schema_ref is not None:
+            return self.schema_ref
 
         base_namespace = self.namespace.rsplit("/", 1)[0]
 
