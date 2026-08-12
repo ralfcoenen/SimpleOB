@@ -5,6 +5,7 @@ from openbilanz.accounting.financial_statement_position import (
 )
 from openbilanz.taxonomy.concept import TaxonomyConcept
 from openbilanz.taxonomy.mapping_set import TaxonomyMappingSet
+from openbilanz.taxonomy.model import TaxonomyModel
 
 
 class TaxonomyMapper:
@@ -13,6 +14,7 @@ class TaxonomyMapper:
     def __init__(
         self,
         mappings: TaxonomyMappingSet,
+        taxonomy_model: TaxonomyModel,
     ) -> None:
         if not isinstance(
             mappings,
@@ -22,7 +24,16 @@ class TaxonomyMapper:
                 "mappings must be a TaxonomyMappingSet"
             )
 
+        if not isinstance(
+            taxonomy_model,
+            TaxonomyModel,
+        ):
+            raise TypeError(
+                "taxonomy_model must be a TaxonomyModel"
+            )
+
         self._mappings = mappings
+        self._taxonomy_model = taxonomy_model
 
     def concept_for(
         self,
@@ -40,5 +51,11 @@ class TaxonomyMapper:
                 f"{position.code}"
             )
 
-        return rule.concept
+        for concept in self._taxonomy_model.concepts.concepts:
+            if concept.name == rule.concept_name:
+                return concept
 
+        raise ValueError(
+            "mapped taxonomy concept not found: "
+            f"{rule.concept_name}"
+        )

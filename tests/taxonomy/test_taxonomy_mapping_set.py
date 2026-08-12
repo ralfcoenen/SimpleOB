@@ -5,11 +5,6 @@ from openbilanz.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
 from openbilanz.accounting.statement_category import StatementCategory
-from openbilanz.taxonomy.concept import (
-    TaxonomyBalance,
-    TaxonomyConcept,
-    TaxonomyPeriodType,
-)
 from openbilanz.taxonomy.mapping import TaxonomyMappingRule
 from openbilanz.taxonomy.mapping_set import TaxonomyMappingSet
 
@@ -23,20 +18,10 @@ def test_mapping_can_be_found_for_financial_statement_position() -> None:
         category=StatementCategory.ASSET,
     )
 
-    concept = TaxonomyConcept(
-        name="bs.ass.fixAss",
-        concept_id="de-gaap-ci_bs.ass.fixAss",
-        type_name="xbrli:monetaryItemType",
-        substitution_group="xbrli:item",
-        period_type=TaxonomyPeriodType.INSTANT,
-        balance=TaxonomyBalance.DEBIT,
-        abstract=False,
-        nillable=True,
-    )
-
+   
     rule = TaxonomyMappingRule(
         position=position,
-        concept=concept,
+        concept_name="bs.ass.fixAss",
     )
 
     mapping_set = TaxonomyMappingSet(
@@ -62,20 +47,10 @@ def test_mapping_is_found_by_position_code() -> None:
         category=StatementCategory.ASSET,
     )
 
-    concept = TaxonomyConcept(
-        name="bs.ass.fixAss",
-        concept_id="de-gaap-ci_bs.ass.fixAss",
-        type_name="xbrli:monetaryItemType",
-        substitution_group="xbrli:item",
-        period_type=TaxonomyPeriodType.INSTANT,
-        balance=TaxonomyBalance.DEBIT,
-        abstract=False,
-        nillable=True,
-    )
-
+   
     rule = TaxonomyMappingRule(
         position=mapped_position,
-        concept=concept,
+        concept_name="bs.ass.fixAss",
     )
 
     mapping_set = TaxonomyMappingSet(
@@ -103,27 +78,6 @@ def test_mapping_set_rejects_duplicate_position_codes() -> None:
         category=StatementCategory.ASSET,
     )
 
-    first_concept = TaxonomyConcept(
-        name="bs.ass.fixAss",
-        concept_id="de-gaap-ci_bs.ass.fixAss",
-        type_name="xbrli:monetaryItemType",
-        substitution_group="xbrli:item",
-        period_type=TaxonomyPeriodType.INSTANT,
-        balance=TaxonomyBalance.DEBIT,
-        abstract=False,
-        nillable=True,
-    )
-
-    second_concept = TaxonomyConcept(
-        name="bs.ass.currAss",
-        concept_id="de-gaap-ci_bs.ass.currAss",
-        type_name="xbrli:monetaryItemType",
-        substitution_group="xbrli:item",
-        period_type=TaxonomyPeriodType.INSTANT,
-        balance=TaxonomyBalance.DEBIT,
-        abstract=False,
-        nillable=True,
-    )
 
     with pytest.raises(
         ValueError,
@@ -133,11 +87,11 @@ def test_mapping_set_rejects_duplicate_position_codes() -> None:
             rules=(
                 TaxonomyMappingRule(
                     position=first_position,
-                    concept=first_concept,
+                    concept_name="bs.ass.fixAss",
                 ),
                 TaxonomyMappingRule(
                     position=duplicate_position,
-                    concept=second_concept,
+                    concept_name="bs.ass.fixAss",
                 ),
             )
         )

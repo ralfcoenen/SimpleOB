@@ -14,11 +14,17 @@ from openbilanz.taxonomy.concept import (
     TaxonomyConcept,
     TaxonomyPeriodType,
 )
+from openbilanz.taxonomy.concept_set import TaxonomyConceptSet
 from openbilanz.taxonomy.context import TaxonomyContext
 from openbilanz.taxonomy.fact_builder import TaxonomyFactBuilder
+from openbilanz.taxonomy.label_set import TaxonomyLabelSet
 from openbilanz.taxonomy.mapper import TaxonomyMapper
 from openbilanz.taxonomy.mapping import TaxonomyMappingRule
 from openbilanz.taxonomy.mapping_set import TaxonomyMappingSet
+from openbilanz.taxonomy.model import TaxonomyModel
+from openbilanz.taxonomy.presentation_set import (
+    TaxonomyPresentationSet,
+)
 from openbilanz.taxonomy.unit import TaxonomyUnit
 
 TEST_ENTITY_SCHEME = "http://www.bundesfinanzministerium.de"
@@ -54,6 +60,41 @@ def _euro_unit() -> TaxonomyUnit:
     return TaxonomyUnit.eur()
 
 
+def _taxonomy_model(
+    *concepts: TaxonomyConcept,
+) -> TaxonomyModel:
+    """Erzeugt ein minimales TaxonomyModel für Tests."""
+
+    return TaxonomyModel(
+        concepts=TaxonomyConceptSet(
+            concepts=concepts,
+        ),
+        labels=TaxonomyLabelSet(
+            labels=(),
+        ),
+        presentation=TaxonomyPresentationSet(
+            relations=(),
+        ),
+    )
+
+
+def _mapper(
+    *,
+    rules: tuple[TaxonomyMappingRule, ...],
+    concepts: tuple[TaxonomyConcept, ...],
+) -> TaxonomyMapper:
+    """Erzeugt einen Mapper mit einem minimalen TaxonomyModel."""
+
+    return TaxonomyMapper(
+        mappings=TaxonomyMappingSet(
+            rules=rules,
+        ),
+        taxonomy_model=_taxonomy_model(
+            *concepts
+        ),
+    )
+
+
 def test_fact_builder_maps_position_and_amount_to_concept() -> None:
     """Eine Abschlussposition mit Betrag wird zum taxonomischen Fact."""
 
@@ -74,15 +115,14 @@ def test_fact_builder_maps_position_and_amount_to_concept() -> None:
         nillable=True,
     )
 
-    mapper = TaxonomyMapper(
-        mappings=TaxonomyMappingSet(
-            rules=(
-                TaxonomyMappingRule(
-                    position=position,
-                    concept=concept,
-                ),
-            )
-        )
+    mapper = _mapper(
+        rules=(
+            TaxonomyMappingRule(
+                position=position,
+                concept_name="bs.ass.fixAss",
+            ),
+        ),
+        concepts=(concept,),
     )
 
     builder = TaxonomyFactBuilder(
@@ -136,19 +176,18 @@ def test_fact_builder_aggregates_positions_for_same_concept() -> None:
         nillable=True,
     )
 
-    mapper = TaxonomyMapper(
-        mappings=TaxonomyMappingSet(
-            rules=(
-                TaxonomyMappingRule(
-                    position=first_position,
-                    concept=concept,
-                ),
-                TaxonomyMappingRule(
-                    position=second_position,
-                    concept=concept,
-                ),
-            )
-        )
+    mapper = _mapper(
+        rules=(
+            TaxonomyMappingRule(
+                position=first_position,
+                concept_name="bs.ass.fixAss",
+            ),
+            TaxonomyMappingRule(
+                position=second_position,
+                concept_name="bs.ass.fixAss",
+            ),
+        ),
+        concepts=(concept,),
     )
 
     builder = TaxonomyFactBuilder(
@@ -197,15 +236,14 @@ def test_fact_builder_ignores_zero_amounts() -> None:
         nillable=True,
     )
 
-    mapper = TaxonomyMapper(
-        mappings=TaxonomyMappingSet(
-            rules=(
-                TaxonomyMappingRule(
-                    position=position,
-                    concept=concept,
-                ),
-            )
-        )
+    mapper = _mapper(
+        rules=(
+            TaxonomyMappingRule(
+                position=position,
+                concept_name="bs.ass.fixAss",
+            ),
+        ),
+        concepts=(concept,),
     )
 
     builder = TaxonomyFactBuilder(
@@ -249,19 +287,18 @@ def test_fact_builder_removes_zero_after_aggregation() -> None:
         nillable=True,
     )
 
-    mapper = TaxonomyMapper(
-        mappings=TaxonomyMappingSet(
-            rules=(
-                TaxonomyMappingRule(
-                    position=first_position,
-                    concept=concept,
-                ),
-                TaxonomyMappingRule(
-                    position=second_position,
-                    concept=concept,
-                ),
-            )
-        )
+    mapper = _mapper(
+        rules=(
+            TaxonomyMappingRule(
+                position=first_position,
+                concept_name="test.concept",
+            ),
+            TaxonomyMappingRule(
+                position=second_position,
+                concept_name="test.concept",
+            ),
+        ),
+        concepts=(concept,),
     )
 
     builder = TaxonomyFactBuilder(
@@ -300,15 +337,14 @@ def test_fact_builder_rejects_non_numeric_concept() -> None:
         nillable=True,
     )
 
-    mapper = TaxonomyMapper(
-        mappings=TaxonomyMappingSet(
-            rules=(
-                TaxonomyMappingRule(
-                    position=position,
-                    concept=concept,
-                ),
-            )
-        )
+    mapper = _mapper(
+        rules=(
+            TaxonomyMappingRule(
+                position=position,
+                concept_name="test.text",
+            ),
+        ),
+        concepts=(concept,),
     )
 
     builder = TaxonomyFactBuilder(
@@ -326,4 +362,3 @@ def test_fact_builder_rejects_non_numeric_concept() -> None:
             context=_duration_context(),
             unit=_euro_unit(),
         )
-    

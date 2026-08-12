@@ -10,9 +10,15 @@ from openbilanz.taxonomy.concept import (
     TaxonomyConcept,
     TaxonomyPeriodType,
 )
+from openbilanz.taxonomy.concept_set import TaxonomyConceptSet
+from openbilanz.taxonomy.label_set import TaxonomyLabelSet
 from openbilanz.taxonomy.mapper import TaxonomyMapper
 from openbilanz.taxonomy.mapping import TaxonomyMappingRule
 from openbilanz.taxonomy.mapping_set import TaxonomyMappingSet
+from openbilanz.taxonomy.model import TaxonomyModel
+from openbilanz.taxonomy.presentation_set import (
+    TaxonomyPresentationSet,
+)
 
 
 def test_taxonomy_mapper_returns_concept_for_position() -> None:
@@ -35,17 +41,30 @@ def test_taxonomy_mapper_returns_concept_for_position() -> None:
         nillable=True,
     )
 
+    taxonomy_model = TaxonomyModel(
+        concepts=TaxonomyConceptSet(
+            concepts=(concept,),
+        ),
+        labels=TaxonomyLabelSet(
+            labels=(),
+        ),
+        presentation=TaxonomyPresentationSet(
+            relations=(),
+        ),
+    )
+
     mapping_set = TaxonomyMappingSet(
         rules=(
             TaxonomyMappingRule(
                 position=position,
-                concept=concept,
+                concept_name="bs.ass.fixAss",
             ),
         )
     )
 
     mapper = TaxonomyMapper(
-        mappings=mapping_set
+        mappings=mapping_set,
+        taxonomy_model=taxonomy_model,
     )
 
     assert mapper.concept_for(
@@ -61,10 +80,23 @@ def test_taxonomy_mapper_rejects_unmapped_position() -> None:
         category=StatementCategory.ASSET,
     )
 
+    taxonomy_model = TaxonomyModel(
+        concepts=TaxonomyConceptSet(
+            concepts=(),
+        ),
+        labels=TaxonomyLabelSet(
+            labels=(),
+        ),
+        presentation=TaxonomyPresentationSet(
+            relations=(),
+        ),
+    )
+
     mapper = TaxonomyMapper(
         mappings=TaxonomyMappingSet(
             rules=()
-        )
+        ),
+        taxonomy_model=taxonomy_model,
     )
 
     with pytest.raises(
@@ -77,5 +109,54 @@ def test_taxonomy_mapper_rejects_unmapped_position() -> None:
         mapper.concept_for(
             position
         )
+    
 
+def test_taxonomy_mapper_resolves_concept_from_taxonomy_model() -> None:
+    """Ein Mapping wird gegen die aktuell geladene Taxonomie aufgelöst."""
 
+    position = FinancialStatementPosition(
+        code="HGB.266.AKTIVA.A",
+        name="Anlagevermögen",
+        category=StatementCategory.ASSET,
+    )
+
+    concept = TaxonomyConcept(
+        name="bs.ass.fixAss",
+        concept_id="de-gaap-ci_bs.ass.fixAss",
+        type_name="xbrli:monetaryItemType",
+        substitution_group="xbrli:item",
+        period_type=TaxonomyPeriodType.INSTANT,
+        balance=TaxonomyBalance.DEBIT,
+        abstract=False,
+        nillable=True,
+    )
+
+    taxonomy_model = TaxonomyModel(
+        concepts=TaxonomyConceptSet(
+            concepts=(concept,),
+        ),
+        labels=TaxonomyLabelSet(
+            labels=(),
+        ),
+        presentation=TaxonomyPresentationSet(
+            relations=(),
+        ),
+    )
+
+    mapping_set = TaxonomyMappingSet(
+        rules=(
+            TaxonomyMappingRule(
+                position=position,
+                concept_name="bs.ass.fixAss",
+            ),
+        )
+    )
+
+    mapper = TaxonomyMapper(
+        mappings=mapping_set,
+        taxonomy_model=taxonomy_model,
+    )
+
+    assert mapper.concept_for(
+        position
+    ) is concept

@@ -203,7 +203,7 @@ def test_arelle_adapter_returns_concept_set() -> None:
     finally:
         adapter.close()
         
-def test_arelle_adapter_concept_set_contains_only_reportable_items() -> None:
+def test_arelle_adapter_concept_set_contains_valid_concepts() -> None:
     """Das ConceptSet enthält nur berichtbare XBRL-Items mit ID."""
 
     require_taxonomy()
