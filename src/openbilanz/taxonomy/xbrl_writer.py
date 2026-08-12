@@ -18,6 +18,32 @@ XLINK_NAMESPACE = "http://www.w3.org/1999/xlink"
 class TaxonomyXbrlWriter:
     """Serialisiert Taxonomie-Objekte als XBRL-Elemente."""
 
+    def namespace_for(
+        self,
+        *,
+        concept_id: str,
+        taxonomy_namespace: str,
+        taxonomy_namespaces: dict[str, str] | None,
+    ) -> str:
+        """Ermittelt den Namespace eines Taxonomie-Concepts."""
+
+        if taxonomy_namespaces is None:
+            return taxonomy_namespace
+
+        taxonomy_prefix = concept_id.split(
+            "_",
+            1,
+        )[0]
+
+        namespace = taxonomy_namespaces.get(
+            taxonomy_prefix
+        )
+
+        if namespace is None:
+            return taxonomy_namespace
+
+        return namespace
+    
     def context_element(
         self,
         context: TaxonomyContext,
@@ -118,7 +144,7 @@ class TaxonomyXbrlWriter:
         )
 
         return element
-
+    
     def instance_element(
         self,
         contexts: dict[str, TaxonomyContext],
@@ -129,6 +155,7 @@ class TaxonomyXbrlWriter:
         ],
         taxonomy_namespace: str,
         entry_points: tuple[TaxonomyEntryPoint, ...],
+        taxonomy_namespaces: dict[str, str] | None = None,
     ) -> ET.Element:
         """Erzeugt das Root-Element einer XBRL-Instanz."""
 
@@ -165,6 +192,12 @@ class TaxonomyXbrlWriter:
                 contexts=contexts,
             )
 
+            namespace = self.namespace_for(
+                concept_id=fact.concept.concept_id,
+                taxonomy_namespace=taxonomy_namespace,
+                taxonomy_namespaces=taxonomy_namespaces,
+            )
+
             if isinstance(
                 fact,
                 TaxonomyTextFact,
@@ -173,7 +206,7 @@ class TaxonomyXbrlWriter:
                     self.text_fact_element(
                         fact=fact,
                         context_id=context_id,
-                        namespace=taxonomy_namespace,
+                        namespace=namespace,
                     )
                 )
                 continue
@@ -186,7 +219,7 @@ class TaxonomyXbrlWriter:
                         unit=fact.unit,
                         units=units,
                     ),
-                    namespace=taxonomy_namespace,
+                    namespace=namespace,
                 )
             )
         

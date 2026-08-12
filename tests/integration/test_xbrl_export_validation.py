@@ -3,6 +3,7 @@
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 
@@ -10,6 +11,8 @@ from openbilanz.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
 from openbilanz.accounting.statement_category import StatementCategory
+from openbilanz.domain.company import Company
+from openbilanz.domain.fiscal_year import FiscalYear
 from openbilanz.exporter.xbrl_export import XbrlExporter
 from openbilanz.taxonomy.arelle_adapter import ArelleAdapter
 from openbilanz.taxonomy.concept import (
@@ -21,6 +24,8 @@ from openbilanz.taxonomy.context import TaxonomyContext
 from openbilanz.taxonomy.entry_point import TaxonomyEntryPoint
 from openbilanz.taxonomy.fact import TaxonomyFact
 from openbilanz.taxonomy.fact_builder import TaxonomyFactBuilder
+from openbilanz.taxonomy.gcd_company_data import GcdCompanyData
+from openbilanz.taxonomy.gcd_fact_builder import GcdFactBuilder
 from openbilanz.taxonomy.mapper import TaxonomyMapper
 from openbilanz.taxonomy.mapping import TaxonomyMappingRule
 from openbilanz.taxonomy.mapping_set import TaxonomyMappingSet
@@ -35,6 +40,11 @@ TAXONOMY_ROOT = Path(
 DE_GAAP_CI_NAMESPACE = (
     "http://www.xbrl.de/taxonomies/"
     "de-gaap-ci-2024-04-01"
+)
+
+DE_GCD_NAMESPACE = (
+    "http://www.xbrl.de/taxonomies/"
+    "de-gcd-2024-04-01"
 )
 
 TEST_ENTITY_SCHEME = (
@@ -118,6 +128,7 @@ def test_exported_xbrl_instance_is_validated_by_arelle(
         ),
     )
 
+    
     instance_path = (
         tmp_path
         / "openbilanz-test-instance.xbrl"
@@ -243,7 +254,7 @@ def test_exported_xbrl_instance_with_balance_sheet_and_income_statement(
                 entry_point,
             ),
         )
-
+        
         instance_path = (
             tmp_path
             / "openbilanz-balance-and-income.xbrl"
@@ -422,3 +433,184 @@ def test_financial_statement_positions_are_exported_to_valid_xbrl(
     assert result.is_valid
     assert result.errors == ()
 
+def test_combined_gcd_and_gaap_ci_instance_is_validated_by_arelle(
+    tmp_path: Path,
+) -> None:
+    """GCD- und GAAP-CI-Facts werden gemeinsam valide exportiert."""
+
+    version_root = TAXONOMY_ROOT / "6.8"
+
+    if not version_root.is_dir():
+        pytest.skip(
+            "Taxonomy 6.8 is not installed locally"
+        )
+
+    resolver = TaxonomyResolver(
+        root=TAXONOMY_ROOT
+    )
+
+    gcd_entry_point_path = resolver.gcd_entry_point(
+        TaxonomyVersion.V6_8
+    )
+
+    gaap_entry_point_path = resolver.gaap_ci_fiscal_entry_point(
+        TaxonomyVersion.V6_8
+    )
+
+    gcd_base_entry_point = TaxonomyEntryPoint.from_file(
+        gcd_entry_point_path
+    )
+
+    gaap_base_entry_point = TaxonomyEntryPoint.from_file(
+        gaap_entry_point_path
+    )
+
+    gcd_entry_point = TaxonomyEntryPoint(
+        path=gcd_base_entry_point.path,
+        namespace=gcd_base_entry_point.namespace,
+        schema_imports=gcd_base_entry_point.schema_imports,
+        linkbase_references=gcd_base_entry_point.linkbase_references,
+        schema_ref=gcd_entry_point_path.as_uri(),
+    )
+
+    gaap_entry_point = TaxonomyEntryPoint(
+        path=gaap_base_entry_point.path,
+        namespace=gaap_base_entry_point.namespace,
+        schema_imports=gaap_base_entry_point.schema_imports,
+        linkbase_references=gaap_base_entry_point.linkbase_references,
+        schema_ref=gaap_entry_point_path.as_uri(),
+    )
+
+    adapter = ArelleAdapter()
+
+    try:
+        gcd_model = adapter.model(
+            gcd_entry_point_path
+        )
+
+        gaap_model = adapter.model(
+            gaap_entry_point_path
+        )
+
+        company = Company(
+            company_id=uuid4(),
+            name="Muster UG (haftungsbeschränkt)",
+        )
+
+        company_data = GcdCompanyData(
+            company=company,
+            tax_number="1234567890123",
+            legal_form="UG (haftungsbeschränkt)",
+        )
+
+        fiscal_year = FiscalYear(
+            start_date=date(2025, 1, 1),
+            end_date=date(2025, 12, 31),
+        )
+
+        duration_context = TaxonomyContext(
+            entity_identifier="DE123456789",
+            entity_scheme=TEST_ENTITY_SCHEME,
+            period_type=TaxonomyPeriodType.DURATION,
+            start_date=fiscal_year.start_date,
+            end_date=fiscal_year.end_date,
+        )
+
+        instant_context = TaxonomyContext(
+            entity_identifier="DE123456789",
+            entity_scheme=TEST_ENTITY_SCHEME,
+            period_type=TaxonomyPeriodType.INSTANT,
+            start_date=None,
+            end_date=fiscal_year.end_date,
+        )
+
+        gcd_builder = GcdFactBuilder()
+
+        gcd_facts = (
+            gcd_builder.company_facts(
+                data=company_data,
+                taxonomy_model=gcd_model,
+                context=duration_context,
+            )
+            + gcd_builder.fiscal_year_facts(
+                fiscal_year=fiscal_year,
+                taxonomy_model=gcd_model,
+                context=duration_context,
+            )
+        )
+
+        gaap_concepts_by_name = {
+            concept.name: concept
+            for concept in gaap_model.concepts.concepts
+        }
+
+        unit = TaxonomyUnit.eur()
+
+        fixed_assets_fact = TaxonomyFact(
+            concept=gaap_concepts_by_name[
+                "bs.ass.fixAss"
+            ],
+            amount=Decimal("125000.00"),
+            context=instant_context,
+            unit=unit,
+        )
+
+        net_income_fact = TaxonomyFact(
+            concept=gaap_concepts_by_name[
+                "is.netIncome"
+            ],
+            amount=Decimal("15000.00"),
+            context=duration_context,
+            unit=unit,
+        )
+
+        facts = (
+            gcd_facts
+            + (
+                fixed_assets_fact,
+                net_income_fact,
+            )
+        )
+
+        exporter = XbrlExporter()
+
+        xml = exporter.export(
+            contexts={
+                "ctx-instant-2025": instant_context,
+                "ctx-duration-2025": duration_context,
+            },
+            units={
+                "EUR": unit,
+            },
+            facts=facts,
+            taxonomy_namespace=DE_GAAP_CI_NAMESPACE,
+            taxonomy_namespaces={
+                "de-gcd": DE_GCD_NAMESPACE,
+                "de-gaap-ci": DE_GAAP_CI_NAMESPACE,
+            },
+            entry_points=(
+                gcd_entry_point,
+                gaap_entry_point,
+            ),
+        )
+
+        instance_path = (
+            tmp_path
+            / "openbilanz-gcd-and-gaap-ci.xbrl"
+        )
+
+        instance_path.write_text(
+            xml,
+            encoding="utf-8",
+        )
+
+        result = adapter.validate(
+            instance_path
+        )
+
+    finally:
+        adapter.close()
+
+    assert result.is_valid
+    assert result.errors == ()
+    

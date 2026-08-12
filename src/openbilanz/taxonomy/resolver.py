@@ -67,6 +67,47 @@ class TaxonomyResolver:
 
         return matches[0]
     
+    def gcd_entry_point(
+        self,
+        version: TaxonomyVersion,
+    ) -> Path:
+        """Findet den GCD-Entry-Point einer Version."""
+
+        if not isinstance(
+            version,
+            TaxonomyVersion,
+        ):
+            raise TypeError(
+                "version must be a TaxonomyVersion"
+            )
+
+        version_root = (
+            self._root
+            / version.value
+        )
+
+        matches = tuple(
+            sorted(
+                version_root.rglob(
+                    "de-gcd-*-shell.xsd"
+                )
+            )
+        )
+
+        if not matches:
+            raise FileNotFoundError(
+                "GCD entry point not found "
+                f"for taxonomy {version.value}"
+            )
+
+        if len(matches) > 1:
+            raise ValueError(
+                "multiple GCD entry points found "
+                f"for taxonomy {version.value}"
+            )
+
+        return matches[0]
+    
     def for_fiscal_year(
         self,
         fiscal_year: FiscalYear,

@@ -1126,3 +1126,118 @@ def test_xbrl_writer_builds_instance_with_numeric_and_text_facts() -> None:
     assert "unitRef" not in text_element.attrib
     assert "decimals" not in text_element.attrib
     
+def test_xbrl_writer_builds_instance_with_multiple_taxonomy_namespaces() -> None:
+    """GCD- und GAAP-CI-Facts erhalten ihre jeweiligen Namespaces."""
+
+    gcd_namespace = (
+        "http://www.xbrl.de/taxonomies/"
+        "de-gcd-2024-04-01"
+    )
+
+    gaap_namespace = (
+        "http://www.xbrl.de/taxonomies/"
+        "de-gaap-ci-2024-04-01"
+    )
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    unit = TaxonomyUnit.eur()
+
+    gcd_concept = TaxonomyConcept(
+        name="genInfo.company.id.name",
+        concept_id="de-gcd_genInfo.company.id.name",
+        type_name="xbrli:stringItemType",
+        substitution_group="xbrli:item",
+        period_type=TaxonomyPeriodType.DURATION,
+        balance=TaxonomyBalance.NONE,
+        abstract=False,
+        nillable=True,
+    )
+
+    gaap_concept = TaxonomyConcept(
+        name="is.netIncome",
+        concept_id="de-gaap-ci_is.netIncome",
+        type_name="xbrli:monetaryItemType",
+        substitution_group="xbrli:item",
+        period_type=TaxonomyPeriodType.DURATION,
+        balance=TaxonomyBalance.CREDIT,
+        abstract=False,
+        nillable=True,
+    )
+
+    gcd_fact = TaxonomyTextFact(
+        concept=gcd_concept,
+        value="Muster UG (haftungsbeschränkt)",
+        context=context,
+    )
+
+    gaap_fact = TaxonomyFact(
+        concept=gaap_concept,
+        amount=Decimal("15000.00"),
+        context=context,
+        unit=unit,
+    )
+
+    gcd_entry_point = TaxonomyEntryPoint(
+        path=Path(
+            "de-gcd-2024-04-01-shell.xsd"
+        ),
+        namespace=gcd_namespace,
+        schema_imports=(),
+    )
+
+    gaap_entry_point = TaxonomyEntryPoint(
+        path=Path(
+            "de-gaap-ci-2024-04-01-shell-fiscal.xsd"
+        ),
+        namespace=gaap_namespace,
+        schema_imports=(),
+    )
+
+    writer = TaxonomyXbrlWriter()
+
+    root = writer.instance_element(
+        contexts={
+            "ctx-2025": context,
+        },
+        units={
+            "EUR": unit,
+        },
+        facts=(
+            gcd_fact,
+            gaap_fact,
+        ),
+        taxonomy_namespace=gaap_namespace,
+        taxonomy_namespaces={
+            "de-gcd": gcd_namespace,
+            "de-gaap-ci": gaap_namespace,
+        },
+        entry_points=(
+            gcd_entry_point,
+            gaap_entry_point,
+        ),
+    )
+
+    gcd_element = root.find(
+        f"{{{gcd_namespace}}}"
+        "genInfo.company.id.name"
+    )
+
+    gaap_element = root.find(
+        f"{{{gaap_namespace}}}"
+        "is.netIncome"
+    )
+
+    assert gcd_element is not None
+    assert gcd_element.text == (
+        "Muster UG (haftungsbeschränkt)"
+    )
+
+    assert gaap_element is not None
+    assert gaap_element.text == "15000.00"

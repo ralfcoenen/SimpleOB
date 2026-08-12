@@ -169,3 +169,32 @@ def test_resolver_uses_correct_taxonomy_for_fiscal_year(
     assert entry_point == resolver.gaap_ci_fiscal_entry_point(
         version
     )
+
+def test_taxonomy_resolver_finds_gcd_entry_point(
+    tmp_path: Path,
+) -> None:
+    """Der Resolver findet den GCD-Entry-Point einer Taxonomieversion."""
+
+    entry_point = (
+        tmp_path
+        / "6.8"
+        / "de-gcd-2024-04-01"
+        / "de-gcd-2024-04-01-shell.xsd"
+    )
+
+    entry_point.parent.mkdir(
+        parents=True
+    )
+
+    entry_point.touch()
+
+    resolver = TaxonomyResolver(
+        root=tmp_path
+    )
+
+    result = resolver.gcd_entry_point(
+        TaxonomyVersion.V6_8
+    )
+
+    assert result == entry_point
+    

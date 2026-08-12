@@ -16,6 +16,7 @@ from openbilanz.taxonomy.entry_point import TaxonomyEntryPoint
 from openbilanz.taxonomy.fact import TaxonomyFact
 from openbilanz.taxonomy.resolver import TaxonomyResolver
 from openbilanz.taxonomy.taxonomy import TaxonomyVersion
+from openbilanz.taxonomy.text_fact import TaxonomyTextFact
 from openbilanz.taxonomy.unit import TaxonomyUnit
 
 DE_GAAP_CI_NAMESPACE = (
@@ -182,3 +183,63 @@ def test_xbrl_exporter_uses_real_taxonomy_entry_point() -> None:
     assert "bs.ass.fixAss" in xml
     assert "125000.00" in xml
 
+def test_xbrl_exporter_supports_multiple_taxonomy_namespaces() -> None:
+    """Der Exporter unterstützt mehrere Taxonomie-Namespaces."""
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    gcd_namespace = (
+        "http://www.xbrl.de/taxonomies/"
+        "de-gcd-2024-04-01"
+    )
+
+    gaap_namespace = (
+        "http://www.xbrl.de/taxonomies/"
+        "de-gaap-ci-2024-04-01"
+    )
+
+    gcd_concept = TaxonomyConcept(
+        name="genInfo.company.id.name",
+        concept_id="de-gcd_genInfo.company.id.name",
+        type_name="xbrli:stringItemType",
+        substitution_group="xbrli:item",
+        period_type=TaxonomyPeriodType.DURATION,
+        balance=TaxonomyBalance.NONE,
+        abstract=False,
+        nillable=True,
+    )
+
+    fact = TaxonomyTextFact(
+        concept=gcd_concept,
+        value="Muster UG (haftungsbeschränkt)",
+        context=context,
+    )
+
+    exporter = XbrlExporter()
+
+    xml = exporter.export(
+        contexts={
+            "ctx-2025": context,
+        },
+        units={},
+        facts=(
+            fact,
+        ),
+        taxonomy_namespace=gaap_namespace,
+        taxonomy_namespaces={
+            "de-gcd": gcd_namespace,
+            "de-gaap-ci": gaap_namespace,
+        },
+        entry_points=(),
+    )
+
+    assert (
+        "genInfo.company.id.name"
+        in xml
+    )

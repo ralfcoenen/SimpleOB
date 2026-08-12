@@ -25,6 +25,7 @@ class XbrlExporter:
         ],
         taxonomy_namespace: str,
         entry_points: tuple[TaxonomyEntryPoint, ...],
+        taxonomy_namespaces: dict[str, str] | None = None,
     ) -> str:
         """Erzeugt eine XBRL-Instanz als XML-String."""
 
@@ -33,6 +34,7 @@ class XbrlExporter:
             units=units,
             facts=facts,
             taxonomy_namespace=taxonomy_namespace,
+            taxonomy_namespaces=taxonomy_namespaces,
             entry_points=entry_points,
         )
 
