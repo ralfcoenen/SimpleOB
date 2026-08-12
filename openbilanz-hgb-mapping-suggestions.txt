@@ -1,0 +1,842 @@
+[info] loaded in 0.83 secs at 2026-08-12T15:05:22 - /tmp/openbilanz-taxonomy/6.8/german-gaap-taxonomy-v6.8-2024-04-01/xbrl/de-gaap-ci-2024-04-01/de-gaap-ci-2024-04-01-shell-fiscal.xsd 
+[] Formula xpath2 grammar initialized in 0.39 secs - 
+
+====================================================================================================
+HGB.266.AKTIVA | Aktiva
+====================================================================================================
+0.571 | bs.ass.other
+        sonstige Aktiva
+        period=instant balance=debit
+0.429 | bs.ass.defTax
+        Aktive latente Steuern
+        period=instant balance=debit
+0.387 | bs.ass
+        Bilanzsumme, Summe Aktiva
+        period=instant balance=debit
+0.333 | bs.eqLiab.equity
+        Eigenkapital
+        period=instant balance=credit
+0.308 | bs.ass.prepaidExp
+        Aktive Rechnungsabgrenzungsposten
+        period=instant balance=debit
+0.286 | bs.eqLiab.equity.capRes
+        Kapitalrücklage
+        period=instant balance=credit
+0.286 | bs.eqLiab.liab.securities
+        Anleihen
+        period=instant balance=credit
+0.278 | is.netIncome.regular.operatingCOGS.otherCostTC.custody
+        Nachrichtlich: Verwahrentgelte
+        period=duration balance=debit
+
+====================================================================================================
+HGB.266.AKTIVA.A.I.3 | Geschäfts- oder Firmenwert
+====================================================================================================
+0.689 | bs.ass.fixAss.intan.goodwill
+        Geschäfts-, Firmen- oder Praxiswert
+        period=instant balance=debit
+0.667 | bs.ass.fixAss.intan.goodwill.fromConsolidation
+        Geschäfts- oder Firmenwert aus Kapitalkonsolidierung
+        period=instant balance=debit
+0.508 | bs.ass.fixAss.intan.goodwill.purchased
+        Derivativer Firmenwert (Goodwill)
+        period=instant balance=debit
+0.491 | bs.ass.fixAss.tan.branche_kfz
+        Geschäfts- und Vorführfahrzeuge
+        period=instant balance=debit
+0.480 | bs.ass.fixAss.tan.branche_kfz.demoModel
+        Geschäfts- und Vorführfahrzeuge, Vorführfahrzeuge
+        period=instant balance=debit
+0.464 | bs.eqLiab.otherSpecRes.negGoodwillHGBs246_1sent4
+        Sonstige Sonderposten, negativer Geschäfts- oder Firmenwert nach § 246 Abs. 1 S. 4 HGB
+        period=instant balance=credit
+0.462 | bs.eqLiab.equity.coopPartners
+        Eigenkapital, davon Geschäftsguthaben der Mitglieder
+        period=instant balance=credit
+0.420 | bs.ass.SurplusFromOffsetting
+        Aktiver Unterschiedsbetrag aus der Vermögensverrechnung
+        period=instant balance=debit
+
+====================================================================================================
+HGB.266.AKTIVA.A.I.4 | Geleistete Anzahlungen
+====================================================================================================
+0.830 | bs.ass.currAss.inventory.advPaymPaid
+        Vorräte, geleistete Anzahlungen
+        period=instant balance=debit
+0.698 | bs.ass.fixAss.tan.inConstrAdvPaym
+        geleistete Anzahlungen und Anlagen im Bau
+        period=instant balance=debit
+0.567 | bs.eqLiab.liab.advPaym
+        erhaltene Anzahlungen auf Bestellungen
+        period=instant balance=credit
+0.557 | bs.ass.fixAss.intan.advPaym
+        Immaterielle Vermögensgegenstände, geleistete Anzahlungen
+        period=instant balance=debit
+0.557 | bs.ass.fixAss.tan.inConstrAdvPaym.buildingUnderConstr
+        geleistete Anzahlungen und Anlagen im Bau, Gebäude im Bau
+        period=instant balance=debit
+0.524 | bs.eqLiab.accruals.tax
+        Steuerrückstellungen
+        period=instant balance=credit
+0.514 | bs.ass.fixAss.fin
+        Finanzanlagen
+        period=instant balance=debit
+0.514 | bs.ass.fixAss.fin.particip
+        Beteiligungen
+        period=instant balance=debit
+
+====================================================================================================
+HGB.266.AKTIVA.B.I.4 | Geleistete Anzahlungen
+====================================================================================================
+0.830 | bs.ass.currAss.inventory.advPaymPaid
+        Vorräte, geleistete Anzahlungen
+        period=instant balance=debit
+0.698 | bs.ass.fixAss.tan.inConstrAdvPaym
+        geleistete Anzahlungen und Anlagen im Bau
+        period=instant balance=debit
+0.567 | bs.eqLiab.liab.advPaym
+        erhaltene Anzahlungen auf Bestellungen
+        period=instant balance=credit
+0.557 | bs.ass.fixAss.intan.advPaym
+        Immaterielle Vermögensgegenstände, geleistete Anzahlungen
+        period=instant balance=debit
+0.557 | bs.ass.fixAss.tan.inConstrAdvPaym.buildingUnderConstr
+        geleistete Anzahlungen und Anlagen im Bau, Gebäude im Bau
+        period=instant balance=debit
+0.524 | bs.eqLiab.accruals.tax
+        Steuerrückstellungen
+        period=instant balance=credit
+0.514 | bs.ass.fixAss.fin
+        Finanzanlagen
+        period=instant balance=debit
+0.514 | bs.ass.fixAss.fin.particip
+        Beteiligungen
+        period=instant balance=debit
+
+====================================================================================================
+HGB.266.AKTIVA.B.II.4 | Sonstige Vermögensgegenstände
+====================================================================================================
+0.784 | bs.ass.currAss.receiv
+        Forderungen und sonstige Vermögensgegenstände
+        period=instant balance=debit
+0.774 | bs.ass.fixAss.intan
+        Immaterielle Vermögensgegenstände
+        period=instant balance=debit
+0.581 | is.netIncome.otherTaxes.personalTaxes
+        sonstige Steuern, Personensteuern
+        period=duration balance=debit
+0.574 | bs.ass.currAss.receiv.other.unpaidSupplementaryCalls
+        Forderungen und sonstige Vermögensgegenstände, eingeforderte Nachschüsse
+        period=instant balance=debit
+0.569 | bs.ass.currAss.receiv.shareholder
+        Forderungen und sonstige Vermögensgegenstände, davon gegen Gesellschafter
+        period=instant balance=debit
+0.558 | bs.ass.fixAss.intan.advPaym
+        Immaterielle Vermögensgegenstände, geleistete Anzahlungen
+        period=instant balance=debit
+0.554 | bs.ass.fixAss.fin.otherFinAss.profSharRights
+        Sonstige Finanzanlagen, Genussrechte
+        period=instant balance=debit
+0.552 | bs.ass.currAss.receiv.other
+        Forderungen und sonstige Vermögensgegenstände, sonstige Vermögensgegenstände
+        period=instant balance=debit
+
+====================================================================================================
+HGB.266.AKTIVA.B.III | Wertpapiere
+====================================================================================================
+0.524 | bs.ass.fixAss.fin.securities
+        Wertpapiere des Anlagevermögens
+        period=instant balance=debit
+0.524 | bs.ass.currAss.securities
+        Wertpapiere des Umlaufvermögens
+        period=instant balance=debit
+0.440 | bs.ass.fixAss.fin.securities.shares
+        Wertpapiere des Anlagevermögens, Aktien
+        period=instant balance=debit
+0.393 | bs.ass.fixAss.fin.securities.bonds
+        Wertpapiere des Anlagevermögens, Obligationen
+        period=instant balance=debit
+0.386 | bs.ass.fixAss.fin.securities.partCertificate
+        Wertpapiere des Anlagevermögens, Genussscheine
+        period=instant balance=debit
+0.379 | bs.ass.fixAss.fin.securities.warrants
+        Wertpapiere des Anlagevermögens, Optionsscheine
+        period=instant balance=debit
+0.375 | is.netIncome.regular.operatingCOGS.salesCost
+        Vertriebskosten (UKV)
+        period=duration balance=debit
+0.361 | bs.ass.fixAss.fin.securities.mutInvestm
+        Wertpapiere des Anlagevermögens, Investmentanteile
+        period=instant balance=debit
+
+====================================================================================================
+HGB.266.AKTIVA.B.III.2 | Sonstige Wertpapiere
+====================================================================================================
+0.634 | bs.eqLiab.otherSpecRes
+        Sonstige Sonderposten
+        period=instant balance=credit
+0.629 | bs.ass.other
+        sonstige Aktiva
+        period=instant balance=debit
+0.611 | is.netIncome.otherTaxes
+        sonstige Steuern
+        period=duration balance=debit
+0.585 | bs.ass.fixAss.fin.otherLoans
+        Sonstige Ausleihungen
+        period=instant balance=debit
+0.566 | is.netIncome.otherTaxes.personalTaxes
+        sonstige Steuern, Personensteuern
+        period=duration balance=debit
+0.565 | bs.eqLiab.liab.other
+        sonstige Verbindlichkeiten
+        period=instant balance=credit
+0.516 | bs.eqLiab.otherSpecRes.other
+        Sonstige Sonderposten, andere Sonderposten
+        period=instant balance=credit
+0.512 | bs.eqLiab.accruals.other
+        sonstige Rückstellungen
+        period=instant balance=credit
+
+====================================================================================================
+HGB.266.AKTIVA.C | Rechnungsabgrenzungsposten
+====================================================================================================
+0.881 | bs.ass.prepaidExp
+        Aktive Rechnungsabgrenzungsposten
+        period=instant balance=debit
+0.867 | bs.eqLiab.defIncome
+        Passive Rechnungsabgrenzungsposten
+        period=instant balance=credit
+0.800 | bs.ass.prepaidExp.premium
+        Aktive Rechnungsabgrenzungsposten, Agio
+        period=instant balance=debit
+0.627 | bs.ass.prepaidExp.moneyProv
+        Aktive Rechnungsabgrenzungsposten, Geldbeschaffungskosten
+        period=instant balance=debit
+0.542 | bs.ass.prepaidExp.other
+        Aktive Rechnungsabgrenzungsposten, sonstige aktive Rechnungsabgrenzung
+        period=instant balance=debit
+0.464 | bs.ass.fixAss.fin.loansToSharehold
+        Ausleihungen an Gesellschafter
+        period=instant balance=debit
+0.448 | bs.ass.prepaidExp.loadRedempt
+        Aktive Rechnungsabgrenzungsposten, Disagio/Damnum/Unterschiedsbetrag nach § 250 Abs. 3 HGB
+        period=instant balance=debit
+0.444 | bs.ass.prepaidExp.vat
+        Aktive Rechnungsabgrenzungsposten, als Aufwand berücksichtigte Umsatzsteuer auf Anzahlungen
+        period=instant balance=debit
+
+====================================================================================================
+HGB.266.PASSIVA | Passiva
+====================================================================================================
+0.467 | bs.eqLiab.defTax
+        Passive latente Steuern
+        period=instant balance=credit
+0.424 | bs.eqLiab
+        Bilanzsumme, Summe Passiva
+        period=instant balance=credit
+0.375 | bs.ass
+        Bilanzsumme, Summe Aktiva
+        period=instant balance=debit
+0.364 | bs.ass.other
+        sonstige Aktiva
+        period=instant balance=debit
+0.341 | bs.eqLiab.defIncome
+        Passive Rechnungsabgrenzungsposten
+        period=instant balance=credit
+0.324 | bs.eqLiab.equity.foundation
+        Eigenkapital, Stiftungskapital
+        period=instant balance=credit
+0.312 | bs.eqLiab.equity.revenueRes.statutory
+        satzungsmäßige Rücklagen
+        period=instant balance=credit
+0.296 | is.netIncome.regular.operatingTC.deprAmort
+        Abschreibungen (GKV)
+        period=duration balance=debit
+
+====================================================================================================
+HGB.266.PASSIVA.A.I | Gezeichnetes Kapital
+====================================================================================================
+0.625 | bs.eqLiab.equity
+        Eigenkapital
+        period=instant balance=credit
+0.556 | bs.eqLiab.equity.subscribed
+        Gezeichnetes Kapital / Kapitalkonto / Kapitalanteile
+        period=instant balance=credit
+0.533 | bs.eqLiab.equity.revenueRes.legal.capAdjust
+        gesetzliche Rücklage, Kapitalanpassungen
+        period=instant balance=credit
+0.464 | bs.eqLiab.otherSpecRes.statutoryBoundCapital
+        Sonstige Sonderposten, nutzungsgebundenes Kapital
+        period=instant balance=credit
+0.444 | bs.ass.fixAss.intan.goodwill.fromConsolidation
+        Geschäfts- oder Firmenwert aus Kapitalkonsolidierung
+        period=instant balance=debit
+0.442 | bs.eqLiab.equity.reallocationSurplus.capAdjust
+        Eigenkapital, Umschichtungsergebnisse, Kapitalanpassungen
+        period=instant balance=credit
+0.431 | bs.ass.currAss.inventory.advPaymPaid
+        Vorräte, geleistete Anzahlungen
+        period=instant balance=debit
+0.429 | is.netIncome.regular.fin.netInterest.negCapitalTransferFee
+        negative Kapitalüberlassungsentgelte
+        period=duration balance=debit
+
+====================================================================================================
+HGB.266.PASSIVA.A.III | Gewinnrücklagen
+====================================================================================================
+0.811 | bs.eqLiab.equity.revenueRes.other
+        andere Gewinnrücklagen
+        period=instant balance=credit
+0.629 | bs.eqLiab.equity.revenueRes.legal
+        gesetzliche Rücklage
+        period=instant balance=credit
+0.625 | bs.eqLiab.equity.revenueRes
+        Gewinnrücklagen/Ergebnisrücklagen
+        period=instant balance=credit
+0.600 | bs.eqLiab.equity.capRes
+        Kapitalrücklage
+        period=instant balance=credit
+0.577 | bs.eqLiab.equity.revenueRes.other.movements
+        andere Gewinnrücklage, Umschichtungen
+        period=instant balance=credit
+0.571 | bs.ass.fixAss.fin
+        Finanzanlagen
+        period=instant balance=debit
+0.552 | bs.eqLiab.accruals
+        Rückstellungen
+        period=instant balance=credit
+0.550 | bs.eqLiab.equity.revenueRes.statutory
+        satzungsmäßige Rücklagen
+        period=instant balance=credit
+
+====================================================================================================
+HGB.266.PASSIVA.A.IV | Gewinnvortrag/Verlustvortrag
+====================================================================================================
+0.492 | bs.eqLiab.equity.revenueRes
+        Gewinnrücklagen/Ergebnisrücklagen
+        period=instant balance=credit
+0.457 | bs.eqLiab.equity.retainedEarnings
+        Eigenkapital, Gewinn-/Verlustvortrag - bei Kapitalgesellschaften
+        period=instant balance=credit
+0.440 | bs.eqLiab.equity.SurplusOfUnspentFunds
+        Eigenkapital, Ergebnisvortrag/Mittelvortrag/Verwendungsüberhang
+        period=instant balance=credit
+0.431 | bs.eqLiab.equity.revenueRes.other.movements
+        andere Gewinnrücklage, Umschichtungen
+        period=instant balance=credit
+0.416 | bs.ass.fixAss.tan.branche_kfz.demoModel
+        Geschäfts- und Vorführfahrzeuge, Vorführfahrzeuge
+        period=instant balance=debit
+0.415 | bs.ass.currAss.inventory.other
+        Vorräte, sonstige Vorräte
+        period=instant balance=debit
+0.405 | is.netIncome.tax.gewst
+        Steuern vom Einkommen und vom Ertrag, Gewerbesteuer
+        period=duration balance=debit
+0.400 | bs.eqLiab.equity.revenueRes.other
+        andere Gewinnrücklagen
+        period=instant balance=credit
+
+====================================================================================================
+HGB.266.PASSIVA.A.V | Jahresüberschuss/Jahresfehlbetrag
+====================================================================================================
+0.885 | is.netIncome
+        Jahresüberschuss/-fehlbetrag
+        period=duration balance=credit
+0.482 | bs.eqLiab.equity.netIncome
+        Eigenkapital, Jahresüberschuss/-fehlbetrag (Bilanz) - bei Kapitalgesellschaften
+        period=instant balance=credit
+0.450 | bs.eqLiab.equity.netIncomePartnershipsHGBs264c
+        Eigenkapital, Jahresüberschuss/-fehlbetrag (Bilanz) bei Personen(handels)gesellschaften
+        period=instant balance=credit
+0.427 | bs.eqLiab.equity.revenueRes.legal.profitPresentYear
+        gesetzliche Rücklage, davon aus dem Jahresüberschuss des Geschäftsjahres eingestellt
+        period=instant balance=credit
+0.422 | bs.eqLiab.equity.netIncomePartnerships
+        Eigenkapital, davon Jahresüberschuss/-fehlbetrag (Bilanz) - bei Personen(handels)gesellschaften
+        period=instant balance=credit
+0.420 | bs.eqLiab.equity.revenueRes.other.profitPresentYear
+        andere Gewinnrücklagen, davon aus dem Jahresüberschuss des Geschäftsjahres eingestellt
+        period=instant balance=credit
+0.410 | bs.eqLiab.equity.revenueRes.statutory.profitPresentYear
+        satzungsmäßige Rücklagen, davon aus dem Jahresüberschuss des Geschäftsjahres eingestellt
+        period=instant balance=credit
+0.389 | bs.ass.prepaidExp.premium
+        Aktive Rechnungsabgrenzungsposten, Agio
+        period=instant balance=debit
+
+====================================================================================================
+HGB.266.PASSIVA.D | Rechnungsabgrenzungsposten
+====================================================================================================
+0.881 | bs.ass.prepaidExp
+        Aktive Rechnungsabgrenzungsposten
+        period=instant balance=debit
+0.867 | bs.eqLiab.defIncome
+        Passive Rechnungsabgrenzungsposten
+        period=instant balance=credit
+0.800 | bs.ass.prepaidExp.premium
+        Aktive Rechnungsabgrenzungsposten, Agio
+        period=instant balance=debit
+0.627 | bs.ass.prepaidExp.moneyProv
+        Aktive Rechnungsabgrenzungsposten, Geldbeschaffungskosten
+        period=instant balance=debit
+0.542 | bs.ass.prepaidExp.other
+        Aktive Rechnungsabgrenzungsposten, sonstige aktive Rechnungsabgrenzung
+        period=instant balance=debit
+0.464 | bs.ass.fixAss.fin.loansToSharehold
+        Ausleihungen an Gesellschafter
+        period=instant balance=debit
+0.448 | bs.ass.prepaidExp.loadRedempt
+        Aktive Rechnungsabgrenzungsposten, Disagio/Damnum/Unterschiedsbetrag nach § 250 Abs. 3 HGB
+        period=instant balance=debit
+0.444 | bs.ass.prepaidExp.vat
+        Aktive Rechnungsabgrenzungsposten, als Aufwand berücksichtigte Umsatzsteuer auf Anzahlungen
+        period=instant balance=debit
+
+====================================================================================================
+HGB.275.GKV | Gewinn- und Verlustrechnung nach dem Gesamtkostenverfahren
+====================================================================================================
+0.505 | bs.ass.InvStGs56
+        Rücklagen und Korrekturposten nach dem InvStG
+        period=instant balance=debit
+0.457 | bs.eqLiab.accruals.tax.minst
+        Steuerrückstellungen, Mindeststeuerrückstellung
+        period=instant balance=credit
+0.457 | is.netIncome.regular.operatingCOGS.adminCost
+        allgemeine Verwaltungskosten (UKV)
+        period=duration balance=debit
+0.455 | is.netIncome.regular.fin.netParticipation.loss
+        Aufwendungen aus Verlustübernahmen (Mutter)
+        period=duration balance=debit
+0.451 | is.netIncome.regular.fin.netInterest.expenses.regularInterest.PartnersLoans
+        Zinsen und ähnliche Aufwendungen, Zinsen, Zinsen für Gesellschafterdarlehen
+        period=duration balance=debit
+0.450 | is.netIncome.regular.fin.netParticipation.lossAssoc
+        Aufwendungen aus Verlustübernahme von assoziierten Unternehmen
+        period=duration balance=debit
+0.450 | is.netIncome.tax.deductableForeignIncomeTaxes
+        Steuern vom Einkommen und vom Ertrag, anrechenbare ausländische Steuern
+        period=duration balance=debit
+0.449 | bs.ass.InvStG
+        Aktiver Ausgleichsposten nach dem InvStG
+        period=instant balance=debit
+
+====================================================================================================
+HGB.275.GKV.1 | Umsatzerlöse
+====================================================================================================
+0.800 | is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.netSales
+        Umsatzerlöse (GKV)
+        period=duration balance=credit
+0.800 | is.netIncome.regular.operatingCOGS.grossOpProfit.netSales
+        Umsatzerlöse (UKV)
+        period=duration balance=credit
+0.538 | bs.ass.currAss
+        Umlaufvermögen
+        period=instant balance=debit
+0.438 | bs.eqLiab.equity.revenueRes.legal
+        gesetzliche Rücklage
+        period=instant balance=credit
+0.432 | bs.eqLiab.equity.revenueRes.statutory
+        satzungsmäßige Rücklagen
+        period=instant balance=credit
+0.400 | bs.ass.accountingConvenience
+        Bilanzierungshilfe
+        period=instant balance=debit
+0.400 | bs.ass.fixAss.intan
+        Immaterielle Vermögensgegenstände
+        period=instant balance=debit
+0.385 | bs.ass.fixAss
+        Anlagevermögen
+        period=instant balance=debit
+
+====================================================================================================
+HGB.275.GKV.2 | Erhöhung oder Verminderung des Bestands an fertigen und unfertigen Erzeugnissen
+====================================================================================================
+0.958 | is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.inventoryChange
+        Erhöhung oder Verminderung des Bestandes an fertigen und unfertigen Erzeugnissen (GKV)
+        period=duration balance=credit
+0.819 | is.netIncome.regular.operatingCOGS.inventoryChange
+        Nachrichtlich: Erhöhung oder Verminderung des Bestandes an fertigen und unfertigen Erzeugnissen (entsprechend GKV)
+        period=duration balance=credit
+0.738 | is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.inventoryChange.increasefinished
+        Erhöhung oder Verminderung des Bestandes an fertigen und unfertigen Erzeugnissen (GKV), Erhöhung des Bestandes an fertigen Erzeugnissen
+        period=duration balance=credit
+0.725 | is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.inventoryChange.decreasefinished
+        Erhöhung oder Verminderung des Bestandes an fertigen und unfertigen Erzeugnissen (GKV), Verminderung des Bestandes an fertigen Erzeugnissen
+        period=duration balance=debit
+0.653 | is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.inventoryChange.increaseGoodsInProgress
+        Erhöhung oder Verminderung des Bestandes an fertigen und unfertigen Erzeugnissen (GKV), Erhöhung des Bestandes an unfertigen Erzeugnissen und unfertigen Leistungen
+        period=duration balance=credit
+0.653 | is.netIncome.regular.operatingCOGS.inventoryChange.increasefinished
+        Nachrichtlich: Erhöhung oder Verminderung des Bestandes an fertigen und unfertigen Erzeugnissen (entsprechend GKV), Erhöhung des Bestandes an fertigen Erzeugnissen
+        period=duration balance=credit
+0.642 | is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.inventoryChange.decreaseGoodsInProgress
+        Erhöhung oder Verminderung des Bestandes an fertigen und unfertigen Erzeugnissen (GKV), Verminderung des Bestandes an unfertigen Erzeugnissen und unfertigen Leistungen
+        period=duration balance=debit
+0.642 | is.netIncome.regular.operatingCOGS.inventoryChange.decreasefinished
+        Nachrichtlich: Erhöhung oder Verminderung des Bestandes an fertigen und unfertigen Erzeugnissen (entsprechend GKV), Verminderung des Bestandes an fertigen Erzeugnissen
+        period=duration balance=debit
+
+====================================================================================================
+HGB.275.GKV.3 | Andere aktivierte Eigenleistungen
+====================================================================================================
+0.917 | is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.ownWork
+        andere aktivierte Eigenleistungen (GKV)
+        period=duration balance=credit
+0.660 | is.netIncome.regular.operatingCOGS.ownWork
+        Nachrichtlich: andere aktivierte Eigenleistungen (entsprechend GKV)
+        period=duration balance=credit
+0.653 | is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.ownWork.plants
+        andere aktivierte Eigenleistungen (GKV), selbsterstellte Sachanlagen
+        period=duration balance=credit
+0.623 | is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.ownWork.fixing
+        andere aktivierte Eigenleistungen (GKV), selbstgetätigte Großreparaturen
+        period=duration balance=credit
+0.561 | bs.ass.taxbalanceGenerally
+        Allgemeiner aktiver steuerlicher Ausgleichsposten
+        period=instant balance=debit
+0.543 | bs.eqLiab.equity.revenueRes.other.movements
+        andere Gewinnrücklage, Umschichtungen
+        period=instant balance=credit
+0.537 | is.netIncome.regular.operatingTC.grossTradingProfit.totalOutput.ownWork.intan
+        andere aktivierte Eigenleistungen (GKV), selbsterstellte immaterielle Vermögensgegenstände
+        period=duration balance=credit
+0.531 | bs.ass.currAss.inventory.advPaymPaid
+        Vorräte, geleistete Anzahlungen
+        period=instant balance=debit
+
+====================================================================================================
+HGB.275.GKV.4 | Sonstige betriebliche Erträge
+====================================================================================================
+0.906 | is.netIncome.regular.operatingTC.otherOpRevenue
+        sonstige betriebliche Erträge (GKV)
+        period=duration balance=credit
+0.906 | is.netIncome.regular.operatingCOGS.grossOpProfit.otherRevenue
+        sonstige betriebliche Erträge (UKV)
+        period=duration balance=credit
+0.725 | is.netIncome.regular.operatingTC.otherCost
+        sonstige betriebliche Aufwendungen (GKV)
+        period=duration balance=debit
+0.708 | is.netIncome.regular.fin.netInterest.income
+        sonstige Zinsen und ähnliche Erträge
+        period=duration balance=credit
+0.707 | is.netIncome.regular.operatingTC.otherOpRevenue.nonAllocable
+        sonstige betriebliche Erträge (GKV), nicht zuordenbar
+        period=duration balance=credit
+0.707 | is.netIncome.regular.operatingCOGS.grossOpProfit.otherRevenue.misc
+        sonstige betriebliche Erträge (UKV), nicht zuordenbar
+        period=duration balance=credit
+0.667 | is.netIncome.regular.operatingTC.otherOpRevenue.subsidies
+        sonstige betriebliche Erträge (GKV), Zuschüsse und Zulagen
+        period=duration balance=credit
+0.667 | is.netIncome.regular.operatingTC.otherOpRevenue.currGains
+        sonstige betriebliche Erträge (GKV), Kurs-/Währungsgewinne
+        period=duration balance=credit
+
+====================================================================================================
+HGB.275.GKV.5 | Materialaufwand
+====================================================================================================
+0.833 | is.netIncome.regular.operatingTC.grossTradingProfit.materialServices
+        Materialaufwand (GKV)
+        period=duration balance=debit
+0.611 | is.netIncome.regular.operatingTC.staff
+        Personalaufwand (GKV)
+        period=duration balance=debit
+0.556 | is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.misc
+        Materialaufwand (GKV), nicht zuordenbar
+        period=duration balance=debit
+0.469 | is.netIncome.regular.operatingCOGS.materialServices
+        Nachrichtlich: Materialaufwand (entsprechend GKV)
+        period=duration balance=debit
+0.429 | bs.ass.fixAss.fin.particip
+        Beteiligungen
+        period=instant balance=debit
+0.424 | is.netIncome.regular.operatingCOGS.grossOpProfit.netSales
+        Umsatzerlöse (UKV)
+        period=duration balance=credit
+0.414 | bs.ass.currAss
+        Umlaufvermögen
+        period=instant balance=debit
+0.407 | is.netIncome.regular.operatingTC.staff.misc
+        Personalaufwand (GKV), nicht zuordenbar
+        period=duration balance=debit
+
+====================================================================================================
+HGB.275.GKV.5.a | Aufwendungen für Roh-, Hilfs- und Betriebsstoffe und für bezogene Waren
+====================================================================================================
+0.959 | is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material
+        Aufwendungen für Roh-, Hilfs- und Betriebsstoffe und für bezogene Waren (GKV)
+        period=duration balance=debit
+0.855 | is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material.misc
+        Aufwendungen für Roh-, Hilfs- und Betriebsstoffe und für bezogene Waren (GKV), nicht zuordenbar
+        period=duration balance=debit
+0.785 | is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material.purchased
+        Aufwendungen für Roh-, Hilfs- und Betriebsstoffe und für bezogene Waren (GKV), Aufwendungen für bezogene Waren
+        period=duration balance=debit
+0.776 | is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material.group
+        Aufwendungen für Roh-, Hilfs- und Betriebsstoffe und für bezogene Waren (GKV), davon von verbundenen Unternehmen
+        period=duration balance=debit
+0.736 | is.netIncome.regular.operatingCOGS.materialServices.material
+        Nachrichtlich: Materialaufwand (entsprechend GKV), Aufwendungen für Roh-, Hilfs- und Betriebsstoffe und für bezogene Waren
+        period=duration balance=debit
+0.717 | is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material.rawMatConsSup
+        Aufwendungen für Roh-, Hilfs- und Betriebsstoffe und für bezogene Waren (GKV), Aufwendungen für Roh-, Hilfs- und Betriebsstoffe
+        period=duration balance=debit
+0.714 | is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material.purchased.misc
+        Aufwendungen für Roh-, Hilfs- und Betriebsstoffe und für bezogene Waren (GKV), Aufwendungen für bezogene Waren, nicht zuordenbar
+        period=duration balance=debit
+0.696 | is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.material.purchased.inventoryChange
+        Aufwendungen für Roh-, Hilfs- und Betriebsstoffe und für bezogene Waren (GKV), Aufwendungen für bezogene Waren, Bestandsveränderungen
+        period=duration balance=debit
+
+====================================================================================================
+HGB.275.GKV.5.b | Aufwendungen für bezogene Leistungen
+====================================================================================================
+0.923 | is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.services
+        Aufwendungen für bezogene Leistungen (GKV)
+        period=duration balance=debit
+0.637 | is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.group
+        Aufwendungen für bezogene Leistungen (GKV), davon von verbundenen Unternehmen
+        period=duration balance=debit
+0.621 | is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.services.OtherDedInputTax
+        Aufwendungen für bezogene Leistungen (GKV), Übrige Leistungen mit Vorsteuerabzug
+        period=duration balance=debit
+0.615 | bs.ass.currAss.receiv.trade
+        Forderungen aus Lieferungen und Leistungen
+        period=instant balance=debit
+0.615 | is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.services.OtherNonDedInputTax
+        Aufwendungen für bezogene Leistungen (GKV), Übrige Leistungen ohne Vorsteuerabzug
+        period=duration balance=debit
+0.585 | is.netIncome.regular.operatingCOGS.materialServices.services
+        Nachrichtlich: Materialaufwand (entsprechend GKV), Aufwendungen für bezogene Leistungen
+        period=duration balance=debit
+0.576 | is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.services.UStG13bDedInputTax
+        Aufwendungen für bezogene Leistungen (GKV), Leistungen nach § 13b UStG mit Vorsteuerabzug
+        period=duration balance=debit
+0.571 | is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.services.UStG13bNonDedInputTax
+        Aufwendungen für bezogene Leistungen (GKV), Leistungen nach § 13b UStG ohne Vorsteuerabzug
+        period=duration balance=debit
+
+====================================================================================================
+HGB.275.GKV.6 | Personalaufwand
+====================================================================================================
+0.833 | is.netIncome.regular.operatingTC.staff
+        Personalaufwand (GKV)
+        period=duration balance=debit
+0.611 | is.netIncome.regular.operatingTC.grossTradingProfit.materialServices
+        Materialaufwand (GKV)
+        period=duration balance=debit
+0.556 | is.netIncome.regular.operatingTC.staff.misc
+        Personalaufwand (GKV), nicht zuordenbar
+        period=duration balance=debit
+0.469 | is.netIncome.regular.operatingCOGS.staff
+        Nachrichtlich: Personalaufwand (entsprechend GKV)
+        period=duration balance=debit
+0.407 | is.netIncome.regular.operatingTC.grossTradingProfit.materialServices.misc
+        Materialaufwand (GKV), nicht zuordenbar
+        period=duration balance=debit
+0.400 | bs.ass.fixAss.tan.other
+        Sonstige Sachanlagen
+        period=instant balance=debit
+0.389 | is.netIncome.eat
+        Ergebnis nach Steuern
+        period=duration balance=credit
+0.385 | bs.ass.fixAss.tan
+        Sachanlagen
+        period=instant balance=debit
+
+====================================================================================================
+HGB.275.GKV.6.a | Löhne und Gehälter
+====================================================================================================
+0.857 | is.netIncome.regular.operatingTC.staff.salaries
+        Löhne und Gehälter (GKV)
+        period=duration balance=debit
+0.667 | is.netIncome.regular.operatingTC.staff.salaries.inKind
+        Löhne und Gehälter (GKV), Sachbezüge
+        period=duration balance=debit
+0.600 | is.netIncome.regular.operatingTC.staff.salaries.nonAllocable
+        Löhne und Gehälter (GKV), nicht zuordenbar
+        period=duration balance=debit
+0.581 | is.netIncome.regular.operatingTC.staff.salaries.minijobs
+        Löhne und Gehälter (GKV), Löhne für Minijobs
+        period=duration balance=debit
+0.537 | is.netIncome.regular.operatingTC.staff.salaries.voluntayBenefits
+        Löhne und Gehälter (GKV), freiwillige Zuwendungen
+        period=duration balance=debit
+0.522 | is.netIncome.regular.operatingTC.staff.salaries.misc
+        Löhne und Gehälter (GKV), übrige Löhne und Gehälter
+        period=duration balance=debit
+0.458 | bs.ass.fixAss.fin.loansToSharehold
+        Ausleihungen an Gesellschafter
+        period=instant balance=debit
+0.414 | is.netIncome.regular.operatingCOGS.staff.salaries
+        Nachrichtlich: Personalaufwand (entsprechend GKV), Löhne und Gehälter
+        period=duration balance=debit
+
+====================================================================================================
+HGB.275.GKV.6.b | Soziale Abgaben und Aufwendungen für Altersversorgung und für Unterstützung
+====================================================================================================
+0.962 | is.netIncome.regular.operatingTC.staff.social
+        soziale Abgaben und Aufwendungen für Altersversorgung und für Unterstützung (GKV)
+        period=duration balance=debit
+0.867 | is.netIncome.regular.operatingTC.staff.social.socExp
+        soziale Abgaben und Aufwendungen für Altersversorgung und für Unterstützung (GKV), soziale Abgaben
+        period=duration balance=debit
+0.862 | is.netIncome.regular.operatingTC.staff.social.other
+        soziale Abgaben und Aufwendungen für Altersversorgung und für Unterstützung (GKV), nicht zuordenbar
+        period=duration balance=debit
+0.798 | is.netIncome.regular.operatingTC.staff.social.welfare
+        soziale Abgaben und Aufwendungen für Altersversorgung und für Unterstützung (GKV), Aufwendungen für Unterstützung
+        period=duration balance=debit
+0.785 | is.netIncome.regular.operatingTC.staff.social.socExp.misc
+        soziale Abgaben und Aufwendungen für Altersversorgung und für Unterstützung (GKV), soziale Abgaben, nicht zuordenbar
+        period=duration balance=debit
+0.785 | is.netIncome.regular.operatingTC.staff.social.pensions
+        soziale Abgaben und Aufwendungen für Altersversorgung und für Unterstützung (GKV), Aufwendungen für Altersversorgung
+        period=duration balance=debit
+0.758 | is.netIncome.regular.operatingTC.staff.social.socExp.other
+        soziale Abgaben und Aufwendungen für Altersversorgung und für Unterstützung (GKV), soziale Abgaben, für übrige Arbeitnehmer
+        period=duration balance=debit
+0.746 | is.netIncome.regular.operatingCOGS.staff.social
+        Nachrichtlich: Personalaufwand (entsprechend GKV), soziale Abgaben und Aufwendungen für Altersversorgung und für Unterstützung
+        period=duration balance=debit
+
+====================================================================================================
+HGB.275.GKV.7 | Abschreibungen
+====================================================================================================
+0.824 | is.netIncome.regular.operatingTC.deprAmort
+        Abschreibungen (GKV)
+        period=duration balance=debit
+0.593 | bs.ass.fixAss.fin.particip
+        Beteiligungen
+        period=instant balance=debit
+0.560 | bs.ass.fixAss.tan
+        Sachanlagen
+        period=instant balance=debit
+0.538 | is.netIncome.regular.operatingTC.deprAmort.misc
+        Abschreibungen (GKV), nicht zuordenbar
+        period=duration balance=debit
+0.514 | bs.ass.fixAss.fin.otherLoans
+        Sonstige Ausleihungen
+        period=instant balance=debit
+0.500 | bs.eqLiab.accruals
+        Rückstellungen
+        period=instant balance=credit
+0.471 | bs.eqLiab.accruals.tax
+        Steuerrückstellungen
+        period=instant balance=credit
+0.462 | is.netIncome.regular.fin.netParticipation.earnings
+        Erträge aus Beteiligungen
+        period=duration balance=credit
+
+====================================================================================================
+HGB.275.GKV.7.a | auf immaterielle Vermögensgegenstände des Anlagevermögens und Sachanlagen
+====================================================================================================
+0.869 | is.netIncome.regular.operatingTC.deprAmort.fixAss
+        Abschreibungen (GKV), auf immaterielle Vermögensgegenstände des Anlagevermögens und Sachanlagen
+        period=duration balance=debit
+0.793 | is.netIncome.regular.operatingTC.deprAmort.fixAss.tan
+        Abschreibungen (GKV) auf immaterielle Vermögensgegenstände des Anlagevermögens und Sachanlagen, auf Sachanlagen
+        period=duration balance=debit
+0.789 | is.netIncome.regular.operatingTC.deprAmort.fixAss.other
+        Abschreibungen (GKV) auf immaterielle Vermögensgegenstände des Anlagevermögens und Sachanlagen, nicht zuordenbar
+        period=duration balance=debit
+0.705 | is.netIncome.regular.operatingTC.deprAmort.fixAss.extraordinary
+        Abschreibungen (GKV) auf immaterielle Vermögensgegenstände des Anlagevermögens und Sachanlagen, davon außerplanmäßige Abschreibungen
+        period=duration balance=debit
+0.702 | is.netIncome.regular.operatingTC.deprAmort.fixAss.goodwill
+        Abschreibungen (GKV) auf immaterielle Vermögensgegenstände des Anlagevermögens und Sachanlagen, auf Geschäfts-, Firmen- oder Praxiswert
+        period=duration balance=debit
+0.702 | is.netIncome.regular.operatingTC.deprAmort.fixAss.tan.lowValueAs
+        Abschreibungen (GKV) auf immaterielle Vermögensgegenstände des Anlagevermögens und Sachanlagen, auf Sachanlagen, Sofortabschreibung GWG
+        period=duration balance=debit
+0.692 | is.netIncome.regular.operatingCOGS.deprAm.fixAss
+        Nachrichtlich: Abschreibungen (entsprechend GKV), Abschreibungen auf immaterielle Vermögensgegenstände des Anlagevermögens und Sachanlagen
+        period=duration balance=debit
+0.691 | bs.ass.assInbetwFixAndCurr
+        Vermögensgegenstände zwischen Anlagevermögen und Umlaufvermögen
+        period=instant balance=debit
+
+====================================================================================================
+HGB.275.GKV.7.b | auf Vermögensgegenstände des Umlaufvermögens, soweit diese die in der Kapitalgesellschaft üblichen Abschreibungen überschreiten
+====================================================================================================
+0.920 | is.netIncome.regular.operatingTC.deprAmort.currAss
+        Abschreibungen (GKV), auf Vermögensgegenstände des Umlaufvermögens, soweit diese die in der Kapitalgesellschaft üblichen Abschreibungen überschreiten
+        period=duration balance=debit
+0.864 | is.netIncome.regular.operatingTC.deprAmort.currAss.misc
+        Abschreibungen (GKV), auf Vermögensgegenstände des Umlaufvermögens, soweit diese die in der Kapitalgesellschaft üblichen Abschreibungen überschreiten, nicht zuordenbar
+        period=duration balance=debit
+0.836 | is.netIncome.regular.operatingTC.deprAmort.currAss.inventory
+        Abschreibungen (GKV), auf Vermögensgegenstände des Umlaufvermögens, soweit diese die in der Kapitalgesellschaft üblichen Abschreibungen überschreiten, Abschreibungen auf Vorräte
+        period=duration balance=debit
+0.836 | is.netIncome.regular.operatingCOGS.deprAm.currAss
+        Nachrichtlich: Abschreibungen (entsprechend GKV); auf Vermögensgegenstände des Umlaufvermögens, soweit diese die in der Kapitalgesellschaft üblichen Abschreibungen überschreiten
+        period=duration balance=debit
+0.789 | is.netIncome.regular.operatingCOGS.deprAm.currAss.misc
+        Nachrichtlich: Abschreibungen (entsprechend GKV), auf Vermögensgegenstände des Umlaufvermögens, soweit diese die in der Kapitalgesellschaft üblichen Abschreibungen überschreiten, nicht zuordenbar
+        period=duration balance=debit
+0.765 | is.netIncome.regular.operatingCOGS.deprAm.currAss.inventory
+        Nachrichtlich: Abschreibungen (entsprechend GKV); auf Vermögensgegenstände des Umlaufvermögens, soweit diese die in der Kapitalgesellschaft üblichen Abschreibungen überschreiten, Abschreibungen auf Vorräte
+        period=duration balance=debit
+0.743 | is.netIncome.regular.operatingTC.deprAmort.currAss.receiv
+        Abschreibungen (GKV), auf Vermögensgegenstände des Umlaufvermögens, soweit diese die in der Kapitalgesellschaft üblichen Abschreibungen überschreiten, Abschreibungen auf Forderungen und sonstige Vermögensgegenstände
+        period=duration balance=debit
+0.706 | is.netIncome.regular.operatingTC.deprAmort.currAss.receiv.misc
+        Abschreibungen (GKV), auf Vermögensgegenstände des Umlaufvermögens, soweit diese die in der Kapitalgesellschaft üblichen Abschreibungen überschreiten, Abschreibungen auf Forderungen und sonstige Vermögensgegenstände, nicht zuordenbar
+        period=duration balance=debit
+
+====================================================================================================
+HGB.275.GKV.8 | Sonstige betriebliche Aufwendungen
+====================================================================================================
+0.919 | is.netIncome.regular.operatingTC.otherCost
+        sonstige betriebliche Aufwendungen (GKV)
+        period=duration balance=debit
+0.782 | is.netIncome.regular.operatingTC.otherCost.fees
+        sonstige betriebliche Aufwendungen (GKV), Provisionen
+        period=duration balance=debit
+0.773 | is.netIncome.regular.operatingTC.otherCost.marketing
+        sonstige betriebliche Aufwendungen (GKV), Werbeaufwand
+        period=duration balance=debit
+0.747 | is.netIncome.regular.operatingTC.otherCost.custodyFee
+        sonstige betriebliche Aufwendungen (GKV), Verwahrentgelte
+        period=duration balance=debit
+0.739 | is.netIncome.regular.operatingTC.otherCost.misc
+        sonstige betriebliche Aufwendungen (GKV), nicht zuordenbar
+        period=duration balance=debit
+0.725 | is.netIncome.regular.operatingTC.otherOpRevenue
+        sonstige betriebliche Erträge (GKV)
+        period=duration balance=credit
+0.725 | is.netIncome.regular.operatingCOGS.grossOpProfit.otherRevenue
+        sonstige betriebliche Erträge (UKV)
+        period=duration balance=credit
+0.723 | is.netIncome.regular.operatingTC.otherCost.training
+        sonstige betriebliche Aufwendungen (GKV), Fortbildungskosten
+        period=duration balance=debit
+
+====================================================================================================
+HGB.275.GKV.17 | Jahresüberschuss/Jahresfehlbetrag
+====================================================================================================
+0.885 | is.netIncome
+        Jahresüberschuss/-fehlbetrag
+        period=duration balance=credit
+0.482 | bs.eqLiab.equity.netIncome
+        Eigenkapital, Jahresüberschuss/-fehlbetrag (Bilanz) - bei Kapitalgesellschaften
+        period=instant balance=credit
+0.450 | bs.eqLiab.equity.netIncomePartnershipsHGBs264c
+        Eigenkapital, Jahresüberschuss/-fehlbetrag (Bilanz) bei Personen(handels)gesellschaften
+        period=instant balance=credit
+0.427 | bs.eqLiab.equity.revenueRes.legal.profitPresentYear
+        gesetzliche Rücklage, davon aus dem Jahresüberschuss des Geschäftsjahres eingestellt
+        period=instant balance=credit
+0.422 | bs.eqLiab.equity.netIncomePartnerships
+        Eigenkapital, davon Jahresüberschuss/-fehlbetrag (Bilanz) - bei Personen(handels)gesellschaften
+        period=instant balance=credit
+0.420 | bs.eqLiab.equity.revenueRes.other.profitPresentYear
+        andere Gewinnrücklagen, davon aus dem Jahresüberschuss des Geschäftsjahres eingestellt
+        period=instant balance=credit
+0.410 | bs.eqLiab.equity.revenueRes.statutory.profitPresentYear
+        satzungsmäßige Rücklagen, davon aus dem Jahresüberschuss des Geschäftsjahres eingestellt
+        period=instant balance=credit
+0.389 | bs.ass.prepaidExp.premium
+        Aktive Rechnungsabgrenzungsposten, Agio
+        period=instant balance=debit
