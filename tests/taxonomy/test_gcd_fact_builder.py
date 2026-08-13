@@ -1980,3 +1980,96 @@ def test_gcd_fact_builder_builds_entity_with_taxable_purpose_business() -> None:
     assert result.fact.value == "normal"
     assert result.fact.context is context
     
+def test_gcd_fact_builder_builds_optional_shareholder_identifier_facts() -> None:
+    """Der Builder erzeugt optionale Shareholder-Facts taxonomieabhängig."""
+
+    shareholder = GcdShareholder(
+        name="Mustermann",
+        first_name="Max",
+        shareholder_id="1",
+        tax_number="1234567890123",
+        tax_id="12345678901",
+        wid="WID-1",
+        legal_status=(
+            GcdShareholderLegalStatus.NATURAL_PERSON
+        ),
+        share_divide_key=GcdShareDivideKey(
+            numerator="25",
+            denominator="100",
+        ),
+        signer_id="SIGNER-1",
+        economic_id="BEWI-1",
+        id_not_assigned="NO-ID",
+    )
+
+    concept_names = (
+        "genInfo.company.id.shareholder.name",
+        "genInfo.company.id.shareholder.FirstName",
+        "genInfo.company.id.shareholder.id",
+        "genInfo.company.id.shareholder.signerId",
+        "genInfo.company.id.shareholder.taxnumber",
+        "genInfo.company.id.shareholder.taxid",
+        "genInfo.company.id.shareholder.WID",
+        "genInfo.company.id.shareholder.beWiNr",
+        "genInfo.company.id.shareholder.idNotAssigned",
+        (
+            "genInfo.company.id.shareholder."
+            "legalStatus.legalStatus.NPP"
+        ),
+        (
+            "genInfo.company.id.shareholder."
+            "ShareDivideKey.numerator"
+        ),
+        (
+            "genInfo.company.id.shareholder."
+            "ShareDivideKey.denominator"
+        ),
+    )
+
+    concepts = tuple(
+        TaxonomyConcept(
+            name=name,
+            concept_id="de-gcd_" + name,
+            type_name="xbrli:stringItemType",
+            substitution_group="xbrli:item",
+            period_type=TaxonomyPeriodType.DURATION,
+            balance=TaxonomyBalance.NONE,
+            abstract=False,
+            nillable=True,
+        )
+        for name in concept_names
+    )
+
+    taxonomy_model = _taxonomy_model(
+        *concepts
+    )
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    builder = GcdFactBuilder()
+
+    result = builder.shareholder(
+        shareholder=shareholder,
+        taxonomy_model=taxonomy_model,
+        context=context,
+    )
+
+    assert result.first_name is not None
+    assert result.first_name.value == "Max"
+
+    assert result.signer_id is not None
+    assert result.signer_id.value == "SIGNER-1"
+
+    assert result.economic_id is not None
+    assert result.economic_id.value == "BEWI-1"
+
+    assert result.id_not_assigned is not None
+    assert result.id_not_assigned.value == "NO-ID"
+    
+    

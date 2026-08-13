@@ -2125,3 +2125,120 @@ def test_xbrl_writer_serializes_gcd_company_classification_tuples() -> None:
     assert business_element[0].text == "normal"
     
     
+def test_xbrl_writer_serializes_optional_shareholder_identifiers() -> None:
+    """Der Writer serialisiert beWiNr und idNotAssigned."""
+
+    namespace = (
+        "http://www.xbrl.de/taxonomies/"
+        "de-gcd-2026-04-01"
+    )
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2026, 1, 1),
+        end_date=date(2026, 12, 31),
+    )
+
+    def text_fact(
+        name: str,
+        value: str,
+    ) -> TaxonomyTextFact:
+        return TaxonomyTextFact(
+            concept=TaxonomyConcept(
+                name=name,
+                concept_id="de-gcd_" + name,
+                type_name="xbrli:stringItemType",
+                substitution_group="xbrli:item",
+                period_type=TaxonomyPeriodType.DURATION,
+                balance=TaxonomyBalance.NONE,
+                abstract=False,
+                nillable=True,
+            ),
+            value=value,
+            context=context,
+        )
+
+    shareholder = GcdShareholderTuple(
+        name=text_fact(
+            "genInfo.company.id.shareholder.name",
+            "Mustermann",
+        ),
+        shareholder_id=text_fact(
+            "genInfo.company.id.shareholder.id",
+            "1",
+        ),
+        tax_number=text_fact(
+            "genInfo.company.id.shareholder.taxnumber",
+            "1234567890123",
+        ),
+        tax_id=text_fact(
+            "genInfo.company.id.shareholder.taxid",
+            "12345678901",
+        ),
+        wid=text_fact(
+            "genInfo.company.id.shareholder.WID",
+            "WID-1",
+        ),
+        legal_status=GcdShareholderLegalStatusTuple(
+            fact=text_fact(
+                (
+                    "genInfo.company.id.shareholder."
+                    "legalStatus.legalStatus.NPP"
+                ),
+                "NPP",
+            ),
+        ),
+        share_divide_key=GcdShareDivideKeyTuple(
+            numerator=text_fact(
+                (
+                    "genInfo.company.id.shareholder."
+                    "ShareDivideKey.numerator"
+                ),
+                "25",
+            ),
+            denominator=text_fact(
+                (
+                    "genInfo.company.id.shareholder."
+                    "ShareDivideKey.denominator"
+                ),
+                "100",
+            ),
+        ),
+        economic_id=text_fact(
+            "genInfo.company.id.shareholder.beWiNr",
+            "BEWI-1",
+        ),
+        id_not_assigned=text_fact(
+            "genInfo.company.id.shareholder.idNotAssigned",
+            "NO-ID",
+        ),
+    )
+
+    writer = TaxonomyXbrlWriter()
+
+    element = writer.gcd_shareholder_element(
+        shareholder=shareholder,
+        context_id="ctx-2026",
+        namespace=namespace,
+    )
+
+    economic_id = element.find(
+        f"{{{namespace}}}"
+        "genInfo.company.id.shareholder.beWiNr"
+    )
+
+    assert economic_id is not None
+    assert economic_id.text == "BEWI-1"
+    assert economic_id.get("contextRef") == "ctx-2026"
+
+    id_not_assigned = element.find(
+        f"{{{namespace}}}"
+        "genInfo.company.id.shareholder.idNotAssigned"
+    )
+
+    assert id_not_assigned is not None
+    assert id_not_assigned.text == "NO-ID"
+    assert id_not_assigned.get("contextRef") == "ctx-2026"
+

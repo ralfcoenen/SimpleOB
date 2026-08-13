@@ -776,6 +776,8 @@ def test_combined_69_instance_with_report_element_is_validated_by_arelle(
             current_number=1,
             special_balance_required=False,
             extension_required=False,
+            economic_id="BEWI-1",
+            id_not_assigned="NO-ID",
         )
 
         shareholder = gcd_builder.shareholder(
@@ -1068,6 +1070,8 @@ def test_combined_610_instance_with_report_element_is_validated_by_arelle(
             current_number=1,
             special_balance_required=False,
             extension_required=False,
+            economic_id="BEWI-1",
+            id_not_assigned="NO-ID",
         )
 
         shareholder = gcd_builder.shareholder(

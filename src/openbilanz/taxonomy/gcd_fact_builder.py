@@ -822,7 +822,12 @@ class GcdFactBuilder:
                 "context must be a TaxonomyContext"
             )
 
-        values = [
+        concepts_by_name = {
+            concept.name: concept
+            for concept in taxonomy_model.concepts.concepts
+        }
+
+        values: list[tuple[str, str]] = [
             (
                 "genInfo.company.id.shareholder.name",
                 shareholder.name,
@@ -845,6 +850,14 @@ class GcdFactBuilder:
             ),
         ]
 
+        if shareholder.first_name is not None:
+            values.append(
+                (
+                    "genInfo.company.id.shareholder.FirstName",
+                    shareholder.first_name,
+                )
+            )
+
         if shareholder.group is not None:
             values.append(
                 (
@@ -856,10 +869,36 @@ class GcdFactBuilder:
                 )
             )
 
-        concepts_by_name = {
-            concept.name: concept
-            for concept in taxonomy_model.concepts.concepts
-        }
+        if shareholder.signer_id is not None:
+            values.append(
+                (
+                    "genInfo.company.id.shareholder.signerId",
+                    shareholder.signer_id,
+                )
+            )
+
+        if shareholder.economic_id is not None:
+            values.append(
+                (
+                    "genInfo.company.id.shareholder.beWiNr",
+                    shareholder.economic_id,
+                )
+            )
+
+        id_not_assigned_name = (
+            "genInfo.company.id.shareholder.idNotAssigned"
+        )
+
+        if (
+            shareholder.id_not_assigned is not None
+            and id_not_assigned_name in concepts_by_name
+        ):
+            values.append(
+                (
+                    id_not_assigned_name,
+                    shareholder.id_not_assigned,
+                )
+            )
 
         facts: list[TaxonomyTextFact] = []
 
@@ -883,7 +922,7 @@ class GcdFactBuilder:
             )
 
         return tuple(facts)    
-
+    
     def shareholder_legal_status(
         self,
         *,
@@ -1165,6 +1204,14 @@ class GcdFactBuilder:
                 context=context,
             )
 
+        group_name = None
+
+        if shareholder.group is not None:
+            group_name = (
+                "genInfo.company.id.shareholder.group."
+                f"{shareholder.group.value}"
+            )
+
         return GcdShareholderTuple(
             name=facts_by_name[
                 "genInfo.company.id.shareholder.name"
@@ -1183,13 +1230,24 @@ class GcdFactBuilder:
             ],
             legal_status=legal_status,
             share_divide_key=share_divide_key,
-            group=facts_by_name.get(
-                (
-                    "genInfo.company.id.shareholder.group."
-                    f"{shareholder.group.value}"
-                )
-                if shareholder.group is not None
-                else ""
+            first_name=facts_by_name.get(
+                "genInfo.company.id.shareholder.FirstName"
+            ),
+            group=(
+                facts_by_name.get(group_name)
+                if group_name is not None
+                else None
             ),
             current_number=current_number,
+            signer_id=facts_by_name.get(
+                "genInfo.company.id.shareholder.signerId"
+            ),
+            economic_id=facts_by_name.get(
+                "genInfo.company.id.shareholder.beWiNr"
+            ),
+            id_not_assigned=facts_by_name.get(
+                "genInfo.company.id.shareholder.idNotAssigned"
+            ),
         )
+        
+   

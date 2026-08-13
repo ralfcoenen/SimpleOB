@@ -292,7 +292,6 @@ class TaxonomyXbrlWriter:
 
         return element    
     
-    
     def gcd_shareholder_element(
         self,
         *,
@@ -335,12 +334,10 @@ class TaxonomyXbrlWriter:
             element,
             shareholder.name,
         )
-
         append_text_fact(
             element,
             shareholder.first_name,
         )
-
         append_text_fact(
             element,
             shareholder.shareholder_id,
@@ -380,20 +377,25 @@ class TaxonomyXbrlWriter:
             element,
             shareholder.signer_id,
         )
-
         append_text_fact(
             element,
             shareholder.tax_number,
         )
-
         append_text_fact(
             element,
             shareholder.tax_id,
         )
-
         append_text_fact(
             element,
             shareholder.wid,
+        )
+        append_text_fact(
+            element,
+            shareholder.id_not_assigned,
+        )
+        append_text_fact(
+            element,
+            shareholder.economic_id,
         )
 
         legal_status_element = ET.Element(
@@ -419,7 +421,6 @@ class TaxonomyXbrlWriter:
             share_divide_key_element,
             shareholder.share_divide_key.numerator,
         )
-
         append_text_fact(
             share_divide_key_element,
             shareholder.share_divide_key.denominator,
@@ -433,14 +434,14 @@ class TaxonomyXbrlWriter:
             element,
             shareholder.special_balance_required,
         )
-
         append_text_fact(
             element,
             shareholder.extension_required,
         )
 
-        return element
-    
+        return element   
+   
+   
     def instance_element(
         self,
         contexts: dict[str, TaxonomyContext],

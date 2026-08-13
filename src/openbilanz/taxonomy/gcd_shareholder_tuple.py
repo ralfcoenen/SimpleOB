@@ -36,5 +36,11 @@ class GcdShareholderTuple:
     group: TaxonomyTextFact | None = None
     current_number: TaxonomyFact | None = None
     signer_id: TaxonomyTextFact | None = None
+    economic_id: TaxonomyTextFact | None = None
+    id_not_assigned: TaxonomyTextFact | None = None
     special_balance_required: TaxonomyTextFact | None = None
     extension_required: TaxonomyTextFact | None = None
+    
+    
+    
+    
