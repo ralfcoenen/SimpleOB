@@ -25,22 +25,25 @@ from openbilanz.taxonomy.entry_point import TaxonomyEntryPoint
 from openbilanz.taxonomy.fact import TaxonomyFact
 from openbilanz.taxonomy.fact_builder import TaxonomyFactBuilder
 from openbilanz.taxonomy.gcd_company_data import GcdCompanyData
+from openbilanz.taxonomy.gcd_company_identifiers import (
+    GcdCompanyIdentifiers,
+)
 from openbilanz.taxonomy.gcd_fact_builder import GcdFactBuilder
+from openbilanz.taxonomy.gcd_report_profile import (
+    GcdReportProfile,
+)
+from openbilanz.taxonomy.gcd_shareholder import (
+    GcdShareDivideKey,
+    GcdShareholder,
+    GcdShareholderGroup,
+    GcdShareholderLegalStatus,
+)
 from openbilanz.taxonomy.mapper import TaxonomyMapper
 from openbilanz.taxonomy.mapping import TaxonomyMappingRule
 from openbilanz.taxonomy.mapping_set import TaxonomyMappingSet
 from openbilanz.taxonomy.resolver import TaxonomyResolver
 from openbilanz.taxonomy.taxonomy import TaxonomyVersion
 from openbilanz.taxonomy.unit import TaxonomyUnit
-from openbilanz.taxonomy.gcd_report_profile import (
-    GcdReportProfile,
-)
-from openbilanz.taxonomy.gcd_report_data import (
-    GcdReportData,
-)
-from openbilanz.taxonomy.gcd_company_identifiers import (
-    GcdCompanyIdentifiers,
-)
 
 TAXONOMY_ROOT = Path(
     "/tmp/openbilanz-taxonomy"
@@ -113,6 +116,7 @@ def test_exported_xbrl_instance_is_validated_by_arelle(
     )
 
     unit = TaxonomyUnit.eur()
+    
 
     fact = TaxonomyFact(
         concept=concept,
@@ -732,6 +736,32 @@ def test_combined_69_instance_with_report_element_is_validated_by_arelle(
 
         gcd_builder = GcdFactBuilder()
 
+        shareholder_data = GcdShareholder(
+            name="Mustermann",
+            first_name="Max",
+            shareholder_id="1",
+            tax_number="1234567890123",
+            tax_id="12345678901",
+            wid="WID-1",
+            group=GcdShareholderGroup.LIMITED,
+            legal_status=(
+                GcdShareholderLegalStatus.NATURAL_PERSON
+            ),
+            share_divide_key=GcdShareDivideKey(
+                numerator="100",
+                denominator="100",
+            ),
+            current_number=1,
+            special_balance_required=False,
+            extension_required=False,
+        )
+
+        shareholder = gcd_builder.shareholder(
+            shareholder=shareholder_data,
+            taxonomy_model=gcd_model,
+            context=duration_context,
+        )
+
         identifiers = GcdCompanyIdentifiers(
             tax_number_13="1234567890123",
             tax_id="12345678901",
@@ -766,9 +796,6 @@ def test_combined_69_instance_with_report_element_is_validated_by_arelle(
 
         profile = GcdReportProfile.standard()
         
-        report_data = GcdReportData(
-            income_statement_ends_with_balance_profit=False,
-        )
 
         profile_facts = gcd_builder.report_profile_facts(
             profile=profile,
@@ -776,12 +803,6 @@ def test_combined_69_instance_with_report_element_is_validated_by_arelle(
             context=duration_context,
         )
         
-        report_data_facts = gcd_builder.report_data_facts(
-            data=report_data,
-            taxonomy_model=gcd_model,
-            context=duration_context,
-        )
-
         report_element = gcd_builder.report_element(
             profile=profile,
             taxonomy_model=gcd_model,
@@ -795,6 +816,7 @@ def test_combined_69_instance_with_report_element_is_validated_by_arelle(
         }
 
         unit = TaxonomyUnit.eur()
+        pure_unit = TaxonomyUnit.pure()
 
         fixed_assets_fact = TaxonomyFact(
             concept=gaap_concepts_by_name[
@@ -832,6 +854,7 @@ def test_combined_69_instance_with_report_element_is_validated_by_arelle(
             },
             units={
                 "EUR": unit,
+                "PURE": pure_unit,
             },
             facts=facts,
             report_elements=(
@@ -848,6 +871,9 @@ def test_combined_69_instance_with_report_element_is_validated_by_arelle(
             ),
             company_id_nos=(
                 company_id_no,
+            ),
+            shareholders=(
+                shareholder,
             ),
         )
 
@@ -961,11 +987,6 @@ def test_combined_610_instance_with_report_element_is_validated_by_arelle(
             start_date=date(2027, 1, 1),
             end_date=date(2027, 12, 31),
         )
-        
-        previous_fiscal_year = FiscalYear(
-            start_date=date(2026, 1, 1),
-            end_date=date(2026, 12, 31),
-        )
 
         duration_context = TaxonomyContext(
             entity_identifier="DE123456789",
@@ -984,6 +1005,32 @@ def test_combined_610_instance_with_report_element_is_validated_by_arelle(
         )
 
         gcd_builder = GcdFactBuilder()
+        
+        shareholder_data = GcdShareholder(
+            name="Mustermann",
+            first_name="Max",
+            shareholder_id="1",
+            tax_number="1234567890123",
+            tax_id="12345678901",
+            wid="WID-1",
+            group=GcdShareholderGroup.LIMITED,
+            legal_status=(
+                GcdShareholderLegalStatus.NATURAL_PERSON
+            ),
+            share_divide_key=GcdShareDivideKey(
+                numerator="100",
+                denominator="100",
+            ),
+            current_number=1,
+            special_balance_required=False,
+            extension_required=False,
+        )
+
+        shareholder = gcd_builder.shareholder(
+            shareholder=shareholder_data,
+            taxonomy_model=gcd_model,
+            context=duration_context,
+        )
 
         identifiers = GcdCompanyIdentifiers(
             tax_number_13="1234567890123",
@@ -1013,18 +1060,9 @@ def test_combined_610_instance_with_report_element_is_validated_by_arelle(
 
         profile = GcdReportProfile.standard()
         
-        report_data = GcdReportData(
-            income_statement_ends_with_balance_profit=False,
-        )
 
         profile_facts = gcd_builder.report_profile_facts(
             profile=profile,
-            taxonomy_model=gcd_model,
-            context=duration_context,
-        )
-        
-        report_data_facts = gcd_builder.report_data_facts(
-            data=report_data,
             taxonomy_model=gcd_model,
             context=duration_context,
         )
@@ -1042,6 +1080,7 @@ def test_combined_610_instance_with_report_element_is_validated_by_arelle(
         }
 
         unit = TaxonomyUnit.eur()
+        pure_unit = TaxonomyUnit.pure()
 
         fixed_assets_fact = TaxonomyFact(
             concept=gaap_concepts_by_name[
@@ -1079,6 +1118,7 @@ def test_combined_610_instance_with_report_element_is_validated_by_arelle(
             },
             units={
                 "EUR": unit,
+                "PURE": pure_unit,
             },
             facts=facts,
             report_elements=(
@@ -1095,6 +1135,9 @@ def test_combined_610_instance_with_report_element_is_validated_by_arelle(
             ),
             company_id_nos=(
                 company_id_no,
+            ),
+            shareholders=(
+                shareholder,
             ),
         )
 

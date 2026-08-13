@@ -14,20 +14,20 @@ from openbilanz.taxonomy.concept import (
 from openbilanz.taxonomy.context import TaxonomyContext
 from openbilanz.taxonomy.entry_point import TaxonomyEntryPoint
 from openbilanz.taxonomy.fact import TaxonomyFact
-from openbilanz.taxonomy.text_fact import TaxonomyTextFact
-from openbilanz.taxonomy.unit import TaxonomyUnit
-from openbilanz.taxonomy.xbrl_writer import TaxonomyXbrlWriter
-
+from openbilanz.taxonomy.gcd_company_id_no import (
+    GcdCompanyIdNo,
+)
 from openbilanz.taxonomy.gcd_report_element import (
     GcdReportElement,
 )
-from openbilanz.taxonomy.gcd_company_id_no import (
-    GcdCompanyIdNo,
+from openbilanz.taxonomy.gcd_shareholder_tuple import (
+    GcdShareDivideKeyTuple,
+    GcdShareholderLegalStatusTuple,
+    GcdShareholderTuple,
 )
-from openbilanz.taxonomy.gcd_company_id_no import (
-    GcdCompanyIdNo,
-)
-
+from openbilanz.taxonomy.text_fact import TaxonomyTextFact
+from openbilanz.taxonomy.unit import TaxonomyUnit
+from openbilanz.taxonomy.xbrl_writer import TaxonomyXbrlWriter
 
 DE_GAAP_CI_NAMESPACE = (
     "http://www.xbrl.de/taxonomies/"
@@ -1487,147 +1487,6 @@ def test_xbrl_writer_includes_gcd_report_element_in_instance() -> None:
     )
     assert children[1].attrib["contextRef"] == "ctx-2025"
     assert children[1].text == "GuV"
-    
-def test_xbrl_writer_serializes_gcd_company_id_no_tuple() -> None:
-    """Der Writer serialisiert das GCD-idNo-Tuple."""
-
-    context = TaxonomyContext(
-        entity_identifier="DE123456789",
-        entity_scheme=TEST_ENTITY_SCHEME,
-        period_type=TaxonomyPeriodType.DURATION,
-        start_date=date(2025, 1, 1),
-        end_date=date(2025, 12, 31),
-    )
-
-    concept_names = (
-        "genInfo.company.id.idNo.type.companyId.ST13",
-        "genInfo.company.id.idNo.type.companyId.STID",
-        "genInfo.company.id.idNo.type.companyId.STWID",
-        "genInfo.company.id.idNo.type.companyId.BF4",
-    )
-
-    values = (
-        "1234567890123",
-        "12345678901",
-        "DE123456789",
-        "1234",
-    )
-
-    facts = tuple(
-        TaxonomyTextFact(
-            concept=TaxonomyConcept(
-                name=name,
-                concept_id="de-gcd_" + name,
-                type_name="xbrli:stringItemType",
-                substitution_group="xbrli:item",
-                period_type=TaxonomyPeriodType.DURATION,
-                balance=TaxonomyBalance.NONE,
-                abstract=False,
-                nillable=True,
-            ),
-            value=value,
-            context=context,
-        )
-        for name, value in zip(
-            concept_names,
-            values,
-            strict=True,
-        )
-    )
-
-    company_id_no = GcdCompanyIdNo(
-        facts=facts
-    )
-
-    writer = TaxonomyXbrlWriter()
-
-    element = writer.gcd_company_id_no_element(
-        company_id_no=company_id_no,
-        context_id="ctx-2025",
-        namespace=(
-            "http://www.xbrl.de/taxonomies/"
-            "de-gcd-2025-04-01"
-        ),
-    )
-
-    xml = ET.tostring(
-        element,
-        encoding="unicode",
-    )
-
-    assert "genInfo.company.id.idNo" in xml
-    assert "1234567890123" in xml
-    assert "12345678901" in xml
-    assert "DE123456789" in xml
-    assert "1234" in xml
-    assert 'contextRef="ctx-2025"' in xml
-
-def test_xbrl_writer_includes_gcd_company_id_no_in_instance() -> None:
-    """Das GCD-idNo-Tuple wird in die XBRL-Instanz aufgenommen."""
-
-    context = TaxonomyContext(
-        entity_identifier="DE123456789",
-        entity_scheme=TEST_ENTITY_SCHEME,
-        period_type=TaxonomyPeriodType.DURATION,
-        start_date=date(2025, 1, 1),
-        end_date=date(2025, 12, 31),
-    )
-
-    concept = TaxonomyConcept(
-        name=(
-            "genInfo.company.id.idNo.type.companyId.ST13"
-        ),
-        concept_id=(
-            "de-gcd_genInfo.company.id.idNo.type.companyId.ST13"
-        ),
-        type_name="xbrli:stringItemType",
-        substitution_group="xbrli:item",
-        period_type=TaxonomyPeriodType.DURATION,
-        balance=TaxonomyBalance.NONE,
-        abstract=False,
-        nillable=True,
-    )
-
-    fact = TaxonomyTextFact(
-        concept=concept,
-        value="1234567890123",
-        context=context,
-    )
-
-    company_id_no = GcdCompanyIdNo(
-        facts=(fact,)
-    )
-
-    writer = TaxonomyXbrlWriter()
-
-    root = writer.instance_element(
-        contexts={
-            "ctx-2025": context,
-        },
-        units={},
-        facts=(),
-        company_id_nos=(
-            company_id_no,
-        ),
-        taxonomy_namespace=(
-            "http://www.xbrl.de/taxonomies/"
-            "de-gcd-2025-04-01"
-        ),
-        taxonomy_namespaces={
-            "de-gcd": (
-                "http://www.xbrl.de/taxonomies/"
-                "de-gcd-2025-04-01"
-            ),
-        },
-        entry_points=(),
-    )
-
-    xml = writer.to_xml_string(
-        root=root
-    )
-
-    assert "genInfo.company.id.idNo" in xml
-    assert "1234567890123" in xml
 
 def test_xbrl_writer_serializes_gcd_company_id_no_tuple() -> None:
     """Der Writer serialisiert das GCD-idNo-Tuple."""
@@ -1802,3 +1661,354 @@ def test_xbrl_writer_includes_gcd_company_id_no_in_instance() -> None:
         "genInfo.company.id.idNo.type.companyId.ST13"
     ) in tags
     
+def test_xbrl_writer_serializes_gcd_shareholder_tuple() -> None:
+    """Der Writer serialisiert ein verschachteltes Gesellschafter-Tuple."""
+
+    namespace = (
+        "http://www.xbrl.de/taxonomies/"
+        "de-gcd-2025-04-01"
+    )
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    def text_fact(
+        name: str,
+        value: str,
+    ) -> TaxonomyTextFact:
+        return TaxonomyTextFact(
+            concept=TaxonomyConcept(
+                name=name,
+                concept_id="de-gcd_" + name,
+                type_name="xbrli:stringItemType",
+                substitution_group="xbrli:item",
+                period_type=TaxonomyPeriodType.DURATION,
+                balance=TaxonomyBalance.NONE,
+                abstract=False,
+                nillable=True,
+            ),
+            value=value,
+            context=context,
+        )
+
+    shareholder = GcdShareholderTuple(
+        name=text_fact(
+            "genInfo.company.id.shareholder.name",
+            "Mustermann",
+        ),
+        first_name=text_fact(
+            "genInfo.company.id.shareholder.FirstName",
+            "Max",
+        ),
+        shareholder_id=text_fact(
+            "genInfo.company.id.shareholder.id",
+            "1",
+        ),
+        group=text_fact(
+            "genInfo.company.id.shareholder.group.limPartner",
+            "limPartner",
+        ),
+        current_number=TaxonomyFact(
+            concept=TaxonomyConcept(
+                name=(
+                    "genInfo.company.id.shareholder.currentnumber"
+                ),
+                concept_id=(
+                    "de-gcd_genInfo.company.id.shareholder.currentnumber"
+                ),
+                type_name="xbrli:positiveIntegerItemType",
+                substitution_group="xbrli:item",
+                period_type=TaxonomyPeriodType.DURATION,
+                balance=TaxonomyBalance.NONE,
+                abstract=False,
+                nillable=True,
+            ),
+            amount=Decimal("1"),
+            context=context,
+            unit=TaxonomyUnit.pure(),
+            decimals="INF",
+        ),
+        signer_id=None,
+        tax_number=text_fact(
+            "genInfo.company.id.shareholder.taxnumber",
+            "1234567890123",
+        ),
+        tax_id=text_fact(
+            "genInfo.company.id.shareholder.taxid",
+            "12345678901",
+        ),
+        wid=text_fact(
+            "genInfo.company.id.shareholder.WID",
+            "WID-1",
+        ),
+        legal_status=GcdShareholderLegalStatusTuple(
+            fact=text_fact(
+                (
+                    "genInfo.company.id.shareholder."
+                    "legalStatus.legalStatus.NPP"
+                ),
+                "NPP",
+            ),
+        ),
+        share_divide_key=GcdShareDivideKeyTuple(
+            numerator=text_fact(
+                (
+                    "genInfo.company.id.shareholder."
+                    "ShareDivideKey.numerator"
+                ),
+                "25",
+            ),
+            denominator=text_fact(
+                (
+                    "genInfo.company.id.shareholder."
+                    "ShareDivideKey.denominator"
+                ),
+                "100",
+            ),
+        ),
+        special_balance_required=None,
+        extension_required=None,
+    )
+
+    writer = TaxonomyXbrlWriter()
+
+    element = writer.gcd_shareholder_element(
+        shareholder=shareholder,
+        context_id="ctx-2025",
+        namespace=namespace,
+        pure_unit_id="PURE",
+    )
+
+    assert element.tag == (
+        f"{{{namespace}}}"
+        "genInfo.company.id.shareholder"
+    )
+
+    group = element.find(
+        f"{{{namespace}}}"
+        "genInfo.company.id.shareholder.group"
+    )
+
+    assert group is not None
+    assert len(group) == 1
+    assert group[0].tag == (
+        f"{{{namespace}}}"
+        "genInfo.company.id.shareholder.group.limPartner"
+    )
+
+    legal_status = element.find(
+        f"{{{namespace}}}"
+        "genInfo.company.id.shareholder.legalStatus"
+    )
+
+    assert legal_status is not None
+    assert len(legal_status) == 1
+    assert legal_status[0].tag == (
+        f"{{{namespace}}}"
+        "genInfo.company.id.shareholder."
+        "legalStatus.legalStatus.NPP"
+    )
+
+    share_divide_key = element.find(
+        f"{{{namespace}}}"
+        "genInfo.company.id.shareholder.ShareDivideKey"
+    )
+
+    assert share_divide_key is not None
+    assert len(share_divide_key) == 2
+
+    assert share_divide_key[0].text == "25"
+    assert share_divide_key[1].text == "100"
+
+    for child in element.iter():
+        if child is element:
+            continue
+
+        if len(child) == 0:
+            assert child.get("contextRef") == "ctx-2025"
+
+
+def test_xbrl_writer_includes_gcd_shareholder_in_instance() -> None:
+    """Ein Gesellschafter-Tuple wird in die XBRL-Instanz aufgenommen."""
+
+    namespace = (
+        "http://www.xbrl.de/taxonomies/"
+        "de-gcd-2025-04-01"
+    )
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    def text_fact(
+        name: str,
+        value: str,
+    ) -> TaxonomyTextFact:
+        return TaxonomyTextFact(
+            concept=TaxonomyConcept(
+                name=name,
+                concept_id="de-gcd_" + name,
+                type_name="xbrli:stringItemType",
+                substitution_group="xbrli:item",
+                period_type=TaxonomyPeriodType.DURATION,
+                balance=TaxonomyBalance.NONE,
+                abstract=False,
+                nillable=True,
+            ),
+            value=value,
+            context=context,
+        )
+
+    shareholder = GcdShareholderTuple(
+        name=text_fact(
+            "genInfo.company.id.shareholder.name",
+            "Mustermann",
+        ),
+        shareholder_id=text_fact(
+            "genInfo.company.id.shareholder.id",
+            "1",
+        ),
+        tax_number=text_fact(
+            "genInfo.company.id.shareholder.taxnumber",
+            "1234567890123",
+        ),
+        tax_id=text_fact(
+            "genInfo.company.id.shareholder.taxid",
+            "12345678901",
+        ),
+        wid=text_fact(
+            "genInfo.company.id.shareholder.WID",
+            "WID-1",
+        ),
+        legal_status=GcdShareholderLegalStatusTuple(
+            fact=text_fact(
+                (
+                    "genInfo.company.id.shareholder."
+                    "legalStatus.legalStatus.NPP"
+                ),
+                "NPP",
+            ),
+        ),
+        share_divide_key=GcdShareDivideKeyTuple(
+            numerator=text_fact(
+                (
+                    "genInfo.company.id.shareholder."
+                    "ShareDivideKey.numerator"
+                ),
+                "100",
+            ),
+            denominator=text_fact(
+                (
+                    "genInfo.company.id.shareholder."
+                    "ShareDivideKey.denominator"
+                ),
+                "100",
+            ),
+        ),
+    )
+
+    writer = TaxonomyXbrlWriter()
+
+    root = writer.instance_element(
+        contexts={
+            "ctx-2025": context,
+        },
+        units={},
+        facts=(),
+        shareholders=(
+            shareholder,
+        ),
+        taxonomy_namespace=namespace,
+        taxonomy_namespaces={
+            "de-gcd": namespace,
+        },
+        entry_points=(),
+    )
+
+    tags = {
+        element.tag
+        for element in root.iter()
+    }
+
+    assert (
+        f"{{{namespace}}}"
+        "genInfo.company.id.shareholder"
+    ) in tags
+
+    assert (
+        f"{{{namespace}}}"
+        "genInfo.company.id.shareholder.legalStatus"
+    ) in tags
+
+    assert (
+        f"{{{namespace}}}"
+        "genInfo.company.id.shareholder.ShareDivideKey"
+    ) in tags
+
+def test_xbrl_writer_serializes_shareholder_current_number() -> None:
+    """Der Writer serialisiert currentnumber als numerischen XBRL-Fact."""
+
+    namespace = (
+        "http://www.xbrl.de/taxonomies/"
+        "de-gcd-2025-04-01"
+    )
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    concept = TaxonomyConcept(
+        name=(
+            "genInfo.company.id.shareholder.currentnumber"
+        ),
+        concept_id=(
+            "de-gcd_genInfo.company.id.shareholder.currentnumber"
+        ),
+        type_name="xbrli:positiveIntegerItemType",
+        substitution_group="xbrli:item",
+        period_type=TaxonomyPeriodType.DURATION,
+        balance=TaxonomyBalance.NONE,
+        abstract=False,
+        nillable=True,
+    )
+
+    fact = TaxonomyFact(
+        concept=concept,
+        amount=Decimal("1"),
+        context=context,
+        unit=TaxonomyUnit.pure(),
+        decimals="INF",
+    )
+
+    writer = TaxonomyXbrlWriter()
+
+    element = writer.fact_element(
+        fact=fact,
+        context_id="ctx-2025",
+        unit_id="PURE",
+        namespace=namespace,
+    )
+
+    assert element.tag == (
+        f"{{{namespace}}}"
+        "genInfo.company.id.shareholder.currentnumber"
+    )
+    assert element.text == "1"
+    assert element.get("contextRef") == "ctx-2025"
+    assert element.get("unitRef") == "PURE"
+    assert element.get("decimals") == "INF"
+    
+

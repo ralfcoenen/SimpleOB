@@ -1,6 +1,7 @@
 """Tests für das GCD-Report-Element-Tuple."""
-import pytest
 from datetime import date
+
+import pytest
 
 from openbilanz.taxonomy.concept import (
     TaxonomyBalance,
@@ -12,7 +13,6 @@ from openbilanz.taxonomy.gcd_report_element import (
     GcdReportElement,
 )
 from openbilanz.taxonomy.text_fact import TaxonomyTextFact
-
 
 TEST_ENTITY_SCHEME = (
     "http://www.bundesfinanzministerium.de"

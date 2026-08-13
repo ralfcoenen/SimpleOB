@@ -14,17 +14,21 @@ from openbilanz.taxonomy.concept import (
 from openbilanz.taxonomy.context import TaxonomyContext
 from openbilanz.taxonomy.entry_point import TaxonomyEntryPoint
 from openbilanz.taxonomy.fact import TaxonomyFact
+from openbilanz.taxonomy.gcd_company_id_no import (
+    GcdCompanyIdNo,
+)
+from openbilanz.taxonomy.gcd_report_element import (
+    GcdReportElement,
+)
+from openbilanz.taxonomy.gcd_shareholder_tuple import (
+    GcdShareDivideKeyTuple,
+    GcdShareholderLegalStatusTuple,
+    GcdShareholderTuple,
+)
 from openbilanz.taxonomy.resolver import TaxonomyResolver
 from openbilanz.taxonomy.taxonomy import TaxonomyVersion
 from openbilanz.taxonomy.text_fact import TaxonomyTextFact
 from openbilanz.taxonomy.unit import TaxonomyUnit
-
-from openbilanz.taxonomy.gcd_report_element import (
-    GcdReportElement,
-)
-from openbilanz.taxonomy.gcd_company_id_no import (
-    GcdCompanyIdNo,
-)
 
 DE_GAAP_CI_NAMESPACE = (
     "http://www.xbrl.de/taxonomies/"
@@ -424,3 +428,135 @@ def test_xbrl_exporter_includes_gcd_company_id_no() -> None:
     assert "1234567890123" in xml
     assert 'contextRef="ctx-2025"' in xml
     
+def test_xbrl_exporter_includes_gcd_shareholder() -> None:
+    """Der Exporter übernimmt ein verschachteltes GCD-Gesellschafter-Tuple."""
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    gcd_namespace = (
+        "http://www.xbrl.de/taxonomies/"
+        "de-gcd-2025-04-01"
+    )
+
+    def text_fact(
+        name: str,
+        value: str,
+    ) -> TaxonomyTextFact:
+        return TaxonomyTextFact(
+            concept=TaxonomyConcept(
+                name=name,
+                concept_id="de-gcd_" + name,
+                type_name="xbrli:stringItemType",
+                substitution_group="xbrli:item",
+                period_type=TaxonomyPeriodType.DURATION,
+                balance=TaxonomyBalance.NONE,
+                abstract=False,
+                nillable=True,
+            ),
+            value=value,
+            context=context,
+        )
+
+    shareholder = GcdShareholderTuple(
+        name=text_fact(
+            "genInfo.company.id.shareholder.name",
+            "Mustermann",
+        ),
+        shareholder_id=text_fact(
+            "genInfo.company.id.shareholder.id",
+            "1",
+        ),
+        tax_number=text_fact(
+            "genInfo.company.id.shareholder.taxnumber",
+            "1234567890123",
+        ),
+        tax_id=text_fact(
+            "genInfo.company.id.shareholder.taxid",
+            "12345678901",
+        ),
+        wid=text_fact(
+            "genInfo.company.id.shareholder.WID",
+            "WID-1",
+        ),
+        legal_status=GcdShareholderLegalStatusTuple(
+            fact=text_fact(
+                (
+                    "genInfo.company.id.shareholder."
+                    "legalStatus.legalStatus.NPP"
+                ),
+                "NPP",
+            ),
+        ),
+        share_divide_key=GcdShareDivideKeyTuple(
+            numerator=text_fact(
+                (
+                    "genInfo.company.id.shareholder."
+                    "ShareDivideKey.numerator"
+                ),
+                "25",
+            ),
+            denominator=text_fact(
+                (
+                    "genInfo.company.id.shareholder."
+                    "ShareDivideKey.denominator"
+                ),
+                "100",
+            ),
+        ),
+    )
+
+    exporter = XbrlExporter()
+
+    xml = exporter.export(
+        contexts={
+            "ctx-2025": context,
+        },
+        units={},
+        facts=(),
+        shareholders=(
+            shareholder,
+        ),
+        taxonomy_namespace=gcd_namespace,
+        taxonomy_namespaces={
+            "de-gcd": gcd_namespace,
+        },
+        entry_points=(),
+    )
+
+    assert "genInfo.company.id.shareholder" in xml
+    assert "genInfo.company.id.shareholder.name" in xml
+    assert "Mustermann" in xml
+
+    assert (
+        "genInfo.company.id.shareholder.legalStatus"
+        in xml
+    )
+    assert (
+        "genInfo.company.id.shareholder."
+        "legalStatus.legalStatus.NPP"
+        in xml
+    )
+
+    assert (
+        "genInfo.company.id.shareholder.ShareDivideKey"
+        in xml
+    )
+    assert (
+        "genInfo.company.id.shareholder."
+        "ShareDivideKey.numerator"
+        in xml
+    )
+    assert (
+        "genInfo.company.id.shareholder."
+        "ShareDivideKey.denominator"
+        in xml
+    )
+
+    assert 'contextRef="ctx-2025"' in xml
+

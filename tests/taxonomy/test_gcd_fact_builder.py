@@ -1,7 +1,9 @@
 """Tests für den Aufbau von GCD-Facts."""
-import pytest
 from datetime import date
+from decimal import Decimal
 from uuid import uuid4
+
+import pytest
 
 from openbilanz.domain.company import Company
 from openbilanz.domain.fiscal_year import FiscalYear
@@ -12,32 +14,45 @@ from openbilanz.taxonomy.concept import (
 )
 from openbilanz.taxonomy.concept_set import TaxonomyConceptSet
 from openbilanz.taxonomy.context import TaxonomyContext
+from openbilanz.taxonomy.fact import TaxonomyFact
 from openbilanz.taxonomy.gcd_company_data import GcdCompanyData
+from openbilanz.taxonomy.gcd_company_id_no import (
+    GcdCompanyIdNo,
+)
+from openbilanz.taxonomy.gcd_company_identifiers import (
+    GcdCompanyIdentifiers,
+)
 from openbilanz.taxonomy.gcd_fact_builder import GcdFactBuilder
+from openbilanz.taxonomy.gcd_report_data import (
+    GcdReportData,
+)
+from openbilanz.taxonomy.gcd_report_element import (
+    GcdReportElement,
+)
 from openbilanz.taxonomy.gcd_report_profile import (
     GcdReportProfile,
+)
+from openbilanz.taxonomy.gcd_shareholder import (
+    GcdShareDivideKey,
+    GcdShareholder,
+    GcdShareholderGroup,
+    GcdShareholderLegalStatus,
+)
+from openbilanz.taxonomy.gcd_shareholder_tuple import (
+    GcdShareDivideKeyTuple,
+    GcdShareholderLegalStatusTuple,
+    GcdShareholderTuple,
 )
 from openbilanz.taxonomy.label_set import TaxonomyLabelSet
 from openbilanz.taxonomy.model import TaxonomyModel
 from openbilanz.taxonomy.presentation_set import (
     TaxonomyPresentationSet,
 )
-from openbilanz.taxonomy.text_fact import TaxonomyTextFact
-from openbilanz.taxonomy.gcd_report_element import (
-    GcdReportElement,
-)
 from openbilanz.taxonomy.taxonomy import (
     TaxonomyVersion,
 )
-from openbilanz.taxonomy.gcd_report_data import (
-    GcdReportData,
-)
-from openbilanz.taxonomy.gcd_company_identifiers import (
-    GcdCompanyIdentifiers,
-)
-from openbilanz.taxonomy.gcd_company_id_no import (
-    GcdCompanyIdNo,
-)
+from openbilanz.taxonomy.text_fact import TaxonomyTextFact
+from openbilanz.taxonomy.unit import TaxonomyUnit
 
 TEST_ENTITY_SCHEME = (
     "http://www.bundesfinanzministerium.de"
@@ -1365,4 +1380,494 @@ def test_gcd_fact_builder_omits_optional_company_identifiers() -> None:
             context=context,
         ),
     )
+
+def test_gcd_fact_builder_builds_basic_shareholder_facts() -> None:
+    """Der Builder erzeugt die flachen Basis-Facts eines Gesellschafters."""
+
+    shareholder = GcdShareholder(
+        name="Mustermann",
+        shareholder_id="1",
+        tax_number="1234567890123",
+        tax_id="12345678901",
+        wid="WID-1",
+        legal_status=(
+            GcdShareholderLegalStatus.NATURAL_PERSON
+        ),
+        share_divide_key=GcdShareDivideKey(
+            numerator="25",
+            denominator="100",
+        ),
+    )
+
+    concept_names = (
+        "genInfo.company.id.shareholder.name",
+        "genInfo.company.id.shareholder.id",
+        "genInfo.company.id.shareholder.taxnumber",
+        "genInfo.company.id.shareholder.taxid",
+        "genInfo.company.id.shareholder.WID",
+    )
+
+    concepts = tuple(
+        TaxonomyConcept(
+            name=name,
+            concept_id="de-gcd_" + name,
+            type_name="xbrli:stringItemType",
+            substitution_group="xbrli:item",
+            period_type=TaxonomyPeriodType.DURATION,
+            balance=TaxonomyBalance.NONE,
+            abstract=False,
+            nillable=True,
+        )
+        for name in concept_names
+    )
+
+    taxonomy_model = _taxonomy_model(
+        *concepts
+    )
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    builder = GcdFactBuilder()
+
+    facts = builder.shareholder_facts(
+        shareholder=shareholder,
+        taxonomy_model=taxonomy_model,
+        context=context,
+    )
+
+    assert len(facts) == 5
+
+    values_by_name = {
+        fact.concept.name: fact.value
+        for fact in facts
+    }
+
+    assert values_by_name == {
+        "genInfo.company.id.shareholder.name": (
+            "Mustermann"
+        ),
+        "genInfo.company.id.shareholder.id": (
+            "1"
+        ),
+        "genInfo.company.id.shareholder.taxnumber": (
+            "1234567890123"
+        ),
+        "genInfo.company.id.shareholder.taxid": (
+            "12345678901"
+        ),
+        "genInfo.company.id.shareholder.WID": (
+            "WID-1"
+        ),
+    }
+
+def test_gcd_fact_builder_builds_shareholder_group_fact() -> None:
+    """Der Builder ergänzt die ausgewählte Gesellschaftergruppe."""
+
+    shareholder = GcdShareholder(
+        name="Mustermann",
+        shareholder_id="1",
+        tax_number="1234567890123",
+        tax_id="12345678901",
+        wid="WID-1",
+        group=GcdShareholderGroup.LIMITED,
+        legal_status=(
+            GcdShareholderLegalStatus.NATURAL_PERSON
+        ),
+        share_divide_key=GcdShareDivideKey(
+            numerator="25",
+            denominator="100",
+        ),
+    )
+
+    concept_names = (
+        "genInfo.company.id.shareholder.name",
+        "genInfo.company.id.shareholder.id",
+        "genInfo.company.id.shareholder.taxnumber",
+        "genInfo.company.id.shareholder.taxid",
+        "genInfo.company.id.shareholder.WID",
+        "genInfo.company.id.shareholder.group.limPartner",
+    )
+
+    concepts = tuple(
+        TaxonomyConcept(
+            name=name,
+            concept_id="de-gcd_" + name,
+            type_name="xbrli:stringItemType",
+            substitution_group="xbrli:item",
+            period_type=TaxonomyPeriodType.DURATION,
+            balance=TaxonomyBalance.NONE,
+            abstract=False,
+            nillable=True,
+        )
+        for name in concept_names
+    )
+
+    taxonomy_model = _taxonomy_model(
+        *concepts
+    )
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    builder = GcdFactBuilder()
+
+    facts = builder.shareholder_facts(
+        shareholder=shareholder,
+        taxonomy_model=taxonomy_model,
+        context=context,
+    )
+
+    assert len(facts) == 6
+
+    values_by_name = {
+        fact.concept.name: fact.value
+        for fact in facts
+    }
+
+    assert (
+        values_by_name[
+            "genInfo.company.id.shareholder.group.limPartner"
+        ]
+        == "limPartner"
+    )
+
+def test_gcd_fact_builder_builds_shareholder_legal_status() -> None:
+    """Der Builder erzeugt das Legal-Status-Tuple eines Gesellschafters."""
+
+    shareholder = GcdShareholder(
+        name="Mustermann",
+        shareholder_id="1",
+        tax_number="1234567890123",
+        tax_id="12345678901",
+        wid="WID-1",
+        legal_status=(
+            GcdShareholderLegalStatus.NATURAL_PERSON
+        ),
+        share_divide_key=GcdShareDivideKey(
+            numerator="25",
+            denominator="100",
+        ),
+    )
+
+    concept_name = (
+        "genInfo.company.id.shareholder."
+        "legalStatus.legalStatus.NPP"
+    )
+
+    concept = TaxonomyConcept(
+        name=concept_name,
+        concept_id="de-gcd_" + concept_name,
+        type_name="xbrli:stringItemType",
+        substitution_group="xbrli:item",
+        period_type=TaxonomyPeriodType.DURATION,
+        balance=TaxonomyBalance.NONE,
+        abstract=False,
+        nillable=True,
+    )
+
+    taxonomy_model = _taxonomy_model(
+        concept
+    )
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    builder = GcdFactBuilder()
+
+    result = builder.shareholder_legal_status(
+        shareholder=shareholder,
+        taxonomy_model=taxonomy_model,
+        context=context,
+    )
+
+    assert isinstance(
+        result,
+        GcdShareholderLegalStatusTuple,
+    )
+
+    assert result.fact.concept.name == concept_name
+    assert result.fact.value == "NPP"
+    assert result.fact.context == context
+    
+def test_gcd_fact_builder_builds_shareholder_share_divide_key() -> None:
+    """Der Builder erzeugt das Beteiligungsquoten-Tuple."""
+
+    shareholder = GcdShareholder(
+        name="Mustermann",
+        shareholder_id="1",
+        tax_number="1234567890123",
+        tax_id="12345678901",
+        wid="WID-1",
+        legal_status=(
+            GcdShareholderLegalStatus.NATURAL_PERSON
+        ),
+        share_divide_key=GcdShareDivideKey(
+            numerator="25",
+            denominator="100",
+        ),
+    )
+
+    numerator_name = (
+        "genInfo.company.id.shareholder."
+        "ShareDivideKey.numerator"
+    )
+
+    denominator_name = (
+        "genInfo.company.id.shareholder."
+        "ShareDivideKey.denominator"
+    )
+
+    concepts = (
+        TaxonomyConcept(
+            name=numerator_name,
+            concept_id="de-gcd_" + numerator_name,
+            type_name="xbrli:stringItemType",
+            substitution_group="xbrli:item",
+            period_type=TaxonomyPeriodType.DURATION,
+            balance=TaxonomyBalance.NONE,
+            abstract=False,
+            nillable=True,
+        ),
+        TaxonomyConcept(
+            name=denominator_name,
+            concept_id="de-gcd_" + denominator_name,
+            type_name="xbrli:stringItemType",
+            substitution_group="xbrli:item",
+            period_type=TaxonomyPeriodType.DURATION,
+            balance=TaxonomyBalance.NONE,
+            abstract=False,
+            nillable=True,
+        ),
+    )
+
+    taxonomy_model = _taxonomy_model(
+        *concepts
+    )
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    builder = GcdFactBuilder()
+
+    result = builder.shareholder_share_divide_key(
+        shareholder=shareholder,
+        taxonomy_model=taxonomy_model,
+        context=context,
+    )
+
+    assert isinstance(
+        result,
+        GcdShareDivideKeyTuple,
+    )
+
+    assert (
+        result.numerator.concept.name
+        == numerator_name
+    )
+    assert result.numerator.value == "25"
+    assert result.numerator.context == context
+
+    assert (
+        result.denominator.concept.name
+        == denominator_name
+    )
+    assert result.denominator.value == "100"
+    assert result.denominator.context == context
+
+
+def test_gcd_fact_builder_builds_shareholder_current_number() -> None:
+    """Der Builder erzeugt currentnumber als numerischen Fact."""
+
+    shareholder = GcdShareholder(
+        name="Mustermann",
+        shareholder_id="1",
+        tax_number="1234567890123",
+        tax_id="12345678901",
+        wid="WID-1",
+        legal_status=(
+            GcdShareholderLegalStatus.NATURAL_PERSON
+        ),
+        share_divide_key=GcdShareDivideKey(
+            numerator="25",
+            denominator="100",
+        ),
+        current_number=1,
+    )
+
+    concept_name = (
+        "genInfo.company.id.shareholder.currentnumber"
+    )
+
+    concept = TaxonomyConcept(
+        name=concept_name,
+        concept_id="de-gcd_" + concept_name,
+        type_name="xbrli:positiveIntegerItemType",
+        substitution_group="xbrli:item",
+        period_type=TaxonomyPeriodType.DURATION,
+        balance=TaxonomyBalance.NONE,
+        abstract=False,
+        nillable=True,
+    )
+
+    taxonomy_model = _taxonomy_model(
+        concept
+    )
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    builder = GcdFactBuilder()
+
+    result = builder.shareholder_current_number(
+        shareholder=shareholder,
+        taxonomy_model=taxonomy_model,
+        context=context,
+    )
+
+    assert isinstance(
+        result,
+        TaxonomyFact,
+    )
+
+    assert result.concept.name == concept_name
+    assert result.amount == Decimal("1")
+    assert result.context == context
+    assert result.unit == TaxonomyUnit.pure()
+    assert result.decimals == "INF"
+    
+def test_gcd_fact_builder_builds_shareholder_tuple() -> None:
+    """Der Builder setzt die Gesellschafter-Bausteine zum Tuple zusammen."""
+
+    shareholder = GcdShareholder(
+        name="Mustermann",
+        shareholder_id="1",
+        tax_number="1234567890123",
+        tax_id="12345678901",
+        wid="WID-1",
+        group=GcdShareholderGroup.LIMITED,
+        legal_status=(
+            GcdShareholderLegalStatus.NATURAL_PERSON
+        ),
+        share_divide_key=GcdShareDivideKey(
+            numerator="25",
+            denominator="100",
+        ),
+        current_number=1,
+    )
+
+    concept_names = (
+        "genInfo.company.id.shareholder.name",
+        "genInfo.company.id.shareholder.id",
+        "genInfo.company.id.shareholder.taxnumber",
+        "genInfo.company.id.shareholder.taxid",
+        "genInfo.company.id.shareholder.WID",
+        "genInfo.company.id.shareholder.group.limPartner",
+        (
+            "genInfo.company.id.shareholder."
+            "legalStatus.legalStatus.NPP"
+        ),
+        (
+            "genInfo.company.id.shareholder."
+            "ShareDivideKey.numerator"
+        ),
+        (
+            "genInfo.company.id.shareholder."
+            "ShareDivideKey.denominator"
+        ),
+        "genInfo.company.id.shareholder.currentnumber",
+    )
+
+    concepts = tuple(
+        TaxonomyConcept(
+            name=name,
+            concept_id="de-gcd_" + name,
+            type_name=(
+                "xbrli:positiveIntegerItemType"
+                if name.endswith("currentnumber")
+                else "xbrli:stringItemType"
+            ),
+            substitution_group="xbrli:item",
+            period_type=TaxonomyPeriodType.DURATION,
+            balance=TaxonomyBalance.NONE,
+            abstract=False,
+            nillable=True,
+        )
+        for name in concept_names
+    )
+
+    taxonomy_model = _taxonomy_model(
+        *concepts
+    )
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    builder = GcdFactBuilder()
+
+    result = builder.shareholder(
+        shareholder=shareholder,
+        taxonomy_model=taxonomy_model,
+        context=context,
+    )
+
+    assert isinstance(
+        result,
+        GcdShareholderTuple,
+    )
+
+    assert result.name.value == "Mustermann"
+    assert result.shareholder_id.value == "1"
+    assert result.tax_number.value == "1234567890123"
+    assert result.tax_id.value == "12345678901"
+    assert result.wid.value == "WID-1"
+
+    assert result.group is not None
+    assert result.group.value == "limPartner"
+
+    assert result.legal_status.fact.value == "NPP"
+
+    assert (
+        result.share_divide_key.numerator.value
+        == "25"
+    )
+    assert (
+        result.share_divide_key.denominator.value
+        == "100"
+    )
+
+    assert result.current_number is not None
+    assert result.current_number.amount == Decimal("1")
+    assert result.current_number.unit == TaxonomyUnit.pure()
+    assert result.current_number.decimals == "INF"
     

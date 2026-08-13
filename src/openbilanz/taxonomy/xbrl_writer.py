@@ -6,15 +6,17 @@ from openbilanz.taxonomy.concept import TaxonomyPeriodType
 from openbilanz.taxonomy.context import TaxonomyContext
 from openbilanz.taxonomy.entry_point import TaxonomyEntryPoint
 from openbilanz.taxonomy.fact import TaxonomyFact
-from openbilanz.taxonomy.text_fact import TaxonomyTextFact
-from openbilanz.taxonomy.unit import TaxonomyUnit
-
-from openbilanz.taxonomy.gcd_report_element import (
-    GcdReportElement,
-)
 from openbilanz.taxonomy.gcd_company_id_no import (
     GcdCompanyIdNo,
 )
+from openbilanz.taxonomy.gcd_report_element import (
+    GcdReportElement,
+)
+from openbilanz.taxonomy.gcd_shareholder_tuple import (
+    GcdShareholderTuple,
+)
+from openbilanz.taxonomy.text_fact import TaxonomyTextFact
+from openbilanz.taxonomy.unit import TaxonomyUnit
 
 XBRLI_NAMESPACE = "http://www.xbrl.org/2003/instance"
 ISO4217_NAMESPACE = "http://www.xbrl.org/2003/iso4217"
@@ -218,6 +220,154 @@ class TaxonomyXbrlWriter:
 
         return element
     
+    def gcd_shareholder_element(
+        self,
+        *,
+        shareholder: GcdShareholderTuple,
+        context_id: str,
+        namespace: str,
+        pure_unit_id: str | None = None,
+    ) -> ET.Element:
+        """Erzeugt ein verschachteltes GCD-Gesellschafter-Tuple."""
+
+        if not isinstance(
+            shareholder,
+            GcdShareholderTuple,
+        ):
+            raise TypeError(
+                "shareholder must be a GcdShareholderTuple"
+            )
+
+        element = ET.Element(
+            f"{{{namespace}}}"
+            "genInfo.company.id.shareholder"
+        )
+
+        def append_text_fact(
+            parent: ET.Element,
+            fact: TaxonomyTextFact | None,
+        ) -> None:
+            if fact is None:
+                return
+
+            parent.append(
+                self.text_fact_element(
+                    fact=fact,
+                    context_id=context_id,
+                    namespace=namespace,
+                )
+            )
+
+        append_text_fact(
+            element,
+            shareholder.name,
+        )
+
+        append_text_fact(
+            element,
+            shareholder.first_name,
+        )
+
+        append_text_fact(
+            element,
+            shareholder.shareholder_id,
+        )
+
+        if shareholder.group is not None:
+            group_element = ET.Element(
+                f"{{{namespace}}}"
+                "genInfo.company.id.shareholder.group"
+            )
+
+            append_text_fact(
+                group_element,
+                shareholder.group,
+            )
+
+            element.append(
+                group_element
+            )
+
+        if shareholder.current_number is not None:
+            if pure_unit_id is None:
+                raise ValueError(
+                    "pure_unit_id is required for current_number"
+                )
+
+            element.append(
+                self.fact_element(
+                    fact=shareholder.current_number,
+                    context_id=context_id,
+                    unit_id=pure_unit_id,
+                    namespace=namespace,
+                )
+            )
+
+        append_text_fact(
+            element,
+            shareholder.signer_id,
+        )
+
+        append_text_fact(
+            element,
+            shareholder.tax_number,
+        )
+
+        append_text_fact(
+            element,
+            shareholder.tax_id,
+        )
+
+        append_text_fact(
+            element,
+            shareholder.wid,
+        )
+
+        legal_status_element = ET.Element(
+            f"{{{namespace}}}"
+            "genInfo.company.id.shareholder.legalStatus"
+        )
+
+        append_text_fact(
+            legal_status_element,
+            shareholder.legal_status.fact,
+        )
+
+        element.append(
+            legal_status_element
+        )
+
+        share_divide_key_element = ET.Element(
+            f"{{{namespace}}}"
+            "genInfo.company.id.shareholder.ShareDivideKey"
+        )
+
+        append_text_fact(
+            share_divide_key_element,
+            shareholder.share_divide_key.numerator,
+        )
+
+        append_text_fact(
+            share_divide_key_element,
+            shareholder.share_divide_key.denominator,
+        )
+
+        element.append(
+            share_divide_key_element
+        )
+
+        append_text_fact(
+            element,
+            shareholder.special_balance_required,
+        )
+
+        append_text_fact(
+            element,
+            shareholder.extension_required,
+        )
+
+        return element
+    
     def instance_element(
         self,
         contexts: dict[str, TaxonomyContext],
@@ -231,6 +381,7 @@ class TaxonomyXbrlWriter:
         taxonomy_namespaces: dict[str, str] | None = None,
         report_elements: tuple[GcdReportElement, ...] = (),
         company_id_nos: tuple[GcdCompanyIdNo, ...] = (),
+        shareholders: tuple[GcdShareholderTuple, ...] = (),
     ) -> ET.Element:
         """Erzeugt das Root-Element einer XBRL-Instanz."""
 
@@ -347,6 +498,35 @@ class TaxonomyXbrlWriter:
                     namespace=namespace,
                 )
             )
+        
+        for shareholder in shareholders:
+            context_id = self.context_id_for(
+                context=shareholder.name.context,
+                contexts=contexts,
+            )
+
+            namespace = self.namespace_for(
+                concept_id=shareholder.name.concept.concept_id,
+                taxonomy_namespace=taxonomy_namespace,
+                taxonomy_namespaces=taxonomy_namespaces,
+            )
+
+            pure_unit_id = None
+
+            if shareholder.current_number is not None:
+                pure_unit_id = self.unit_id_for(
+                    unit=shareholder.current_number.unit,
+                    units=units,
+                )
+
+            root.append(
+                self.gcd_shareholder_element(
+                    shareholder=shareholder,
+                    context_id=context_id,
+                    namespace=namespace,
+                    pure_unit_id=pure_unit_id,
+                )
+            )        
         
         return root
 

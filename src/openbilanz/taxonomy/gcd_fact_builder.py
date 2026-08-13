@@ -1,32 +1,41 @@
 """Aufbau von GCD-Werten aus Unternehmensstammdaten."""
 
 from datetime import date
+from decimal import Decimal
 
 from openbilanz.domain.fiscal_year import FiscalYear
 from openbilanz.taxonomy.context import TaxonomyContext
+from openbilanz.taxonomy.fact import TaxonomyFact
 from openbilanz.taxonomy.gcd_company_data import GcdCompanyData
-from openbilanz.taxonomy.model import TaxonomyModel
-from openbilanz.taxonomy.text_fact import TaxonomyTextFact
-
-from openbilanz.taxonomy.gcd_report_profile import (
-    GcdReportProfile,
-)
-
-from openbilanz.taxonomy.gcd_report_element import (
-    GcdReportElement,
-)
-from openbilanz.taxonomy.taxonomy import (
-    TaxonomyVersion,
-)
-from openbilanz.taxonomy.gcd_report_data import (
-    GcdReportData,
-)
 from openbilanz.taxonomy.gcd_company_id_no import (
     GcdCompanyIdNo,
 )
 from openbilanz.taxonomy.gcd_company_identifiers import (
     GcdCompanyIdentifiers,
 )
+from openbilanz.taxonomy.gcd_report_data import (
+    GcdReportData,
+)
+from openbilanz.taxonomy.gcd_report_element import (
+    GcdReportElement,
+)
+from openbilanz.taxonomy.gcd_report_profile import (
+    GcdReportProfile,
+)
+from openbilanz.taxonomy.gcd_shareholder import (
+    GcdShareholder,
+)
+from openbilanz.taxonomy.gcd_shareholder_tuple import (
+    GcdShareDivideKeyTuple,
+    GcdShareholderLegalStatusTuple,
+    GcdShareholderTuple,
+)
+from openbilanz.taxonomy.model import TaxonomyModel
+from openbilanz.taxonomy.taxonomy import (
+    TaxonomyVersion,
+)
+from openbilanz.taxonomy.text_fact import TaxonomyTextFact
+from openbilanz.taxonomy.unit import TaxonomyUnit
 
 
 class GcdFactBuilder:
@@ -640,4 +649,409 @@ class GcdFactBuilder:
 
         return GcdCompanyIdNo(
             facts=tuple(facts)
+        )
+        
+    def shareholder_facts(
+        self,
+        *,
+        shareholder: GcdShareholder,
+        taxonomy_model: TaxonomyModel,
+        context: TaxonomyContext,
+    ) -> tuple[TaxonomyTextFact, ...]:
+        """Erzeugt die flachen Basis-Facts eines Gesellschafters."""
+
+        if not isinstance(
+            shareholder,
+            GcdShareholder,
+        ):
+            raise TypeError(
+                "shareholder must be a GcdShareholder"
+            )
+
+        if not isinstance(
+            taxonomy_model,
+            TaxonomyModel,
+        ):
+            raise TypeError(
+                "taxonomy_model must be a TaxonomyModel"
+            )
+
+        if not isinstance(
+            context,
+            TaxonomyContext,
+        ):
+            raise TypeError(
+                "context must be a TaxonomyContext"
+            )
+
+        values = [
+            (
+                "genInfo.company.id.shareholder.name",
+                shareholder.name,
+            ),
+            (
+                "genInfo.company.id.shareholder.id",
+                shareholder.shareholder_id,
+            ),
+            (
+                "genInfo.company.id.shareholder.taxnumber",
+                shareholder.tax_number,
+            ),
+            (
+                "genInfo.company.id.shareholder.taxid",
+                shareholder.tax_id,
+            ),
+            (
+                "genInfo.company.id.shareholder.WID",
+                shareholder.wid,
+            ),
+        ]
+
+        if shareholder.group is not None:
+            values.append(
+                (
+                    (
+                        "genInfo.company.id.shareholder.group."
+                        f"{shareholder.group.value}"
+                    ),
+                    shareholder.group.value,
+                )
+            )
+
+        concepts_by_name = {
+            concept.name: concept
+            for concept in taxonomy_model.concepts.concepts
+        }
+
+        facts: list[TaxonomyTextFact] = []
+
+        for concept_name, value in values:
+            concept = concepts_by_name.get(
+                concept_name
+            )
+
+            if concept is None:
+                raise ValueError(
+                    "GCD taxonomy concept not found: "
+                    f"{concept_name}"
+                )
+
+            facts.append(
+                TaxonomyTextFact(
+                    concept=concept,
+                    value=value,
+                    context=context,
+                )
+            )
+
+        return tuple(facts)    
+
+    def shareholder_legal_status(
+        self,
+        *,
+        shareholder: GcdShareholder,
+        taxonomy_model: TaxonomyModel,
+        context: TaxonomyContext,
+    ) -> GcdShareholderLegalStatusTuple:
+        """Erzeugt das Legal-Status-Tuple eines Gesellschafters."""
+
+        if not isinstance(
+            shareholder,
+            GcdShareholder,
+        ):
+            raise TypeError(
+                "shareholder must be a GcdShareholder"
+            )
+
+        if not isinstance(
+            taxonomy_model,
+            TaxonomyModel,
+        ):
+            raise TypeError(
+                "taxonomy_model must be a TaxonomyModel"
+            )
+
+        if not isinstance(
+            context,
+            TaxonomyContext,
+        ):
+            raise TypeError(
+                "context must be a TaxonomyContext"
+            )
+
+        concept_name = (
+            "genInfo.company.id.shareholder."
+            "legalStatus.legalStatus."
+            f"{shareholder.legal_status.value}"
+        )
+
+        concepts_by_name = {
+            concept.name: concept
+            for concept in taxonomy_model.concepts.concepts
+        }
+
+        concept = concepts_by_name.get(
+            concept_name
+        )
+
+        if concept is None:
+            raise ValueError(
+                "GCD taxonomy concept not found: "
+                f"{concept_name}"
+            )
+
+        fact = TaxonomyTextFact(
+            concept=concept,
+            value=shareholder.legal_status.value,
+            context=context,
+        )
+
+        return GcdShareholderLegalStatusTuple(
+            fact=fact,
+        )    
+    
+    def shareholder_share_divide_key(
+        self,
+        *,
+        shareholder: GcdShareholder,
+        taxonomy_model: TaxonomyModel,
+        context: TaxonomyContext,
+    ) -> GcdShareDivideKeyTuple:
+        """Erzeugt das ShareDivideKey-Tuple eines Gesellschafters."""
+
+        if not isinstance(
+            shareholder,
+            GcdShareholder,
+        ):
+            raise TypeError(
+                "shareholder must be a GcdShareholder"
+            )
+
+        if not isinstance(
+            taxonomy_model,
+            TaxonomyModel,
+        ):
+            raise TypeError(
+                "taxonomy_model must be a TaxonomyModel"
+            )
+
+        if not isinstance(
+            context,
+            TaxonomyContext,
+        ):
+            raise TypeError(
+                "context must be a TaxonomyContext"
+            )
+
+        numerator_name = (
+            "genInfo.company.id.shareholder."
+            "ShareDivideKey.numerator"
+        )
+
+        denominator_name = (
+            "genInfo.company.id.shareholder."
+            "ShareDivideKey.denominator"
+        )
+
+        concepts_by_name = {
+            concept.name: concept
+            for concept in taxonomy_model.concepts.concepts
+        }
+
+        numerator_concept = concepts_by_name.get(
+            numerator_name
+        )
+
+        if numerator_concept is None:
+            raise ValueError(
+                "GCD taxonomy concept not found: "
+                f"{numerator_name}"
+            )
+
+        denominator_concept = concepts_by_name.get(
+            denominator_name
+        )
+
+        if denominator_concept is None:
+            raise ValueError(
+                "GCD taxonomy concept not found: "
+                f"{denominator_name}"
+            )
+
+        numerator_fact = TaxonomyTextFact(
+            concept=numerator_concept,
+            value=shareholder.share_divide_key.numerator,
+            context=context,
+        )
+
+        denominator_fact = TaxonomyTextFact(
+            concept=denominator_concept,
+            value=shareholder.share_divide_key.denominator,
+            context=context,
+        )
+
+        return GcdShareDivideKeyTuple(
+            numerator=numerator_fact,
+            denominator=denominator_fact,
+        )
+        
+    def shareholder_current_number(
+        self,
+        *,
+        shareholder: GcdShareholder,
+        taxonomy_model: TaxonomyModel,
+        context: TaxonomyContext,
+    ) -> TaxonomyFact:
+        """Erzeugt currentnumber als numerischen Gesellschafter-Fact."""
+
+        if not isinstance(
+            shareholder,
+            GcdShareholder,
+        ):
+            raise TypeError(
+                "shareholder must be a GcdShareholder"
+            )
+
+        if not isinstance(
+            taxonomy_model,
+            TaxonomyModel,
+        ):
+            raise TypeError(
+                "taxonomy_model must be a TaxonomyModel"
+            )
+
+        if not isinstance(
+            context,
+            TaxonomyContext,
+        ):
+            raise TypeError(
+                "context must be a TaxonomyContext"
+            )
+
+        if shareholder.current_number is None:
+            raise ValueError(
+                "shareholder.current_number must not be None"
+            )
+
+        concept_name = (
+            "genInfo.company.id.shareholder.currentnumber"
+        )
+
+        concepts_by_name = {
+            concept.name: concept
+            for concept in taxonomy_model.concepts.concepts
+        }
+
+        concept = concepts_by_name.get(
+            concept_name
+        )
+
+        if concept is None:
+            raise ValueError(
+                "GCD taxonomy concept not found: "
+                f"{concept_name}"
+            )
+
+        return TaxonomyFact(
+            concept=concept,
+            amount=Decimal(
+                shareholder.current_number
+            ),
+            context=context,
+            unit=TaxonomyUnit.pure(),
+            decimals="INF",
+        )
+        
+    def shareholder(
+        self,
+        *,
+        shareholder: GcdShareholder,
+        taxonomy_model: TaxonomyModel,
+        context: TaxonomyContext,
+    ) -> GcdShareholderTuple:
+        """Setzt die Gesellschafter-Bausteine zum GCD-Tuple zusammen."""
+
+        if not isinstance(
+            shareholder,
+            GcdShareholder,
+        ):
+            raise TypeError(
+                "shareholder must be a GcdShareholder"
+            )
+
+        if not isinstance(
+            taxonomy_model,
+            TaxonomyModel,
+        ):
+            raise TypeError(
+                "taxonomy_model must be a TaxonomyModel"
+            )
+
+        if not isinstance(
+            context,
+            TaxonomyContext,
+        ):
+            raise TypeError(
+                "context must be a TaxonomyContext"
+            )
+
+        flat_facts = self.shareholder_facts(
+            shareholder=shareholder,
+            taxonomy_model=taxonomy_model,
+            context=context,
+        )
+
+        facts_by_name = {
+            fact.concept.name: fact
+            for fact in flat_facts
+        }
+
+        legal_status = self.shareholder_legal_status(
+            shareholder=shareholder,
+            taxonomy_model=taxonomy_model,
+            context=context,
+        )
+
+        share_divide_key = self.shareholder_share_divide_key(
+            shareholder=shareholder,
+            taxonomy_model=taxonomy_model,
+            context=context,
+        )
+
+        current_number = None
+
+        if shareholder.current_number is not None:
+            current_number = self.shareholder_current_number(
+                shareholder=shareholder,
+                taxonomy_model=taxonomy_model,
+                context=context,
+            )
+
+        return GcdShareholderTuple(
+            name=facts_by_name[
+                "genInfo.company.id.shareholder.name"
+            ],
+            shareholder_id=facts_by_name[
+                "genInfo.company.id.shareholder.id"
+            ],
+            tax_number=facts_by_name[
+                "genInfo.company.id.shareholder.taxnumber"
+            ],
+            tax_id=facts_by_name[
+                "genInfo.company.id.shareholder.taxid"
+            ],
+            wid=facts_by_name[
+                "genInfo.company.id.shareholder.WID"
+            ],
+            legal_status=legal_status,
+            share_divide_key=share_divide_key,
+            group=facts_by_name.get(
+                (
+                    "genInfo.company.id.shareholder.group."
+                    f"{shareholder.group.value}"
+                )
+                if shareholder.group is not None
+                else ""
+            ),
+            current_number=current_number,
         )
