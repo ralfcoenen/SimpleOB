@@ -9,6 +9,10 @@ from openbilanz.taxonomy.fact import TaxonomyFact
 from openbilanz.taxonomy.text_fact import TaxonomyTextFact
 from openbilanz.taxonomy.unit import TaxonomyUnit
 
+from openbilanz.taxonomy.gcd_report_element import (
+    GcdReportElement,
+)
+
 XBRLI_NAMESPACE = "http://www.xbrl.org/2003/instance"
 ISO4217_NAMESPACE = "http://www.xbrl.org/2003/iso4217"
 LINK_NAMESPACE = "http://www.xbrl.org/2003/linkbase"
@@ -145,6 +149,39 @@ class TaxonomyXbrlWriter:
 
         return element
     
+    def gcd_report_element_element(
+        self,
+        *,
+        report_element: GcdReportElement,
+        context_id: str,
+        namespace: str,
+    ) -> ET.Element:
+        """Erzeugt das GCD-Report-Element als XBRL-Tuple."""
+
+        if not isinstance(
+            report_element,
+            GcdReportElement,
+        ):
+            raise TypeError(
+                "report_element must be a GcdReportElement"
+            )
+
+        element = ET.Element(
+            f"{{{namespace}}}"
+            "genInfo.report.id.reportElement"
+        )
+
+        for fact in report_element.facts:
+            element.append(
+                self.text_fact_element(
+                    fact=fact,
+                    context_id=context_id,
+                    namespace=namespace,
+                )
+            )
+
+        return element
+    
     def instance_element(
         self,
         contexts: dict[str, TaxonomyContext],
@@ -156,6 +193,7 @@ class TaxonomyXbrlWriter:
         taxonomy_namespace: str,
         entry_points: tuple[TaxonomyEntryPoint, ...],
         taxonomy_namespaces: dict[str, str] | None = None,
+        report_elements: tuple[GcdReportElement, ...] = (),
     ) -> ET.Element:
         """Erzeugt das Root-Element einer XBRL-Instanz."""
 
@@ -219,6 +257,31 @@ class TaxonomyXbrlWriter:
                         unit=fact.unit,
                         units=units,
                     ),
+                    namespace=namespace,
+                )
+            )
+        
+        for report_element in report_elements:
+            if not report_element.facts:
+                continue
+
+            first_fact = report_element.facts[0]
+
+            context_id = self.context_id_for(
+                context=first_fact.context,
+                contexts=contexts,
+            )
+
+            namespace = self.namespace_for(
+                concept_id=first_fact.concept.concept_id,
+                taxonomy_namespace=taxonomy_namespace,
+                taxonomy_namespaces=taxonomy_namespaces,
+            )
+
+            root.append(
+                self.gcd_report_element_element(
+                    report_element=report_element,
+                    context_id=context_id,
                     namespace=namespace,
                 )
             )

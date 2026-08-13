@@ -12,6 +12,12 @@ class GcdCompanyData:
     company: Company
     tax_number: str
     legal_form: str
+    street: str = ""
+    house_number: str = ""
+    postal_code: str = ""
+    city: str = ""
+    country: str = ""
+    business: str = ""
 
     def __post_init__(self) -> None:
         if not isinstance(
@@ -43,7 +49,6 @@ class GcdCompanyData:
                 "tax_number must contain exactly 13 digits"
             )
 
-
         if not isinstance(
             self.legal_form,
             str,
@@ -57,3 +62,4 @@ class GcdCompanyData:
                 "legal_form must not be blank"
             )
             
+        

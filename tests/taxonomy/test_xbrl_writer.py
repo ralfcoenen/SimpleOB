@@ -18,6 +18,11 @@ from openbilanz.taxonomy.text_fact import TaxonomyTextFact
 from openbilanz.taxonomy.unit import TaxonomyUnit
 from openbilanz.taxonomy.xbrl_writer import TaxonomyXbrlWriter
 
+from openbilanz.taxonomy.gcd_report_element import (
+    GcdReportElement,
+)
+
+
 DE_GAAP_CI_NAMESPACE = (
     "http://www.xbrl.de/taxonomies/"
     "de-gaap-ci-2024-04-01"
@@ -1241,3 +1246,239 @@ def test_xbrl_writer_builds_instance_with_multiple_taxonomy_namespaces() -> None
 
     assert gaap_element is not None
     assert gaap_element.text == "15000.00"
+
+
+def test_xbrl_writer_serializes_gcd_report_element_tuple() -> None:
+    """GCD-Berichtsbestandteile werden innerhalb ihres Tuples serialisiert."""
+
+    gcd_namespace = (
+        "http://www.xbrl.de/taxonomies/"
+        "de-gcd-2025-04-01"
+    )
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    balance_concept = TaxonomyConcept(
+        name=(
+            "genInfo.report.id.reportElement."
+            "reportElements.B"
+        ),
+        concept_id=(
+            "de-gcd_genInfo.report.id.reportElement."
+            "reportElements.B"
+        ),
+        type_name="xbrli:stringItemType",
+        substitution_group=(
+            "de-gcd:"
+            "genInfo.report.id.reportElement."
+            "reportElements.head"
+        ),
+        period_type=TaxonomyPeriodType.DURATION,
+        balance=TaxonomyBalance.NONE,
+        abstract=False,
+        nillable=True,
+    )
+
+    income_statement_concept = TaxonomyConcept(
+        name=(
+            "genInfo.report.id.reportElement."
+            "reportElements.GuV"
+        ),
+        concept_id=(
+            "de-gcd_genInfo.report.id.reportElement."
+            "reportElements.GuV"
+        ),
+        type_name="xbrli:stringItemType",
+        substitution_group=(
+            "de-gcd:"
+            "genInfo.report.id.reportElement."
+            "reportElements.head"
+        ),
+        period_type=TaxonomyPeriodType.DURATION,
+        balance=TaxonomyBalance.NONE,
+        abstract=False,
+        nillable=True,
+    )
+
+    balance_fact = TaxonomyTextFact(
+        concept=balance_concept,
+        value="Bilanz",
+        context=context,
+    )
+
+    income_statement_fact = TaxonomyTextFact(
+        concept=income_statement_concept,
+        value="GuV",
+        context=context,
+    )
+
+    report_element = GcdReportElement(
+        facts=(
+            balance_fact,
+            income_statement_fact,
+        )
+    )
+
+    writer = TaxonomyXbrlWriter()
+
+    element = writer.gcd_report_element_element(
+        report_element=report_element,
+        context_id="ctx-2025",
+        namespace=gcd_namespace,
+    )
+
+    assert element.tag == (
+        f"{{{gcd_namespace}}}"
+        "genInfo.report.id.reportElement"
+    )
+
+    children = list(element)
+
+    assert len(children) == 2
+
+    assert children[0].tag == (
+        f"{{{gcd_namespace}}}"
+        "genInfo.report.id.reportElement."
+        "reportElements.B"
+    )
+    assert children[0].attrib["contextRef"] == "ctx-2025"
+    assert children[0].text == "Bilanz"
+
+    assert children[1].tag == (
+        f"{{{gcd_namespace}}}"
+        "genInfo.report.id.reportElement."
+        "reportElements.GuV"
+    )
+    assert children[1].attrib["contextRef"] == "ctx-2025"
+    assert children[1].text == "GuV"
+
+    assert "contextRef" not in element.attrib
+
+def test_xbrl_writer_includes_gcd_report_element_in_instance() -> None:
+    """Die XBRL-Instanz enthält das GCD-Report-Element als Tuple."""
+
+    gcd_namespace = (
+        "http://www.xbrl.de/taxonomies/"
+        "de-gcd-2025-04-01"
+    )
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    balance_concept = TaxonomyConcept(
+        name=(
+            "genInfo.report.id.reportElement."
+            "reportElements.B"
+        ),
+        concept_id=(
+            "de-gcd_genInfo.report.id.reportElement."
+            "reportElements.B"
+        ),
+        type_name="xbrli:stringItemType",
+        substitution_group=(
+            "de-gcd:"
+            "genInfo.report.id.reportElement."
+            "reportElements.head"
+        ),
+        period_type=TaxonomyPeriodType.DURATION,
+        balance=TaxonomyBalance.NONE,
+        abstract=False,
+        nillable=True,
+    )
+
+    income_statement_concept = TaxonomyConcept(
+        name=(
+            "genInfo.report.id.reportElement."
+            "reportElements.GuV"
+        ),
+        concept_id=(
+            "de-gcd_genInfo.report.id.reportElement."
+            "reportElements.GuV"
+        ),
+        type_name="xbrli:stringItemType",
+        substitution_group=(
+            "de-gcd:"
+            "genInfo.report.id.reportElement."
+            "reportElements.head"
+        ),
+        period_type=TaxonomyPeriodType.DURATION,
+        balance=TaxonomyBalance.NONE,
+        abstract=False,
+        nillable=True,
+    )
+
+    report_element = GcdReportElement(
+        facts=(
+            TaxonomyTextFact(
+                concept=balance_concept,
+                value="Bilanz",
+                context=context,
+            ),
+            TaxonomyTextFact(
+                concept=income_statement_concept,
+                value="GuV",
+                context=context,
+            ),
+        )
+    )
+
+    writer = TaxonomyXbrlWriter()
+
+    root = writer.instance_element(
+        contexts={
+            "ctx-2025": context,
+        },
+        units={},
+        facts=(),
+        taxonomy_namespace=gcd_namespace,
+        taxonomy_namespaces={
+            "de-gcd": gcd_namespace,
+        },
+        entry_points=(),
+        report_elements=(
+            report_element,
+        ),
+    )
+
+    report_elements = root.findall(
+        f"{{{gcd_namespace}}}"
+        "genInfo.report.id.reportElement"
+    )
+
+    assert len(report_elements) == 1
+
+    report_element_xml = report_elements[0]
+
+    assert "contextRef" not in report_element_xml.attrib
+
+    children = list(report_element_xml)
+
+    assert len(children) == 2
+
+    assert children[0].tag == (
+        f"{{{gcd_namespace}}}"
+        "genInfo.report.id.reportElement."
+        "reportElements.B"
+    )
+    assert children[0].attrib["contextRef"] == "ctx-2025"
+    assert children[0].text == "Bilanz"
+
+    assert children[1].tag == (
+        f"{{{gcd_namespace}}}"
+        "genInfo.report.id.reportElement."
+        "reportElements.GuV"
+    )
+    assert children[1].attrib["contextRef"] == "ctx-2025"
+    assert children[1].text == "GuV"
+    

@@ -19,6 +19,10 @@ from openbilanz.taxonomy.taxonomy import TaxonomyVersion
 from openbilanz.taxonomy.text_fact import TaxonomyTextFact
 from openbilanz.taxonomy.unit import TaxonomyUnit
 
+from openbilanz.taxonomy.gcd_report_element import (
+    GcdReportElement,
+)
+
 DE_GAAP_CI_NAMESPACE = (
     "http://www.xbrl.de/taxonomies/"
     "de-gaap-ci-2024-04-01"
@@ -243,3 +247,110 @@ def test_xbrl_exporter_supports_multiple_taxonomy_namespaces() -> None:
         "genInfo.company.id.name"
         in xml
     )
+
+def test_xbrl_exporter_serializes_gcd_report_element() -> None:
+    """Der Exporter reicht GCD-Report-Elemente bis in die XBRL-Ausgabe durch."""
+
+    gcd_namespace = (
+        "http://www.xbrl.de/taxonomies/"
+        "de-gcd-2025-04-01"
+    )
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    balance_concept = TaxonomyConcept(
+        name=(
+            "genInfo.report.id.reportElement."
+            "reportElements.B"
+        ),
+        concept_id=(
+            "de-gcd_genInfo.report.id.reportElement."
+            "reportElements.B"
+        ),
+        type_name="xbrli:stringItemType",
+        substitution_group=(
+            "de-gcd:"
+            "genInfo.report.id.reportElement."
+            "reportElements.head"
+        ),
+        period_type=TaxonomyPeriodType.DURATION,
+        balance=TaxonomyBalance.NONE,
+        abstract=False,
+        nillable=True,
+    )
+
+    income_statement_concept = TaxonomyConcept(
+        name=(
+            "genInfo.report.id.reportElement."
+            "reportElements.GuV"
+        ),
+        concept_id=(
+            "de-gcd_genInfo.report.id.reportElement."
+            "reportElements.GuV"
+        ),
+        type_name="xbrli:stringItemType",
+        substitution_group=(
+            "de-gcd:"
+            "genInfo.report.id.reportElement."
+            "reportElements.head"
+        ),
+        period_type=TaxonomyPeriodType.DURATION,
+        balance=TaxonomyBalance.NONE,
+        abstract=False,
+        nillable=True,
+    )
+
+    report_element = GcdReportElement(
+        facts=(
+            TaxonomyTextFact(
+                concept=balance_concept,
+                value="Bilanz",
+                context=context,
+            ),
+            TaxonomyTextFact(
+                concept=income_statement_concept,
+                value="GuV",
+                context=context,
+            ),
+        )
+    )
+
+    exporter = XbrlExporter()
+
+    xml = exporter.export(
+        contexts={
+            "ctx-2025": context,
+        },
+        units={},
+        facts=(),
+        report_elements=(
+            report_element,
+        ),
+        taxonomy_namespace=gcd_namespace,
+        taxonomy_namespaces={
+            "de-gcd": gcd_namespace,
+        },
+        entry_points=(),
+    )
+
+    assert "genInfo.report.id.reportElement" in xml
+
+    assert (
+        "genInfo.report.id.reportElement.reportElements.B"
+        in xml
+    )
+
+    assert (
+        "genInfo.report.id.reportElement.reportElements.GuV"
+        in xml
+    )
+
+    assert ">Bilanz<" in xml
+    assert ">GuV<" in xml
+    

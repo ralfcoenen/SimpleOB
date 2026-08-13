@@ -6,6 +6,9 @@ from openbilanz.taxonomy.fact import TaxonomyFact
 from openbilanz.taxonomy.text_fact import TaxonomyTextFact
 from openbilanz.taxonomy.unit import TaxonomyUnit
 from openbilanz.taxonomy.xbrl_writer import TaxonomyXbrlWriter
+from openbilanz.taxonomy.gcd_report_element import (
+    GcdReportElement,
+)
 
 
 class XbrlExporter:
@@ -26,6 +29,7 @@ class XbrlExporter:
         taxonomy_namespace: str,
         entry_points: tuple[TaxonomyEntryPoint, ...],
         taxonomy_namespaces: dict[str, str] | None = None,
+        report_elements: tuple[GcdReportElement, ...] = (),
     ) -> str:
         """Erzeugt eine XBRL-Instanz als XML-String."""
 
@@ -36,6 +40,7 @@ class XbrlExporter:
             taxonomy_namespace=taxonomy_namespace,
             taxonomy_namespaces=taxonomy_namespaces,
             entry_points=entry_points,
+            report_elements=report_elements,
         )
 
         return self._writer.to_xml_string(

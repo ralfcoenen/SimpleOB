@@ -118,3 +118,32 @@ def test_gcd_company_data_accepts_13_digit_tax_number() -> None:
 
     assert data.tax_number == "1234567890123"
 
+
+def test_gcd_company_data_contains_required_company_details() -> None:
+    """GCD-Stammdaten enthalten die erforderlichen Unternehmensangaben."""
+
+    company = Company(
+        company_id=uuid4(),
+        name="Muster UG (haftungsbeschränkt)",
+    )
+
+    data = GcdCompanyData(
+        company=company,
+        tax_number="1234567890123",
+        legal_form="UG (haftungsbeschränkt)",
+        street="Musterstraße",
+        house_number="12a",
+        postal_code="12345",
+        city="Musterstadt",
+        country="DE",
+        business="Softwareentwicklung",
+    )
+
+    assert data.street == "Musterstraße"
+    assert data.house_number == "12a"
+    assert data.postal_code == "12345"
+    assert data.city == "Musterstadt"
+    assert data.country == "DE"
+    assert data.business == "Softwareentwicklung"
+    
+        
