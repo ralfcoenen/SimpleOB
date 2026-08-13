@@ -2,6 +2,7 @@
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
+from xml.etree import ElementTree as ET
 
 import pytest
 
@@ -16,6 +17,12 @@ from openbilanz.taxonomy.entry_point import TaxonomyEntryPoint
 from openbilanz.taxonomy.fact import TaxonomyFact
 from openbilanz.taxonomy.gcd_company_id_no import (
     GcdCompanyIdNo,
+)
+from openbilanz.taxonomy.gcd_domestic_branch_of_foreign_company import (
+    GcdDomesticBranchOfForeignCompany,
+)
+from openbilanz.taxonomy.gcd_entity_with_taxable_purpose_business import (
+    GcdEntityWithTaxablePurposeBusiness,
 )
 from openbilanz.taxonomy.gcd_report_element import (
     GcdReportElement,
@@ -559,4 +566,120 @@ def test_xbrl_exporter_includes_gcd_shareholder() -> None:
     )
 
     assert 'contextRef="ctx-2025"' in xml
+
+def test_xbrl_export_includes_gcd_company_classification_tuples() -> None:
+    """Der Export enthält beide GCD-Unternehmensklassifikationen."""
+
+    gcd_namespace = (
+        "http://www.xbrl.de/taxonomies/"
+        "de-gcd-2025-04-01"
+    )
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    branch_fact = TaxonomyTextFact(
+        concept=TaxonomyConcept(
+            name=(
+                "genInfo.company.id."
+                "domesticBranchOfForeignCompany.HGB"
+            ),
+            concept_id=(
+                "de-gcd_genInfo.company.id."
+                "domesticBranchOfForeignCompany.HGB"
+            ),
+            type_name="xbrli:stringItemType",
+            substitution_group="xbrli:item",
+            period_type=TaxonomyPeriodType.DURATION,
+            balance=TaxonomyBalance.NONE,
+            abstract=False,
+            nillable=True,
+        ),
+        value="HGB",
+        context=context,
+    )
+
+    business_fact = TaxonomyTextFact(
+        concept=TaxonomyConcept(
+            name=(
+                "genInfo.company.id."
+                "entityWithTaxablePurposeBusiness.normal"
+            ),
+            concept_id=(
+                "de-gcd_genInfo.company.id."
+                "entityWithTaxablePurposeBusiness.normal"
+            ),
+            type_name="xbrli:stringItemType",
+            substitution_group="xbrli:item",
+            period_type=TaxonomyPeriodType.DURATION,
+            balance=TaxonomyBalance.NONE,
+            abstract=False,
+            nillable=True,
+        ),
+        value="normal",
+        context=context,
+    )
+
+    exporter = XbrlExporter()
+
+    xml = exporter.export(
+        contexts={
+            "ctx-2025": context,
+        },
+        units={},
+        facts=(),
+        taxonomy_namespace=gcd_namespace,
+        entry_points=(),
+        domestic_branches=(
+            GcdDomesticBranchOfForeignCompany(
+                fact=branch_fact,
+            ),
+        ),
+        taxable_purpose_businesses=(
+            GcdEntityWithTaxablePurposeBusiness(
+                fact=business_fact,
+            ),
+        ),
+    )
+
+    root = ET.fromstring(
+        xml
+    )
+
+    branch_element = root.find(
+        f"{{{gcd_namespace}}}"
+        "genInfo.company.id.domesticBranchOfForeignCompany"
+    )
+
+    assert branch_element is not None
+
+    branch_child = branch_element.find(
+        f"{{{gcd_namespace}}}"
+        "genInfo.company.id.domesticBranchOfForeignCompany.HGB"
+    )
+
+    assert branch_child is not None
+    assert branch_child.text == "HGB"
+    assert branch_child.get("contextRef") == "ctx-2025"
+
+    business_element = root.find(
+        f"{{{gcd_namespace}}}"
+        "genInfo.company.id.entityWithTaxablePurposeBusiness"
+    )
+
+    assert business_element is not None
+
+    business_child = business_element.find(
+        f"{{{gcd_namespace}}}"
+        "genInfo.company.id.entityWithTaxablePurposeBusiness.normal"
+    )
+
+    assert business_child is not None
+    assert business_child.text == "normal"
+    assert business_child.get("contextRef") == "ctx-2025"
 

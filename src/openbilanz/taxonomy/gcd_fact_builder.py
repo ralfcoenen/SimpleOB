@@ -13,6 +13,14 @@ from openbilanz.taxonomy.gcd_company_id_no import (
 from openbilanz.taxonomy.gcd_company_identifiers import (
     GcdCompanyIdentifiers,
 )
+from openbilanz.taxonomy.gcd_domestic_branch_of_foreign_company import (
+    GcdDomesticBranchOfForeignCompany,
+    GcdDomesticBranchOfForeignCompanyType,
+)
+from openbilanz.taxonomy.gcd_entity_with_taxable_purpose_business import (
+    GcdEntityWithTaxablePurposeBusiness,
+    GcdEntityWithTaxablePurposeBusinessType,
+)
 from openbilanz.taxonomy.gcd_report_data import (
     GcdReportData,
 )
@@ -649,6 +657,136 @@ class GcdFactBuilder:
 
         return GcdCompanyIdNo(
             facts=tuple(facts)
+        )
+
+    def domestic_branch_of_foreign_company(
+        self,
+        *,
+        branch_type: GcdDomesticBranchOfForeignCompanyType,
+        taxonomy_model: TaxonomyModel,
+        context: TaxonomyContext,
+    ) -> GcdDomesticBranchOfForeignCompany:
+        """Erzeugt das GCD-Tuple für eine inländische Zweigniederlassung."""
+
+        if not isinstance(
+            branch_type,
+            GcdDomesticBranchOfForeignCompanyType,
+        ):
+            raise TypeError(
+                "branch_type must be a "
+                "GcdDomesticBranchOfForeignCompanyType"
+            )
+
+        if not isinstance(
+            taxonomy_model,
+            TaxonomyModel,
+        ):
+            raise TypeError(
+                "taxonomy_model must be a TaxonomyModel"
+            )
+
+        if not isinstance(
+            context,
+            TaxonomyContext,
+        ):
+            raise TypeError(
+                "context must be a TaxonomyContext"
+            )
+
+        concept_name = (
+            "genInfo.company.id."
+            "domesticBranchOfForeignCompany."
+            f"{branch_type.value}"
+        )
+
+        concepts_by_name = {
+            concept.name: concept
+            for concept in taxonomy_model.concepts.concepts
+        }
+
+        concept = concepts_by_name.get(
+            concept_name
+        )
+
+        if concept is None:
+            raise ValueError(
+                "GCD taxonomy concept not found: "
+                f"{concept_name}"
+            )
+
+        fact = TaxonomyTextFact(
+            concept=concept,
+            value=branch_type.value,
+            context=context,
+        )
+
+        return GcdDomesticBranchOfForeignCompany(
+            fact=fact,
+        )
+
+    def entity_with_taxable_purpose_business(
+        self,
+        *,
+        business_type: GcdEntityWithTaxablePurposeBusinessType,
+        taxonomy_model: TaxonomyModel,
+        context: TaxonomyContext,
+    ) -> GcdEntityWithTaxablePurposeBusiness:
+        """Erzeugt das GCD-Tuple für den steuerpflichtigen Betrieb."""
+
+        if not isinstance(
+            business_type,
+            GcdEntityWithTaxablePurposeBusinessType,
+        ):
+            raise TypeError(
+                "business_type must be a "
+                "GcdEntityWithTaxablePurposeBusinessType"
+            )
+
+        if not isinstance(
+            taxonomy_model,
+            TaxonomyModel,
+        ):
+            raise TypeError(
+                "taxonomy_model must be a TaxonomyModel"
+            )
+
+        if not isinstance(
+            context,
+            TaxonomyContext,
+        ):
+            raise TypeError(
+                "context must be a TaxonomyContext"
+            )
+
+        concept_name = (
+            "genInfo.company.id."
+            "entityWithTaxablePurposeBusiness."
+            f"{business_type.value}"
+        )
+
+        concepts_by_name = {
+            concept.name: concept
+            for concept in taxonomy_model.concepts.concepts
+        }
+
+        concept = concepts_by_name.get(
+            concept_name
+        )
+
+        if concept is None:
+            raise ValueError(
+                "GCD taxonomy concept not found: "
+                f"{concept_name}"
+            )
+
+        fact = TaxonomyTextFact(
+            concept=concept,
+            value=business_type.value,
+            context=context,
+        )
+
+        return GcdEntityWithTaxablePurposeBusiness(
+            fact=fact,
         )
         
     def shareholder_facts(

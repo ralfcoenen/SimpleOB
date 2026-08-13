@@ -6,6 +6,12 @@ from openbilanz.taxonomy.fact import TaxonomyFact
 from openbilanz.taxonomy.gcd_company_id_no import (
     GcdCompanyIdNo,
 )
+from openbilanz.taxonomy.gcd_domestic_branch_of_foreign_company import (
+    GcdDomesticBranchOfForeignCompany,
+)
+from openbilanz.taxonomy.gcd_entity_with_taxable_purpose_business import (
+    GcdEntityWithTaxablePurposeBusiness,
+)
 from openbilanz.taxonomy.gcd_report_element import (
     GcdReportElement,
 )
@@ -37,6 +43,14 @@ class XbrlExporter:
         taxonomy_namespaces: dict[str, str] | None = None,
         report_elements: tuple[GcdReportElement, ...] = (),
         company_id_nos: tuple[GcdCompanyIdNo, ...] = (),
+        domestic_branches: tuple[
+            GcdDomesticBranchOfForeignCompany,
+            ...,
+        ] = (),
+        taxable_purpose_businesses: tuple[
+            GcdEntityWithTaxablePurposeBusiness,
+            ...,
+        ] = (),        
         shareholders: tuple[GcdShareholderTuple, ...] = (),
     ) -> str:
         """Erzeugt eine XBRL-Instanz als XML-String."""
@@ -51,6 +65,8 @@ class XbrlExporter:
             report_elements=report_elements,
             company_id_nos=company_id_nos,
             shareholders=shareholders,
+            domestic_branches=domestic_branches,
+            taxable_purpose_businesses=taxable_purpose_businesses,            
         )
 
         return self._writer.to_xml_string(

@@ -22,6 +22,14 @@ from openbilanz.taxonomy.gcd_company_id_no import (
 from openbilanz.taxonomy.gcd_company_identifiers import (
     GcdCompanyIdentifiers,
 )
+from openbilanz.taxonomy.gcd_domestic_branch_of_foreign_company import (
+    GcdDomesticBranchOfForeignCompany,
+    GcdDomesticBranchOfForeignCompanyType,
+)
+from openbilanz.taxonomy.gcd_entity_with_taxable_purpose_business import (
+    GcdEntityWithTaxablePurposeBusiness,
+    GcdEntityWithTaxablePurposeBusinessType,
+)
 from openbilanz.taxonomy.gcd_fact_builder import GcdFactBuilder
 from openbilanz.taxonomy.gcd_report_data import (
     GcdReportData,
@@ -1870,4 +1878,105 @@ def test_gcd_fact_builder_builds_shareholder_tuple() -> None:
     assert result.current_number.amount == Decimal("1")
     assert result.current_number.unit == TaxonomyUnit.pure()
     assert result.current_number.decimals == "INF"
+    
+def test_gcd_fact_builder_builds_domestic_branch_of_foreign_company() -> None:
+    """Der Builder erzeugt das Tuple für eine inländische Zweigniederlassung."""
+
+    concept = TaxonomyConcept(
+        name=(
+            "genInfo.company.id."
+            "domesticBranchOfForeignCompany.HGB"
+        ),
+        concept_id=(
+            "de-gcd_genInfo.company.id."
+            "domesticBranchOfForeignCompany.HGB"
+        ),
+        type_name="xbrli:stringItemType",
+        substitution_group="xbrli:item",
+        period_type=TaxonomyPeriodType.DURATION,
+        balance=TaxonomyBalance.NONE,
+        abstract=False,
+        nillable=True,
+    )
+
+    taxonomy_model = _taxonomy_model(
+        concept
+    )
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    builder = GcdFactBuilder()
+
+    result = builder.domestic_branch_of_foreign_company(
+        branch_type=GcdDomesticBranchOfForeignCompanyType.HGB,
+        taxonomy_model=taxonomy_model,
+        context=context,
+    )
+
+    assert isinstance(
+        result,
+        GcdDomesticBranchOfForeignCompany,
+    )
+
+    assert result.fact.concept is concept
+    assert result.fact.value == "HGB"
+    assert result.fact.context is context
+
+
+def test_gcd_fact_builder_builds_entity_with_taxable_purpose_business() -> None:
+    """Der Builder erzeugt das Tuple für den steuerpflichtigen Betrieb."""
+
+    concept = TaxonomyConcept(
+        name=(
+            "genInfo.company.id."
+            "entityWithTaxablePurposeBusiness.normal"
+        ),
+        concept_id=(
+            "de-gcd_genInfo.company.id."
+            "entityWithTaxablePurposeBusiness.normal"
+        ),
+        type_name="xbrli:stringItemType",
+        substitution_group="xbrli:item",
+        period_type=TaxonomyPeriodType.DURATION,
+        balance=TaxonomyBalance.NONE,
+        abstract=False,
+        nillable=True,
+    )
+
+    taxonomy_model = _taxonomy_model(
+        concept
+    )
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    builder = GcdFactBuilder()
+
+    result = builder.entity_with_taxable_purpose_business(
+        business_type=(
+            GcdEntityWithTaxablePurposeBusinessType.NORMAL
+        ),
+        taxonomy_model=taxonomy_model,
+        context=context,
+    )
+
+    assert isinstance(
+        result,
+        GcdEntityWithTaxablePurposeBusiness,
+    )
+
+    assert result.fact.concept is concept
+    assert result.fact.value == "normal"
+    assert result.fact.context is context
     

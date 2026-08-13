@@ -28,6 +28,12 @@ from openbilanz.taxonomy.gcd_company_data import GcdCompanyData
 from openbilanz.taxonomy.gcd_company_identifiers import (
     GcdCompanyIdentifiers,
 )
+from openbilanz.taxonomy.gcd_domestic_branch_of_foreign_company import (
+    GcdDomesticBranchOfForeignCompanyType,
+)
+from openbilanz.taxonomy.gcd_entity_with_taxable_purpose_business import (
+    GcdEntityWithTaxablePurposeBusinessType,
+)
 from openbilanz.taxonomy.gcd_fact_builder import GcdFactBuilder
 from openbilanz.taxonomy.gcd_report_profile import (
     GcdReportProfile,
@@ -735,6 +741,22 @@ def test_combined_69_instance_with_report_element_is_validated_by_arelle(
         )
 
         gcd_builder = GcdFactBuilder()
+        
+        branch = gcd_builder.domestic_branch_of_foreign_company(
+            branch_type=GcdDomesticBranchOfForeignCompanyType.HGB,
+            taxonomy_model=gcd_model,
+            context=duration_context,
+        )
+
+        taxable_purpose_business = (
+            gcd_builder.entity_with_taxable_purpose_business(
+                business_type=(
+                    GcdEntityWithTaxablePurposeBusinessType.NORMAL
+                ),
+                taxonomy_model=gcd_model,
+                context=duration_context,
+            )
+        )
 
         shareholder_data = GcdShareholder(
             name="Mustermann",
@@ -875,6 +897,12 @@ def test_combined_69_instance_with_report_element_is_validated_by_arelle(
             shareholders=(
                 shareholder,
             ),
+            domestic_branches=(
+                branch,
+            ),
+            taxable_purpose_businesses=(
+                taxable_purpose_business,
+            ),
         )
 
         instance_path = (
@@ -1005,6 +1033,22 @@ def test_combined_610_instance_with_report_element_is_validated_by_arelle(
         )
 
         gcd_builder = GcdFactBuilder()
+        
+        branch = gcd_builder.domestic_branch_of_foreign_company(
+            branch_type=GcdDomesticBranchOfForeignCompanyType.HGB,
+            taxonomy_model=gcd_model,
+            context=duration_context,
+        )
+
+        taxable_purpose_business = (
+            gcd_builder.entity_with_taxable_purpose_business(
+                business_type=(
+                    GcdEntityWithTaxablePurposeBusinessType.NORMAL
+                ),
+                taxonomy_model=gcd_model,
+                context=duration_context,
+            )
+        )
         
         shareholder_data = GcdShareholder(
             name="Mustermann",
@@ -1138,6 +1182,12 @@ def test_combined_610_instance_with_report_element_is_validated_by_arelle(
             ),
             shareholders=(
                 shareholder,
+            ),
+            domestic_branches=(
+                branch,
+            ),
+            taxable_purpose_businesses=(
+                taxable_purpose_business,
             ),
         )
 

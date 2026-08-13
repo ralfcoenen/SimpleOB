@@ -9,6 +9,12 @@ from openbilanz.taxonomy.fact import TaxonomyFact
 from openbilanz.taxonomy.gcd_company_id_no import (
     GcdCompanyIdNo,
 )
+from openbilanz.taxonomy.gcd_domestic_branch_of_foreign_company import (
+    GcdDomesticBranchOfForeignCompany,
+)
+from openbilanz.taxonomy.gcd_entity_with_taxable_purpose_business import (
+    GcdEntityWithTaxablePurposeBusiness,
+)
 from openbilanz.taxonomy.gcd_report_element import (
     GcdReportElement,
 )
@@ -220,6 +226,73 @@ class TaxonomyXbrlWriter:
 
         return element
     
+    def gcd_domestic_branch_of_foreign_company_element(
+        self,
+        *,
+        branch: GcdDomesticBranchOfForeignCompany,
+        context_id: str,
+        namespace: str,
+    ) -> ET.Element:
+        """Erzeugt das GCD-Tuple für eine inländische Zweigniederlassung."""
+
+        if not isinstance(
+            branch,
+            GcdDomesticBranchOfForeignCompany,
+        ):
+            raise TypeError(
+                "branch must be a "
+                "GcdDomesticBranchOfForeignCompany"
+            )
+
+        element = ET.Element(
+            f"{{{namespace}}}"
+            "genInfo.company.id.domesticBranchOfForeignCompany"
+        )
+
+        element.append(
+            self.text_fact_element(
+                fact=branch.fact,
+                context_id=context_id,
+                namespace=namespace,
+            )
+        )
+
+        return element
+
+    def gcd_entity_with_taxable_purpose_business_element(
+        self,
+        *,
+        business: GcdEntityWithTaxablePurposeBusiness,
+        context_id: str,
+        namespace: str,
+    ) -> ET.Element:
+        """Erzeugt das GCD-Tuple für den steuerpflichtigen Betrieb."""
+
+        if not isinstance(
+            business,
+            GcdEntityWithTaxablePurposeBusiness,
+        ):
+            raise TypeError(
+                "business must be a "
+                "GcdEntityWithTaxablePurposeBusiness"
+            )
+
+        element = ET.Element(
+            f"{{{namespace}}}"
+            "genInfo.company.id.entityWithTaxablePurposeBusiness"
+        )
+
+        element.append(
+            self.text_fact_element(
+                fact=business.fact,
+                context_id=context_id,
+                namespace=namespace,
+            )
+        )
+
+        return element    
+    
+    
     def gcd_shareholder_element(
         self,
         *,
@@ -381,6 +454,14 @@ class TaxonomyXbrlWriter:
         taxonomy_namespaces: dict[str, str] | None = None,
         report_elements: tuple[GcdReportElement, ...] = (),
         company_id_nos: tuple[GcdCompanyIdNo, ...] = (),
+        domestic_branches: tuple[
+            GcdDomesticBranchOfForeignCompany,
+            ...,
+        ] = (),
+        taxable_purpose_businesses: tuple[
+            GcdEntityWithTaxablePurposeBusiness,
+            ...,
+        ] = (),        
         shareholders: tuple[GcdShareholderTuple, ...] = (),
     ) -> ET.Element:
         """Erzeugt das Root-Element einer XBRL-Instanz."""
@@ -473,6 +554,46 @@ class TaxonomyXbrlWriter:
                     namespace=namespace,
                 )
             )
+ 
+        for branch in domestic_branches:
+            context_id = self.context_id_for(
+                context=branch.fact.context,
+                contexts=contexts,
+            )
+
+            namespace = self.namespace_for(
+                concept_id=branch.fact.concept.concept_id,
+                taxonomy_namespace=taxonomy_namespace,
+                taxonomy_namespaces=taxonomy_namespaces,
+            )
+
+            root.append(
+                self.gcd_domestic_branch_of_foreign_company_element(
+                    branch=branch,
+                    context_id=context_id,
+                    namespace=namespace,
+                )
+            )
+
+        for business in taxable_purpose_businesses:
+            context_id = self.context_id_for(
+                context=business.fact.context,
+                contexts=contexts,
+            )
+
+            namespace = self.namespace_for(
+                concept_id=business.fact.concept.concept_id,
+                taxonomy_namespace=taxonomy_namespace,
+                taxonomy_namespaces=taxonomy_namespaces,
+            )
+
+            root.append(
+                self.gcd_entity_with_taxable_purpose_business_element(
+                    business=business,
+                    context_id=context_id,
+                    namespace=namespace,
+                )
+            ) 
         
         for report_element in report_elements:
             if not report_element.facts:

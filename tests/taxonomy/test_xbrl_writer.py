@@ -17,6 +17,12 @@ from openbilanz.taxonomy.fact import TaxonomyFact
 from openbilanz.taxonomy.gcd_company_id_no import (
     GcdCompanyIdNo,
 )
+from openbilanz.taxonomy.gcd_domestic_branch_of_foreign_company import (
+    GcdDomesticBranchOfForeignCompany,
+)
+from openbilanz.taxonomy.gcd_entity_with_taxable_purpose_business import (
+    GcdEntityWithTaxablePurposeBusiness,
+)
 from openbilanz.taxonomy.gcd_report_element import (
     GcdReportElement,
 )
@@ -2012,3 +2018,110 @@ def test_xbrl_writer_serializes_shareholder_current_number() -> None:
     assert element.get("decimals") == "INF"
     
 
+def test_xbrl_writer_serializes_gcd_company_classification_tuples() -> None:
+    """Der Writer serialisiert beide GCD-Unternehmensklassifikationen."""
+
+    namespace = (
+        "http://www.xbrl.de/taxonomies/"
+        "de-gcd-2025-04-01"
+    )
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    branch_fact = TaxonomyTextFact(
+        concept=TaxonomyConcept(
+            name=(
+                "genInfo.company.id."
+                "domesticBranchOfForeignCompany.HGB"
+            ),
+            concept_id=(
+                "de-gcd_genInfo.company.id."
+                "domesticBranchOfForeignCompany.HGB"
+            ),
+            type_name="xbrli:stringItemType",
+            substitution_group="xbrli:item",
+            period_type=TaxonomyPeriodType.DURATION,
+            balance=TaxonomyBalance.NONE,
+            abstract=False,
+            nillable=True,
+        ),
+        value="HGB",
+        context=context,
+    )
+
+    business_fact = TaxonomyTextFact(
+        concept=TaxonomyConcept(
+            name=(
+                "genInfo.company.id."
+                "entityWithTaxablePurposeBusiness.normal"
+            ),
+            concept_id=(
+                "de-gcd_genInfo.company.id."
+                "entityWithTaxablePurposeBusiness.normal"
+            ),
+            type_name="xbrli:stringItemType",
+            substitution_group="xbrli:item",
+            period_type=TaxonomyPeriodType.DURATION,
+            balance=TaxonomyBalance.NONE,
+            abstract=False,
+            nillable=True,
+        ),
+        value="normal",
+        context=context,
+    )
+
+    writer = TaxonomyXbrlWriter()
+
+    branch_element = (
+        writer.gcd_domestic_branch_of_foreign_company_element(
+            branch=GcdDomesticBranchOfForeignCompany(
+                fact=branch_fact,
+            ),
+            context_id="ctx-2025",
+            namespace=namespace,
+        )
+    )
+
+    business_element = (
+        writer.gcd_entity_with_taxable_purpose_business_element(
+            business=GcdEntityWithTaxablePurposeBusiness(
+                fact=business_fact,
+            ),
+            context_id="ctx-2025",
+            namespace=namespace,
+        )
+    )
+
+    assert branch_element.tag == (
+        f"{{{namespace}}}"
+        "genInfo.company.id.domesticBranchOfForeignCompany"
+    )
+
+    assert len(branch_element) == 1
+    assert branch_element[0].tag == (
+        f"{{{namespace}}}"
+        "genInfo.company.id.domesticBranchOfForeignCompany.HGB"
+    )
+    assert branch_element[0].attrib["contextRef"] == "ctx-2025"
+    assert branch_element[0].text == "HGB"
+
+    assert business_element.tag == (
+        f"{{{namespace}}}"
+        "genInfo.company.id.entityWithTaxablePurposeBusiness"
+    )
+
+    assert len(business_element) == 1
+    assert business_element[0].tag == (
+        f"{{{namespace}}}"
+        "genInfo.company.id.entityWithTaxablePurposeBusiness.normal"
+    )
+    assert business_element[0].attrib["contextRef"] == "ctx-2025"
+    assert business_element[0].text == "normal"
+    
+    
