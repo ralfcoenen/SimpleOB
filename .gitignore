@@ -20,3 +20,6 @@ data/*.sqlite
 
 # Python package metadata
 *.egg-info/
+
+# Scripts Ausgaben
+script_results/
