@@ -18,7 +18,9 @@ from openbilanz.taxonomy.gcd_report_element import (
 from openbilanz.taxonomy.taxonomy import (
     TaxonomyVersion,
 )
-
+from openbilanz.taxonomy.gcd_report_data import (
+    GcdReportData,
+)
 
 class GcdFactBuilder:
     """Erzeugt GCD-Werte aus fachlichen Stammdaten."""
@@ -89,6 +91,8 @@ class GcdFactBuilder:
     def fiscal_year_values(
         self,
         fiscal_year: FiscalYear,
+        *,
+        previous_fiscal_year: FiscalYear | None = None,
     ) -> dict[str, date]:
         """Liefert die GCD-Werte für das Wirtschaftsjahr."""
 
@@ -99,16 +103,47 @@ class GcdFactBuilder:
             raise TypeError(
                 "fiscal_year must be a FiscalYear"
             )
+            
+        if (
+            previous_fiscal_year is not None
+            and not isinstance(
+                previous_fiscal_year,
+                FiscalYear,
+            )
+        ):
+            raise TypeError(
+                "previous_fiscal_year must be a FiscalYear or None"
+            )
 
-        return {
+        values = {
             "genInfo.report.period.fiscalYearBegin": (
                 fiscal_year.start_date
             ),
             "genInfo.report.period.fiscalYearEnd": (
                 fiscal_year.end_date
             ),
+            "genInfo.report.period.balSheetClosingDate": (
+                fiscal_year.end_date
+            ),
         }
-    
+
+        if previous_fiscal_year is not None:
+            values.update(
+                {
+                    "genInfo.report.period.fiscalPreviousYearBegin": (
+                        previous_fiscal_year.start_date
+                    ),
+                    "genInfo.report.period.fiscalPreviousYearEnd": (
+                        previous_fiscal_year.end_date
+                    ),
+                    "genInfo.report.period.balSheetClosingDatePreviousYear": (
+                        previous_fiscal_year.end_date
+                    ),
+                }
+            )
+
+        return values
+        
     def company_facts(
         self,
         *,
@@ -180,6 +215,7 @@ class GcdFactBuilder:
         fiscal_year: FiscalYear,
         taxonomy_model: TaxonomyModel,
         context: TaxonomyContext,
+        previous_fiscal_year: FiscalYear | None = None,
     ) -> tuple[TaxonomyTextFact, ...]:
         """Erzeugt GCD-Text-Facts für das Wirtschaftsjahr."""
 
@@ -208,7 +244,8 @@ class GcdFactBuilder:
             )
 
         values = self.fiscal_year_values(
-            fiscal_year
+            fiscal_year,
+            previous_fiscal_year=previous_fiscal_year,
         )
 
         concepts_by_name = {
@@ -435,4 +472,71 @@ class GcdFactBuilder:
 
         return GcdReportElement(
             facts=tuple(facts)
+        )
+        
+    def report_data_facts(
+        self,
+        *,
+        data: GcdReportData,
+        taxonomy_model: TaxonomyModel,
+        context: TaxonomyContext,
+    ) -> tuple[TaxonomyTextFact, ...]:
+        """Erzeugt GCD-Facts aus variablen Berichtsdaten."""
+
+        if not isinstance(
+            data,
+            GcdReportData,
+        ):
+            raise TypeError(
+                "data must be a GcdReportData"
+            )
+
+        if not isinstance(
+            taxonomy_model,
+            TaxonomyModel,
+        ):
+            raise TypeError(
+                "taxonomy_model must be a TaxonomyModel"
+            )
+
+        if not isinstance(
+            context,
+            TaxonomyContext,
+        ):
+            raise TypeError(
+                "context must be a TaxonomyContext"
+            )
+
+        concept_name = (
+            "genInfo.report.id."
+            "incomeStatementendswithBalProfit"
+        )
+
+        concepts_by_name = {
+            concept.name: concept
+            for concept in taxonomy_model.concepts.concepts
+        }
+
+        concept = concepts_by_name.get(
+            concept_name
+        )
+
+        if concept is None:
+            raise ValueError(
+                "GCD taxonomy concept not found: "
+                f"{concept_name}"
+            )
+
+        value = (
+            "true"
+            if data.income_statement_ends_with_balance_profit
+            else "false"
+        )
+
+        return (
+            TaxonomyTextFact(
+                concept=concept,
+                value=value,
+                context=context,
+            ),
         )

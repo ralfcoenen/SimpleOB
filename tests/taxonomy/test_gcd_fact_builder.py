@@ -1,5 +1,5 @@
 """Tests für den Aufbau von GCD-Facts."""
-
+import pytest
 from datetime import date
 from uuid import uuid4
 
@@ -29,6 +29,10 @@ from openbilanz.taxonomy.gcd_report_element import (
 from openbilanz.taxonomy.taxonomy import (
     TaxonomyVersion,
 )
+from openbilanz.taxonomy.gcd_report_data import (
+    GcdReportData,
+)
+
 
 TEST_ENTITY_SCHEME = (
     "http://www.bundesfinanzministerium.de"
@@ -186,19 +190,23 @@ def test_gcd_fact_builder_defines_fiscal_year_values() -> None:
     )
 
     assert values == {
-        "genInfo.report.period.fiscalYearBegin": date(
-            2025,
-            1,
-            1,
-        ),
-        "genInfo.report.period.fiscalYearEnd": date(
-            2025,
-            12,
-            31,
-        ),
-    }
-
-
+    "genInfo.report.period.fiscalYearBegin": date(
+        2025,
+        1,
+        1,
+    ),
+    "genInfo.report.period.fiscalYearEnd": date(
+        2025,
+        12,
+        31,
+    ),
+    "genInfo.report.period.balSheetClosingDate": date(
+        2025,
+        12,
+        31,
+    ),
+}
+   
 def test_gcd_fact_builder_builds_company_facts() -> None:
     """Unternehmensstammdaten werden zu GCD-Text-Facts."""
 
@@ -534,6 +542,18 @@ def test_gcd_fact_builder_builds_fiscal_year_facts() -> None:
             abstract=False,
             nillable=True,
         ),
+        TaxonomyConcept(
+            name="genInfo.report.period.balSheetClosingDate",
+            concept_id=(
+                "de-gcd_genInfo.report.period.balSheetClosingDate"
+            ),
+            type_name="xbrli:dateItemType",
+            substitution_group="xbrli:item",
+            period_type=TaxonomyPeriodType.DURATION,
+            balance=TaxonomyBalance.NONE,
+            abstract=False,
+            nillable=True,
+        ),
     )
 
     taxonomy_model = _taxonomy_model(
@@ -556,7 +576,7 @@ def test_gcd_fact_builder_builds_fiscal_year_facts() -> None:
         context=context,
     )
 
-    assert len(facts) == 2
+    assert len(facts) == 3
 
     assert all(
         isinstance(
@@ -578,8 +598,10 @@ def test_gcd_fact_builder_builds_fiscal_year_facts() -> None:
         "genInfo.report.period.fiscalYearEnd": (
             "2025-12-31"
         ),
+        "genInfo.report.period.balSheetClosingDate": (
+            "2025-12-31"
+        ),
     }
-
 
 def test_gcd_fact_builder_builds_report_profile_facts() -> None:
     """Das GCD-Berichtsprofil erzeugt grundlegende Berichtsfacts."""
@@ -982,3 +1004,232 @@ def test_gcd_fact_builder_keeps_account_statements_in_610() -> None:
         ),
     }
     
+def test_gcd_fact_builder_includes_balance_sheet_closing_date() -> None:
+    """Das Ende des Wirtschaftsjahres ist zugleich der Bilanzstichtag."""
+
+    fiscal_year = FiscalYear(
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    builder = GcdFactBuilder()
+
+    values = builder.fiscal_year_values(
+        fiscal_year
+    )
+
+    assert values == {
+        "genInfo.report.period.fiscalYearBegin": date(
+            2025,
+            1,
+            1,
+        ),
+        "genInfo.report.period.fiscalYearEnd": date(
+            2025,
+            12,
+            31,
+        ),
+        "genInfo.report.period.balSheetClosingDate": date(
+            2025,
+            12,
+            31,
+        ),
+    }
+
+
+def test_gcd_fact_builder_includes_previous_fiscal_year_values() -> None:
+    """Der Builder liefert die GCD-Periodendaten des Vorjahres."""
+
+    fiscal_year = FiscalYear(
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    previous_fiscal_year = FiscalYear(
+        start_date=date(2024, 1, 1),
+        end_date=date(2024, 12, 31),
+    )
+
+    builder = GcdFactBuilder()
+
+    values = builder.fiscal_year_values(
+        fiscal_year,
+        previous_fiscal_year=previous_fiscal_year,
+    )
+
+    assert values == {
+        "genInfo.report.period.fiscalYearBegin": date(
+            2025,
+            1,
+            1,
+        ),
+        "genInfo.report.period.fiscalYearEnd": date(
+            2025,
+            12,
+            31,
+        ),
+        "genInfo.report.period.balSheetClosingDate": date(
+            2025,
+            12,
+            31,
+        ),
+        "genInfo.report.period.fiscalPreviousYearBegin": date(
+            2024,
+            1,
+            1,
+        ),
+        "genInfo.report.period.fiscalPreviousYearEnd": date(
+            2024,
+            12,
+            31,
+        ),
+        "genInfo.report.period.balSheetClosingDatePreviousYear": date(
+            2024,
+            12,
+            31,
+        ),
+    }
+    
+def test_gcd_fact_builder_builds_previous_fiscal_year_facts() -> None:
+        """Vorjahresdaten werden zu GCD-Text-Facts."""
+
+        fiscal_year = FiscalYear(
+            start_date=date(2025, 1, 1),
+            end_date=date(2025, 12, 31),
+        )
+
+        previous_fiscal_year = FiscalYear(
+            start_date=date(2024, 1, 1),
+            end_date=date(2024, 12, 31),
+        )
+
+        concept_names = (
+            "genInfo.report.period.fiscalYearBegin",
+            "genInfo.report.period.fiscalYearEnd",
+            "genInfo.report.period.balSheetClosingDate",
+            "genInfo.report.period.fiscalPreviousYearBegin",
+            "genInfo.report.period.fiscalPreviousYearEnd",
+            "genInfo.report.period.balSheetClosingDatePreviousYear",
+        )
+
+        concepts = tuple(
+            TaxonomyConcept(
+                name=name,
+                concept_id="de-gcd_" + name,
+                type_name="xbrli:dateItemType",
+                substitution_group="xbrli:item",
+                period_type=TaxonomyPeriodType.DURATION,
+                balance=TaxonomyBalance.NONE,
+                abstract=False,
+                nillable=True,
+            )
+            for name in concept_names
+        )
+
+        taxonomy_model = _taxonomy_model(
+            *concepts
+        )
+
+        context = TaxonomyContext(
+            entity_identifier="DE123456789",
+            entity_scheme=TEST_ENTITY_SCHEME,
+            period_type=TaxonomyPeriodType.DURATION,
+            start_date=date(2025, 1, 1),
+            end_date=date(2025, 12, 31),
+        )
+
+        builder = GcdFactBuilder()
+
+        facts = builder.fiscal_year_facts(
+            fiscal_year=fiscal_year,
+            previous_fiscal_year=previous_fiscal_year,
+            taxonomy_model=taxonomy_model,
+            context=context,
+        )
+
+        assert len(facts) == 6
+
+        values = {
+            fact.concept.name: fact.value
+            for fact in facts
+        }
+
+        assert values == {
+            "genInfo.report.period.fiscalYearBegin": "2025-01-01",
+            "genInfo.report.period.fiscalYearEnd": "2025-12-31",
+            "genInfo.report.period.balSheetClosingDate": "2025-12-31",
+            "genInfo.report.period.fiscalPreviousYearBegin": "2024-01-01",
+            "genInfo.report.period.fiscalPreviousYearEnd": "2024-12-31",
+            "genInfo.report.period.balSheetClosingDatePreviousYear": (
+                "2024-12-31"
+            ),
+        }
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    (
+        (
+            True,
+            "true",
+        ),
+        (
+            False,
+            "false",
+        ),
+    ),
+)
+def test_gcd_fact_builder_builds_variable_report_data_facts(
+    value: bool,
+    expected: str,
+) -> None:
+    """Variable Berichtsdaten werden zu GCD-Facts."""
+
+    concept = TaxonomyConcept(
+        name=(
+            "genInfo.report.id."
+            "incomeStatementendswithBalProfit"
+        ),
+        concept_id=(
+            "de-gcd_genInfo.report.id."
+            "incomeStatementendswithBalProfit"
+        ),
+        type_name="xbrli:booleanItemType",
+        substitution_group="xbrli:item",
+        period_type=TaxonomyPeriodType.DURATION,
+        balance=TaxonomyBalance.NONE,
+        abstract=False,
+        nillable=True,
+    )
+
+    taxonomy_model = _taxonomy_model(
+        concept
+    )
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    data = GcdReportData(
+        income_statement_ends_with_balance_profit=value,
+    )
+
+    builder = GcdFactBuilder()
+
+    facts = builder.report_data_facts(
+        data=data,
+        taxonomy_model=taxonomy_model,
+        context=context,
+    )
+
+    assert facts == (
+        TaxonomyTextFact(
+            concept=concept,
+            value=expected,
+            context=context,
+        ),
+    )

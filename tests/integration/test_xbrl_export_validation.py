@@ -35,7 +35,9 @@ from openbilanz.taxonomy.unit import TaxonomyUnit
 from openbilanz.taxonomy.gcd_report_profile import (
     GcdReportProfile,
 )
-
+from openbilanz.taxonomy.gcd_report_data import (
+    GcdReportData,
+)
 
 TAXONOMY_ROOT = Path(
     "/tmp/openbilanz-taxonomy"
@@ -727,6 +729,11 @@ def test_combined_69_instance_with_report_element_is_validated_by_arelle(
 
         gcd_builder = GcdFactBuilder()
 
+        previous_fiscal_year = FiscalYear(
+            start_date=date(2025, 1, 1),
+            end_date=date(2025, 12, 31),
+        )
+
         gcd_facts = (
             gcd_builder.company_facts(
                 data=company_data,
@@ -735,15 +742,26 @@ def test_combined_69_instance_with_report_element_is_validated_by_arelle(
             )
             + gcd_builder.fiscal_year_facts(
                 fiscal_year=fiscal_year,
+                previous_fiscal_year=previous_fiscal_year,
                 taxonomy_model=gcd_model,
                 context=duration_context,
             )
         )
 
         profile = GcdReportProfile.standard()
+        
+        report_data = GcdReportData(
+            income_statement_ends_with_balance_profit=False,
+        )
 
         profile_facts = gcd_builder.report_profile_facts(
             profile=profile,
+            taxonomy_model=gcd_model,
+            context=duration_context,
+        )
+        
+        report_data_facts = gcd_builder.report_data_facts(
+            data=report_data,
             taxonomy_model=gcd_model,
             context=duration_context,
         )
@@ -924,6 +942,11 @@ def test_combined_610_instance_with_report_element_is_validated_by_arelle(
             start_date=date(2027, 1, 1),
             end_date=date(2027, 12, 31),
         )
+        
+        previous_fiscal_year = FiscalYear(
+            start_date=date(2026, 1, 1),
+            end_date=date(2026, 12, 31),
+        )
 
         duration_context = TaxonomyContext(
             entity_identifier="DE123456789",
@@ -957,9 +980,19 @@ def test_combined_610_instance_with_report_element_is_validated_by_arelle(
         )
 
         profile = GcdReportProfile.standard()
+        
+        report_data = GcdReportData(
+            income_statement_ends_with_balance_profit=False,
+        )
 
         profile_facts = gcd_builder.report_profile_facts(
             profile=profile,
+            taxonomy_model=gcd_model,
+            context=duration_context,
+        )
+        
+        report_data_facts = gcd_builder.report_data_facts(
+            data=report_data,
             taxonomy_model=gcd_model,
             context=duration_context,
         )
