@@ -22,6 +22,9 @@ from openbilanz.taxonomy.unit import TaxonomyUnit
 from openbilanz.taxonomy.gcd_report_element import (
     GcdReportElement,
 )
+from openbilanz.taxonomy.gcd_company_id_no import (
+    GcdCompanyIdNo,
+)
 
 DE_GAAP_CI_NAMESPACE = (
     "http://www.xbrl.de/taxonomies/"
@@ -353,4 +356,71 @@ def test_xbrl_exporter_serializes_gcd_report_element() -> None:
 
     assert ">Bilanz<" in xml
     assert ">GuV<" in xml
+    
+def test_xbrl_exporter_includes_gcd_company_id_no() -> None:
+    """Der Exporter übernimmt das GCD-idNo-Tuple."""
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    gcd_namespace = (
+        "http://www.xbrl.de/taxonomies/"
+        "de-gcd-2025-04-01"
+    )
+
+    concept = TaxonomyConcept(
+        name=(
+            "genInfo.company.id.idNo.type.companyId.ST13"
+        ),
+        concept_id=(
+            "de-gcd_genInfo.company.id.idNo.type.companyId.ST13"
+        ),
+        type_name="xbrli:stringItemType",
+        substitution_group="xbrli:item",
+        period_type=TaxonomyPeriodType.DURATION,
+        balance=TaxonomyBalance.NONE,
+        abstract=False,
+        nillable=True,
+    )
+
+    company_id_no = GcdCompanyIdNo(
+        facts=(
+            TaxonomyTextFact(
+                concept=concept,
+                value="1234567890123",
+                context=context,
+            ),
+        )
+    )
+
+    exporter = XbrlExporter()
+
+    xml = exporter.export(
+        contexts={
+            "ctx-2025": context,
+        },
+        units={},
+        facts=(),
+        company_id_nos=(
+            company_id_no,
+        ),
+        taxonomy_namespace=gcd_namespace,
+        taxonomy_namespaces={
+            "de-gcd": gcd_namespace,
+        },
+        entry_points=(),
+    )
+
+    assert "genInfo.company.id.idNo" in xml
+    assert (
+        "genInfo.company.id.idNo.type.companyId.ST13"
+        in xml
+    )
+    assert "1234567890123" in xml
+    assert 'contextRef="ctx-2025"' in xml
     

@@ -12,6 +12,9 @@ from openbilanz.taxonomy.unit import TaxonomyUnit
 from openbilanz.taxonomy.gcd_report_element import (
     GcdReportElement,
 )
+from openbilanz.taxonomy.gcd_company_id_no import (
+    GcdCompanyIdNo,
+)
 
 XBRLI_NAMESPACE = "http://www.xbrl.org/2003/instance"
 ISO4217_NAMESPACE = "http://www.xbrl.org/2003/iso4217"
@@ -182,6 +185,39 @@ class TaxonomyXbrlWriter:
 
         return element
     
+    def gcd_company_id_no_element(
+        self,
+        *,
+        company_id_no: GcdCompanyIdNo,
+        context_id: str,
+        namespace: str,
+    ) -> ET.Element:
+        """Erzeugt das GCD-idNo-Element als XBRL-Tuple."""
+
+        if not isinstance(
+            company_id_no,
+            GcdCompanyIdNo,
+        ):
+            raise TypeError(
+                "company_id_no must be a GcdCompanyIdNo"
+            )
+
+        element = ET.Element(
+            f"{{{namespace}}}"
+            "genInfo.company.id.idNo"
+        )
+
+        for fact in company_id_no.facts:
+            element.append(
+                self.text_fact_element(
+                    fact=fact,
+                    context_id=context_id,
+                    namespace=namespace,
+                )
+            )
+
+        return element
+    
     def instance_element(
         self,
         contexts: dict[str, TaxonomyContext],
@@ -194,6 +230,7 @@ class TaxonomyXbrlWriter:
         entry_points: tuple[TaxonomyEntryPoint, ...],
         taxonomy_namespaces: dict[str, str] | None = None,
         report_elements: tuple[GcdReportElement, ...] = (),
+        company_id_nos: tuple[GcdCompanyIdNo, ...] = (),
     ) -> ET.Element:
         """Erzeugt das Root-Element einer XBRL-Instanz."""
 
@@ -257,6 +294,31 @@ class TaxonomyXbrlWriter:
                         unit=fact.unit,
                         units=units,
                     ),
+                    namespace=namespace,
+                )
+            )
+        
+        for company_id_no in company_id_nos:
+            if not company_id_no.facts:
+                continue
+
+            first_fact = company_id_no.facts[0]
+
+            context_id = self.context_id_for(
+                context=first_fact.context,
+                contexts=contexts,
+            )
+
+            namespace = self.namespace_for(
+                concept_id=first_fact.concept.concept_id,
+                taxonomy_namespace=taxonomy_namespace,
+                taxonomy_namespaces=taxonomy_namespaces,
+            )
+
+            root.append(
+                self.gcd_company_id_no_element(
+                    company_id_no=company_id_no,
+                    context_id=context_id,
                     namespace=namespace,
                 )
             )

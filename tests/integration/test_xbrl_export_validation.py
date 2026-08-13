@@ -38,6 +38,9 @@ from openbilanz.taxonomy.gcd_report_profile import (
 from openbilanz.taxonomy.gcd_report_data import (
     GcdReportData,
 )
+from openbilanz.taxonomy.gcd_company_identifiers import (
+    GcdCompanyIdentifiers,
+)
 
 TAXONOMY_ROOT = Path(
     "/tmp/openbilanz-taxonomy"
@@ -729,6 +732,19 @@ def test_combined_69_instance_with_report_element_is_validated_by_arelle(
 
         gcd_builder = GcdFactBuilder()
 
+        identifiers = GcdCompanyIdentifiers(
+            tax_number_13="1234567890123",
+            tax_id="12345678901",
+            tax_economic_id="DE123456789",
+            bf4="1234",
+        )
+
+        company_id_no = gcd_builder.company_id_no(
+            identifiers=identifiers,
+            taxonomy_model=gcd_model,
+            context=duration_context,
+        )
+
         previous_fiscal_year = FiscalYear(
             start_date=date(2025, 1, 1),
             end_date=date(2025, 12, 31),
@@ -829,6 +845,9 @@ def test_combined_69_instance_with_report_element_is_validated_by_arelle(
             entry_points=(
                 gcd_entry_point,
                 gaap_entry_point,
+            ),
+            company_id_nos=(
+                company_id_no,
             ),
         )
 
@@ -966,6 +985,19 @@ def test_combined_610_instance_with_report_element_is_validated_by_arelle(
 
         gcd_builder = GcdFactBuilder()
 
+        identifiers = GcdCompanyIdentifiers(
+            tax_number_13="1234567890123",
+            tax_id="12345678901",
+            tax_economic_id="DE123456789",
+            bf4="1234",
+        )
+
+        company_id_no = gcd_builder.company_id_no(
+            identifiers=identifiers,
+            taxonomy_model=gcd_model,
+            context=duration_context,
+        )
+
         gcd_facts = (
             gcd_builder.company_facts(
                 data=company_data,
@@ -1060,6 +1092,9 @@ def test_combined_610_instance_with_report_element_is_validated_by_arelle(
             entry_points=(
                 gcd_entry_point,
                 gaap_entry_point,
+            ),
+            company_id_nos=(
+                company_id_no,
             ),
         )
 

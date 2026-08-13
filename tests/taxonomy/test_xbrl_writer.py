@@ -21,6 +21,12 @@ from openbilanz.taxonomy.xbrl_writer import TaxonomyXbrlWriter
 from openbilanz.taxonomy.gcd_report_element import (
     GcdReportElement,
 )
+from openbilanz.taxonomy.gcd_company_id_no import (
+    GcdCompanyIdNo,
+)
+from openbilanz.taxonomy.gcd_company_id_no import (
+    GcdCompanyIdNo,
+)
 
 
 DE_GAAP_CI_NAMESPACE = (
@@ -1481,4 +1487,318 @@ def test_xbrl_writer_includes_gcd_report_element_in_instance() -> None:
     )
     assert children[1].attrib["contextRef"] == "ctx-2025"
     assert children[1].text == "GuV"
+    
+def test_xbrl_writer_serializes_gcd_company_id_no_tuple() -> None:
+    """Der Writer serialisiert das GCD-idNo-Tuple."""
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    concept_names = (
+        "genInfo.company.id.idNo.type.companyId.ST13",
+        "genInfo.company.id.idNo.type.companyId.STID",
+        "genInfo.company.id.idNo.type.companyId.STWID",
+        "genInfo.company.id.idNo.type.companyId.BF4",
+    )
+
+    values = (
+        "1234567890123",
+        "12345678901",
+        "DE123456789",
+        "1234",
+    )
+
+    facts = tuple(
+        TaxonomyTextFact(
+            concept=TaxonomyConcept(
+                name=name,
+                concept_id="de-gcd_" + name,
+                type_name="xbrli:stringItemType",
+                substitution_group="xbrli:item",
+                period_type=TaxonomyPeriodType.DURATION,
+                balance=TaxonomyBalance.NONE,
+                abstract=False,
+                nillable=True,
+            ),
+            value=value,
+            context=context,
+        )
+        for name, value in zip(
+            concept_names,
+            values,
+            strict=True,
+        )
+    )
+
+    company_id_no = GcdCompanyIdNo(
+        facts=facts
+    )
+
+    writer = TaxonomyXbrlWriter()
+
+    element = writer.gcd_company_id_no_element(
+        company_id_no=company_id_no,
+        context_id="ctx-2025",
+        namespace=(
+            "http://www.xbrl.de/taxonomies/"
+            "de-gcd-2025-04-01"
+        ),
+    )
+
+    xml = ET.tostring(
+        element,
+        encoding="unicode",
+    )
+
+    assert "genInfo.company.id.idNo" in xml
+    assert "1234567890123" in xml
+    assert "12345678901" in xml
+    assert "DE123456789" in xml
+    assert "1234" in xml
+    assert 'contextRef="ctx-2025"' in xml
+
+def test_xbrl_writer_includes_gcd_company_id_no_in_instance() -> None:
+    """Das GCD-idNo-Tuple wird in die XBRL-Instanz aufgenommen."""
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    concept = TaxonomyConcept(
+        name=(
+            "genInfo.company.id.idNo.type.companyId.ST13"
+        ),
+        concept_id=(
+            "de-gcd_genInfo.company.id.idNo.type.companyId.ST13"
+        ),
+        type_name="xbrli:stringItemType",
+        substitution_group="xbrli:item",
+        period_type=TaxonomyPeriodType.DURATION,
+        balance=TaxonomyBalance.NONE,
+        abstract=False,
+        nillable=True,
+    )
+
+    fact = TaxonomyTextFact(
+        concept=concept,
+        value="1234567890123",
+        context=context,
+    )
+
+    company_id_no = GcdCompanyIdNo(
+        facts=(fact,)
+    )
+
+    writer = TaxonomyXbrlWriter()
+
+    root = writer.instance_element(
+        contexts={
+            "ctx-2025": context,
+        },
+        units={},
+        facts=(),
+        company_id_nos=(
+            company_id_no,
+        ),
+        taxonomy_namespace=(
+            "http://www.xbrl.de/taxonomies/"
+            "de-gcd-2025-04-01"
+        ),
+        taxonomy_namespaces={
+            "de-gcd": (
+                "http://www.xbrl.de/taxonomies/"
+                "de-gcd-2025-04-01"
+            ),
+        },
+        entry_points=(),
+    )
+
+    xml = writer.to_xml_string(
+        root=root
+    )
+
+    assert "genInfo.company.id.idNo" in xml
+    assert "1234567890123" in xml
+
+def test_xbrl_writer_serializes_gcd_company_id_no_tuple() -> None:
+    """Der Writer serialisiert das GCD-idNo-Tuple."""
+
+    namespace = (
+        "http://www.xbrl.de/taxonomies/"
+        "de-gcd-2025-04-01"
+    )
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    concept_names = (
+        "genInfo.company.id.idNo.type.companyId.ST13",
+        "genInfo.company.id.idNo.type.companyId.STID",
+        "genInfo.company.id.idNo.type.companyId.STWID",
+        "genInfo.company.id.idNo.type.companyId.BF4",
+    )
+
+    values = (
+        "1234567890123",
+        "12345678901",
+        "DE123456789",
+        "1234",
+    )
+
+    facts = tuple(
+        TaxonomyTextFact(
+            concept=TaxonomyConcept(
+                name=name,
+                concept_id="de-gcd_" + name,
+                type_name="xbrli:stringItemType",
+                substitution_group="xbrli:item",
+                period_type=TaxonomyPeriodType.DURATION,
+                balance=TaxonomyBalance.NONE,
+                abstract=False,
+                nillable=True,
+            ),
+            value=value,
+            context=context,
+        )
+        for name, value in zip(
+            concept_names,
+            values,
+            strict=True,
+        )
+    )
+
+    company_id_no = GcdCompanyIdNo(
+        facts=facts
+    )
+
+    writer = TaxonomyXbrlWriter()
+
+    element = writer.gcd_company_id_no_element(
+        company_id_no=company_id_no,
+        context_id="ctx-2025",
+        namespace=namespace,
+    )
+
+    assert element.tag == (
+        f"{{{namespace}}}"
+        "genInfo.company.id.idNo"
+    )
+
+    assert len(element) == 4
+
+    assert element[0].tag == (
+        f"{{{namespace}}}"
+        "genInfo.company.id.idNo.type.companyId.ST13"
+    )
+    assert element[0].text == "1234567890123"
+
+    assert element[1].tag == (
+        f"{{{namespace}}}"
+        "genInfo.company.id.idNo.type.companyId.STID"
+    )
+    assert element[1].text == "12345678901"
+
+    assert element[2].tag == (
+        f"{{{namespace}}}"
+        "genInfo.company.id.idNo.type.companyId.STWID"
+    )
+    assert element[2].text == "DE123456789"
+
+    assert element[3].tag == (
+        f"{{{namespace}}}"
+        "genInfo.company.id.idNo.type.companyId.BF4"
+    )
+    assert element[3].text == "1234"
+
+    for child in element:
+        assert child.get("contextRef") == "ctx-2025"
+
+
+def test_xbrl_writer_includes_gcd_company_id_no_in_instance() -> None:
+    """Das idNo-Tuple wird in die XBRL-Instanz aufgenommen."""
+
+    namespace = (
+        "http://www.xbrl.de/taxonomies/"
+        "de-gcd-2025-04-01"
+    )
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    concept = TaxonomyConcept(
+        name=(
+            "genInfo.company.id.idNo.type.companyId.ST13"
+        ),
+        concept_id=(
+            "de-gcd_genInfo.company.id.idNo.type.companyId.ST13"
+        ),
+        type_name="xbrli:stringItemType",
+        substitution_group="xbrli:item",
+        period_type=TaxonomyPeriodType.DURATION,
+        balance=TaxonomyBalance.NONE,
+        abstract=False,
+        nillable=True,
+    )
+
+    company_id_no = GcdCompanyIdNo(
+        facts=(
+            TaxonomyTextFact(
+                concept=concept,
+                value="1234567890123",
+                context=context,
+            ),
+        )
+    )
+
+    writer = TaxonomyXbrlWriter()
+
+    root = writer.instance_element(
+        contexts={
+            "ctx-2025": context,
+        },
+        units={},
+        facts=(),
+        company_id_nos=(
+            company_id_no,
+        ),
+        taxonomy_namespace=namespace,
+        taxonomy_namespaces={
+            "de-gcd": namespace,
+        },
+        entry_points=(),
+    )
+
+    tags = {
+        element.tag
+        for element in root.iter()
+    }
+
+    assert (
+        f"{{{namespace}}}"
+        "genInfo.company.id.idNo"
+    ) in tags
+
+    assert (
+        f"{{{namespace}}}"
+        "genInfo.company.id.idNo.type.companyId.ST13"
+    ) in tags
     

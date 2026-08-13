@@ -21,6 +21,13 @@ from openbilanz.taxonomy.taxonomy import (
 from openbilanz.taxonomy.gcd_report_data import (
     GcdReportData,
 )
+from openbilanz.taxonomy.gcd_company_id_no import (
+    GcdCompanyIdNo,
+)
+from openbilanz.taxonomy.gcd_company_identifiers import (
+    GcdCompanyIdentifiers,
+)
+
 
 class GcdFactBuilder:
     """Erzeugt GCD-Werte aus fachlichen Stammdaten."""
@@ -539,4 +546,98 @@ class GcdFactBuilder:
                 value=value,
                 context=context,
             ),
+        )
+    
+    def company_id_no(
+        self,
+        *,
+        identifiers: GcdCompanyIdentifiers,
+        taxonomy_model: TaxonomyModel,
+        context: TaxonomyContext,
+    ) -> GcdCompanyIdNo:
+        """Erzeugt das GCD-idNo-Tuple für Unternehmenskennungen."""
+
+        if not isinstance(
+            identifiers,
+            GcdCompanyIdentifiers,
+        ):
+            raise TypeError(
+                "identifiers must be a GcdCompanyIdentifiers"
+            )
+
+        if not isinstance(
+            taxonomy_model,
+            TaxonomyModel,
+        ):
+            raise TypeError(
+                "taxonomy_model must be a TaxonomyModel"
+            )
+
+        if not isinstance(
+            context,
+            TaxonomyContext,
+        ):
+            raise TypeError(
+                "context must be a TaxonomyContext"
+            )
+
+        values: list[tuple[str, str]] = [
+            (
+                "genInfo.company.id.idNo.type.companyId.ST13",
+                identifiers.tax_number_13,
+            ),
+        ]
+
+        if identifiers.tax_id is not None:
+            values.append(
+                (
+                    "genInfo.company.id.idNo.type.companyId.STID",
+                    identifiers.tax_id,
+                )
+            )
+
+        if identifiers.tax_economic_id is not None:
+            values.append(
+                (
+                    "genInfo.company.id.idNo.type.companyId.STWID",
+                    identifiers.tax_economic_id,
+                )
+            )
+
+        if identifiers.bf4 is not None:
+            values.append(
+                (
+                    "genInfo.company.id.idNo.type.companyId.BF4",
+                    identifiers.bf4,
+                )
+            )
+
+        concepts_by_name = {
+            concept.name: concept
+            for concept in taxonomy_model.concepts.concepts
+        }
+
+        facts: list[TaxonomyTextFact] = []
+
+        for concept_name, value in values:
+            concept = concepts_by_name.get(
+                concept_name
+            )
+
+            if concept is None:
+                raise ValueError(
+                    "GCD taxonomy concept not found: "
+                    f"{concept_name}"
+                )
+
+            facts.append(
+                TaxonomyTextFact(
+                    concept=concept,
+                    value=value,
+                    context=context,
+                )
+            )
+
+        return GcdCompanyIdNo(
+            facts=tuple(facts)
         )

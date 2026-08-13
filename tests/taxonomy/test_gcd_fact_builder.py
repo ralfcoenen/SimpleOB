@@ -32,7 +32,12 @@ from openbilanz.taxonomy.taxonomy import (
 from openbilanz.taxonomy.gcd_report_data import (
     GcdReportData,
 )
-
+from openbilanz.taxonomy.gcd_company_identifiers import (
+    GcdCompanyIdentifiers,
+)
+from openbilanz.taxonomy.gcd_company_id_no import (
+    GcdCompanyIdNo,
+)
 
 TEST_ENTITY_SCHEME = (
     "http://www.bundesfinanzministerium.de"
@@ -1233,3 +1238,131 @@ def test_gcd_fact_builder_builds_variable_report_data_facts(
             context=context,
         ),
     )
+    
+def test_gcd_fact_builder_builds_company_id_no_tuple() -> None:
+    """Unternehmenskennungen werden zu einem GCD-idNo-Tuple."""
+
+    identifiers = GcdCompanyIdentifiers(
+        tax_number_13="1234567890123",
+        tax_id="12345678901",
+        tax_economic_id="DE123456789",
+        bf4="1234",
+    )
+
+    concept_names = (
+        "genInfo.company.id.idNo.type.companyId.ST13",
+        "genInfo.company.id.idNo.type.companyId.STID",
+        "genInfo.company.id.idNo.type.companyId.STWID",
+        "genInfo.company.id.idNo.type.companyId.BF4",
+    )
+
+    concepts = tuple(
+        TaxonomyConcept(
+            name=name,
+            concept_id="de-gcd_" + name,
+            type_name="xbrli:stringItemType",
+            substitution_group="xbrli:item",
+            period_type=TaxonomyPeriodType.DURATION,
+            balance=TaxonomyBalance.NONE,
+            abstract=False,
+            nillable=True,
+        )
+        for name in concept_names
+    )
+
+    taxonomy_model = _taxonomy_model(
+        *concepts
+    )
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    builder = GcdFactBuilder()
+
+    company_id_no = builder.company_id_no(
+        identifiers=identifiers,
+        taxonomy_model=taxonomy_model,
+        context=context,
+    )
+
+    assert isinstance(
+        company_id_no,
+        GcdCompanyIdNo,
+    )
+
+    values = {
+        fact.concept.name: fact.value
+        for fact in company_id_no.facts
+    }
+
+    assert values == {
+        "genInfo.company.id.idNo.type.companyId.ST13": (
+            "1234567890123"
+        ),
+        "genInfo.company.id.idNo.type.companyId.STID": (
+            "12345678901"
+        ),
+        "genInfo.company.id.idNo.type.companyId.STWID": (
+            "DE123456789"
+        ),
+        "genInfo.company.id.idNo.type.companyId.BF4": (
+            "1234"
+        ),
+    }
+
+
+def test_gcd_fact_builder_omits_optional_company_identifiers() -> None:
+    """Nicht vorhandene optionale Kennungen werden nicht ausgegeben."""
+
+    identifiers = GcdCompanyIdentifiers(
+        tax_number_13="1234567890123",
+    )
+
+    concept = TaxonomyConcept(
+        name=(
+            "genInfo.company.id.idNo.type.companyId.ST13"
+        ),
+        concept_id=(
+            "de-gcd_genInfo.company.id.idNo.type.companyId.ST13"
+        ),
+        type_name="xbrli:stringItemType",
+        substitution_group="xbrli:item",
+        period_type=TaxonomyPeriodType.DURATION,
+        balance=TaxonomyBalance.NONE,
+        abstract=False,
+        nillable=True,
+    )
+
+    taxonomy_model = _taxonomy_model(
+        concept
+    )
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    builder = GcdFactBuilder()
+
+    company_id_no = builder.company_id_no(
+        identifiers=identifiers,
+        taxonomy_model=taxonomy_model,
+        context=context,
+    )
+
+    assert company_id_no.facts == (
+        TaxonomyTextFact(
+            concept=concept,
+            value="1234567890123",
+            context=context,
+        ),
+    )
+    
