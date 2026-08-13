@@ -831,7 +831,6 @@ def test_combined_69_instance_with_report_element_is_validated_by_arelle(
             profile=profile,
             taxonomy_model=gcd_model,
             context=duration_context,
-            version=TaxonomyVersion.V6_9,
         )
 
         gaap_concepts_by_name = {
@@ -870,6 +869,8 @@ def test_combined_69_instance_with_report_element_is_validated_by_arelle(
         )
 
         exporter = XbrlExporter()
+        
+        
 
         xml = exporter.export(
             contexts={
@@ -907,6 +908,46 @@ def test_combined_69_instance_with_report_element_is_validated_by_arelle(
             ),
         )
 
+        assert (
+            "genInfo.company.id.shareholder.beWiNr"
+            in xml
+        )
+
+        assert (
+            "genInfo.company.id.shareholder.idNotAssigned"
+            not in xml
+        )
+
+        assert (
+            "genInfo.report.id.reportElement.reportElements.B"
+            in xml
+        )
+
+        assert (
+            "genInfo.report.id.reportElement.reportElements.GuV"
+            in xml
+        )
+
+        assert (
+            "genInfo.report.id.reportElement.reportElements.BAL"
+            not in xml
+        )
+
+        assert (
+            "genInfo.report.id.reportElement.reportElements.KS"
+            not in xml
+        )
+
+        assert (
+            "genInfo.company.id.domesticBranchOfForeignCompany.HGB"
+            in xml
+        )
+
+        assert (
+            "genInfo.company.id.entityWithTaxablePurposeBusiness.normal"
+            in xml
+        )
+        
         instance_path = (
             tmp_path
             / "openbilanz-gcd-gaap-ci-69.xbrl"
@@ -1119,7 +1160,6 @@ def test_combined_610_instance_with_report_element_is_validated_by_arelle(
             profile=profile,
             taxonomy_model=gcd_model,
             context=duration_context,
-            version=TaxonomyVersion.V6_10,
         )
 
         gaap_concepts_by_name = {
@@ -1195,6 +1235,46 @@ def test_combined_610_instance_with_report_element_is_validated_by_arelle(
             ),
         )
 
+        assert (
+            "genInfo.company.id.shareholder.beWiNr"
+            in xml
+        )
+
+        assert (
+            "genInfo.company.id.shareholder.idNotAssigned"
+            in xml
+        )
+
+        assert (
+            "genInfo.report.id.reportElement.reportElements.B"
+            in xml
+        )
+
+        assert (
+            "genInfo.report.id.reportElement.reportElements.GuV"
+            in xml
+        )
+
+        assert (
+            "genInfo.report.id.reportElement.reportElements.BAL"
+            not in xml
+        )
+
+        assert (
+            "genInfo.report.id.reportElement.reportElements.KS"
+            not in xml
+        )
+
+        assert (
+            "genInfo.company.id.domesticBranchOfForeignCompany.HGB"
+            in xml
+        )
+
+        assert (
+            "genInfo.company.id.entityWithTaxablePurposeBusiness.normal"
+            in xml
+        )
+        
         instance_path = (
             tmp_path
             / "openbilanz-gcd-gaap-ci-610.xbrl"

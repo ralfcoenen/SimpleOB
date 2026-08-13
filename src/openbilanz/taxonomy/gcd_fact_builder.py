@@ -39,9 +39,6 @@ from openbilanz.taxonomy.gcd_shareholder_tuple import (
     GcdShareholderTuple,
 )
 from openbilanz.taxonomy.model import TaxonomyModel
-from openbilanz.taxonomy.taxonomy import (
-    TaxonomyVersion,
-)
 from openbilanz.taxonomy.text_fact import TaxonomyTextFact
 from openbilanz.taxonomy.unit import TaxonomyUnit
 
@@ -402,9 +399,8 @@ class GcdFactBuilder:
         profile: GcdReportProfile,
         taxonomy_model: TaxonomyModel,
         context: TaxonomyContext,
-        version=TaxonomyVersion
     ) -> GcdReportElement:
-        """Erzeugt das GCD-Report-Element für den Standardfall."""
+        """Erzeugt das GCD-Report-Element aus dem Berichtsprofil."""
 
         if not isinstance(
             profile,
@@ -429,53 +425,30 @@ class GcdFactBuilder:
             raise TypeError(
                 "context must be a TaxonomyContext"
             )
-            
-        if not isinstance(
-            version,
-            TaxonomyVersion,
-        ):
-            raise TypeError(
-                "version must be a TaxonomyVersion"
-            )
-
-        values = [
-            (
-                "genInfo.report.id.reportElement."
-                "reportElements.B",
-                "Bilanz",
-            ),
-            (
-                "genInfo.report.id.reportElement."
-                "reportElements.GuV",
-                "GuV",
-            ),
-            (
-                "genInfo.report.id.reportElement."
-                "reportElements.BAL",
-                "Anlagenspiegel",
-            ),
-        ]
-
-        if version in (
-            TaxonomyVersion.V6_9,
-            TaxonomyVersion.V6_10,
-        ):
-            values.append(
-                (
-                    "genInfo.report.id.reportElement."
-                    "reportElements.KS",
-                    "Kontennachweis",
-                )
-            )
 
         concepts_by_name = {
             concept.name: concept
             for concept in taxonomy_model.concepts.concepts
         }
 
+        values = {
+            "genInfo.report.id.reportElement.reportElements.B": (
+                "Bilanz"
+            ),
+            "genInfo.report.id.reportElement.reportElements.GuV": (
+                "GuV"
+            ),
+            "genInfo.report.id.reportElement.reportElements.BAL": (
+                "Anlagenspiegel"
+            ),
+            "genInfo.report.id.reportElement.reportElements.KS": (
+                "Kontennachweis"
+            ),
+        }
+
         facts: list[TaxonomyTextFact] = []
 
-        for concept_name, value in values:
+        for concept_name in profile.report_elements:
             concept = concepts_by_name.get(
                 concept_name
             )
@@ -483,6 +456,16 @@ class GcdFactBuilder:
             if concept is None:
                 raise ValueError(
                     "GCD taxonomy concept not found: "
+                    f"{concept_name}"
+                )
+
+            value = values.get(
+                concept_name
+            )
+
+            if value is None:
+                raise ValueError(
+                    "unsupported GCD report element: "
                     f"{concept_name}"
                 )
 
@@ -496,7 +479,7 @@ class GcdFactBuilder:
 
         return GcdReportElement(
             facts=tuple(facts)
-        )
+        )    
         
     def report_data_facts(
         self,

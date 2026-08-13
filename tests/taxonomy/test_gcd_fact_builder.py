@@ -56,9 +56,6 @@ from openbilanz.taxonomy.model import TaxonomyModel
 from openbilanz.taxonomy.presentation_set import (
     TaxonomyPresentationSet,
 )
-from openbilanz.taxonomy.taxonomy import (
-    TaxonomyVersion,
-)
 from openbilanz.taxonomy.text_fact import TaxonomyTextFact
 from openbilanz.taxonomy.unit import TaxonomyUnit
 
@@ -826,7 +823,6 @@ def test_gcd_fact_builder_builds_standard_report_element() -> None:
     concept_names = (
         "genInfo.report.id.reportElement.reportElements.B",
         "genInfo.report.id.reportElement.reportElements.GuV",
-        "genInfo.report.id.reportElement.reportElements.BAL",
     )
 
     concepts = tuple(
@@ -865,7 +861,6 @@ def test_gcd_fact_builder_builds_standard_report_element() -> None:
         profile=profile,
         taxonomy_model=taxonomy_model,
         context=context,
-        version=TaxonomyVersion.V6_8,
     )
 
     assert isinstance(
@@ -885,21 +880,15 @@ def test_gcd_fact_builder_builds_standard_report_element() -> None:
         "genInfo.report.id.reportElement.reportElements.GuV": (
             "GuV"
         ),
-        "genInfo.report.id.reportElement.reportElements.BAL": (
-            "Anlagenspiegel"
-        ),
     }
 
 def test_gcd_fact_builder_adds_account_statements_from_69() -> None:
-    """Ab Taxonomie 6.9 gehört der Kontennachweis zum Report-Element."""
-
+    """Taxonomie 6.9 verwendet im Standardprofil nur Bilanz und GuV."""
     profile = GcdReportProfile.standard()
 
     concept_names = (
         "genInfo.report.id.reportElement.reportElements.B",
         "genInfo.report.id.reportElement.reportElements.GuV",
-        "genInfo.report.id.reportElement.reportElements.BAL",
-        "genInfo.report.id.reportElement.reportElements.KS",
     )
 
     concepts = tuple(
@@ -938,7 +927,6 @@ def test_gcd_fact_builder_adds_account_statements_from_69() -> None:
         profile=profile,
         taxonomy_model=taxonomy_model,
         context=context,
-        version=TaxonomyVersion.V6_9,
     )
 
     values = {
@@ -953,24 +941,16 @@ def test_gcd_fact_builder_adds_account_statements_from_69() -> None:
         "genInfo.report.id.reportElement.reportElements.GuV": (
             "GuV"
         ),
-        "genInfo.report.id.reportElement.reportElements.BAL": (
-            "Anlagenspiegel"
-        ),
-        "genInfo.report.id.reportElement.reportElements.KS": (
-            "Kontennachweis"
-        ),
     }
-    
+        
 def test_gcd_fact_builder_keeps_account_statements_in_610() -> None:
-    """Auch Taxonomie 6.10 enthält den Kontennachweis im Report-Element."""
+    """Taxonomie 6.10 verwendet im Standardprofil nur Bilanz und GuV."""
 
     profile = GcdReportProfile.standard()
 
     concept_names = (
         "genInfo.report.id.reportElement.reportElements.B",
         "genInfo.report.id.reportElement.reportElements.GuV",
-        "genInfo.report.id.reportElement.reportElements.BAL",
-        "genInfo.report.id.reportElement.reportElements.KS",
     )
 
     concepts = tuple(
@@ -1009,7 +989,6 @@ def test_gcd_fact_builder_keeps_account_statements_in_610() -> None:
         profile=profile,
         taxonomy_model=taxonomy_model,
         context=context,
-        version=TaxonomyVersion.V6_10,
     )
 
     values = {
@@ -1024,14 +1003,8 @@ def test_gcd_fact_builder_keeps_account_statements_in_610() -> None:
         "genInfo.report.id.reportElement.reportElements.GuV": (
             "GuV"
         ),
-        "genInfo.report.id.reportElement.reportElements.BAL": (
-            "Anlagenspiegel"
-        ),
-        "genInfo.report.id.reportElement.reportElements.KS": (
-            "Kontennachweis"
-        ),
     }
-    
+
 def test_gcd_fact_builder_includes_balance_sheet_closing_date() -> None:
     """Das Ende des Wirtschaftsjahres ist zugleich der Bilanzstichtag."""
 

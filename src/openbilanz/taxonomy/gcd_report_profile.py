@@ -1,3 +1,4 @@
+
 """Fachliches GCD-Berichtsprofil für den unterstützten Standardfall."""
 
 from dataclasses import dataclass
@@ -15,6 +16,7 @@ class GcdReportProfile:
     income_statement_format: str
     consolidation_range: str
     income_classification: str
+    report_elements: tuple[str, ...]
 
     @classmethod
     def standard(cls) -> "GcdReportProfile":
@@ -51,6 +53,10 @@ class GcdReportProfile:
             income_classification=(
                 "genInfo.company.id.incomeClassification.trade"
             ),
+            report_elements=(
+                "genInfo.report.id.reportElement.reportElements.B",
+                "genInfo.report.id.reportElement.reportElements.GuV",
+            ),
         )
 
     def legal_status_for(
@@ -75,4 +81,4 @@ class GcdReportProfile:
             "unsupported legal form: "
             f"{legal_form}"
         )
-        
+    
