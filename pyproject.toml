@@ -39,6 +39,9 @@ where = [
 testpaths = [
     "tests"
 ]
+markers = [
+    "integration: tests requiring integration with external or installed components",
+]
 
 [project.scripts]
 openbilanz = "openbilanz.main:main"
