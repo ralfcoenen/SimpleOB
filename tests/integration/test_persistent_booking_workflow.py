@@ -257,7 +257,7 @@ def test_reconstructs_income_statement_and_balance_sheet() -> None:
                     amount=Decimal("17000.00"),
                 ),
                 BookingLine(
-                    account_number="1800",
+                    account_number="0800",
                     side=EntrySide.CREDIT,
                     amount=Decimal("17000.00"),
                 ),
@@ -268,7 +268,7 @@ def test_reconstructs_income_statement_and_balance_sheet() -> None:
             description="Büromaterial",
             lines=(
                 BookingLine(
-                    account_number="4980",
+                    account_number="4930",
                     side=EntrySide.DEBIT,
                     amount=Decimal("500.00"),
                 ),

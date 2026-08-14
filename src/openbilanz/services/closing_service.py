@@ -85,23 +85,60 @@ class ClosingService:
             bookings=tuple(bookings),
         )
 
-    @staticmethod
+    @classmethod
     def _calculate_net_income_from_statement(
+        cls,
         income_statement: IncomeStatement,
     ) -> Decimal:
-        """Berechnet das Ergebnis aus den kategorisierten GuV-Positionen."""
+        """Berechnet das Ergebnis ohne Doppelzählung aggregierter Positionen."""
+
+        income_total, expense_total = cls._statement_totals(
+            position=income_statement.income_statement,
+            amounts=income_statement.amounts,
+        )
+
+        return income_total - expense_total
+
+
+    @classmethod
+    def _statement_totals(
+        cls,
+        *,
+        position,
+        amounts,
+    ) -> tuple[Decimal, Decimal]:
+        """Ermittelt Erlöse und Aufwendungen eines GuV-Teilbaums.
+
+        Sobald eine fachlich kategorisierte Position erreicht wird,
+        wird deren bereits aggregierter Betrag verwendet. Untergeordnete
+        Positionen werden dann nicht nochmals berücksichtigt.
+        """
+
+        amount = amounts.get(
+            position,
+            Decimal("0.00"),
+        )
+
+        if position.category is StatementCategory.INCOME:
+            return amount, Decimal("0.00")
+
+        if position.category is StatementCategory.EXPENSE:
+            return Decimal("0.00"), amount
 
         income_total = Decimal("0.00")
         expense_total = Decimal("0.00")
 
-        for position, amount in income_statement.amounts.items():
-            if position.category is StatementCategory.INCOME:
-                income_total += amount
-            elif position.category is StatementCategory.EXPENSE:
-                expense_total += amount
+        for child in position.children:
+            child_income, child_expenses = cls._statement_totals(
+                position=child,
+                amounts=amounts,
+            )
 
-        return income_total - expense_total
+            income_total += child_income
+            expense_total += child_expenses
 
+        return income_total, expense_total
+   
     def _create_account_closing_bookings(
         self,
         *,

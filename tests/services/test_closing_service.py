@@ -14,6 +14,9 @@ from openbilanz.domain.chart_of_accounts_template import (
 )
 from openbilanz.domain.entry_side import EntrySide
 from openbilanz.domain.template_account import TemplateAccount
+from openbilanz.hgb.income_statement_structure import (
+    create_hgb_income_statement_structure,
+)
 from openbilanz.services.closing_accounts import ClosingAccounts
 from openbilanz.services.closing_result import ClosingResult
 from openbilanz.services.closing_service import ClosingService
@@ -325,3 +328,51 @@ def test_close_creates_booking_for_net_income() -> None:
             amount=Decimal("300.00"),
         ),
     )
+
+
+def test_calculate_net_income_does_not_double_count_aggregated_positions(
+) -> None:
+    """Aggregierte GuV-Eltern und ihre Kinder werden nicht doppelt gezählt."""
+
+    service = ClosingService()
+
+    income_statement_root = (
+        create_hgb_income_statement_structure()
+    )
+
+    positions = {}
+
+    def collect(position) -> None:
+        positions[position.code] = position
+
+        for child in position.children:
+            collect(child)
+
+    collect(income_statement_root)
+
+    income_statement = IncomeStatement(
+        income_statement=income_statement_root,
+        amounts={
+            positions["HGB.275.GKV.1"]:
+                Decimal("16500.00"),
+
+            positions["HGB.275.GKV.5"]:
+                Decimal("3000.00"),
+            positions["HGB.275.GKV.5.b"]:
+                Decimal("3000.00"),
+
+            positions["HGB.275.GKV.7"]:
+                Decimal("800.00"),
+            positions["HGB.275.GKV.7.a"]:
+                Decimal("800.00"),
+
+            positions["HGB.275.GKV.8"]:
+                Decimal("7620.00"),
+        },
+    )
+
+    result = service.calculate_net_income(
+        income_statement=income_statement,
+    )
+
+    assert result == Decimal("5080.00")

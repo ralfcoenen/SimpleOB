@@ -37,8 +37,8 @@ def test_imports_openbilanz_standard_chart_of_accounts() -> None:
 
     assert template.name == "openbilanz_standard"
 
-    assert len(template.accounts) == 11
-    assert len(template.account_mapping_rules) == 11
+    assert len(template.accounts) == 31
+    assert len(template.account_mapping_rules) == 30
 
     bank = next(
         account
@@ -54,7 +54,7 @@ def test_imports_openbilanz_standard_chart_of_accounts() -> None:
     assert bank.name == "Bank"
     assert bank.account_type is AccountType.ASSET
 
-    assert revenue.name == "Umsatzerlöse"
+    assert revenue.name == "Umsatzerlöse 19 %"
     assert revenue.account_type is AccountType.REVENUE
 
     bank_rule = next(
