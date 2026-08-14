@@ -127,3 +127,13 @@ def test_builds_gaap_ci_statement_from_hgb_amounts() -> None:
 
     finally:
         adapter.close()
+
+
+def test_ignores_unmapped_hgb_structure_positions() -> None:
+    """Reine HGB-Strukturpositionen benötigen kein Taxonomie-Mapping."""
+
+    assets, liabilities = create_hgb_balance_sheet_structure()
+    income_statement = create_hgb_income_statement_structure()
+
+    assert income_statement.code == "HGB.275.GKV"
+

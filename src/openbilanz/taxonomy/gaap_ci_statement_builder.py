@@ -26,13 +26,15 @@ class GaapCiStatement:
 
     balance_sheet_facts: tuple[TaxonomyFact, ...]
     income_statement_facts: tuple[TaxonomyFact, ...]
+    instant_context: TaxonomyContext
+    duration_context: TaxonomyContext
+    unit: TaxonomyUnit
 
     @property
     def facts(self) -> tuple[TaxonomyFact, ...]:
         """Liefert sämtliche GAAP-CI-Facts."""
 
         return self.balance_sheet_facts + self.income_statement_facts
-
 
 class GaapCiStatementBuilder:
     """Überführt HGB-Abschlusswerte in GAAP-CI-Facts."""
@@ -100,14 +102,23 @@ class GaapCiStatementBuilder:
         balance_amounts = {
             position: amount
             for position, amount in amounts.items()
-            if position in balance_positions
+            if (
+                position in balance_positions
+                and self._mappings.for_position(position)
+                is not None
+            )
         }
+
         income_amounts = {
             position: amount
             for position, amount in amounts.items()
-            if position in income_positions
+            if (
+                position in income_positions
+                and self._mappings.for_position(position)
+                is not None
+            )
         }
-
+        
         unknown_positions = set(amounts) - (
             balance_positions | income_positions
         )
@@ -157,8 +168,11 @@ class GaapCiStatementBuilder:
         return GaapCiStatement(
             balance_sheet_facts=balance_sheet_facts,
             income_statement_facts=income_statement_facts,
+            instant_context=instant_context,
+            duration_context=duration_context,
+            unit=fact_unit,
         )
-
+        
     @staticmethod
     def _walk(
         position: FinancialStatementPosition,

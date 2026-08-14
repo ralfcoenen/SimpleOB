@@ -7,13 +7,30 @@ from uuid import uuid4
 
 import pytest
 
+from openbilanz.accounting.account_balance import AccountBalance
+from openbilanz.accounting.financial_statement_builder import (
+    FinancialStatementBuilder,
+)
 from openbilanz.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
+from openbilanz.accounting.mapper import AccountMapper
 from openbilanz.accounting.statement_category import StatementCategory
+from openbilanz.domain.account_mapping_rule import AccountMappingRule
+from openbilanz.domain.account_type import AccountType
+from openbilanz.domain.chart_of_accounts_template import (
+    ChartOfAccountsTemplate,
+)
 from openbilanz.domain.company import Company
 from openbilanz.domain.fiscal_year import FiscalYear
+from openbilanz.domain.template_account import TemplateAccount
 from openbilanz.exporter.xbrl_export import XbrlExporter
+from openbilanz.hgb.balance_sheet_structure import (
+    create_hgb_balance_sheet_structure,
+)
+from openbilanz.hgb.income_statement_structure import (
+    create_hgb_income_statement_structure,
+)
 from openbilanz.taxonomy.arelle_adapter import ArelleAdapter
 from openbilanz.taxonomy.concept import (
     TaxonomyBalance,
@@ -43,6 +60,9 @@ from openbilanz.taxonomy.gcd_shareholder import (
     GcdShareholder,
     GcdShareholderGroup,
     GcdShareholderLegalStatus,
+)
+from openbilanz.taxonomy.hgb_gaap_ci_mapping import (
+    create_hgb_gaap_ci_mapping,
 )
 from openbilanz.taxonomy.mapper import TaxonomyMapper
 from openbilanz.taxonomy.mapping import TaxonomyMappingRule
@@ -1295,3 +1315,365 @@ def test_combined_610_instance_with_report_element_is_validated_by_arelle(
     assert result.is_valid
     assert result.errors == ()
     
+def test_gaap_ci_69_builds_facts_from_real_hgb_statement_pipeline(
+    tmp_path: Path,
+) -> None:
+    """HGB-Abschlusswerte werden über das Mapping zu validem GAAP-CI-XBRL."""
+
+    version_root = TAXONOMY_ROOT / "6.9"
+
+    if not version_root.is_dir():
+        pytest.skip(
+            "Taxonomy 6.9 is not installed locally"
+        )
+
+    resolver = TaxonomyResolver(
+        root=TAXONOMY_ROOT
+    )
+
+    entry_point_path = resolver.gaap_ci_fiscal_entry_point(
+        TaxonomyVersion.V6_9
+    )
+
+    base_entry_point = TaxonomyEntryPoint.from_file(
+        entry_point_path
+    )
+
+    entry_point = TaxonomyEntryPoint(
+        path=base_entry_point.path,
+        namespace=base_entry_point.namespace,
+        schema_imports=base_entry_point.schema_imports,
+        linkbase_references=base_entry_point.linkbase_references,
+        schema_ref=entry_point_path.as_uri(),
+    )
+
+    taxonomy_namespace = (
+        "http://www.xbrl.de/taxonomies/"
+        "de-gaap-ci-2025-04-01"
+    )
+
+    assets, liabilities = (
+        create_hgb_balance_sheet_structure()
+    )
+
+    income_statement = (
+        create_hgb_income_statement_structure()
+    )
+
+    def find_position(
+        root: FinancialStatementPosition,
+        code: str,
+    ) -> FinancialStatementPosition:
+        if root.code == code:
+            return root
+
+        for child in root.children:
+            try:
+                return find_position(
+                    child,
+                    code,
+                )
+            except ValueError:
+                pass
+
+        raise ValueError(
+            f"HGB position not found: {code}"
+        )
+
+    bank = find_position(
+        assets,
+        "HGB.266.AKTIVA.B.IV",
+    )
+
+    subscribed_capital = find_position(
+        liabilities,
+        "HGB.266.PASSIVA.A.I",
+    )
+
+    trade_liabilities = find_position(
+        liabilities,
+        "HGB.266.PASSIVA.C.4",
+    )
+
+    net_sales = find_position(
+        income_statement,
+        "HGB.275.GKV.1",
+    )
+
+    other_cost = find_position(
+        income_statement,
+        "HGB.275.GKV.8",
+    )
+
+    accounts = (
+        TemplateAccount(
+            account_number="1200",
+            name="Bank",
+            account_type=AccountType.ASSET,
+        ),
+        TemplateAccount(
+            account_number="0800",
+            name="Gezeichnetes Kapital",
+            account_type=AccountType.EQUITY,
+        ),
+        TemplateAccount(
+            account_number="1600",
+            name="Verbindlichkeiten aus Lieferungen",
+            account_type=AccountType.LIABILITY,
+        ),
+        TemplateAccount(
+            account_number="8400",
+            name="Umsatzerlöse",
+            account_type=AccountType.REVENUE,
+        ),
+        TemplateAccount(
+            account_number="4900",
+            name="Sonstige betriebliche Aufwendungen",
+            account_type=AccountType.EXPENSE,
+        ),
+    )
+
+    chart_of_accounts = ChartOfAccountsTemplate(
+        name="GAAP-CI-Integrationstest",
+        accounts=accounts,
+        account_mapping_rules=(
+            AccountMappingRule(
+                account_number="1200",
+                debit_position=bank,
+                credit_position=None,
+            ),
+            AccountMappingRule(
+                account_number="0800",
+                debit_position=None,
+                credit_position=subscribed_capital,
+            ),
+            AccountMappingRule(
+                account_number="1600",
+                debit_position=None,
+                credit_position=trade_liabilities,
+            ),
+            AccountMappingRule(
+                account_number="8400",
+                debit_position=None,
+                credit_position=net_sales,
+            ),
+            AccountMappingRule(
+                account_number="4900",
+                debit_position=other_cost,
+                credit_position=None,
+            ),
+        ),
+    )
+
+    balances = (
+        AccountBalance(
+            account_number="1200",
+            debit=Decimal("10000.00"),
+        ),
+        AccountBalance(
+            account_number="0800",
+            credit=Decimal("1000.00"),
+        ),
+        AccountBalance(
+            account_number="1600",
+            credit=Decimal("9000.00"),
+        ),
+        AccountBalance(
+            account_number="8400",
+            credit=Decimal("5000.00"),
+        ),
+        AccountBalance(
+            account_number="4900",
+            debit=Decimal("2000.00"),
+        ),
+    )
+
+    statement_builder = FinancialStatementBuilder(
+        AccountMapper(
+            chart_of_accounts
+        )
+    )
+
+    amounts = statement_builder.build(
+        balances=balances,
+        root_positions=(
+            assets,
+            liabilities,
+            income_statement,
+        ),
+    )
+
+    assert amounts[assets] == Decimal("10000.00")
+    assert amounts[liabilities] == Decimal("10000.00")
+
+    assert amounts[net_sales] == Decimal("5000.00")
+    assert amounts[other_cost] == Decimal("2000.00")
+
+    mapping_set = create_hgb_gaap_ci_mapping(
+        assets=assets,
+        liabilities=liabilities,
+        income_statement=income_statement,
+    )
+
+    adapter = ArelleAdapter()
+
+    try:
+        taxonomy_model = adapter.model(
+            entry_point_path
+        )
+
+        validation_result = mapping_set.validate(
+            taxonomy_model
+        )
+
+        assert validation_result.is_valid
+
+        mapper = TaxonomyMapper(
+            mappings=mapping_set,
+            taxonomy_model=taxonomy_model,
+        )
+
+        fact_builder = TaxonomyFactBuilder(
+            mapper=mapper
+        )
+
+        instant_context = TaxonomyContext(
+            entity_identifier="DE123456789",
+            entity_scheme=TEST_ENTITY_SCHEME,
+            period_type=TaxonomyPeriodType.INSTANT,
+            start_date=None,
+            end_date=date(2026, 12, 31),
+        )
+
+        duration_context = TaxonomyContext(
+            entity_identifier="DE123456789",
+            entity_scheme=TEST_ENTITY_SCHEME,
+            period_type=TaxonomyPeriodType.DURATION,
+            start_date=date(2026, 1, 1),
+            end_date=date(2026, 12, 31),
+        )
+
+        unit = TaxonomyUnit.eur()
+
+        def collect(
+            root: FinancialStatementPosition,
+        ) -> tuple[FinancialStatementPosition, ...]:
+            result = [root]
+
+            for child in root.children:
+                result.extend(
+                    collect(child)
+                )
+
+            return tuple(result)
+
+        balance_positions = set(
+            collect(assets)
+            + collect(liabilities)
+        )
+
+        income_positions = set(
+            collect(income_statement)
+        )
+
+        balance_amounts = {
+            position: amount
+            for position, amount in amounts.items()
+            if (
+                position in balance_positions
+                and mapping_set.for_position(position)
+                is not None
+            )
+        }
+
+        income_amounts = {
+            position: amount
+            for position, amount in amounts.items()
+            if (
+                position in income_positions
+                and mapping_set.for_position(position)
+                is not None
+            )
+        }
+
+        balance_facts = fact_builder.build(
+            amounts=balance_amounts,
+            context=instant_context,
+            unit=unit,
+        )
+
+        income_facts = fact_builder.build(
+            amounts=income_amounts,
+            context=duration_context,
+            unit=unit,
+        )
+
+        facts = (
+            balance_facts
+            + income_facts
+        )
+
+        concepts_by_name = {
+            fact.concept.name: fact
+            for fact in facts
+        }
+
+        assert concepts_by_name[
+            "bs.ass.currAss.cashEquiv"
+        ].amount == Decimal("10000.00")
+
+        assert concepts_by_name[
+            "bs.eqLiab.equity.subscribed"
+        ].amount == Decimal("1000.00")
+
+        assert concepts_by_name[
+            "bs.eqLiab.liab.trade"
+        ].amount == Decimal("9000.00")
+
+        assert concepts_by_name[
+            (
+                "is.netIncome.regular.operatingTC."
+                "grossTradingProfit.totalOutput.netSales"
+            )
+        ].amount == Decimal("5000.00")
+
+        assert concepts_by_name[
+            "is.netIncome.regular.operatingTC.otherCost"
+        ].amount == Decimal("2000.00")
+
+        exporter = XbrlExporter()
+
+        xml = exporter.export(
+            contexts={
+                "ctx-instant-2026": instant_context,
+                "ctx-duration-2026": duration_context,
+            },
+            units={
+                "EUR": unit,
+            },
+            facts=facts,
+            taxonomy_namespace=taxonomy_namespace,
+            entry_points=(
+                entry_point,
+            ),
+        )
+
+        instance_path = (
+            tmp_path
+            / "openbilanz-gaap-ci-pipeline-69.xbrl"
+        )
+
+        instance_path.write_text(
+            xml,
+            encoding="utf-8",
+        )
+
+        result = adapter.validate(
+            instance_path
+        )
+
+    finally:
+        adapter.close()
+
+    assert result.is_valid
+    assert result.errors == ()
