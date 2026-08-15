@@ -6,6 +6,9 @@ from sqlalchemy.orm import Session
 
 from openbilanz.database.models import Mandant, Wirtschaftsjahr
 from openbilanz.domain.company import Company
+from openbilanz.domain.company_master_data import (
+    CompanyMasterData,
+)
 from openbilanz.domain.fiscal_year import FiscalYear
 from openbilanz.domain.fiscal_year_status import FiscalYearStatus
 from openbilanz.domain.managed_fiscal_year import ManagedFiscalYear
@@ -336,4 +339,99 @@ class CompanyRepository:
         if commit:
             self._session.commit()
         
+    def get_master_data(
+    self,
+    company_id: UUID,
+) -> CompanyMasterData | None:
+        """Lädt die Stammdaten eines Unternehmens."""
+
+        model = (
+            self._session.query(Mandant)
+            .filter(
+                Mandant.company_id == str(company_id)
+            )
+            .one_or_none()
+        )
+
+        if model is None:
+            return None
+
+        company = Company(
+            company_id=UUID(model.company_id),
+            name=model.name,
+        )
+
+        return CompanyMasterData(
+            company=company,
+            legal_form=model.rechtsform or "",
+            tax_number=model.steuernummer or "",
+            tax_office=model.finanzamt or "",
+            tax_id=model.steuer_id or "",
+            tax_economic_id=model.wirtschafts_id or "",
+            bf4=model.bf4 or "",
+            street=model.strasse or "",
+            house_number=model.hausnummer or "",
+            postal_code=model.plz or "",
+            city=model.ort or "",
+            country=model.land or "",
+            business=model.geschaeftstaetigkeit or "",
+        ) 
         
+    def save_master_data(
+        self,
+        master_data: CompanyMasterData,
+    ) -> None:
+        """Speichert die Stammdaten eines Unternehmens."""
+
+        model = (
+            self._session.query(Mandant)
+            .filter(
+                Mandant.company_id
+                == str(master_data.company.company_id)
+            )
+            .one_or_none()
+        )
+
+        if model is None:
+            raise ValueError(
+                "Unternehmen wurde nicht gefunden."
+            )
+
+        model.rechtsform = (
+            master_data.legal_form or None
+        )
+        model.steuernummer = (
+            master_data.tax_number or None
+        )
+        model.finanzamt = (
+            master_data.tax_office or None
+        )
+        model.steuer_id = (
+            master_data.tax_id or None
+        )
+        model.wirtschafts_id = (
+            master_data.tax_economic_id or None
+        )
+        model.bf4 = (
+            master_data.bf4 or None
+        )
+        model.strasse = (
+            master_data.street or None
+        )
+        model.hausnummer = (
+            master_data.house_number or None
+        )
+        model.plz = (
+            master_data.postal_code or None
+        )
+        model.ort = (
+            master_data.city or None
+        )
+        model.land = (
+            master_data.country or None
+        )
+        model.geschaeftstaetigkeit = (
+            master_data.business or None
+        )
+
+        self._session.commit()       

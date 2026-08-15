@@ -27,6 +27,7 @@ class BookingFrame(ttk.Frame):
 
         self._accounts = accounts
         self._on_booking_created = on_booking_created
+        self._enabled = True
 
         self._accounts_by_display_name = {
             self._account_display_name(account): account
@@ -68,11 +69,12 @@ class BookingFrame(ttk.Frame):
             pady=6,
         )
 
-        ttk.Entry(
+        self._booking_date_entry = ttk.Entry(
             self,
             textvariable=self._booking_date_var,
             width=16,
-        ).grid(
+        )
+        self._booking_date_entry.grid(
             row=0,
             column=1,
             sticky="w",
@@ -243,6 +245,59 @@ class BookingFrame(ttk.Frame):
                 "write",
                 self._on_form_changed,
             )
+    
+    def set_enabled(
+        self,
+        enabled: bool,
+    ) -> None:
+        """Aktiviert oder sperrt die Buchungserfassung."""
+
+        self._enabled = enabled
+
+        entry_state = (
+            "normal"
+            if enabled
+            else "disabled"
+        )
+
+        combobox_state = (
+            "normal"
+            if enabled
+            else "disabled"
+        )
+
+        self._booking_date_entry.configure(
+            state=entry_state
+        )
+        self._voucher_no_entry.configure(
+            state=entry_state
+        )
+        self._description_entry.configure(
+            state=entry_state
+        )
+        self._amount_entry.configure(
+            state=entry_state
+        )
+
+        self._debit_account_box.configure(
+            state=combobox_state
+        )
+        self._credit_account_box.configure(
+            state=combobox_state
+        )
+
+        if enabled:
+            self._on_form_changed()
+        else:
+            self._booking_button.state(
+                ["disabled"]
+            )
+
+            self._status_var.set(
+                "Das Geschäftsjahr ist abgeschlossen. "
+                "Buchungen sind nicht mehr möglich."
+            )
+    
     def _filter_debit_accounts(
         self,
         _event: tk.Event,
@@ -292,6 +347,12 @@ class BookingFrame(ttk.Frame):
         self,
         *_args: object,
     ) -> None:
+        
+        if not self._enabled:
+            self._booking_button.state(
+                ["disabled"]
+            )
+            return
         """Prüft die Vollständigkeit der Buchungsmaske."""
 
         debit_account = self._resolve_account(
@@ -343,6 +404,9 @@ class BookingFrame(ttk.Frame):
     def _create_booking(self) -> None:
         """Erzeugt die Buchung aus den Eingaben."""
 
+        if not self._enabled:
+            return
+        
         debit_account = self._resolve_account(
             self._debit_account_var.get()
         )

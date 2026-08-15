@@ -1,9 +1,9 @@
 """Integrationstests für das persistente Referenzszenario."""
-import pytest
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
 
+import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -53,7 +53,6 @@ from openbilanz.taxonomy.gcd_company_identifiers import (
 )
 from openbilanz.taxonomy.resolver import TaxonomyResolver
 from openbilanz.taxonomy.taxonomy import TaxonomyVersion
-
 
 STANDARD_CHART_PATH = (
     Path(__file__).resolve().parents[2]

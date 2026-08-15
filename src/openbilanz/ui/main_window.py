@@ -1,48 +1,31 @@
 """Hauptfenster der OpenBilanz-Anwendung."""
-
 import tkinter as tk
-from pathlib import Path
-from tkinter import ttk
+from tkinter import messagebox, ttk
 
 from openbilanz.accounting.balance_sheet import BalanceSheet
-from openbilanz.accounting.financial_statement_builder import (
-    FinancialStatementBuilder,
-)
-from openbilanz.accounting.hgb_financial_statement_position_provider import (
-    HgbFinancialStatementPositionProvider,
+from openbilanz.accounting.financial_statement_context import (
+    FinancialStatementContext,
 )
 from openbilanz.accounting.income_statement import IncomeStatement
 from openbilanz.accounting.ledger import Ledger
-from openbilanz.accounting.mapper import AccountMapper
-from openbilanz.core.context import ApplicationContext
-from openbilanz.database.booking_repository import (
-    BookingRepository,
-)
-from openbilanz.domain.account import Account
 from openbilanz.domain.account_type import AccountType
 from openbilanz.domain.booking import Booking
-from openbilanz.domain.chart_of_accounts_template import (
-    ChartOfAccountsTemplate,
-)
 from openbilanz.domain.journal import Journal
 from openbilanz.domain.money import ZERO
-from openbilanz.hgb.balance_sheet_structure import (
-    create_hgb_balance_sheet_structure,
-)
-from openbilanz.hgb.income_statement_structure import (
-    create_hgb_income_statement_structure,
-)
-from openbilanz.importers.csv_chart_of_accounts_importer import (
-    CsvChartOfAccountsImporter,
-)
 from openbilanz.services.closing_result import ClosingResult
 from openbilanz.services.closing_service import ClosingService
+from openbilanz.services.fiscal_year_workspace import (
+    FiscalYearWorkspace,
+)
 from openbilanz.services.opening_balance_service import (
     OpeningBalanceService,
 )
-from openbilanz.services.posting_service import PostingService
 from openbilanz.ui.balance_sheet_frame import BalanceSheetFrame
 from openbilanz.ui.booking_frame import BookingFrame
+from openbilanz.ui.closing_frame import ClosingFrame
+from openbilanz.ui.company_master_data_dialog import (
+    CompanyMasterDataDialog,
+)
 from openbilanz.ui.income_statement_frame import (
     IncomeStatementFrame,
 )
@@ -57,65 +40,82 @@ class MainWindow(tk.Tk):
     def __init__(
         self,
         *,
-        context: ApplicationContext,
-        booking_repository: BookingRepository,
+        workspace: FiscalYearWorkspace,
+        financial_statement_context: FinancialStatementContext,
     ) -> None:
         super().__init__()
 
-        self._context = context
-        self._booking_repository = booking_repository
+        self._workspace = workspace
+        self._context = workspace.context
+        self._financial_statement_context = (
+            financial_statement_context
+        )
 
         self.title("OpenBilanz")
         self.geometry("1100x700")
         self.minsize(850, 550)
 
-        self._journal = Journal()
-        self._ledger = Ledger()
-
         self._opening_balance_service = OpeningBalanceService(
             opening_balance_account_number="9000",
         )
-        self._posting_service = PostingService()
+
         self._closing_service = ClosingService()
 
-        (
-            self._assets,
-            self._liabilities,
-        ) = create_hgb_balance_sheet_structure()
-
+        self._assets = (
+            financial_statement_context.assets
+        )
+        self._liabilities = (
+            financial_statement_context.liabilities
+        )
         self._income_statement = (
-            create_hgb_income_statement_structure()
+            financial_statement_context.income_statement
         )
 
         self._chart_of_accounts = (
-            self._load_standard_chart_of_accounts()
+            financial_statement_context.chart_of_accounts
         )
-
-        self._accounts = tuple(
-            Account(template=template_account)
-            for template_account
-            in self._chart_of_accounts.accounts
+        self._accounts = (
+            financial_statement_context.accounts
         )
-
+        self._account_mapper = (
+            financial_statement_context.account_mapper
+        )
         self._financial_statement_builder = (
-            FinancialStatementBuilder(
-                AccountMapper(
-                    self._chart_of_accounts
-                )
-            )
+            financial_statement_context.statement_builder
         )
+        self._account_types = (
+            financial_statement_context.account_types
+        )
+        
+        self._current_income_statement: (
+            IncomeStatement | None
+        ) = None
 
-        self._account_types = {
-            account.account_number: account.account_type
-            for account
-            in self._chart_of_accounts.accounts
-        }
+        self._current_closing_result: (
+            ClosingResult | None
+        ) = None
 
-        self._load_bookings()
+        self._current_balance_sheet: (
+            BalanceSheet | None
+        ) = None
+
+        self._current_closing_balances = ()
 
         self._create_ui()
 
         self._refresh_all()
+
+    @property
+    def _journal(self) -> Journal:
+        """Liefert das Journal des aktuellen Workspace."""
+
+        return self._workspace.journal
+
+    @property
+    def _ledger(self) -> Ledger:
+        """Liefert das Hauptbuch des aktuellen Workspace."""
+
+        return self._workspace.ledger
 
     def _create_ui(self) -> None:
         """Erzeugt die Benutzeroberfläche."""
@@ -173,10 +173,20 @@ class MainWindow(tk.Tk):
         )
         
         ttk.Button(
+            context_frame,
+            text="Unternehmensstammdaten",
+            command=self._open_company_master_data,
+        ).pack(
+            anchor="w",
+            pady=(8, 0),
+        )
+        
+        self._opening_balance_button = ttk.Button(
             container,
             text="Eröffnungsbilanz erfassen",
             command=self._open_opening_balance,
-        ).pack(
+        )
+        self._opening_balance_button.pack(
             anchor="w",
             pady=(0, 16),
         )
@@ -184,6 +194,7 @@ class MainWindow(tk.Tk):
         self._notebook = ttk.Notebook(
             container
         )
+
         self._notebook.pack(
             fill="both",
             expand=True,
@@ -193,19 +204,28 @@ class MainWindow(tk.Tk):
             self._notebook,
             padding=16,
         )
+
         self._journal_tab = ttk.Frame(
             self._notebook,
             padding=16,
         )
+
         self._booking_tab = ttk.Frame(
             self._notebook,
             padding=16,
         )
+
         self._balance_sheet_tab = ttk.Frame(
             self._notebook,
             padding=16,
         )
+
         self._income_statement_tab = ttk.Frame(
+            self._notebook,
+            padding=16,
+        )
+
+        self._closing_tab = ttk.Frame(
             self._notebook,
             padding=16,
         )
@@ -214,21 +234,30 @@ class MainWindow(tk.Tk):
             self._accounts_tab,
             text="Konten",
         )
+
         self._notebook.add(
             self._journal_tab,
             text="Journal",
         )
+
         self._notebook.add(
             self._booking_tab,
             text="Buchen",
         )
+
         self._notebook.add(
             self._balance_sheet_tab,
             text="Bilanz",
         )
+
         self._notebook.add(
             self._income_statement_tab,
             text="GuV",
+        )
+
+        self._notebook.add(
+            self._closing_tab,
+            text="Jahresabschluss",
         )
 
         self._create_accounts_tab()
@@ -236,6 +265,7 @@ class MainWindow(tk.Tk):
         self._create_booking_tab()
         self._create_balance_sheet_tab()
         self._create_income_statement_tab()
+        self._create_closing_tab()
 
     def _create_accounts_tab(self) -> None:
         """Erzeugt den Arbeitsbereich Konten."""
@@ -276,18 +306,22 @@ class MainWindow(tk.Tk):
             "account_number",
             text="Konto",
         )
+
         self._account_table.heading(
             "name",
             text="Bezeichnung",
         )
+
         self._account_table.heading(
             "debit",
             text="Soll",
         )
+
         self._account_table.heading(
             "credit",
             text="Haben",
         )
+
         self._account_table.heading(
             "balance",
             text="Saldo",
@@ -298,21 +332,25 @@ class MainWindow(tk.Tk):
             width=90,
             anchor="w",
         )
+
         self._account_table.column(
             "name",
             width=330,
             anchor="w",
         )
+
         self._account_table.column(
             "debit",
             width=120,
             anchor="e",
         )
+
         self._account_table.column(
             "credit",
             width=120,
             anchor="e",
         )
+
         self._account_table.column(
             "balance",
             width=140,
@@ -355,22 +393,27 @@ class MainWindow(tk.Tk):
             "date",
             text="Datum",
         )
+
         self._journal_table.heading(
             "voucher",
             text="Beleg",
         )
+
         self._journal_table.heading(
             "description",
             text="Buchungstext",
         )
+
         self._journal_table.heading(
             "account",
             text="Konto",
         )
+
         self._journal_table.heading(
             "side",
             text="S/H",
         )
+
         self._journal_table.heading(
             "amount",
             text="Betrag",
@@ -381,26 +424,31 @@ class MainWindow(tk.Tk):
             width=100,
             anchor="w",
         )
+
         self._journal_table.column(
             "voucher",
             width=100,
             anchor="w",
         )
+
         self._journal_table.column(
             "description",
             width=230,
             anchor="w",
         )
+
         self._journal_table.column(
             "account",
             width=330,
             anchor="w",
         )
+
         self._journal_table.column(
             "side",
             width=60,
             anchor="center",
         )
+
         self._journal_table.column(
             "amount",
             width=130,
@@ -425,12 +473,13 @@ class MainWindow(tk.Tk):
             pady=(0, 16),
         )
 
-        booking_frame = BookingFrame(
+        self._booking_frame = BookingFrame(
             self._booking_tab,
             accounts=self._accounts,
             on_booking_created=self._post_booking,
         )
-        booking_frame.pack(
+
+        self._booking_frame.pack(
             fill="x",
             expand=False,
         )
@@ -454,6 +503,7 @@ class MainWindow(tk.Tk):
                 self._balance_sheet_tab
             )
         )
+
         self._balance_sheet_frame.pack(
             fill="both",
             expand=True,
@@ -478,7 +528,24 @@ class MainWindow(tk.Tk):
                 self._income_statement_tab
             )
         )
+
         self._income_statement_frame.pack(
+            fill="both",
+            expand=True,
+        )
+
+    def _create_closing_tab(
+        self,
+    ) -> None:
+        """Erzeugt den Arbeitsbereich Jahresabschluss."""
+
+        self._closing_frame = ClosingFrame(
+            self._closing_tab,
+            on_validate=self._validate_closing,
+            on_close=self._close_fiscal_year,
+        )
+
+        self._closing_frame.pack(
             fill="both",
             expand=True,
         )
@@ -489,16 +556,11 @@ class MainWindow(tk.Tk):
     ) -> None:
         """Verbucht und speichert eine Buchung."""
 
-        self._posting_service.post_booking(
-            booking=booking,
-            ledger=self._ledger,
-            journal=self._journal,
-        )
+        if self._workspace.is_closed:
+            return
 
-        self._booking_repository.add(
-            company_id=self._context.company.company_id,
-            fiscal_year=self._context.fiscal_year,
-            booking=booking,
+        self._workspace.post_booking(
+            booking
         )
 
         self._refresh_all()
@@ -506,6 +568,9 @@ class MainWindow(tk.Tk):
     def _open_opening_balance(self) -> None:
         """Erfasst, verbucht und speichert die Eröffnungsbilanz."""
 
+        if self._workspace.is_closed:
+            return
+        
         dialog = OpeningBalanceDialog(
             self
         )
@@ -523,30 +588,95 @@ class MainWindow(tk.Tk):
         )
 
         for booking in bookings:
-            self._posting_service.post_booking(
-                booking=booking,
-                ledger=self._ledger,
-                journal=self._journal,
-            )
-
-            self._booking_repository.add(
-                company_id=self._context.company.company_id,
-                fiscal_year=self._context.fiscal_year,
-                booking=booking,
+            self._workspace.post_booking(
+                booking
             )
 
         self._refresh_all()
 
+    def _validate_closing(self) -> None:
+        """Prüft den Jahresabschluss."""
 
+        if (
+            self._current_income_statement is None
+            or self._current_closing_result is None
+            or self._current_balance_sheet is None
+        ):
+            return
+
+        result = self._workspace.validate_closing(
+            balance_sheet=self._current_balance_sheet,
+            income_statement=self._current_income_statement,
+            closing_result=self._current_closing_result,
+            balances=self._current_closing_balances,
+            mapper=self._account_mapper,
+        )
+
+        self._closing_frame.update_consistency(
+            result
+        )
+
+    def _close_fiscal_year(self) -> None:
+        """Schließt das Geschäftsjahr persistent ab."""
+
+        if self._workspace.is_closed:
+            return
+
+        if self._current_income_statement is None:
+            return
+
+        confirmed = messagebox.askyesno(
+            "Geschäftsjahr abschließen",
+            (
+                "Das Geschäftsjahr wird endgültig abgeschlossen.\n\n"
+                "Dabei werden die Erfolgskonten abgeschlossen und "
+                "weitere Buchungen in diesem Geschäftsjahr gesperrt.\n\n"
+                "Möchten Sie fortfahren?"
+            ),
+            parent=self,
+        )
+
+        if not confirmed:
+            return
+
+        try:
+            result = self._workspace.close_fiscal_year(
+                income_statement=self._current_income_statement,
+                chart_of_accounts=self._chart_of_accounts,
+            )
+        except ValueError as exc:
+            messagebox.showerror(
+                "Jahresabschluss fehlgeschlagen",
+                str(exc),
+                parent=self,
+            )
+            return
+
+        self._refresh_all()
+
+        self._closing_frame.update_net_income(
+            result.net_income
+        )
+
+        self._closing_frame.mark_closed()
+
+        messagebox.showinfo(
+            "Jahresabschluss",
+            "Das Geschäftsjahr wurde erfolgreich abgeschlossen.",
+            parent=self,
+        )
+   
     def _refresh_all(self) -> None:
         """Aktualisiert alle sichtbaren Buchhaltungsdaten."""
 
         self._refresh_overview()
         self._refresh_journal()
         self._refresh_balance_sheet()
+        self._refresh_closing()
+        self._update_editing_state()
 
         self.update_idletasks()
-
+    
     def _refresh_overview(self) -> None:
         """Aktualisiert die Kontenübersicht."""
 
@@ -693,6 +823,8 @@ class MainWindow(tk.Tk):
     def _refresh_balance_sheet(self) -> None:
         """Erzeugt und aktualisiert die laufende Bilanz."""
 
+        self._current_balance_sheet = None
+
         balance_sheet_account_types = (
             AccountType.ASSET,
             AccountType.LIABILITY,
@@ -722,6 +854,11 @@ class MainWindow(tk.Tk):
             in income_statement_account_types
         )
 
+        self._current_closing_balances = (
+            balance_sheet_balances
+            + income_statement_balances
+        )
+
         income_statement_amounts = (
             self._financial_statement_builder.build(
                 balances=income_statement_balances,
@@ -736,12 +873,16 @@ class MainWindow(tk.Tk):
             amounts=income_statement_amounts,
         )
 
+        self._current_income_statement = (
+            income_statement
+        )
+
         net_income = (
             self._closing_service.calculate_net_income(
                 income_statement=income_statement,
             )
         )
-        
+
         self._income_statement_frame.update_income_statement(
             income_statement=income_statement,
             net_income=net_income,
@@ -749,6 +890,10 @@ class MainWindow(tk.Tk):
 
         closing_result = ClosingResult(
             net_income=net_income,
+        )
+
+        self._current_closing_result = (
+            closing_result
         )
 
         equity = next(
@@ -787,6 +932,7 @@ class MainWindow(tk.Tk):
             self._balance_sheet_frame.show_mapping_error(
                 self._format_mapping_error(message)
             )
+
             return
 
         balance_sheet = BalanceSheet(
@@ -795,36 +941,31 @@ class MainWindow(tk.Tk):
             amounts=amounts,
         )
 
+        self._current_balance_sheet = (
+            balance_sheet
+        )
+
         self._balance_sheet_frame.update_balance_sheet(
             balance_sheet
         )
 
+    def _refresh_closing(self) -> None:
+        """Aktualisiert den sichtbaren Abschlussstatus."""
 
-    def _load_standard_chart_of_accounts(
-        self,
-    ) -> ChartOfAccountsTemplate:
-        """Lädt den OpenBilanz-Standardkontenrahmen."""
-
-        provider = (
-            HgbFinancialStatementPositionProvider(
-                (
-                    self._assets,
-                    self._liabilities,
-                    self._income_statement,
-                ),
-            )
+        managed_fiscal_year = (
+            self._workspace.managed_fiscal_year
         )
 
-        csv_file = (
-            Path(__file__).resolve().parent.parent
-            / "resources"
-            / "chart_of_accounts"
-            / "openbilanz_standard.csv"
+        self._closing_frame.update_fiscal_year_status(
+            managed_fiscal_year.status
         )
 
-        return CsvChartOfAccountsImporter(
-            position_provider=provider,
-        ).load(csv_file)
+        if self._current_closing_result is None:
+            return
+
+        self._closing_frame.update_net_income(
+            self._current_closing_result.net_income
+        )
 
     @staticmethod
     def _format_amount(
@@ -911,20 +1052,66 @@ class MainWindow(tk.Tk):
                 )
 
         return cls._format_amount(ZERO)
+    
+    def _update_editing_state(self) -> None:
+        """Passt die Eingabemöglichkeiten an den Geschäftsjahresstatus an."""
 
-    def _load_bookings(self) -> None:
-        """Rekonstruiert Journal und Ledger aus gespeicherten Buchungen."""
+        enabled = self._workspace.is_open
 
-        bookings = (
-            self._booking_repository.list_for_fiscal_year(
-                company_id=self._context.company.company_id,
-                fiscal_year=self._context.fiscal_year,
+        if enabled:
+            self._opening_balance_button.state(
+                ["!disabled"]
             )
+        else:
+            self._opening_balance_button.state(
+                ["disabled"]
+            )
+
+        self._booking_frame.set_enabled(
+            enabled
+        )
+    
+    def _open_company_master_data(
+        self,
+    ) -> None:
+        """Öffnet die Unternehmensstammdaten."""
+
+        try:
+            master_data = (
+                self._workspace.load_company_master_data()
+            )
+        except ValueError as exc:
+            messagebox.showerror(
+                "Unternehmensstammdaten",
+                str(exc),
+                parent=self,
+            )
+            return
+
+        dialog = CompanyMasterDataDialog(
+            self,
+            master_data=master_data,
         )
 
-        for booking in bookings:
-            self._posting_service.post_booking(
-                booking=booking,
-                ledger=self._ledger,
-                journal=self._journal,
+        self.wait_window(dialog)
+
+        if dialog.result is None:
+            return
+
+        try:
+            self._workspace.save_company_master_data(
+                dialog.result
             )
+        except ValueError as exc:
+            messagebox.showerror(
+                "Unternehmensstammdaten",
+                str(exc),
+                parent=self,
+            )
+            return
+
+        messagebox.showinfo(
+            "Unternehmensstammdaten",
+            "Die Unternehmensstammdaten wurden gespeichert.",
+            parent=self,
+        )

@@ -43,6 +43,51 @@ class Mandant(Base):
         String,
         nullable=True,
     )
+    
+    steuer_id: Mapped[str | None] = mapped_column(
+        String,
+        nullable=True,
+    )
+
+    wirtschafts_id: Mapped[str | None] = mapped_column(
+        String,
+        nullable=True,
+    )
+
+    bf4: Mapped[str | None] = mapped_column(
+        String(4),
+        nullable=True,
+    )
+
+    strasse: Mapped[str | None] = mapped_column(
+        String,
+        nullable=True,
+    )
+
+    hausnummer: Mapped[str | None] = mapped_column(
+        String,
+        nullable=True,
+    )
+
+    plz: Mapped[str | None] = mapped_column(
+        String,
+        nullable=True,
+    )
+
+    ort: Mapped[str | None] = mapped_column(
+        String,
+        nullable=True,
+    )
+
+    land: Mapped[str | None] = mapped_column(
+        String(2),
+        nullable=True,
+    )
+
+    geschaeftstaetigkeit: Mapped[str | None] = mapped_column(
+        String,
+        nullable=True,
+    )
 
     wirtschaftsjahre: Mapped[list["Wirtschaftsjahr"]] = relationship(
         back_populates="mandant",

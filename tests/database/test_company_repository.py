@@ -11,6 +11,9 @@ from openbilanz.database.company_repository import (
 from openbilanz.database.database import Base
 from openbilanz.database.models import Wirtschaftsjahr
 from openbilanz.domain.company import Company
+from openbilanz.domain.company_master_data import (
+    CompanyMasterData,
+)
 from openbilanz.domain.fiscal_year import FiscalYear
 from openbilanz.domain.fiscal_year_status import FiscalYearStatus
 from openbilanz.domain.managed_fiscal_year import ManagedFiscalYear
@@ -787,3 +790,202 @@ def test_sets_opening_source_of_fiscal_year() -> None:
     )
 
 
+
+def test_loads_empty_company_master_data() -> None:
+    """Für neue Unternehmen sind zunächst leere Stammdaten vorhanden."""
+
+    engine = create_engine(
+        "sqlite:///:memory:"
+    )
+    Base.metadata.create_all(engine)
+
+    Session = sessionmaker(
+        bind=engine
+    )
+
+    with Session() as session:
+        repository = CompanyRepository(
+            session
+        )
+
+        company = Company(
+            company_id=uuid4(),
+            name="Muster UG",
+        )
+
+        repository.add(company)
+
+        master_data = repository.get_master_data(
+            company.company_id
+        )
+
+    assert master_data == CompanyMasterData(
+        company=company,
+    )
+
+    assert master_data is not None
+    assert master_data.is_e_bilanz_ready is False
+
+
+def test_saves_and_loads_company_master_data() -> None:
+    """Unternehmensstammdaten können vollständig gespeichert werden."""
+
+    engine = create_engine(
+        "sqlite:///:memory:"
+    )
+    Base.metadata.create_all(engine)
+
+    Session = sessionmaker(
+        bind=engine
+    )
+
+    with Session() as session:
+        repository = CompanyRepository(
+            session
+        )
+
+        company = Company(
+            company_id=uuid4(),
+            name="Muster UG",
+        )
+
+        repository.add(company)
+
+        master_data = CompanyMasterData(
+            company=company,
+            legal_form="UG (haftungsbeschränkt)",
+            tax_number="1234567890123",
+            tax_office="Finanzamt Musterstadt",
+            tax_id="12345678901",
+            tax_economic_id="DE123456789",
+            bf4="1234",
+            street="Musterstraße",
+            house_number="12a",
+            postal_code="12345",
+            city="Musterstadt",
+            country="DE",
+            business="Softwareentwicklung",
+        )
+
+        repository.save_master_data(
+            master_data
+        )
+
+        loaded_master_data = (
+            repository.get_master_data(
+                company.company_id
+            )
+        )
+
+    assert loaded_master_data == master_data
+    assert loaded_master_data is not master_data
+
+    assert (
+        loaded_master_data is not None
+    )
+    assert (
+        loaded_master_data.is_e_bilanz_ready
+        is True
+    )
+
+
+def test_updates_company_master_data() -> None:
+    """Vorhandene Unternehmensstammdaten können geändert werden."""
+
+    engine = create_engine(
+        "sqlite:///:memory:"
+    )
+    Base.metadata.create_all(engine)
+
+    Session = sessionmaker(
+        bind=engine
+    )
+
+    with Session() as session:
+        repository = CompanyRepository(
+            session
+        )
+
+        company = Company(
+            company_id=uuid4(),
+            name="Muster UG",
+        )
+
+        repository.add(company)
+
+        repository.save_master_data(
+            CompanyMasterData(
+                company=company,
+                legal_form="UG (haftungsbeschränkt)",
+                tax_number="1234567890123",
+                city="Musterstadt",
+                country="DE",
+            )
+        )
+
+        updated_master_data = CompanyMasterData(
+            company=company,
+            legal_form="UG (haftungsbeschränkt)",
+            tax_number="1234567890123",
+            tax_office="Finanzamt Berlin",
+            tax_id="12345678901",
+            tax_economic_id="DE987654321",
+            bf4="5678",
+            street="Neue Straße",
+            house_number="25",
+            postal_code="10115",
+            city="Berlin",
+            country="DE",
+            business="Software und Beratung",
+        )
+
+        repository.save_master_data(
+            updated_master_data
+        )
+
+        loaded_master_data = (
+            repository.get_master_data(
+                company.company_id
+            )
+        )
+
+    assert loaded_master_data == (
+        updated_master_data
+    )
+
+
+def test_rejects_master_data_for_missing_company() -> None:
+    """Stammdaten eines unbekannten Unternehmens werden abgelehnt."""
+
+    engine = create_engine(
+        "sqlite:///:memory:"
+    )
+    Base.metadata.create_all(engine)
+
+    Session = sessionmaker(
+        bind=engine
+    )
+
+    with Session() as session:
+        repository = CompanyRepository(
+            session
+        )
+
+        company = Company(
+            company_id=uuid4(),
+            name="Nicht vorhandene UG",
+        )
+
+        master_data = CompanyMasterData(
+            company=company,
+            legal_form="UG (haftungsbeschränkt)",
+            tax_number="1234567890123",
+        )
+
+        with pytest.raises(
+            ValueError,
+            match="Unternehmen wurde nicht gefunden.",
+        ):
+            repository.save_master_data(
+                master_data
+            )

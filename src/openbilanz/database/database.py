@@ -1,15 +1,15 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, declarative_base, sessionmaker
+"""Datenbankkonfiguration von OpenBilanz."""
 
-from openbilanz.core.config import DATABASE_URL
-
-engine = create_engine(
-    DATABASE_URL,
-    echo=False,
+from sqlalchemy import Engine, create_engine
+from sqlalchemy.orm import (
+    Session,
+    declarative_base,
+    sessionmaker,
 )
 
-SessionLocal = sessionmaker(
-    bind=engine,
+from openbilanz.core.config import (
+    ApplicationConfig,
+    load_config,
 )
 
 Base = declarative_base()
@@ -18,13 +18,72 @@ Base = declarative_base()
 from openbilanz.database import models  # noqa: E402, F401
 
 
-def create_database() -> None:
-    """Erzeugt die Datenbanktabellen."""
+class Database:
+    """Kapselt Engine und Sitzungen einer OpenBilanz-Datenbank."""
 
-    Base.metadata.create_all(engine)
+    def __init__(
+        self,
+        config: ApplicationConfig,
+    ) -> None:
+        self._config = config
+
+        self._engine = create_engine(
+            config.database_url,
+            echo=False,
+        )
+
+        self._session_factory = sessionmaker(
+            bind=self._engine,
+        )
+
+    @property
+    def config(self) -> ApplicationConfig:
+        """Liefert die verwendete Anwendungskonfiguration."""
+
+        return self._config
+
+    @property
+    def engine(self) -> Engine:
+        """Liefert die SQLAlchemy-Engine."""
+
+        return self._engine
+
+    def create_database(self) -> None:
+        """Erzeugt die Datenbanktabellen."""
+
+        Base.metadata.create_all(
+            self._engine
+        )
+
+    def create_session(self) -> Session:
+        """Erzeugt eine neue Datenbanksitzung."""
+
+        return self._session_factory()
+
+    def dispose(self) -> None:
+        """Gibt die Ressourcen der Engine frei."""
+
+        self._engine.dispose()
+
+
+# ---------------------------------------------------------
+# Übergangskompatibilität
+# ---------------------------------------------------------
+
+_default_database = Database(
+    load_config()
+)
+
+engine = _default_database.engine
+
+
+def create_database() -> None:
+    """Erzeugt die Tabellen der Standarddatenbank."""
+
+    _default_database.create_database()
 
 
 def create_session() -> Session:
-    """Erzeugt eine neue Datenbanksitzung."""
+    """Erzeugt eine Sitzung der Standarddatenbank."""
 
-    return SessionLocal()
+    return _default_database.create_session()
