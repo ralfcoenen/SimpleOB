@@ -1,5 +1,7 @@
 """Anwendungszustand eines geöffneten Geschäftsjahres."""
 
+from pathlib import Path
+
 from openbilanz.accounting.account_balance import AccountBalance
 from openbilanz.accounting.balance_sheet import BalanceSheet
 from openbilanz.accounting.income_statement import IncomeStatement
@@ -27,6 +29,9 @@ from openbilanz.services.closing_consistency_service import (
     ClosingConsistencyService,
 )
 from openbilanz.services.closing_result import ClosingResult
+from openbilanz.services.e_bilanz_export_service import (
+    EBilanzExportService,
+)
 from openbilanz.services.e_bilanz_preparation_service import (
     EBilanzPreparationResult,
     EBilanzPreparationService,
@@ -65,8 +70,9 @@ class FiscalYearWorkspace:
         closing_consistency_service: ClosingConsistencyService,
         e_bilanz_preparation_service: EBilanzPreparationService,
         e_bilanz_service: EBilanzService,
+        e_bilanz_export_service: EBilanzExportService,
         taxonomy_management_service: TaxonomyManagementService,
-        
+
     ) -> None:
         self._context = context
         self._booking_repository = booking_repository
@@ -84,6 +90,8 @@ class FiscalYearWorkspace:
             e_bilanz_preparation_service
         )
         self._e_bilanz_service = e_bilanz_service
+        self._e_bilanz_export_service = e_bilanz_export_service
+        self._validated_e_bilanz_document: EBilanzDocument | None = None
         self._taxonomy_management_service = (
             taxonomy_management_service
         )
@@ -121,7 +129,7 @@ class FiscalYearWorkspace:
         """Liefert das Hauptbuch ohne Jahresabschlussbuchungen."""
 
         return self._pre_closing_ledger
-    
+
     @property
     def managed_fiscal_year(self) -> ManagedFiscalYear:
         """Liefert das Geschäftsjahr einschließlich Verwaltungsstatus."""
@@ -205,7 +213,7 @@ class FiscalYearWorkspace:
             balances=balances,
             mapper=mapper,
         )
-    
+
     def close_fiscal_year(
         self,
         *,
@@ -257,7 +265,7 @@ class FiscalYearWorkspace:
         self._journal = journal
         self._ledger = ledger
         self._pre_closing_ledger = pre_closing_ledger
-    
+
     def load_company_master_data(
         self,
     ) -> CompanyMasterData:
@@ -295,7 +303,7 @@ class FiscalYearWorkspace:
         self._company_repository.save_master_data(
             master_data
         )
-    
+
     def prepare_e_bilanz(
         self,
         *,
@@ -313,7 +321,7 @@ class FiscalYearWorkspace:
             income_statement=income_statement,
             closed_ledger=self._ledger,
         )
-        
+
     def build_e_bilanz(
         self,
         *,
@@ -332,17 +340,21 @@ class FiscalYearWorkspace:
             self._context.company
         )
 
-        return self._e_bilanz_service.build(
+        document = self._e_bilanz_service.build(
             master_data=master_data,
             fiscal_year=self._context.fiscal_year,
             amounts=preparation.amounts,
             entity_identifier=entity.value,
-            entity_scheme=entity.scheme,    
+            entity_scheme=entity.scheme,
             previous_fiscal_year=(
                 self.managed_fiscal_year.opening_source
             ),
         )
-        
+
+        self._validated_e_bilanz_document = None
+
+        return document
+
     def validate_e_bilanz(
         self,
         document: EBilanzDocument,
@@ -355,7 +367,33 @@ class FiscalYearWorkspace:
                 "Jahresabschluss validiert werden."
             )
 
-        return self._e_bilanz_service.validate(
+        result = self._e_bilanz_service.validate(
             document,
             fiscal_year=self._context.fiscal_year,
+        )
+
+        if result.is_valid:
+            self._validated_e_bilanz_document = document
+        elif self._validated_e_bilanz_document is document:
+            self._validated_e_bilanz_document = None
+
+        return result
+
+    def export_e_bilanz(
+        self,
+        *,
+        document: EBilanzDocument,
+        target: Path,
+    ) -> Path:
+        """Exportiert eine erfolgreich validierte E-Bilanz."""
+
+        if document is not self._validated_e_bilanz_document:
+            raise ValueError(
+                "Die E-Bilanz muss vor dem Export "
+                "erfolgreich validiert werden."
+            )
+
+        return self._e_bilanz_export_service.export(
+            document=document,
+            target=target,
         )

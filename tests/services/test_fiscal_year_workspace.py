@@ -2,6 +2,7 @@
 
 from datetime import date
 from decimal import Decimal
+from pathlib import Path
 from unittest.mock import ANY, Mock
 from uuid import uuid4
 
@@ -32,6 +33,9 @@ from openbilanz.domain.fiscal_year_status import FiscalYearStatus
 from openbilanz.domain.journal import Journal
 from openbilanz.domain.managed_fiscal_year import ManagedFiscalYear
 from openbilanz.services.closing_result import ClosingResult
+from openbilanz.services.e_bilanz_export_service import (
+    EBilanzExportService,
+)
 from openbilanz.services.fiscal_year_workspace import FiscalYearWorkspace
 from openbilanz.services.posting_service import PostingService
 from openbilanz.services.taxonomy_management_service import (
@@ -94,6 +98,7 @@ def test_reconstructs_empty_workspace(
         e_bilanz_preparation_service=Mock(),
         e_bilanz_service=Mock(),
         taxonomy_management_service=Mock(),
+        e_bilanz_export_service=Mock(),
     )
 
     assert isinstance(workspace.journal, Journal)
@@ -138,6 +143,7 @@ def test_reports_open_fiscal_year(
         e_bilanz_preparation_service=Mock(),
         e_bilanz_service=Mock(),
         taxonomy_management_service=Mock(),
+        e_bilanz_export_service=Mock(),
     )
 
     assert workspace.is_open is True
@@ -172,6 +178,7 @@ def test_reports_closed_fiscal_year(
         e_bilanz_preparation_service=Mock(),
         e_bilanz_service=Mock(),
         taxonomy_management_service=Mock(),
+        e_bilanz_export_service=Mock(),
     )
 
     assert workspace.is_open is False
@@ -210,6 +217,7 @@ def test_reports_taxonomy_status_for_opened_fiscal_year(
         taxonomy_management_service=(
             taxonomy_management_service
         ),
+        e_bilanz_export_service=Mock(),
     )
 
     status = workspace.taxonomy_status
@@ -241,6 +249,7 @@ def test_raises_when_managed_fiscal_year_is_missing(
         e_bilanz_preparation_service=Mock(),
         e_bilanz_service=Mock(),
         taxonomy_management_service=Mock(),
+        e_bilanz_export_service=Mock(),
     )
 
     with pytest.raises(
@@ -292,6 +301,7 @@ def test_post_booking_persists_and_reloads_workspace(
         e_bilanz_preparation_service=Mock(),
         e_bilanz_service=Mock(),
         taxonomy_management_service=Mock(),
+        e_bilanz_export_service=Mock(),
     )
 
     assert len(workspace.journal) == 0
@@ -355,6 +365,7 @@ def test_post_booking_does_not_change_workspace_when_persistence_fails(
         e_bilanz_preparation_service=Mock(),
         e_bilanz_service=Mock(),
         taxonomy_management_service=Mock(),
+        e_bilanz_export_service=Mock(),
     )
 
     with pytest.raises(
@@ -445,6 +456,7 @@ def test_close_fiscal_year_uses_workflow_and_reloads_closed_bookings(
         e_bilanz_preparation_service=Mock(),
         e_bilanz_service=Mock(),
         taxonomy_management_service=Mock(),
+        e_bilanz_export_service=Mock(),
     )
 
     income_statement = Mock(
@@ -542,6 +554,7 @@ def test_validate_closing_delegates_to_consistency_service(
         e_bilanz_preparation_service=Mock(),
         e_bilanz_service=Mock(),
         taxonomy_management_service=Mock(),
+        e_bilanz_export_service=Mock(),
     )
 
     balance_sheet = Mock(
@@ -630,6 +643,7 @@ def test_loads_company_master_data(
         e_bilanz_preparation_service=Mock(),
         e_bilanz_service=Mock(),
         taxonomy_management_service=Mock(),
+        e_bilanz_export_service=Mock(),
     )
 
     result = workspace.load_company_master_data()
@@ -679,6 +693,7 @@ def test_saves_company_master_data(
         e_bilanz_preparation_service=Mock(),
         e_bilanz_service=Mock(),
         taxonomy_management_service=Mock(),
+        e_bilanz_export_service=Mock(),
     )
 
     workspace.save_company_master_data(
@@ -730,6 +745,7 @@ def test_prepares_e_bilanz_for_closed_fiscal_year(
         ),
         e_bilanz_service=e_bilanz_service,
         taxonomy_management_service=Mock(),
+        e_bilanz_export_service=Mock(),
     )
 
     income_statement = Mock(
@@ -773,6 +789,7 @@ def test_rejects_e_bilanz_preparation_for_open_fiscal_year(
         e_bilanz_preparation_service=Mock(),
         e_bilanz_service=Mock(),
         taxonomy_management_service=Mock(),
+        e_bilanz_export_service=Mock(),
     )
 
     with pytest.raises(
@@ -843,6 +860,14 @@ def test_builds_e_bilanz_from_prepared_data(
         ),
         e_bilanz_service=e_bilanz_service,
         taxonomy_management_service=Mock(),
+        e_bilanz_export_service=Mock(),
+    )
+
+    previous_document = Mock(
+        spec=EBilanzDocument
+    )
+    workspace._validated_e_bilanz_document = (
+        previous_document
     )
 
     result = workspace.build_e_bilanz(
@@ -850,6 +875,8 @@ def test_builds_e_bilanz_from_prepared_data(
     )
 
     assert result is expected_document
+
+    assert workspace._validated_e_bilanz_document is None
 
     e_bilanz_service.build.assert_called_once_with(
         master_data=master_data,
@@ -888,6 +915,7 @@ def test_rejects_e_bilanz_build_for_open_fiscal_year(
         e_bilanz_preparation_service=Mock(),
         e_bilanz_service=Mock(),
         taxonomy_management_service=Mock(),
+        e_bilanz_export_service=Mock(),
     )
 
     with pytest.raises(
@@ -945,6 +973,7 @@ def test_validates_e_bilanz_for_closed_fiscal_year(
         ),
         e_bilanz_service=e_bilanz_service,
         taxonomy_management_service=Mock(),
+        e_bilanz_export_service=Mock(),
     )
 
     document = Mock(
@@ -988,6 +1017,7 @@ def test_rejects_e_bilanz_validation_for_open_fiscal_year(
         e_bilanz_preparation_service=Mock(),
         e_bilanz_service=Mock(),
         taxonomy_management_service=Mock(),
+        e_bilanz_export_service=Mock(),
     )
 
     document = Mock(
@@ -1028,6 +1058,7 @@ def test_installs_required_taxonomy_for_opened_fiscal_year(
         taxonomy_management_service=(
             taxonomy_management_service
         ),
+        e_bilanz_export_service=Mock(),
     )
 
     workspace.install_required_taxonomy()
@@ -1036,4 +1067,118 @@ def test_installs_required_taxonomy_for_opened_fiscal_year(
         context.fiscal_year
     )
 
+def test_exports_successfully_validated_e_bilanz(
+    context: ApplicationContext,
+    tmp_path: Path,
+) -> None:
+    booking_repository = Mock()
+    company_repository = Mock()
+    e_bilanz_service = Mock()
+    export_service = Mock(
+        spec=EBilanzExportService
+    )
 
+    booking_repository.list_for_fiscal_year.return_value = ()
+
+    company_repository.get_managed_fiscal_years.return_value = (
+        ManagedFiscalYear(
+            fiscal_year=context.fiscal_year,
+            status=FiscalYearStatus.CLOSED,
+            opening_source=None,
+        ),
+    )
+
+    validation_result = ArelleValidationResult(
+        is_valid=True,
+        errors=(),
+    )
+    e_bilanz_service.validate.return_value = validation_result
+
+    document = Mock(
+        spec=EBilanzDocument
+    )
+    target = tmp_path / "e-bilanz.xbrl"
+
+    export_service.export.return_value = target
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=company_repository,
+        posting_service=PostingService(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=e_bilanz_service,
+        e_bilanz_export_service=export_service,
+        taxonomy_management_service=Mock(),
+    )
+
+    workspace.validate_e_bilanz(
+        document
+    )
+
+    result = workspace.export_e_bilanz(
+        document=document,
+        target=target,
+    )
+
+    assert result == target
+
+    export_service.export.assert_called_once_with(
+        document=document,
+        target=target,
+    )
+
+
+def test_rejects_export_of_unvalidated_e_bilanz(
+    context: ApplicationContext,
+    tmp_path: Path,
+) -> None:
+    booking_repository = Mock()
+    company_repository = Mock()
+
+    booking_repository.list_for_fiscal_year.return_value = ()
+
+    company_repository.get_managed_fiscal_years.return_value = (
+        ManagedFiscalYear(
+            fiscal_year=context.fiscal_year,
+            status=FiscalYearStatus.CLOSED,
+            opening_source=None,
+        ),
+    )
+
+    export_service = Mock(
+        spec=EBilanzExportService
+    )
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=company_repository,
+        posting_service=PostingService(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        e_bilanz_export_service=export_service,
+        taxonomy_management_service=Mock(),
+    )
+
+    document = Mock(
+        spec=EBilanzDocument
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "E-Bilanz muss vor dem Export "
+            "erfolgreich validiert werden"
+        ),
+    ):
+        workspace.export_e_bilanz(
+            document=document,
+            target=tmp_path / "e-bilanz.xbrl",
+        )
+
+    export_service.export.assert_not_called()

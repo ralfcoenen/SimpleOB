@@ -1,5 +1,5 @@
 """Tests für die Geschäftsjahressteuerung des MainWindow."""
-
+from pathlib import Path
 from unittest.mock import Mock, patch
 from urllib.error import URLError
 
@@ -151,6 +151,7 @@ def _create_e_bilanz_window_double(
     window._prepare_e_bilanz_button = Mock()
     window._build_e_bilanz_button = Mock()
     window._validate_e_bilanz_button = Mock()
+    window._export_e_bilanz_button = Mock()
 
     return window
 
@@ -301,3 +302,98 @@ def test_taxonomy_installation_reports_invalid_taxonomy() -> None:
 
     window._refresh_taxonomy_status.assert_not_called()
     window._refresh_e_bilanz.assert_not_called()
+
+def test_e_bilanz_export_is_disabled_by_refresh() -> None:
+    window = _create_e_bilanz_window_double(
+        taxonomy_usable=True,
+    )
+
+    window._refresh_e_bilanz()
+
+    window._export_e_bilanz_button.config.assert_called_with(
+        state="disabled"
+    )
+
+def test_successful_e_bilanz_validation_enables_export() -> None:
+    window = object.__new__(MainWindow)
+
+    window._workspace = Mock()
+    window._current_e_bilanz_document = Mock()
+    window._export_e_bilanz_button = Mock()
+
+    window._workspace.validate_e_bilanz.return_value = Mock(
+        is_valid=True,
+        errors=(),
+    )
+
+    with patch(
+        "openbilanz.ui.main_window.messagebox.showinfo"
+    ):
+        window._validate_e_bilanz()
+
+    window._export_e_bilanz_button.config.assert_called_once_with(
+        state="normal"
+    )
+
+def test_failed_e_bilanz_validation_disables_export() -> None:
+    window = object.__new__(MainWindow)
+
+    window._workspace = Mock()
+    window._current_e_bilanz_document = Mock()
+    window._export_e_bilanz_button = Mock()
+
+    window._workspace.validate_e_bilanz.return_value = Mock(
+        is_valid=False,
+        errors=("Fehler",),
+    )
+
+    with patch(
+        "openbilanz.ui.main_window.messagebox.showerror"
+    ):
+        window._validate_e_bilanz()
+
+    window._export_e_bilanz_button.config.assert_called_once_with(
+        state="disabled"
+    )
+
+def test_e_bilanz_export_uses_selected_target() -> None:
+    window = object.__new__(MainWindow)
+
+    window._workspace = Mock()
+    window._current_e_bilanz_document = Mock()
+
+    window._workspace.export_e_bilanz.return_value = (
+        Path("/tmp/e-bilanz.xbrl")
+    )
+
+    with (
+        patch(
+            "openbilanz.ui.main_window."
+            "filedialog.asksaveasfilename",
+            return_value="/tmp/e-bilanz.xbrl",
+        ),
+        patch(
+            "openbilanz.ui.main_window.messagebox.showinfo"
+        ),
+    ):
+        window._export_e_bilanz()
+
+    window._workspace.export_e_bilanz.assert_called_once_with(
+        document=window._current_e_bilanz_document,
+        target=Path("/tmp/e-bilanz.xbrl"),
+    )
+
+def test_e_bilanz_export_cancel_does_not_export() -> None:
+    window = object.__new__(MainWindow)
+
+    window._workspace = Mock()
+    window._current_e_bilanz_document = Mock()
+
+    with patch(
+        "openbilanz.ui.main_window."
+        "filedialog.asksaveasfilename",
+        return_value="",
+    ):
+        window._export_e_bilanz()
+
+    window._workspace.export_e_bilanz.assert_not_called()

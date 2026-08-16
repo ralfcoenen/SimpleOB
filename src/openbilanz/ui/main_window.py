@@ -1,6 +1,7 @@
 """Hauptfenster der OpenBilanz-Anwendung."""
 import tkinter as tk
-from tkinter import messagebox, ttk
+from pathlib import Path
+from tkinter import filedialog, messagebox, ttk
 from urllib.error import URLError
 from zipfile import BadZipFile
 
@@ -659,6 +660,16 @@ class MainWindow(tk.Tk):
             anchor="w",
             pady=(8, 0),
         )
+        self._export_e_bilanz_button = ttk.Button(
+            self._e_bilanz_tab,
+            text="E-Bilanz exportieren",
+            command=self._export_e_bilanz,
+            state="disabled",
+        )
+        self._export_e_bilanz_button.pack(
+            anchor="w",
+            pady=(8, 0),
+        )
 
     def _post_booking(
         self,
@@ -849,6 +860,10 @@ class MainWindow(tk.Tk):
     def _refresh_e_bilanz(self) -> None:
         """Aktualisiert den Zustand des E-Bilanz-Arbeitsbereichs."""
 
+        self._export_e_bilanz_button.config(
+            state="disabled",
+        )
+
         if not self._workspace.is_closed:
             self._e_bilanz_status.config(
                 text=(
@@ -1028,6 +1043,10 @@ class MainWindow(tk.Tk):
             return
 
         if result.is_valid:
+            self._export_e_bilanz_button.config(
+                state="normal",
+            )
+
             messagebox.showinfo(
                 "E-Bilanz",
                 "Die E-Bilanz wurde von Arelle "
@@ -1039,13 +1058,63 @@ class MainWindow(tk.Tk):
         errors = "\n".join(
             result.errors
         )
-
+        self._export_e_bilanz_button.config(
+            state="disabled",
+        )
         messagebox.showerror(
             "E-Bilanz-Validierung fehlgeschlagen",
             (
                 "Arelle hat Fehler in der "
                 "E-Bilanz festgestellt.\n\n"
                 f"{errors}"
+            ),
+            parent=self,
+        )
+
+    def _export_e_bilanz(self) -> None:
+        """Exportiert die erfolgreich validierte E-Bilanz."""
+
+        if self._current_e_bilanz_document is None:
+            messagebox.showwarning(
+                "E-Bilanz",
+                "Die E-Bilanz wurde noch nicht erzeugt.",
+                parent=self,
+            )
+            return
+
+        filename = filedialog.asksaveasfilename(
+            parent=self,
+            title="E-Bilanz exportieren",
+            defaultextension=".xbrl",
+            filetypes=(
+                ("XBRL-Dateien", "*.xbrl"),
+                ("Alle Dateien", "*.*"),
+            ),
+        )
+
+        if not filename:
+            return
+
+        target = Path(filename)
+
+        try:
+            exported_path = self._workspace.export_e_bilanz(
+                document=self._current_e_bilanz_document,
+                target=target,
+            )
+        except (ValueError, OSError) as exc:
+            messagebox.showerror(
+                "E-Bilanz konnte nicht exportiert werden",
+                str(exc),
+                parent=self,
+            )
+            return
+
+        messagebox.showinfo(
+            "E-Bilanz",
+            (
+                "Die E-Bilanz wurde erfolgreich exportiert.\n\n"
+                f"{exported_path}"
             ),
             parent=self,
         )

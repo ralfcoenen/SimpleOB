@@ -18,6 +18,9 @@ from openbilanz.services.closing_consistency_service import (
     ClosingConsistencyService,
 )
 from openbilanz.services.closing_service import ClosingService
+from openbilanz.services.e_bilanz_export_service import (
+    EBilanzExportService,
+)
 from openbilanz.services.e_bilanz_preparation_service import (
     EBilanzPreparationService,
 )
@@ -167,6 +170,8 @@ def main() -> None:
             closing_service=closing_service,
         )
 
+        e_bilanz_export_service = EBilanzExportService()
+
         workspace = FiscalYearWorkspace(
             context=context,
             booking_repository=booking_repository,
@@ -180,6 +185,9 @@ def main() -> None:
                 e_bilanz_preparation_service
             ),
             e_bilanz_service=e_bilanz_service,
+            e_bilanz_export_service=(
+                e_bilanz_export_service
+            ),
             taxonomy_management_service=(
                 taxonomy_management_service
             ),
