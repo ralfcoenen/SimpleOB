@@ -36,6 +36,10 @@ from openbilanz.services.fiscal_year_closing_workflow import (
     FiscalYearClosingWorkflow,
 )
 from openbilanz.services.posting_service import PostingService
+from openbilanz.services.taxonomy_management_service import (
+    TaxonomyManagementService,
+    TaxonomyStatus,
+)
 from openbilanz.taxonomy.arelle_adapter import (
     ArelleValidationResult,
 )
@@ -61,6 +65,7 @@ class FiscalYearWorkspace:
         closing_consistency_service: ClosingConsistencyService,
         e_bilanz_preparation_service: EBilanzPreparationService,
         e_bilanz_service: EBilanzService,
+        taxonomy_management_service: TaxonomyManagementService,
         
     ) -> None:
         self._context = context
@@ -79,6 +84,9 @@ class FiscalYearWorkspace:
             e_bilanz_preparation_service
         )
         self._e_bilanz_service = e_bilanz_service
+        self._taxonomy_management_service = (
+            taxonomy_management_service
+        )
 
         self.reload()
 
@@ -87,6 +95,14 @@ class FiscalYearWorkspace:
         """Liefert den aktuellen Anwendungskontext."""
 
         return self._context
+
+    @property
+    def taxonomy_status(self) -> TaxonomyStatus:
+        """Liefert den Taxonomiestatus des geöffneten Geschäftsjahres."""
+
+        return self._taxonomy_management_service.status_for(
+            self._context.fiscal_year
+        )
 
     @property
     def journal(self) -> Journal:
@@ -159,6 +175,12 @@ class FiscalYearWorkspace:
 
         self.reload()
 
+    def install_required_taxonomy(self) -> None:
+        """Installiert die für das geöffnete Geschäftsjahr benötigte Taxonomie."""
+
+        self._taxonomy_management_service.install_required_taxonomy(
+            self._context.fiscal_year
+        )
 
     def validate_closing(
         self,

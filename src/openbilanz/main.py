@@ -27,11 +27,21 @@ from openbilanz.services.fiscal_year_closing_workflow import (
 )
 from openbilanz.services.fiscal_year_workspace import FiscalYearWorkspace
 from openbilanz.services.posting_service import PostingService
+from openbilanz.services.taxonomy_management_service import (
+    TaxonomyManagementService,
+)
 from openbilanz.taxonomy.arelle_adapter import ArelleAdapter
 from openbilanz.taxonomy.gcd_company_data_mapper import (
     GcdCompanyDataMapper,
 )
 from openbilanz.taxonomy.resolver import TaxonomyResolver
+from openbilanz.taxonomy.taxonomy_catalog import TaxonomyCatalog
+from openbilanz.taxonomy.taxonomy_downloader import (
+    TaxonomyDownloader,
+)
+from openbilanz.taxonomy.taxonomy_installation_service import (
+    TaxonomyInstallationService,
+)
 from openbilanz.ui.main_window import MainWindow
 from openbilanz.ui.start_dialog import StartDialog
 
@@ -46,13 +56,29 @@ def main() -> None:
     )
 
     database.create_database()
-    
+
     financial_statement_context = (
         create_standard_financial_statement_context()
     )
-    
+
     resolver = TaxonomyResolver(
         root=config.taxonomy_dir
+    )
+
+    taxonomy_catalog = TaxonomyCatalog(
+        root=config.taxonomy_dir
+    )
+
+    taxonomy_installation_service = TaxonomyInstallationService(
+        target_root=config.taxonomy_dir
+    )
+
+    taxonomy_downloader = TaxonomyDownloader()
+
+    taxonomy_management_service = TaxonomyManagementService(
+        catalog=taxonomy_catalog,
+        installation_service=taxonomy_installation_service,
+        download=taxonomy_downloader.download,
     )
 
     arelle_adapter = ArelleAdapter()
@@ -89,7 +115,7 @@ def main() -> None:
     root.title("OpenBilanz")
 
     session = database.create_session()
-    
+
     try:
         company_repository = CompanyRepository(
             session
@@ -129,7 +155,7 @@ def main() -> None:
                 loss_account="8021",
             )
         )
-        
+
         closing_consistency_service = (
             ClosingConsistencyService()
         )
@@ -154,16 +180,19 @@ def main() -> None:
                 e_bilanz_preparation_service
             ),
             e_bilanz_service=e_bilanz_service,
+            taxonomy_management_service=(
+                taxonomy_management_service
+            ),
         )
 
-        
+
         window = MainWindow(
             workspace=workspace,
             financial_statement_context=(
                 financial_statement_context
             ),
         )
-        
+
         window.mainloop()
 
     finally:

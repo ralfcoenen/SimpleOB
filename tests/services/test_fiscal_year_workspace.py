@@ -34,12 +34,17 @@ from openbilanz.domain.managed_fiscal_year import ManagedFiscalYear
 from openbilanz.services.closing_result import ClosingResult
 from openbilanz.services.fiscal_year_workspace import FiscalYearWorkspace
 from openbilanz.services.posting_service import PostingService
+from openbilanz.services.taxonomy_management_service import (
+    TaxonomyManagementService,
+    TaxonomyStatus,
+)
 from openbilanz.taxonomy.arelle_adapter import (
     ArelleValidationResult,
 )
 from openbilanz.taxonomy.e_bilanz_builder import (
     EBilanzDocument,
 )
+from openbilanz.taxonomy.taxonomy import TaxonomyVersion
 
 
 @pytest.fixture
@@ -88,6 +93,7 @@ def test_reconstructs_empty_workspace(
         closing_consistency_service=Mock(),
         e_bilanz_preparation_service=Mock(),
         e_bilanz_service=Mock(),
+        taxonomy_management_service=Mock(),
     )
 
     assert isinstance(workspace.journal, Journal)
@@ -131,6 +137,7 @@ def test_reports_open_fiscal_year(
         closing_consistency_service=Mock(),
         e_bilanz_preparation_service=Mock(),
         e_bilanz_service=Mock(),
+        taxonomy_management_service=Mock(),
     )
 
     assert workspace.is_open is True
@@ -164,11 +171,54 @@ def test_reports_closed_fiscal_year(
         closing_consistency_service=Mock(),
         e_bilanz_preparation_service=Mock(),
         e_bilanz_service=Mock(),
+        taxonomy_management_service=Mock(),
     )
 
     assert workspace.is_open is False
     assert workspace.is_closed is True
 
+def test_reports_taxonomy_status_for_opened_fiscal_year(
+    context: ApplicationContext,
+) -> None:
+    booking_repository = Mock()
+    company_repository = Mock()
+    taxonomy_management_service = Mock(
+        spec=TaxonomyManagementService
+    )
+
+    booking_repository.list_for_fiscal_year.return_value = ()
+
+    expected_status = TaxonomyStatus(
+        required_version=TaxonomyVersion.V6_9,
+        installed=True,
+        complete=True,
+    )
+
+    taxonomy_management_service.status_for.return_value = (
+        expected_status
+    )
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=company_repository,
+        posting_service=Mock(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        taxonomy_management_service=(
+            taxonomy_management_service
+        ),
+    )
+
+    status = workspace.taxonomy_status
+
+    assert status is expected_status
+
+    taxonomy_management_service.status_for.assert_called_once_with(
+        context.fiscal_year
+    )
 
 def test_raises_when_managed_fiscal_year_is_missing(
     context: ApplicationContext,
@@ -190,6 +240,7 @@ def test_raises_when_managed_fiscal_year_is_missing(
         closing_consistency_service=Mock(),
         e_bilanz_preparation_service=Mock(),
         e_bilanz_service=Mock(),
+        taxonomy_management_service=Mock(),
     )
 
     with pytest.raises(
@@ -197,8 +248,8 @@ def test_raises_when_managed_fiscal_year_is_missing(
         match="Das geöffnete Geschäftsjahr wurde nicht gefunden.",
     ):
         _ = workspace.managed_fiscal_year
-        
-        
+
+
 def test_post_booking_persists_and_reloads_workspace(
     context: ApplicationContext,
 ) -> None:
@@ -240,6 +291,7 @@ def test_post_booking_persists_and_reloads_workspace(
         closing_consistency_service=Mock(),
         e_bilanz_preparation_service=Mock(),
         e_bilanz_service=Mock(),
+        taxonomy_management_service=Mock(),
     )
 
     assert len(workspace.journal) == 0
@@ -302,6 +354,7 @@ def test_post_booking_does_not_change_workspace_when_persistence_fails(
         closing_consistency_service=Mock(),
         e_bilanz_preparation_service=Mock(),
         e_bilanz_service=Mock(),
+        taxonomy_management_service=Mock(),
     )
 
     with pytest.raises(
@@ -391,6 +444,7 @@ def test_close_fiscal_year_uses_workflow_and_reloads_closed_bookings(
         closing_consistency_service=Mock(),
         e_bilanz_preparation_service=Mock(),
         e_bilanz_service=Mock(),
+        taxonomy_management_service=Mock(),
     )
 
     income_statement = Mock(
@@ -435,7 +489,7 @@ def test_close_fiscal_year_uses_workflow_and_reloads_closed_bookings(
 
 
     assert closing_account.credit == Decimal("500.00")
-    
+
     pre_closing_revenue_account = (
         workspace.pre_closing_ledger.get_account(
             "8400"
@@ -455,7 +509,7 @@ def test_close_fiscal_year_uses_workflow_and_reloads_closed_bookings(
         workspace.pre_closing_ledger.get_account(
             "8990"
         )
-    
+
 
 def test_validate_closing_delegates_to_consistency_service(
     context: ApplicationContext,
@@ -487,6 +541,7 @@ def test_validate_closing_delegates_to_consistency_service(
         ),
         e_bilanz_preparation_service=Mock(),
         e_bilanz_service=Mock(),
+        taxonomy_management_service=Mock(),
     )
 
     balance_sheet = Mock(
@@ -532,7 +587,7 @@ def test_validate_closing_delegates_to_consistency_service(
     assert call_kwargs["balances"] == balances
     assert call_kwargs["mapper"] is mapper
     assert call_kwargs["trial_balance"].ledger is workspace.ledger
-    
+
 def test_loads_company_master_data(
     context: ApplicationContext,
 ) -> None:
@@ -574,6 +629,7 @@ def test_loads_company_master_data(
         closing_consistency_service=Mock(),
         e_bilanz_preparation_service=Mock(),
         e_bilanz_service=Mock(),
+        taxonomy_management_service=Mock(),
     )
 
     result = workspace.load_company_master_data()
@@ -622,6 +678,7 @@ def test_saves_company_master_data(
         closing_consistency_service=Mock(),
         e_bilanz_preparation_service=Mock(),
         e_bilanz_service=Mock(),
+        taxonomy_management_service=Mock(),
     )
 
     workspace.save_company_master_data(
@@ -631,7 +688,7 @@ def test_saves_company_master_data(
     company_repository.save_master_data.assert_called_once_with(
         master_data
     )
-    
+
 def test_prepares_e_bilanz_for_closed_fiscal_year(
     context: ApplicationContext,
 ) -> None:
@@ -672,6 +729,7 @@ def test_prepares_e_bilanz_for_closed_fiscal_year(
             preparation_service
         ),
         e_bilanz_service=e_bilanz_service,
+        taxonomy_management_service=Mock(),
     )
 
     income_statement = Mock(
@@ -688,7 +746,7 @@ def test_prepares_e_bilanz_for_closed_fiscal_year(
         income_statement=income_statement,
         closed_ledger=workspace.ledger,
     )
-    
+
 def test_rejects_e_bilanz_preparation_for_open_fiscal_year(
     context: ApplicationContext,
 ) -> None:
@@ -714,6 +772,7 @@ def test_rejects_e_bilanz_preparation_for_open_fiscal_year(
         closing_consistency_service=Mock(),
         e_bilanz_preparation_service=Mock(),
         e_bilanz_service=Mock(),
+        taxonomy_management_service=Mock(),
     )
 
     with pytest.raises(
@@ -728,7 +787,7 @@ def test_rejects_e_bilanz_preparation_for_open_fiscal_year(
                 spec=IncomeStatement
             ),
         )
-        
+
 def test_builds_e_bilanz_from_prepared_data(
     context: ApplicationContext,
 ) -> None:
@@ -783,6 +842,7 @@ def test_builds_e_bilanz_from_prepared_data(
             preparation_service
         ),
         e_bilanz_service=e_bilanz_service,
+        taxonomy_management_service=Mock(),
     )
 
     result = workspace.build_e_bilanz(
@@ -801,7 +861,7 @@ def test_builds_e_bilanz_from_prepared_data(
         entity_scheme="urn:openbilanz:company-id",
         previous_fiscal_year=previous_fiscal_year,
     )
-    
+
 def test_rejects_e_bilanz_build_for_open_fiscal_year(
     context: ApplicationContext,
 ) -> None:
@@ -827,6 +887,7 @@ def test_rejects_e_bilanz_build_for_open_fiscal_year(
         closing_consistency_service=Mock(),
         e_bilanz_preparation_service=Mock(),
         e_bilanz_service=Mock(),
+        taxonomy_management_service=Mock(),
     )
 
     with pytest.raises(
@@ -883,6 +944,7 @@ def test_validates_e_bilanz_for_closed_fiscal_year(
             preparation_service
         ),
         e_bilanz_service=e_bilanz_service,
+        taxonomy_management_service=Mock(),
     )
 
     document = Mock(
@@ -925,6 +987,7 @@ def test_rejects_e_bilanz_validation_for_open_fiscal_year(
         closing_consistency_service=Mock(),
         e_bilanz_preparation_service=Mock(),
         e_bilanz_service=Mock(),
+        taxonomy_management_service=Mock(),
     )
 
     document = Mock(
@@ -941,5 +1004,36 @@ def test_rejects_e_bilanz_validation_for_open_fiscal_year(
         workspace.validate_e_bilanz(
             document
         )
+
+def test_installs_required_taxonomy_for_opened_fiscal_year(
+    context: ApplicationContext,
+) -> None:
+    booking_repository = Mock()
+    company_repository = Mock()
+    taxonomy_management_service = Mock(
+        spec=TaxonomyManagementService
+    )
+
+    booking_repository.list_for_fiscal_year.return_value = ()
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=company_repository,
+        posting_service=Mock(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        taxonomy_management_service=(
+            taxonomy_management_service
+        ),
+    )
+
+    workspace.install_required_taxonomy()
+
+    taxonomy_management_service.install_required_taxonomy.assert_called_once_with(
+        context.fiscal_year
+    )
 
 

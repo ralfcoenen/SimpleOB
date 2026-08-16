@@ -27,3 +27,7 @@ script_results/
 # Taxonomien
 data/taxonomy/
 data/taxonomy-backup-*/
+
+# Chat-Übergabedokumente
+docs/development/*Uebergabe*.docx
+docs/development/*Übergabe*.docx

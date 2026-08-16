@@ -1,6 +1,8 @@
 """Hauptfenster der OpenBilanz-Anwendung."""
 import tkinter as tk
 from tkinter import messagebox, ttk
+from urllib.error import URLError
+from zipfile import BadZipFile
 
 from openbilanz.accounting.balance_sheet import BalanceSheet
 from openbilanz.accounting.financial_statement_context import (
@@ -92,7 +94,7 @@ class MainWindow(tk.Tk):
         self._account_types = (
             financial_statement_context.account_types
         )
-        
+
         self._current_income_statement: (
             IncomeStatement | None
         ) = None
@@ -105,18 +107,18 @@ class MainWindow(tk.Tk):
             BalanceSheet | None
         ) = None
 
-        
-        
+
+
         self._current_closing_balances = ()
-        
+
         self._current_e_bilanz_preparation: (
             EBilanzPreparationResult | None
         ) = None
-        
+
         self._current_e_bilanz_document: (
             EBilanzDocument | None
         ) = None
-        
+
         self._create_ui()
 
         self._refresh_all()
@@ -187,7 +189,7 @@ class MainWindow(tk.Tk):
             anchor="w",
             pady=(2, 0),
         )
-        
+
         ttk.Button(
             context_frame,
             text="Unternehmensstammdaten",
@@ -196,7 +198,7 @@ class MainWindow(tk.Tk):
             anchor="w",
             pady=(8, 0),
         )
-        
+
         self._opening_balance_button = ttk.Button(
             container,
             text="Eröffnungsbilanz erfassen",
@@ -245,7 +247,7 @@ class MainWindow(tk.Tk):
             self._notebook,
             padding=16,
         )
-        
+
         self._e_bilanz_tab = ttk.Frame(
             self._notebook,
             padding=16,
@@ -280,7 +282,7 @@ class MainWindow(tk.Tk):
             self._closing_tab,
             text="Jahresabschluss",
         )
-        
+
         self._notebook.add(
             self._e_bilanz_tab,
             text="E-Bilanz",
@@ -599,6 +601,26 @@ class MainWindow(tk.Tk):
             pady=(4, 16),
         )
 
+        self._taxonomy_status = ttk.Label(
+            self._e_bilanz_tab,
+            text="",
+        )
+        self._taxonomy_status.pack(
+            anchor="w",
+            pady=(0, 16),
+        )
+
+        self._install_taxonomy_button = ttk.Button(
+            self._e_bilanz_tab,
+            text="Taxonomie installieren",
+            command=self._install_required_taxonomy,
+            state="disabled",
+        )
+        self._install_taxonomy_button.pack(
+            anchor="w",
+            pady=(0, 16),
+        )
+
         self._e_bilanz_status = ttk.Label(
             self._e_bilanz_tab,
             text="",
@@ -637,7 +659,7 @@ class MainWindow(tk.Tk):
             anchor="w",
             pady=(8, 0),
         )
-    
+
     def _post_booking(
         self,
         booking: Booking,
@@ -658,7 +680,7 @@ class MainWindow(tk.Tk):
 
         if self._workspace.is_closed:
             return
-        
+
         dialog = OpeningBalanceDialog(
             self
         )
@@ -753,7 +775,7 @@ class MainWindow(tk.Tk):
             "Das Geschäftsjahr wurde erfolgreich abgeschlossen.",
             parent=self,
         )
-   
+
     def _refresh_all(self) -> None:
         """Aktualisiert alle sichtbaren Buchhaltungsdaten."""
 
@@ -761,11 +783,69 @@ class MainWindow(tk.Tk):
         self._refresh_journal()
         self._refresh_balance_sheet()
         self._refresh_closing()
+        self._refresh_taxonomy_status()
         self._refresh_e_bilanz()
         self._update_editing_state()
 
         self.update_idletasks()
-    
+
+    def _refresh_taxonomy_status(self) -> None:
+        """Aktualisiert den Taxonomiestatus des Geschäftsjahres."""
+
+        status = self._workspace.taxonomy_status
+
+        if status.complete:
+            status_text = "installiert und vollständig"
+        elif status.installed:
+            status_text = "installiert, aber unvollständig"
+        else:
+            status_text = "nicht installiert"
+
+        if status.usable:
+            self._install_taxonomy_button.config(
+                state="disabled"
+            )
+        else:
+            self._install_taxonomy_button.config(
+                state="normal"
+            )
+
+        self._taxonomy_status.config(
+            text=(
+                "Benötigte Taxonomie: "
+                f"{status.required_version.value}\n"
+                f"Status: {status_text}"
+            ),
+        )
+
+    def _install_required_taxonomy(self) -> None:
+        """Installiert die benötigte Taxonomie."""
+
+        try:
+            self._workspace.install_required_taxonomy()
+        except (
+            URLError,
+            BadZipFile,
+            ValueError,
+            RuntimeError,
+            OSError,
+        ) as exc:
+            messagebox.showerror(
+                "Taxonomie konnte nicht installiert werden",
+                str(exc),
+                parent=self,
+            )
+            return
+
+        self._refresh_taxonomy_status()
+        self._refresh_e_bilanz()
+
+        messagebox.showinfo(
+            "Taxonomie",
+            "Die benötigte Taxonomie wurde erfolgreich installiert.",
+            parent=self,
+        )
+
     def _refresh_e_bilanz(self) -> None:
         """Aktualisiert den Zustand des E-Bilanz-Arbeitsbereichs."""
 
@@ -814,9 +894,18 @@ class MainWindow(tk.Tk):
 
         preparation = self._current_e_bilanz_preparation
 
-        self._build_e_bilanz_button.config(
-            state="normal",
-        )
+        taxonomy_status = self._workspace.taxonomy_status
+
+        if taxonomy_status.usable:
+            self._build_e_bilanz_button.config(
+                state="normal",
+            )
+        else:
+            self._build_e_bilanz_button.config(
+                state="disabled",
+            )
+
+
         if self._current_e_bilanz_document is None:
             self._validate_e_bilanz_button.config(
                 state="disabled",
@@ -826,16 +915,25 @@ class MainWindow(tk.Tk):
                 state="normal",
             )
 
-        self._e_bilanz_status.config(
-            text=(
-                "Die E-Bilanz wurde vorbereitet.\n"
-                f"Bilanzpositionen: "
-                f"{len(preparation.balance_sheet_amounts)}\n"
-                f"GuV-Positionen: "
-                f"{len(preparation.income_statement_amounts)}"
-            ),
+        status_text = (
+            "Die E-Bilanz wurde vorbereitet.\n"
+            f"Bilanzpositionen: "
+            f"{len(preparation.balance_sheet_amounts)}\n"
+            f"GuV-Positionen: "
+            f"{len(preparation.income_statement_amounts)}"
         )
-        
+
+        if not taxonomy_status.usable:
+            status_text += (
+                "\n\n"
+                "Die benötigte Taxonomie ist nicht "
+                "vollständig installiert."
+            )
+
+        self._e_bilanz_status.config(
+            text=status_text,
+        )
+
     def _prepare_e_bilanz(self) -> None:
         """Bereitet die Abschlusswerte für die E-Bilanz auf."""
 
@@ -856,7 +954,7 @@ class MainWindow(tk.Tk):
             return
 
 
-        
+
         try:
             preparation = self._workspace.prepare_e_bilanz(
                 income_statement=self._current_income_statement,
@@ -872,7 +970,7 @@ class MainWindow(tk.Tk):
         self._current_e_bilanz_preparation = preparation
 
         self._refresh_e_bilanz()
-    
+
     def _build_e_bilanz(self) -> None:
         """Erzeugt die E-Bilanz aus den vorbereiteten Abschlusswerten."""
 
@@ -897,7 +995,7 @@ class MainWindow(tk.Tk):
             return
 
         self._current_e_bilanz_document = document
-        
+
         self._refresh_e_bilanz()
 
         messagebox.showinfo(
@@ -905,7 +1003,7 @@ class MainWindow(tk.Tk):
             "Die E-Bilanz wurde erfolgreich erzeugt.",
             parent=self,
         )
-    
+
     def _validate_e_bilanz(self) -> None:
         """Validiert die erzeugte E-Bilanz mit Arelle."""
 
@@ -951,7 +1049,7 @@ class MainWindow(tk.Tk):
             ),
             parent=self,
         )
-    
+
     def _refresh_overview(self) -> None:
         """Aktualisiert die Kontenübersicht."""
 
@@ -1341,7 +1439,7 @@ class MainWindow(tk.Tk):
                 )
 
         return cls._format_amount(ZERO)
-    
+
     def _update_editing_state(self) -> None:
         """Passt die Eingabemöglichkeiten an den Geschäftsjahresstatus an."""
 
@@ -1359,7 +1457,7 @@ class MainWindow(tk.Tk):
         self._booking_frame.set_enabled(
             enabled
         )
-    
+
     def _open_company_master_data(
         self,
     ) -> None:

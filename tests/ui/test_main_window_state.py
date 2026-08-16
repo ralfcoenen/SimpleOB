@@ -1,7 +1,12 @@
 """Tests für die Geschäftsjahressteuerung des MainWindow."""
 
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
+from urllib.error import URLError
 
+from openbilanz.services.taxonomy_management_service import (
+    TaxonomyStatus,
+)
+from openbilanz.taxonomy.taxonomy import TaxonomyVersion
 from openbilanz.ui.main_window import MainWindow
 
 
@@ -22,6 +27,25 @@ def _create_window_double(
 
     return window
 
+def _create_taxonomy_window_double(
+    *,
+    installed: bool,
+    complete: bool,
+) -> MainWindow:
+    """Erzeugt ein MainWindow für Taxonomiestatus-Tests."""
+
+    window = object.__new__(MainWindow)
+
+    window._workspace = Mock()
+    window._workspace.taxonomy_status = TaxonomyStatus(
+        required_version=TaxonomyVersion.V6_9,
+        installed=installed,
+        complete=complete,
+    )
+    window._install_taxonomy_button = Mock()
+    window._taxonomy_status = Mock()
+
+    return window
 
 def test_open_fiscal_year_enables_editing() -> None:
     window = _create_window_double(
@@ -53,3 +77,227 @@ def test_closed_fiscal_year_disables_editing() -> None:
     window._booking_frame.set_enabled.assert_called_once_with(
         False
     )
+
+
+def test_taxonomy_status_reports_complete_installation() -> None:
+    window = _create_taxonomy_window_double(
+        installed=True,
+        complete=True,
+    )
+
+    window._refresh_taxonomy_status()
+
+    window._taxonomy_status.config.assert_called_once_with(
+        text=(
+            "Benötigte Taxonomie: 6.9\n"
+            "Status: installiert und vollständig"
+        ),
+    )
+
+
+def test_taxonomy_status_reports_incomplete_installation() -> None:
+    window = _create_taxonomy_window_double(
+        installed=True,
+        complete=False,
+    )
+
+    window._refresh_taxonomy_status()
+
+    window._taxonomy_status.config.assert_called_once_with(
+        text=(
+            "Benötigte Taxonomie: 6.9\n"
+            "Status: installiert, aber unvollständig"
+        ),
+    )
+
+
+def test_taxonomy_status_reports_missing_installation() -> None:
+    window = _create_taxonomy_window_double(
+        installed=False,
+        complete=False,
+    )
+
+    window._refresh_taxonomy_status()
+
+    window._taxonomy_status.config.assert_called_once_with(
+        text=(
+            "Benötigte Taxonomie: 6.9\n"
+            "Status: nicht installiert"
+        ),
+    )
+
+def _create_e_bilanz_window_double(
+    *,
+    taxonomy_usable: bool,
+) -> MainWindow:
+    """Erzeugt ein MainWindow für E-Bilanz-Zustandstests."""
+
+    window = object.__new__(MainWindow)
+
+    window._workspace = Mock()
+    window._workspace.is_closed = True
+    window._workspace.taxonomy_status = TaxonomyStatus(
+        required_version=TaxonomyVersion.V6_9,
+        installed=taxonomy_usable,
+        complete=taxonomy_usable,
+    )
+
+    window._current_e_bilanz_preparation = Mock()
+    window._current_e_bilanz_preparation.balance_sheet_amounts = {}
+    window._current_e_bilanz_preparation.income_statement_amounts = {}
+    window._current_e_bilanz_document = None
+
+    window._e_bilanz_status = Mock()
+    window._prepare_e_bilanz_button = Mock()
+    window._build_e_bilanz_button = Mock()
+    window._validate_e_bilanz_button = Mock()
+
+    return window
+
+def test_e_bilanz_build_is_enabled_for_usable_taxonomy() -> None:
+    window = _create_e_bilanz_window_double(
+        taxonomy_usable=True,
+    )
+
+    window._refresh_e_bilanz()
+
+    window._build_e_bilanz_button.config.assert_any_call(
+        state="normal"
+    )
+
+
+def test_e_bilanz_build_is_disabled_for_unusable_taxonomy() -> None:
+    window = _create_e_bilanz_window_double(
+        taxonomy_usable=False,
+    )
+
+    window._refresh_e_bilanz()
+
+    window._build_e_bilanz_button.config.assert_any_call(
+        state="disabled"
+    )
+
+
+def test_e_bilanz_status_explains_unusable_taxonomy() -> None:
+    window = _create_e_bilanz_window_double(
+        taxonomy_usable=False,
+    )
+
+    window._refresh_e_bilanz()
+
+    window._e_bilanz_status.config.assert_called_with(
+        text=(
+            "Die E-Bilanz wurde vorbereitet.\n"
+            "Bilanzpositionen: 0\n"
+            "GuV-Positionen: 0\n\n"
+            "Die benötigte Taxonomie ist nicht "
+            "vollständig installiert."
+        ),
+    )
+
+def test_taxonomy_install_button_is_disabled_when_taxonomy_is_usable() -> None:
+    window = _create_taxonomy_window_double(
+        installed=True,
+        complete=True,
+    )
+
+    window._refresh_taxonomy_status()
+
+    window._install_taxonomy_button.config.assert_called_once_with(
+        state="disabled"
+    )
+
+
+def test_taxonomy_install_button_is_enabled_when_taxonomy_is_unusable() -> None:
+    window = _create_taxonomy_window_double(
+        installed=False,
+        complete=False,
+    )
+
+    window._refresh_taxonomy_status()
+
+    window._install_taxonomy_button.config.assert_called_once_with(
+        state="normal"
+    )
+
+def test_installs_required_taxonomy_and_refreshes_state() -> None:
+    window = object.__new__(MainWindow)
+
+    window._workspace = Mock()
+    window._refresh_taxonomy_status = Mock()
+    window._refresh_e_bilanz = Mock()
+
+    with patch(
+        "openbilanz.ui.main_window.messagebox.showinfo"
+    ):
+        window._install_required_taxonomy()
+
+    window._workspace.install_required_taxonomy.assert_called_once_with()
+
+    window._refresh_taxonomy_status.assert_called_once_with()
+    window._refresh_e_bilanz.assert_called_once_with()
+
+
+def test_taxonomy_installation_reports_download_error() -> None:
+    window = object.__new__(MainWindow)
+
+    window._workspace = Mock()
+    window._workspace.install_required_taxonomy.side_effect = (
+        URLError("Download fehlgeschlagen")
+    )
+
+    window._refresh_taxonomy_status = Mock()
+    window._refresh_e_bilanz = Mock()
+
+    with patch(
+        "openbilanz.ui.main_window.messagebox.showerror"
+    ) as showerror:
+        window._install_required_taxonomy()
+
+    showerror.assert_called_once()
+
+    window._refresh_taxonomy_status.assert_not_called()
+    window._refresh_e_bilanz.assert_not_called()
+
+def test_taxonomy_installation_reports_success() -> None:
+    window = object.__new__(MainWindow)
+
+    window._workspace = Mock()
+    window._refresh_taxonomy_status = Mock()
+    window._refresh_e_bilanz = Mock()
+
+    with patch(
+        "openbilanz.ui.main_window.messagebox.showinfo"
+    ) as showinfo:
+        window._install_required_taxonomy()
+
+    showinfo.assert_called_once_with(
+        "Taxonomie",
+        "Die benötigte Taxonomie wurde erfolgreich installiert.",
+        parent=window,
+    )
+
+def test_taxonomy_installation_reports_invalid_taxonomy() -> None:
+    window = object.__new__(MainWindow)
+
+    window._workspace = Mock()
+    window._workspace.install_required_taxonomy.side_effect = (
+        ValueError("Taxonomiequelle ist unvollständig.")
+    )
+
+    window._refresh_taxonomy_status = Mock()
+    window._refresh_e_bilanz = Mock()
+
+    with patch(
+        "openbilanz.ui.main_window.messagebox.showerror"
+    ) as showerror:
+        window._install_required_taxonomy()
+
+    showerror.assert_called_once_with(
+        "Taxonomie konnte nicht installiert werden",
+        "Taxonomiequelle ist unvollständig.",
+        parent=window,
+    )
+
+    window._refresh_taxonomy_status.assert_not_called()
+    window._refresh_e_bilanz.assert_not_called()
