@@ -374,6 +374,7 @@ class CompanyRepository:
             postal_code=model.plz or "",
             city=model.ort or "",
             country=model.land or "",
+            federal_state=model.bundesland or "",
             business=model.geschaeftstaetigkeit or "",
         ) 
         
@@ -429,6 +430,9 @@ class CompanyRepository:
         )
         model.land = (
             master_data.country or None
+        )
+        model.bundesland = (
+            master_data.federal_state or None
         )
         model.geschaeftstaetigkeit = (
             master_data.business or None

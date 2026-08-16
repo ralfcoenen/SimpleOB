@@ -15,6 +15,9 @@ from openbilanz.domain.company_master_data import (
 )
 from openbilanz.domain.fiscal_year import FiscalYear
 from openbilanz.services.e_bilanz_service import EBilanzService
+from openbilanz.taxonomy.arelle_adapter import (
+    ArelleValidationResult,
+)
 from openbilanz.taxonomy.e_bilanz_builder import (
     EBilanzDocument,
 )
@@ -70,6 +73,8 @@ class FakeAdapter:
         self._gaap_ci_model = gaap_ci_model
 
         self.received_paths: list[Path] = []
+        self.validated_path: Path | None = None
+        self.validated_content: str | None = None
 
     def model(
         self,
@@ -83,6 +88,22 @@ class FakeAdapter:
             return self._gcd_model
 
         return self._gaap_ci_model
+    
+    def validate(
+        self,
+        entry_point: Path,
+    ) -> ArelleValidationResult:
+        """Simuliert die Validierung einer erzeugten XBRL-Datei."""
+
+        self.validated_path = entry_point
+        self.validated_content = entry_point.read_text(
+            encoding="utf-8",
+        )
+
+        return ArelleValidationResult(
+            is_valid=True,
+            errors=(),
+        )
 
 
 def _company() -> Company:
@@ -90,6 +111,8 @@ def _company() -> Company:
         company_id=uuid4(),
         name="Muster UG",
     )
+    
+
 
 
 def test_e_bilanz_service_orchestrates_builder() -> None:
@@ -101,12 +124,13 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
     master_data = CompanyMasterData(
         company=_company(),
         legal_form="UG (haftungsbeschränkt)",
-        tax_number="1234567890123",
+        tax_number="123/4567/8901",
+        federal_state="NW",
         tax_id="12345678901",
         tax_economic_id="DE123456789",
         bf4="1234",
     )
-
+    
     gcd_path = Path("/tmp/gcd.xsd")
     gaap_ci_path = Path("/tmp/gaap-ci.xsd")
 
@@ -135,13 +159,19 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
 
     gcd_entry_point = TaxonomyEntryPoint(
         path=gcd_path,
-        namespace="urn:test:gcd",
+        namespace=(
+            "http://www.xbrl.de/taxonomies/"
+            "de-gcd-2025-04-01/shell"
+        ),
         schema_imports=(),
     )
 
     gaap_ci_entry_point = TaxonomyEntryPoint(
         path=gaap_ci_path,
-        namespace="urn:test:gaap-ci",
+        namespace=(
+            "http://www.xbrl.de/taxonomies/"
+            "de-gaap-ci-2025-04-01/shell-fiscal"
+        ),
         schema_imports=(),
     )
 
@@ -214,13 +244,19 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
         gaap_ci_model=gaap_ci_model,
         gcd_entry_point=gcd_entry_point,
         gaap_ci_entry_point=gaap_ci_entry_point,
-        gcd_namespace="urn:test:gcd",
-        gaap_ci_namespace="urn:test:gaap-ci",
+        gcd_namespace=(
+            "http://www.xbrl.de/taxonomies/"
+            "de-gcd-2025-04-01"
+        ),
+        gaap_ci_namespace=(
+            "http://www.xbrl.de/taxonomies/"
+            "de-gaap-ci-2025-04-01"
+        ),
         assets=assets,
         liabilities=liabilities,
         income_statement=income_statement,
     )
-
+    
     builder.build.assert_called_once()
 
     call_kwargs = (
@@ -247,10 +283,138 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
     )
     assert (
         call_kwargs["company_data"].tax_number
-        == master_data.tax_number
+        == "5123045678901"
     )
     assert (
         call_kwargs["identifiers"].tax_number_13
-        == master_data.tax_number
+        == "5123045678901"
+    )
+    
+def test_e_bilanz_service_validates_document_with_local_schema_refs(
+    tmp_path: Path,
+) -> None:
+    """Für die Offline-Validierung werden lokale schemaRefs verwendet."""
+
+    gcd_path = (
+        tmp_path
+        / "de-gcd-2025-04-01-shell.xsd"
+    )
+    gaap_ci_path = (
+        tmp_path
+        / "de-gaap-ci-2025-04-01-shell-fiscal.xsd"
     )
 
+    gcd_path.write_text(
+        (
+            '<xs:schema '
+            'xmlns:xs="http://www.w3.org/2001/XMLSchema" '
+            'targetNamespace='
+            '"http://www.xbrl.de/taxonomies/'
+            'de-gcd-2025-04-01/shell">'
+            "</xs:schema>"
+        ),
+        encoding="utf-8",
+    )
+
+    gaap_ci_path.write_text(
+        (
+            '<xs:schema '
+            'xmlns:xs="http://www.w3.org/2001/XMLSchema" '
+            'targetNamespace='
+            '"http://www.xbrl.de/taxonomies/'
+            'de-gaap-ci-2025-04-01/shell-fiscal">'
+            "</xs:schema>"
+        ),
+        encoding="utf-8",
+    )
+
+    resolver = FakeResolver(
+        gcd_path=gcd_path,
+        gaap_ci_path=gaap_ci_path,
+    )
+
+    adapter = FakeAdapter(
+        gcd_model=object(),
+        gaap_ci_model=object(),
+    )
+
+    service = EBilanzService(
+        resolver=resolver,  # type: ignore[arg-type]
+        adapter=adapter,  # type: ignore[arg-type]
+        company_data_mapper=GcdCompanyDataMapper(),
+        assets=Mock(
+            spec=FinancialStatementPosition
+        ),
+        liabilities=Mock(
+            spec=FinancialStatementPosition
+        ),
+        income_statement=Mock(
+            spec=FinancialStatementPosition
+        ),
+    )
+
+    fiscal_year = FiscalYear(
+        start_date=date(2026, 1, 1),
+        end_date=date(2026, 12, 31),
+    )
+
+    original_xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<xbrl xmlns:link="http://www.xbrl.org/2003/linkbase" '
+        'xmlns:xlink="http://www.w3.org/1999/xlink">'
+        '<link:schemaRef '
+        'xlink:type="simple" '
+        'xlink:href="'
+        'http://www.xbrl.de/taxonomies/'
+        'de-gcd-2025-04-01/'
+        'de-gcd-2025-04-01-shell.xsd"/>'
+        '<link:schemaRef '
+        'xlink:type="simple" '
+        'xlink:href="'
+        'http://www.xbrl.de/taxonomies/'
+        'de-gaap-ci-2025-04-01/'
+        'de-gaap-ci-2025-04-01-shell-fiscal.xsd"/>'
+        "</xbrl>"
+    )
+
+    document = EBilanzDocument(
+        xml=original_xml,
+        gaap_ci_statement=Mock(),
+    )
+
+    result = service.validate(
+        document,
+        fiscal_year=fiscal_year,
+    )
+
+    assert result.is_valid
+    assert result.errors == ()
+
+    assert adapter.validated_path is not None
+    assert adapter.validated_content is not None
+
+    assert gcd_path.as_uri() in (
+        adapter.validated_content
+    )
+
+    assert gaap_ci_path.as_uri() in (
+        adapter.validated_content
+    )
+
+    assert (
+        "http://www.xbrl.de/taxonomies/"
+        "de-gcd-2025-04-01/"
+        "de-gcd-2025-04-01-shell.xsd"
+        not in adapter.validated_content
+    )
+
+    assert (
+        "http://www.xbrl.de/taxonomies/"
+        "de-gaap-ci-2025-04-01/"
+        "de-gaap-ci-2025-04-01-shell-fiscal.xsd"
+        not in adapter.validated_content
+    )
+
+    # Das eigentliche Exportdokument bleibt unverändert.
+    assert document.xml == original_xml
+    

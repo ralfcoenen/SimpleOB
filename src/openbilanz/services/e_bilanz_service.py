@@ -1,7 +1,8 @@
 """Anwendungsservice zur Erzeugung einer E-Bilanz."""
-
 from collections.abc import Mapping
 from decimal import Decimal
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from openbilanz.accounting.financial_statement_position import (
     FinancialStatementPosition,
@@ -12,6 +13,7 @@ from openbilanz.domain.company_master_data import (
 from openbilanz.domain.fiscal_year import FiscalYear
 from openbilanz.taxonomy.arelle_adapter import (
     ArelleAdapter,
+    ArelleValidationResult,
 )
 from openbilanz.taxonomy.e_bilanz_builder import (
     EBilanzBuilder,
@@ -102,15 +104,23 @@ class EBilanzService:
             gaap_ci_path
         )
 
+        gcd_namespace = (
+            gcd_entry_point.namespace
+            .removesuffix("/shell")
+        )
+
+        gaap_ci_namespace = (
+            gaap_ci_entry_point.namespace
+            .removesuffix("/shell-fiscal")
+        )
+        
         builder = EBilanzBuilder(
             gcd_model=gcd_model,
             gaap_ci_model=gaap_ci_model,
             gcd_entry_point=gcd_entry_point,
             gaap_ci_entry_point=gaap_ci_entry_point,
-            gcd_namespace=gcd_entry_point.namespace,
-            gaap_ci_namespace=(
-                gaap_ci_entry_point.namespace
-            ),
+            gcd_namespace=gcd_namespace,
+            gaap_ci_namespace=gaap_ci_namespace,
             assets=self._assets,
             liabilities=self._liabilities,
             income_statement=self._income_statement,
@@ -125,4 +135,79 @@ class EBilanzService:
             previous_fiscal_year=previous_fiscal_year,
             identifiers=mapping.identifiers,
         )
-    
+
+
+    def validate(
+        self,
+        document: EBilanzDocument,
+        *,
+        fiscal_year: FiscalYear,
+    ) -> ArelleValidationResult:
+        """Validiert eine erzeugte E-Bilanz mit Arelle."""
+
+        if not isinstance(
+            document,
+            EBilanzDocument,
+        ):
+            raise TypeError(
+                "document muss ein EBilanzDocument sein."
+            )
+
+        if not isinstance(
+            fiscal_year,
+            FiscalYear,
+        ):
+            raise TypeError(
+                "fiscal_year muss ein FiscalYear sein."
+            )
+
+        version = taxonomy_version_for(
+            fiscal_year
+        )
+
+        gcd_path = self._resolver.gcd_entry_point(
+            version
+        )
+
+        gaap_ci_path = (
+            self._resolver.gaap_ci_fiscal_entry_point(
+                version
+            )
+        )
+
+        gcd_entry_point = TaxonomyEntryPoint.from_file(
+            gcd_path
+        )
+
+        gaap_ci_entry_point = TaxonomyEntryPoint.from_file(
+            gaap_ci_path
+        )
+
+        validation_xml = document.xml
+
+        validation_xml = validation_xml.replace(
+            gcd_entry_point.schema_ref_uri,
+            gcd_path.resolve().as_uri(),
+        )
+
+        validation_xml = validation_xml.replace(
+            gaap_ci_entry_point.schema_ref_uri,
+            gaap_ci_path.resolve().as_uri(),
+        )
+
+        with TemporaryDirectory(
+            prefix="openbilanz-e-bilanz-"
+        ) as temporary_directory:
+            instance_path = (
+                Path(temporary_directory)
+                / "openbilanz-e-bilanz.xbrl"
+            )
+
+            instance_path.write_text(
+                validation_xml,
+                encoding="utf-8",
+            )
+
+            return self._adapter.validate(
+                instance_path
+            )

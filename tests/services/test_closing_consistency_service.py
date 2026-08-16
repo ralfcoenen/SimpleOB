@@ -11,6 +11,7 @@ from openbilanz.accounting.financial_statement_position import (
 from openbilanz.accounting.income_statement import IncomeStatement
 from openbilanz.accounting.ledger import Ledger
 from openbilanz.accounting.mapper import AccountMapper
+from openbilanz.accounting.statement_category import StatementCategory
 from openbilanz.accounting.trial_balance import TrialBalance
 from openbilanz.domain.account_mapping_rule import AccountMappingRule
 from openbilanz.domain.account_type import AccountType
@@ -221,15 +222,33 @@ def test_unbalanced_balance_sheet_is_inconsistent() -> None:
 def test_matching_net_income_is_consistent() -> None:
     """GuV-Ergebnis und Jahresabschlussergebnis stimmen überein."""
 
+    revenue = FinancialStatementPosition(
+        code="revenue",
+        name="Erträge",
+        category=StatementCategory.INCOME,
+    )
+
+    expenses = FinancialStatementPosition(
+        code="expenses",
+        name="Aufwendungen",
+        category=StatementCategory.EXPENSE,
+    )
+
     income_statement_root = FinancialStatementPosition(
         code="income_statement",
         name="Gewinn- und Verlustrechnung",
+        children=(
+            revenue,
+            expenses,
+        ),
     )
 
     income_statement = IncomeStatement(
         income_statement=income_statement_root,
         amounts={
-            income_statement_root: Decimal("5000.00"),
+            revenue: Decimal("5500.00"),
+            expenses: Decimal("500.00"),
+            income_statement_root: Decimal("6000.00"),
         },
     )
 
@@ -244,7 +263,52 @@ def test_matching_net_income_is_consistent() -> None:
 
     assert result.is_consistent
     assert result.errors == ()
-    
+
+def test_net_income_uses_income_and_expense_categories() -> None:
+    """GuV-Ergebnis wird aus Erträgen minus Aufwendungen ermittelt."""
+
+    revenue = FinancialStatementPosition(
+        code="revenue",
+        name="Umsatzerlöse",
+        category=StatementCategory.INCOME,
+    )
+
+    expenses = FinancialStatementPosition(
+        code="expenses",
+        name="Aufwendungen",
+        category=StatementCategory.EXPENSE,
+    )
+
+    income_statement_root = FinancialStatementPosition(
+        code="income_statement",
+        name="Gewinn- und Verlustrechnung",
+        children=(
+            revenue,
+            expenses,
+        ),
+    )
+
+    income_statement = IncomeStatement(
+        income_statement=income_statement_root,
+        amounts={
+            revenue: Decimal("5000.00"),
+            expenses: Decimal("500.00"),
+            income_statement_root: Decimal("5500.00"),
+        },
+    )
+
+    closing_result = ClosingResult(
+        net_income=Decimal("4500.00"),
+    )
+
+    result = ClosingConsistencyService().validate_net_income(
+        income_statement=income_statement,
+        closing_result=closing_result,
+    )
+
+    assert result.is_consistent
+    assert result.errors == ()
+
 def test_mismatching_net_income_is_inconsistent() -> None:
     """Abweichende Jahresergebnisse werden erkannt."""
 
@@ -478,9 +542,18 @@ def test_complete_consistent_closing_is_consistent() -> None:
         name="Passiva",
     )
 
+    revenue = FinancialStatementPosition(
+        code="revenue",
+        name="Erträge",
+        category=StatementCategory.INCOME,
+    )
+
     income_statement_root = FinancialStatementPosition(
         code="income_statement",
         name="Gewinn- und Verlustrechnung",
+        children=(
+            revenue,
+        ),
     )
 
     balance_sheet = BalanceSheet(
@@ -495,6 +568,7 @@ def test_complete_consistent_closing_is_consistent() -> None:
     income_statement = IncomeStatement(
         income_statement=income_statement_root,
         amounts={
+            revenue: Decimal("500.00"),
             income_statement_root: Decimal("500.00"),
         },
     )

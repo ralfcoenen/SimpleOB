@@ -13,6 +13,7 @@ BookingLine,
 EntrySide,
 UnbalancedBookingError,
 )
+from openbilanz.domain.booking_type import BookingType
 
 
 def create_balanced_lines() -> tuple[BookingLine, BookingLine]:
@@ -44,6 +45,39 @@ def test_booking_is_created() -> None:
     assert booking.description == "Wareneinkauf"
     assert isinstance(booking.booking_id, UUID)
     assert len(booking.lines) == 2
+
+def test_booking_uses_regular_booking_type_by_default() -> None:
+    """Normale Buchungen erhalten standardmäßig den Typ REGULAR."""
+
+    booking = Booking(
+        booking_date=date(2026, 7, 27),
+        lines=create_balanced_lines(),
+    )
+
+    assert booking.booking_type is BookingType.REGULAR
+
+
+def test_booking_accepts_explicit_booking_type() -> None:
+    """Ein Buchungstyp kann ausdrücklich angegeben werden."""
+
+    booking = Booking(
+        booking_date=date(2026, 7, 27),
+        lines=create_balanced_lines(),
+        booking_type=BookingType.CLOSING,
+    )
+
+    assert booking.booking_type is BookingType.CLOSING
+
+
+def test_invalid_booking_type_is_rejected() -> None:
+    """Ungültige Buchungstypen werden abgelehnt."""
+
+    with pytest.raises(TypeError, match="Buchungstyp"):
+        Booking(
+            booking_date=date(2026, 7, 27),
+            lines=create_balanced_lines(),
+            booking_type="CLOSING",  # type: ignore[arg-type]
+        )
 
 
 def test_booking_accepts_list_of_lines() -> None:
@@ -286,6 +320,8 @@ def test_invalid_description_is_rejected() -> None:
             description=123,  # type: ignore[arg-type]
             lines=create_balanced_lines(),
         )
+
+
 
 
 def test_booking_is_immutable() -> None:

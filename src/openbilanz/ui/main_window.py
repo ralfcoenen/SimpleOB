@@ -14,11 +14,17 @@ from openbilanz.domain.journal import Journal
 from openbilanz.domain.money import ZERO
 from openbilanz.services.closing_result import ClosingResult
 from openbilanz.services.closing_service import ClosingService
+from openbilanz.services.e_bilanz_preparation_service import (
+    EBilanzPreparationResult,
+)
 from openbilanz.services.fiscal_year_workspace import (
     FiscalYearWorkspace,
 )
 from openbilanz.services.opening_balance_service import (
     OpeningBalanceService,
+)
+from openbilanz.taxonomy.e_bilanz_builder import (
+    EBilanzDocument,
 )
 from openbilanz.ui.balance_sheet_frame import BalanceSheetFrame
 from openbilanz.ui.booking_frame import BookingFrame
@@ -99,8 +105,18 @@ class MainWindow(tk.Tk):
             BalanceSheet | None
         ) = None
 
+        
+        
         self._current_closing_balances = ()
-
+        
+        self._current_e_bilanz_preparation: (
+            EBilanzPreparationResult | None
+        ) = None
+        
+        self._current_e_bilanz_document: (
+            EBilanzDocument | None
+        ) = None
+        
         self._create_ui()
 
         self._refresh_all()
@@ -229,6 +245,11 @@ class MainWindow(tk.Tk):
             self._notebook,
             padding=16,
         )
+        
+        self._e_bilanz_tab = ttk.Frame(
+            self._notebook,
+            padding=16,
+        )
 
         self._notebook.add(
             self._accounts_tab,
@@ -259,6 +280,11 @@ class MainWindow(tk.Tk):
             self._closing_tab,
             text="Jahresabschluss",
         )
+        
+        self._notebook.add(
+            self._e_bilanz_tab,
+            text="E-Bilanz",
+        )
 
         self._create_accounts_tab()
         self._create_journal_tab()
@@ -266,6 +292,7 @@ class MainWindow(tk.Tk):
         self._create_balance_sheet_tab()
         self._create_income_statement_tab()
         self._create_closing_tab()
+        self._create_e_bilanz_tab()
 
     def _create_accounts_tab(self) -> None:
         """Erzeugt den Arbeitsbereich Konten."""
@@ -550,6 +577,67 @@ class MainWindow(tk.Tk):
             expand=True,
         )
 
+    def _create_e_bilanz_tab(self) -> None:
+        """Erzeugt den Arbeitsbereich E-Bilanz."""
+
+        ttk.Label(
+            self._e_bilanz_tab,
+            text="E-Bilanz",
+            font=("TkDefaultFont", 16, "bold"),
+        ).pack(
+            anchor="w",
+        )
+
+        ttk.Label(
+            self._e_bilanz_tab,
+            text=(
+                "Vorbereitung und Erzeugung der E-Bilanz "
+                "für das aktuelle Geschäftsjahr."
+            ),
+        ).pack(
+            anchor="w",
+            pady=(4, 16),
+        )
+
+        self._e_bilanz_status = ttk.Label(
+            self._e_bilanz_tab,
+            text="",
+        )
+        self._e_bilanz_status.pack(
+            anchor="w",
+            pady=(0, 16),
+        )
+
+        self._prepare_e_bilanz_button = ttk.Button(
+            self._e_bilanz_tab,
+            text="E-Bilanz vorbereiten",
+            command=self._prepare_e_bilanz,
+            state="disabled",
+        )
+        self._prepare_e_bilanz_button.pack(
+            anchor="w",
+        )
+        self._build_e_bilanz_button = ttk.Button(
+            self._e_bilanz_tab,
+            text="E-Bilanz erzeugen",
+            command=self._build_e_bilanz,
+            state="disabled",
+        )
+        self._build_e_bilanz_button.pack(
+            anchor="w",
+            pady=(8, 0),
+        )
+        self._validate_e_bilanz_button = ttk.Button(
+            self._e_bilanz_tab,
+            text="E-Bilanz validieren",
+            command=self._validate_e_bilanz,
+            state="disabled",
+        )
+        self._validate_e_bilanz_button.pack(
+            anchor="w",
+            pady=(8, 0),
+        )
+    
     def _post_booking(
         self,
         booking: Booking,
@@ -673,9 +761,196 @@ class MainWindow(tk.Tk):
         self._refresh_journal()
         self._refresh_balance_sheet()
         self._refresh_closing()
+        self._refresh_e_bilanz()
         self._update_editing_state()
 
         self.update_idletasks()
+    
+    def _refresh_e_bilanz(self) -> None:
+        """Aktualisiert den Zustand des E-Bilanz-Arbeitsbereichs."""
+
+        if not self._workspace.is_closed:
+            self._e_bilanz_status.config(
+                text=(
+                    "Die E-Bilanz kann erst nach dem "
+                    "Jahresabschluss vorbereitet werden."
+                ),
+            )
+            self._prepare_e_bilanz_button.config(
+                state="disabled",
+            )
+            self._build_e_bilanz_button.config(
+                state="disabled",
+            )
+            self._build_e_bilanz_button.config(
+                state="disabled",
+            )
+            self._validate_e_bilanz_button.config(
+                state="disabled",
+            )
+            return
+
+        self._prepare_e_bilanz_button.config(
+            state="normal",
+        )
+
+        if self._current_e_bilanz_preparation is None:
+            self._e_bilanz_status.config(
+                text=(
+                    "Das Geschäftsjahr ist abgeschlossen. "
+                    "Die E-Bilanz kann vorbereitet werden."
+                ),
+            )
+            self._build_e_bilanz_button.config(
+                state="disabled",
+            )
+            self._build_e_bilanz_button.config(
+                state="disabled",
+            )
+            self._validate_e_bilanz_button.config(
+                state="disabled",
+            )
+            return
+
+        preparation = self._current_e_bilanz_preparation
+
+        self._build_e_bilanz_button.config(
+            state="normal",
+        )
+        if self._current_e_bilanz_document is None:
+            self._validate_e_bilanz_button.config(
+                state="disabled",
+            )
+        else:
+            self._validate_e_bilanz_button.config(
+                state="normal",
+            )
+
+        self._e_bilanz_status.config(
+            text=(
+                "Die E-Bilanz wurde vorbereitet.\n"
+                f"Bilanzpositionen: "
+                f"{len(preparation.balance_sheet_amounts)}\n"
+                f"GuV-Positionen: "
+                f"{len(preparation.income_statement_amounts)}"
+            ),
+        )
+        
+    def _prepare_e_bilanz(self) -> None:
+        """Bereitet die Abschlusswerte für die E-Bilanz auf."""
+
+        if not self._workspace.is_closed:
+            messagebox.showwarning(
+                "E-Bilanz",
+                "Das Geschäftsjahr ist noch nicht abgeschlossen.",
+                parent=self,
+            )
+            return
+
+        if self._current_income_statement is None:
+            messagebox.showwarning(
+                "E-Bilanz",
+                "Es steht keine GuV für die E-Bilanz-Vorbereitung zur Verfügung.",
+                parent=self,
+            )
+            return
+
+
+        
+        try:
+            preparation = self._workspace.prepare_e_bilanz(
+                income_statement=self._current_income_statement,
+            )
+        except ValueError as exc:
+            messagebox.showerror(
+                "E-Bilanz konnte nicht vorbereitet werden",
+                str(exc),
+                parent=self,
+            )
+            return
+
+        self._current_e_bilanz_preparation = preparation
+
+        self._refresh_e_bilanz()
+    
+    def _build_e_bilanz(self) -> None:
+        """Erzeugt die E-Bilanz aus den vorbereiteten Abschlusswerten."""
+
+        if self._current_e_bilanz_preparation is None:
+            messagebox.showwarning(
+                "E-Bilanz",
+                "Die E-Bilanz wurde noch nicht vorbereitet.",
+                parent=self,
+            )
+            return
+
+        try:
+            document = self._workspace.build_e_bilanz(
+                preparation=self._current_e_bilanz_preparation,
+            )
+        except (ValueError, FileNotFoundError, RuntimeError) as exc:
+            messagebox.showerror(
+                "E-Bilanz konnte nicht erzeugt werden",
+                str(exc),
+                parent=self,
+            )
+            return
+
+        self._current_e_bilanz_document = document
+        
+        self._refresh_e_bilanz()
+
+        messagebox.showinfo(
+            "E-Bilanz",
+            "Die E-Bilanz wurde erfolgreich erzeugt.",
+            parent=self,
+        )
+    
+    def _validate_e_bilanz(self) -> None:
+        """Validiert die erzeugte E-Bilanz mit Arelle."""
+
+        if self._current_e_bilanz_document is None:
+            messagebox.showwarning(
+                "E-Bilanz",
+                "Die E-Bilanz wurde noch nicht erzeugt.",
+                parent=self,
+            )
+            return
+
+        try:
+            result = self._workspace.validate_e_bilanz(
+                self._current_e_bilanz_document
+            )
+        except (ValueError, RuntimeError) as exc:
+            messagebox.showerror(
+                "E-Bilanz konnte nicht validiert werden",
+                str(exc),
+                parent=self,
+            )
+            return
+
+        if result.is_valid:
+            messagebox.showinfo(
+                "E-Bilanz",
+                "Die E-Bilanz wurde von Arelle "
+                "erfolgreich validiert.",
+                parent=self,
+            )
+            return
+
+        errors = "\n".join(
+            result.errors
+        )
+
+        messagebox.showerror(
+            "E-Bilanz-Validierung fehlgeschlagen",
+            (
+                "Arelle hat Fehler in der "
+                "E-Bilanz festgestellt.\n\n"
+                f"{errors}"
+            ),
+            parent=self,
+        )
     
     def _refresh_overview(self) -> None:
         """Aktualisiert die Kontenübersicht."""
@@ -843,15 +1118,29 @@ class MainWindow(tk.Tk):
                 balance.account_number
             )
             in balance_sheet_account_types
+            and (
+                balance.debit_balance > ZERO
+                or balance.credit_balance > ZERO
+            )
+        )
+
+        income_statement_ledger = (
+            self._workspace.pre_closing_ledger
+            if self._workspace.is_closed
+            else self._ledger
         )
 
         income_statement_balances = tuple(
             balance
-            for balance in self._ledger.balances()
+            for balance in income_statement_ledger.balances()
             if self._account_types.get(
                 balance.account_number
             )
             in income_statement_account_types
+            and (
+                balance.debit_balance > ZERO
+                or balance.credit_balance > ZERO
+            )
         )
 
         self._current_closing_balances = (

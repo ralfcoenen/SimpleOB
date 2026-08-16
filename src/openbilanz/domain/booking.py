@@ -7,6 +7,7 @@ from typing import Iterable
 from uuid import UUID, uuid4
 
 from openbilanz.domain.booking_line import BookingLine
+from openbilanz.domain.booking_type import BookingType
 from openbilanz.domain.entry_side import EntrySide
 from openbilanz.domain.errors import UnbalancedBookingError
 from openbilanz.domain.money import ZERO
@@ -27,6 +28,7 @@ class Booking:
     voucher_no: str | None = None
     description: str | None = None
     booking_id: UUID = field(default_factory=uuid4)
+    booking_type: BookingType = BookingType.REGULAR
 
     def __post_init__(self) -> None:
         """Normalisiert und validiert die Buchung."""
@@ -44,6 +46,11 @@ class Booking:
         if not isinstance(self.booking_id, UUID):
             raise TypeError("Die Buchungs-ID muss eine UUID sein.")
 
+        if not isinstance(self.booking_type, BookingType):
+            raise TypeError(
+                "Der Buchungstyp muss ein BookingType sein."
+            )
+        
         if len(lines) < 2:
             raise ValueError(
                 "Eine Buchung muss mindestens zwei Buchungszeilen enthalten."

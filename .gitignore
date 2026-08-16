@@ -23,3 +23,7 @@ data/*.sqlite
 
 # Scripts Ausgaben
 script_results/
+
+# Taxonomien
+data/taxonomy/
+data/taxonomy-backup-*/

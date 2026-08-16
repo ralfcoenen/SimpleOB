@@ -7,6 +7,34 @@ from openbilanz.domain.company_master_data import (
     CompanyMasterData,
 )
 
+FEDERAL_STATES = (
+    ("BW", "Baden-Württemberg"),
+    ("BY", "Bayern"),
+    ("BE", "Berlin"),
+    ("BB", "Brandenburg"),
+    ("HB", "Bremen"),
+    ("HH", "Hamburg"),
+    ("HE", "Hessen"),
+    ("MV", "Mecklenburg-Vorpommern"),
+    ("NI", "Niedersachsen"),
+    ("NW", "Nordrhein-Westfalen"),
+    ("RP", "Rheinland-Pfalz"),
+    ("SL", "Saarland"),
+    ("SN", "Sachsen"),
+    ("ST", "Sachsen-Anhalt"),
+    ("SH", "Schleswig-Holstein"),
+    ("TH", "Thüringen"),
+)
+
+FEDERAL_STATE_LABELS = {
+    code: name
+    for code, name in FEDERAL_STATES
+}
+
+FEDERAL_STATE_CODES = {
+    name: code
+    for code, name in FEDERAL_STATES
+}
 
 class CompanyMasterDataDialog(tk.Toplevel):
     """Bearbeitet die Stammdaten eines Unternehmens."""
@@ -86,6 +114,7 @@ class CompanyMasterDataDialog(tk.Toplevel):
         self._postal_code_var = tk.StringVar()
         self._city_var = tk.StringVar()
         self._country_var = tk.StringVar()
+        self._federal_state_var = tk.StringVar()
         self._business_var = tk.StringVar()
 
         fields = (
@@ -94,7 +123,7 @@ class CompanyMasterDataDialog(tk.Toplevel):
                 self._legal_form_var,
             ),
             (
-                "Steuernummer (13-stellig)",
+                "Steuernummer",
                 self._tax_number_var,
             ),
             (
@@ -162,6 +191,36 @@ class CompanyMasterDataDialog(tk.Toplevel):
                 sticky="ew",
                 pady=6,
             )
+        
+        federal_state_row = len(fields)
+
+        ttk.Label(
+            form,
+            text="Bundesland",
+        ).grid(
+            row=federal_state_row,
+            column=0,
+            sticky="w",
+            padx=(0, 12),
+            pady=6,
+        )
+
+        self._federal_state_box = ttk.Combobox(
+            form,
+            textvariable=self._federal_state_var,
+            values=tuple(
+                name
+                for _, name in FEDERAL_STATES
+            ),
+            state="readonly",
+        )
+
+        self._federal_state_box.grid(
+            row=federal_state_row,
+            column=1,
+            sticky="ew",
+            pady=6,
+        )
 
         buttons = ttk.Frame(
             container
@@ -224,6 +283,12 @@ class CompanyMasterDataDialog(tk.Toplevel):
         self._country_var.set(
             self._master_data.country
         )
+        self._federal_state_var.set(
+            FEDERAL_STATE_LABELS.get(
+                self._master_data.federal_state,
+                "",
+            )
+        )
         self._business_var.set(
             self._master_data.business
         )
@@ -266,6 +331,12 @@ class CompanyMasterDataDialog(tk.Toplevel):
                 ),
                 country=self._value(
                     self._country_var
+                ),
+                federal_state=FEDERAL_STATE_CODES.get(
+                    self._value(
+                        self._federal_state_var
+                    ),
+                    "",
                 ),
                 business=self._value(
                     self._business_var

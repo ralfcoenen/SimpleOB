@@ -5,6 +5,9 @@ from dataclasses import dataclass
 from openbilanz.domain.company_master_data import (
     CompanyMasterData,
 )
+from openbilanz.domain.tax_number_normalizer import (
+    TaxNumberNormalizer,
+)
 from openbilanz.taxonomy.gcd_company_data import (
     GcdCompanyData,
 )
@@ -43,10 +46,15 @@ class GcdCompanyDataMapper:
                 "Die Unternehmensstammdaten sind für "
                 "die E-Bilanz noch unvollständig."
             )
+            
+        tax_number_13 = TaxNumberNormalizer().normalize(
+            federal_state=master_data.federal_state,
+            tax_number=master_data.tax_number,
+        )
 
         company_data = GcdCompanyData(
             company=master_data.company,
-            tax_number=master_data.tax_number,
+            tax_number=tax_number_13,
             legal_form=master_data.legal_form,
             street=master_data.street,
             house_number=master_data.house_number,
@@ -57,7 +65,7 @@ class GcdCompanyDataMapper:
         )
 
         identifiers = GcdCompanyIdentifiers(
-            tax_number_13=master_data.tax_number,
+            tax_number_13=tax_number_13,
             tax_id=(
                 master_data.tax_id
                 or None

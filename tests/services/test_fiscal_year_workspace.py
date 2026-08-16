@@ -15,6 +15,7 @@ from openbilanz.accounting.mapper import AccountMapper
 from openbilanz.core.context import ApplicationContext
 from openbilanz.domain.booking import Booking
 from openbilanz.domain.booking_line import BookingLine
+from openbilanz.domain.booking_type import BookingType
 from openbilanz.domain.chart_of_accounts_template import (
     ChartOfAccountsTemplate,
 )
@@ -33,6 +34,12 @@ from openbilanz.domain.managed_fiscal_year import ManagedFiscalYear
 from openbilanz.services.closing_result import ClosingResult
 from openbilanz.services.fiscal_year_workspace import FiscalYearWorkspace
 from openbilanz.services.posting_service import PostingService
+from openbilanz.taxonomy.arelle_adapter import (
+    ArelleValidationResult,
+)
+from openbilanz.taxonomy.e_bilanz_builder import (
+    EBilanzDocument,
+)
 
 
 @pytest.fixture
@@ -85,6 +92,10 @@ def test_reconstructs_empty_workspace(
 
     assert isinstance(workspace.journal, Journal)
     assert isinstance(workspace.ledger, Ledger)
+    assert isinstance(
+        workspace.pre_closing_ledger,
+        Ledger,
+    )
     assert len(workspace.journal) == 0
 
     booking_repository.list_for_fiscal_year.assert_called_once_with(
@@ -353,6 +364,7 @@ def test_close_fiscal_year_uses_workflow_and_reloads_closed_bookings(
                 amount=Decimal("500.00"),
             ),
         ),
+        booking_type=BookingType.CLOSING,
     )
 
     closing_result = ClosingResult(
@@ -421,7 +433,29 @@ def test_close_fiscal_year_uses_workflow_and_reloads_closed_bookings(
         "8990"
     )
 
+
     assert closing_account.credit == Decimal("500.00")
+    
+    pre_closing_revenue_account = (
+        workspace.pre_closing_ledger.get_account(
+            "8400"
+        )
+    )
+
+    assert (
+        pre_closing_revenue_account.debit
+        == Decimal("0.00")
+    )
+    assert (
+        pre_closing_revenue_account.credit
+        == Decimal("500.00")
+    )
+
+    with pytest.raises(KeyError):
+        workspace.pre_closing_ledger.get_account(
+            "8990"
+        )
+    
 
 def test_validate_closing_delegates_to_consistency_service(
     context: ApplicationContext,
@@ -753,10 +787,6 @@ def test_builds_e_bilanz_from_prepared_data(
 
     result = workspace.build_e_bilanz(
         preparation=preparation,
-        entity_identifier="DE123456789",
-        entity_scheme=(
-            "http://www.bundesfinanzministerium.de"
-        ),
     )
 
     assert result is expected_document
@@ -765,10 +795,10 @@ def test_builds_e_bilanz_from_prepared_data(
         master_data=master_data,
         fiscal_year=context.fiscal_year,
         amounts=preparation.amounts,
-        entity_identifier="DE123456789",
-        entity_scheme=(
-            "http://www.bundesfinanzministerium.de"
+        entity_identifier=str(
+            context.company.company_id
         ),
+        entity_scheme="urn:openbilanz:company-id",
         previous_fiscal_year=previous_fiscal_year,
     )
     
@@ -808,9 +838,108 @@ def test_rejects_e_bilanz_build_for_open_fiscal_year(
     ):
         workspace.build_e_bilanz(
             preparation=Mock(),
-            entity_identifier="DE123456789",
-            entity_scheme=(
-                "http://www.bundesfinanzministerium.de"
-            ),
         )
+
+def test_validates_e_bilanz_for_closed_fiscal_year(
+    context: ApplicationContext,
+) -> None:
+    booking_repository = Mock()
+    company_repository = Mock()
+    posting_service = PostingService()
+    closing_workflow = Mock()
+    closing_consistency_service = Mock()
+    preparation_service = Mock()
+    e_bilanz_service = Mock()
+
+    booking_repository.list_for_fiscal_year.return_value = ()
+
+    company_repository.get_managed_fiscal_years.return_value = (
+        ManagedFiscalYear(
+            fiscal_year=context.fiscal_year,
+            status=FiscalYearStatus.CLOSED,
+            opening_source=None,
+        ),
+    )
+
+    expected_result = ArelleValidationResult(
+        is_valid=True,
+        errors=(),
+    )
+
+    e_bilanz_service.validate.return_value = (
+        expected_result
+    )
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=company_repository,
+        posting_service=posting_service,
+        closing_workflow=closing_workflow,
+        closing_consistency_service=(
+            closing_consistency_service
+        ),
+        e_bilanz_preparation_service=(
+            preparation_service
+        ),
+        e_bilanz_service=e_bilanz_service,
+    )
+
+    document = Mock(
+        spec=EBilanzDocument
+    )
+
+    result = workspace.validate_e_bilanz(
+        document
+    )
+
+    assert result is expected_result
+
+    e_bilanz_service.validate.assert_called_once_with(
+        document,
+        fiscal_year=context.fiscal_year,
+    )
+
+def test_rejects_e_bilanz_validation_for_open_fiscal_year(
+    context: ApplicationContext,
+) -> None:
+    booking_repository = Mock()
+    company_repository = Mock()
+
+    booking_repository.list_for_fiscal_year.return_value = ()
+
+    company_repository.get_managed_fiscal_years.return_value = (
+        ManagedFiscalYear(
+            fiscal_year=context.fiscal_year,
+            status=FiscalYearStatus.OPEN,
+            opening_source=None,
+        ),
+    )
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=company_repository,
+        posting_service=PostingService(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+    )
+
+    document = Mock(
+        spec=EBilanzDocument
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "E-Bilanz kann erst nach dem "
+            "Jahresabschluss validiert werden"
+        ),
+    ):
+        workspace.validate_e_bilanz(
+            document
+        )
+
 

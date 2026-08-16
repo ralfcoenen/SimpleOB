@@ -10,6 +10,7 @@ from openbilanz.core.context import ApplicationContext
 from openbilanz.database.booking_repository import BookingRepository
 from openbilanz.database.company_repository import CompanyRepository
 from openbilanz.domain.booking import Booking
+from openbilanz.domain.booking_type import BookingType
 from openbilanz.domain.chart_of_accounts_template import (
     ChartOfAccountsTemplate,
 )
@@ -35,8 +36,14 @@ from openbilanz.services.fiscal_year_closing_workflow import (
     FiscalYearClosingWorkflow,
 )
 from openbilanz.services.posting_service import PostingService
+from openbilanz.taxonomy.arelle_adapter import (
+    ArelleValidationResult,
+)
 from openbilanz.taxonomy.e_bilanz_builder import (
     EBilanzDocument,
+)
+from openbilanz.taxonomy.entity_identifier import (
+    EntityIdentifier,
 )
 
 
@@ -67,6 +74,7 @@ class FiscalYearWorkspace:
 
         self._journal = Journal()
         self._ledger = Ledger()
+        self._pre_closing_ledger = Ledger()
         self._e_bilanz_preparation_service = (
             e_bilanz_preparation_service
         )
@@ -92,6 +100,12 @@ class FiscalYearWorkspace:
 
         return self._ledger
 
+    @property
+    def pre_closing_ledger(self) -> Ledger:
+        """Liefert das Hauptbuch ohne Jahresabschlussbuchungen."""
+
+        return self._pre_closing_ledger
+    
     @property
     def managed_fiscal_year(self) -> ManagedFiscalYear:
         """Liefert das Geschäftsjahr einschließlich Verwaltungsstatus."""
@@ -196,6 +210,7 @@ class FiscalYearWorkspace:
 
         journal = Journal()
         ledger = Ledger()
+        pre_closing_ledger = Ledger()
 
         bookings = (
             self._booking_repository.list_for_fiscal_year(
@@ -211,10 +226,16 @@ class FiscalYearWorkspace:
                 journal=journal,
             )
 
+            if booking.booking_type is not BookingType.CLOSING:
+                self._posting_service.post_booking(
+                    booking=booking,
+                    ledger=pre_closing_ledger,
+                )
+
         self._journal = journal
         self._ledger = ledger
-
-
+        self._pre_closing_ledger = pre_closing_ledger
+    
     def load_company_master_data(
         self,
     ) -> CompanyMasterData:
@@ -275,8 +296,6 @@ class FiscalYearWorkspace:
         self,
         *,
         preparation: EBilanzPreparationResult,
-        entity_identifier: str,
-        entity_scheme: str,
     ) -> EBilanzDocument:
         """Erzeugt die E-Bilanz des geöffneten Geschäftsjahres."""
 
@@ -287,14 +306,34 @@ class FiscalYearWorkspace:
             )
 
         master_data = self.load_company_master_data()
+        entity = EntityIdentifier.from_company(
+            self._context.company
+        )
 
         return self._e_bilanz_service.build(
             master_data=master_data,
             fiscal_year=self._context.fiscal_year,
             amounts=preparation.amounts,
-            entity_identifier=entity_identifier,
-            entity_scheme=entity_scheme,
+            entity_identifier=entity.value,
+            entity_scheme=entity.scheme,    
             previous_fiscal_year=(
                 self.managed_fiscal_year.opening_source
             ),
+        )
+        
+    def validate_e_bilanz(
+        self,
+        document: EBilanzDocument,
+    ) -> ArelleValidationResult:
+        """Validiert eine erzeugte E-Bilanz."""
+
+        if not self.is_closed:
+            raise ValueError(
+                "Die E-Bilanz kann erst nach dem "
+                "Jahresabschluss validiert werden."
+            )
+
+        return self._e_bilanz_service.validate(
+            document,
+            fiscal_year=self._context.fiscal_year,
         )

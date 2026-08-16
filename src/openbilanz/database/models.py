@@ -83,7 +83,10 @@ class Mandant(Base):
         String(2),
         nullable=True,
     )
-
+    bundesland: Mapped[str | None] = mapped_column(
+        String(2),
+        nullable=True,
+    )
     geschaeftstaetigkeit: Mapped[str | None] = mapped_column(
         String,
         nullable=True,
@@ -181,6 +184,13 @@ class Buchung(Base):
         nullable=True,
     )
 
+    booking_type: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+        default="REGULAR",
+        server_default="REGULAR",
+    )
+    
     wirtschaftsjahr: Mapped[Wirtschaftsjahr] = relationship(
         back_populates="buchungen",
     )

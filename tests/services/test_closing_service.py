@@ -9,6 +9,7 @@ from openbilanz.accounting.ledger import Ledger
 from openbilanz.accounting.statement_category import StatementCategory
 from openbilanz.domain.account_type import AccountType
 from openbilanz.domain.booking_line import BookingLine
+from openbilanz.domain.booking_type import BookingType
 from openbilanz.domain.chart_of_accounts_template import (
     ChartOfAccountsTemplate,
 )
@@ -187,6 +188,7 @@ def test_close_creates_closing_booking_for_revenue_account() -> None:
     assert len(result.bookings) == 1
 
     booking = result.bookings[0]
+    assert booking.booking_type is BookingType.CLOSING
 
     assert booking.booking_date == date(2026, 12, 31)
     assert booking.description == "Abschluss des Erlöskontos 8400"
@@ -249,6 +251,7 @@ def test_close_creates_closing_booking_for_expense_account() -> None:
     assert len(result.bookings) == 1
 
     booking = result.bookings[0]
+    assert booking.booking_type is BookingType.CLOSING
 
     assert booking.booking_date == date(2026, 12, 31)
     assert booking.description == "Abschluss des Aufwandskontos 4930"
@@ -313,6 +316,7 @@ def test_close_creates_booking_for_net_income() -> None:
     assert len(result.bookings) == 1
 
     booking = result.bookings[0]
+    assert booking.booking_type is BookingType.CLOSING
 
     assert booking.booking_date == date(2026, 12, 31)
     assert booking.description == "Abschluss des GuV-Kontos"

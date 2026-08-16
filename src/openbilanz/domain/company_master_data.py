@@ -4,6 +4,26 @@ from dataclasses import dataclass
 
 from openbilanz.domain.company import Company
 
+GERMAN_FEDERAL_STATE_CODES = frozenset(
+    {
+        "BW",
+        "BY",
+        "BE",
+        "BB",
+        "HB",
+        "HH",
+        "HE",
+        "MV",
+        "NI",
+        "NW",
+        "RP",
+        "SL",
+        "SN",
+        "ST",
+        "SH",
+        "TH",
+    }
+)
 
 @dataclass(frozen=True, slots=True)
 class CompanyMasterData:
@@ -21,6 +41,7 @@ class CompanyMasterData:
     postal_code: str = ""
     city: str = ""
     country: str = ""
+    federal_state: str = ""
     business: str = ""
 
     def __post_init__(self) -> None:
@@ -77,21 +98,14 @@ class CompanyMasterData:
             self.country,
         )
         self._validate_string(
+            "federal_state",
+            self.federal_state,
+        )
+        self._validate_string(
             "business",
             self.business,
         )
-
-        if (
-            self.tax_number
-            and (
-                len(self.tax_number) != 13
-                or not self.tax_number.isdigit()
-            )
-        ):
-            raise ValueError(
-                "tax_number must contain exactly 13 digits"
-            )
-
+        
         if (
             self.bf4
             and (
@@ -101,6 +115,14 @@ class CompanyMasterData:
         ):
             raise ValueError(
                 "bf4 must contain exactly 4 digits"
+            )
+        if (
+            self.federal_state
+            and self.federal_state
+            not in GERMAN_FEDERAL_STATE_CODES
+        ):
+            raise ValueError(
+                "federal_state must be a valid German federal state code"
             )
 
     @staticmethod
@@ -130,4 +152,5 @@ class CompanyMasterData:
         return bool(
             self.legal_form
             and self.tax_number
+            and self.federal_state
         )

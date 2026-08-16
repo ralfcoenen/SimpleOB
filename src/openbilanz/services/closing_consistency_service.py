@@ -10,6 +10,7 @@ from openbilanz.domain.closing_consistency_result import (
 )
 from openbilanz.domain.money import ZERO
 from openbilanz.services.closing_result import ClosingResult
+from openbilanz.services.closing_service import ClosingService
 
 
 class ClosingConsistencyService:
@@ -97,8 +98,8 @@ class ClosingConsistencyService:
         errors: list[str] = []
 
         income_statement_result = (
-            income_statement.amount_for(
-                income_statement.income_statement
+            ClosingService().calculate_net_income(
+                income_statement=income_statement,
             )
         )
 

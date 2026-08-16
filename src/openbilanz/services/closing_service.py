@@ -9,6 +9,7 @@ from openbilanz.accounting.statement_category import StatementCategory
 from openbilanz.domain.account_type import AccountType
 from openbilanz.domain.booking import Booking
 from openbilanz.domain.booking_line import BookingLine
+from openbilanz.domain.booking_type import BookingType
 from openbilanz.domain.chart_of_accounts_template import (
     ChartOfAccountsTemplate,
 )
@@ -201,6 +202,7 @@ class ClosingService:
                 booking_date=closing_date,
                 voucher_no=None,
                 description=f"Abschluss des Erlöskontos {account_number}",
+                booking_type=BookingType.CLOSING,
                 lines=(
                     BookingLine(
                         account_number=account_number,
@@ -215,7 +217,7 @@ class ClosingService:
                         amount=credit_balance,
                     ),
                 ),
-            )
+                            )
 
         if (
             account_type is AccountType.EXPENSE
@@ -225,6 +227,7 @@ class ClosingService:
                 booking_date=closing_date,
                 voucher_no=None,
                 description=f"Abschluss des Aufwandskontos {account_number}",
+                booking_type=BookingType.CLOSING,
                 lines=(
                     BookingLine(
                         account_number=(
@@ -282,6 +285,7 @@ class ClosingService:
             booking_date=closing_date,
             voucher_no=None,
             description="Abschluss des GuV-Kontos",
+            booking_type=BookingType.CLOSING,            
             lines=(
                 BookingLine(
                     account_number=(
@@ -312,6 +316,7 @@ class ClosingService:
             booking_date=closing_date,
             voucher_no=None,
             description="Abschluss des GuV-Kontos",
+            booking_type=BookingType.CLOSING,            
             lines=(
                 BookingLine(
                     account_number=self._closing_accounts.loss_account,

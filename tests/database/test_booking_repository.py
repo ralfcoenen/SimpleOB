@@ -16,6 +16,7 @@ from openbilanz.database.company_repository import (
 from openbilanz.database.database import Base
 from openbilanz.domain.booking import Booking
 from openbilanz.domain.booking_line import BookingLine
+from openbilanz.domain.booking_type import BookingType
 from openbilanz.domain.company import Company
 from openbilanz.domain.entry_side import EntrySide
 from openbilanz.domain.fiscal_year import FiscalYear
@@ -91,6 +92,83 @@ def test_adds_and_loads_booking() -> None:
         )
 
     assert loaded_bookings == (booking,)
+
+def test_preserves_closing_booking_type() -> None:
+    """Der Buchungstyp bleibt beim Datenbank-Roundtrip erhalten."""
+
+    engine = create_engine(
+        "sqlite:///:memory:"
+    )
+    Base.metadata.create_all(engine)
+
+    Session = sessionmaker(
+        bind=engine
+    )
+
+    with Session() as session:
+        company_repository = CompanyRepository(
+            session
+        )
+
+        company = Company(
+            company_id=uuid4(),
+            name="Muster UG",
+        )
+
+        fiscal_year = FiscalYear(
+            start_date=date(2026, 1, 1),
+            end_date=date(2026, 12, 31),
+        )
+
+        company_repository.add(
+            company
+        )
+        company_repository.add_fiscal_year(
+            company.company_id,
+            fiscal_year,
+        )
+
+        booking_repository = BookingRepository(
+            session
+        )
+
+        booking = Booking(
+            booking_date=date(2026, 12, 31),
+            description="Abschluss des GuV-Kontos",
+            booking_type=BookingType.CLOSING,
+            lines=(
+                BookingLine(
+                    account_number="8990",
+                    side=EntrySide.DEBIT,
+                    amount=Decimal("4500.00"),
+                ),
+                BookingLine(
+                    account_number="8020",
+                    side=EntrySide.CREDIT,
+                    amount=Decimal("4500.00"),
+                ),
+            ),
+        )
+
+        booking_repository.add(
+            company_id=company.company_id,
+            fiscal_year=fiscal_year,
+            booking=booking,
+        )
+
+        loaded_bookings = (
+            booking_repository.list_for_fiscal_year(
+                company_id=company.company_id,
+                fiscal_year=fiscal_year,
+            )
+        )
+
+    assert len(loaded_bookings) == 1
+    assert (
+        loaded_bookings[0].booking_type
+        is BookingType.CLOSING
+    )
+    assert loaded_bookings[0] == booking
 
 def test_rejects_duplicate_booking_id() -> None:
     engine = create_engine(

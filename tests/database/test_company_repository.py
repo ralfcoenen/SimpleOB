@@ -864,6 +864,7 @@ def test_saves_and_loads_company_master_data() -> None:
             postal_code="12345",
             city="Musterstadt",
             country="DE",
+            federal_state="NW",
             business="Softwareentwicklung",
         )
 
@@ -920,6 +921,7 @@ def test_updates_company_master_data() -> None:
                 tax_number="1234567890123",
                 city="Musterstadt",
                 country="DE",
+                federal_state="NW",
             )
         )
 
@@ -936,6 +938,7 @@ def test_updates_company_master_data() -> None:
             postal_code="10115",
             city="Berlin",
             country="DE",
+            federal_state="NW",
             business="Software und Beratung",
         )
 

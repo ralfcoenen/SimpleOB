@@ -12,6 +12,7 @@ from openbilanz.database.models import (
 )
 from openbilanz.domain.booking import Booking
 from openbilanz.domain.booking_line import BookingLine
+from openbilanz.domain.booking_type import BookingType
 from openbilanz.domain.entry_side import EntrySide
 from openbilanz.domain.fiscal_year import FiscalYear
 from openbilanz.domain.fiscal_year_status import FiscalYearStatus
@@ -53,7 +54,7 @@ class BookingRepository:
             raise ValueError(
                 "Das Geschäftsjahr ist abgeschlossen."
             )
-        
+
         if not fiscal_year.contains(
             booking.booking_date
         ):
@@ -82,8 +83,9 @@ class BookingRepository:
             booking_date=booking.booking_date,
             voucher_no=booking.voucher_no,
             description=booking.description,
-)        
-        
+            booking_type=booking.booking_type.value,
+        )
+
         model.zeilen = [
             Buchungszeile(
                 position=position,
@@ -136,6 +138,9 @@ class BookingRepository:
                 booking_date=model.booking_date,
                 voucher_no=model.voucher_no,
                 description=model.description,
+                booking_type=BookingType(
+                    model.booking_type
+                ),
                 lines=tuple(
                     BookingLine(
                         account_number=line.account_number,
@@ -171,3 +176,4 @@ class BookingRepository:
             )
             .one_or_none()
         )
+    

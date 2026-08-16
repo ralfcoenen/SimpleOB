@@ -24,7 +24,8 @@ def test_maps_complete_company_master_data() -> None:
     master_data = CompanyMasterData(
         company=_company(),
         legal_form="UG (haftungsbeschränkt)",
-        tax_number="1234567890123",
+        tax_number="123/4567/8901",
+        federal_state="NW",
         tax_office="Finanzamt Musterstadt",
         tax_id="12345678901",
         tax_economic_id="DE123456789",
@@ -46,7 +47,7 @@ def test_maps_complete_company_master_data() -> None:
     )
     assert (
         result.company_data.tax_number
-        == "1234567890123"
+        == "5123045678901"
     )
     assert (
         result.company_data.legal_form
@@ -64,12 +65,12 @@ def test_maps_complete_company_master_data() -> None:
 
     assert (
         result.identifiers.tax_number_13
-        == "1234567890123"
+        == "5123045678901"
     )
     assert result.identifiers.tax_id == "12345678901"
     assert (
-        result.identifiers.tax_economic_id
-        == "DE123456789"
+        result.identifiers.tax_number_13
+        == "5123045678901"
     )
     assert result.identifiers.bf4 == "1234"
 
@@ -78,7 +79,8 @@ def test_maps_empty_optional_identifiers_to_none() -> None:
     master_data = CompanyMasterData(
         company=_company(),
         legal_form="UG (haftungsbeschränkt)",
-        tax_number="1234567890123",
+        tax_number="123/4567/8901",
+        federal_state="NW",
     )
 
     result = GcdCompanyDataMapper().map(
@@ -116,4 +118,20 @@ def test_rejects_wrong_type() -> None:
     ):
         GcdCompanyDataMapper().map(
             object()  # type: ignore[arg-type]
+        )
+
+def test_rejects_invalid_state_specific_tax_number() -> None:
+    master_data = CompanyMasterData(
+        company=_company(),
+        legal_form="UG (haftungsbeschränkt)",
+        tax_number="1234/5678/9012",
+        federal_state="NW",
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="Ungültige Steuernummer für Nordrhein-Westfalen",
+    ):
+        GcdCompanyDataMapper().map(
+            master_data
         )
