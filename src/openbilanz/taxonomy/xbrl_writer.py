@@ -2,6 +2,9 @@
 
 from xml.etree import ElementTree as ET
 
+from openbilanz.taxonomy.account_balance_tuple import (
+    TaxonomyAccountBalance,
+)
 from openbilanz.taxonomy.concept import TaxonomyPeriodType
 from openbilanz.taxonomy.context import TaxonomyContext
 from openbilanz.taxonomy.entry_point import TaxonomyEntryPoint
@@ -58,7 +61,7 @@ class TaxonomyXbrlWriter:
             return taxonomy_namespace
 
         return namespace
-    
+
     def context_element(
         self,
         context: TaxonomyContext,
@@ -159,7 +162,7 @@ class TaxonomyXbrlWriter:
         )
 
         return element
-    
+
     def gcd_report_element_element(
         self,
         *,
@@ -192,7 +195,63 @@ class TaxonomyXbrlWriter:
             )
 
         return element
-    
+
+    def account_balance_element(
+        self,
+        *,
+        account_balance: TaxonomyAccountBalance,
+        context_id: str,
+        unit_id: str,
+        namespace: str,
+    ) -> ET.Element:
+        """Erzeugt einen GAAP-CI-Kontennachweis als XBRL-Tuple."""
+
+        if not isinstance(
+            account_balance,
+            TaxonomyAccountBalance,
+        ):
+            raise TypeError(
+                "account_balance must be a "
+                "TaxonomyAccountBalance"
+            )
+
+        element = ET.Element(
+            f"{{{namespace}}}"
+            "detailedInformation.accountBalances"
+        )
+
+        for fact in (
+            account_balance.position_name,
+            account_balance.account_number,
+            account_balance.account_description,
+        ):
+            element.append(
+                self.text_fact_element(
+                    fact=fact,
+                    context_id=context_id,
+                    namespace=namespace,
+                )
+            )
+
+        element.append(
+            self.fact_element(
+                fact=account_balance.amount,
+                context_id=context_id,
+                unit_id=unit_id,
+                namespace=namespace,
+            )
+        )
+
+        element.append(
+            self.text_fact_element(
+                fact=account_balance.not_possible,
+                context_id=context_id,
+                namespace=namespace,
+            )
+        )
+
+        return element
+
     def gcd_company_id_no_element(
         self,
         *,
@@ -225,7 +284,7 @@ class TaxonomyXbrlWriter:
             )
 
         return element
-    
+
     def gcd_domestic_branch_of_foreign_company_element(
         self,
         *,
@@ -290,8 +349,8 @@ class TaxonomyXbrlWriter:
             )
         )
 
-        return element    
-    
+        return element
+
     def gcd_shareholder_element(
         self,
         *,
@@ -439,9 +498,9 @@ class TaxonomyXbrlWriter:
             shareholder.extension_required,
         )
 
-        return element   
-   
-   
+        return element
+
+
     def instance_element(
         self,
         contexts: dict[str, TaxonomyContext],
@@ -462,10 +521,21 @@ class TaxonomyXbrlWriter:
         taxable_purpose_businesses: tuple[
             GcdEntityWithTaxablePurposeBusiness,
             ...,
-        ] = (),        
+        ] = (),
         shareholders: tuple[GcdShareholderTuple, ...] = (),
+        account_balances: tuple[
+            TaxonomyAccountBalance,
+            ...
+        ] = (),
     ) -> ET.Element:
         """Erzeugt das Root-Element einer XBRL-Instanz."""
+
+        if taxonomy_namespaces is not None:
+            for prefix, namespace in taxonomy_namespaces.items():
+                ET.register_namespace(
+                    prefix,
+                    namespace,
+                )
 
         root = ET.Element(
             f"{{{XBRLI_NAMESPACE}}}xbrl"
@@ -485,7 +555,7 @@ class TaxonomyXbrlWriter:
                     context_id=context_id,
                 )
             )
-            
+
         for unit_id, unit in units.items():
             root.append(
                 self.unit_element(
@@ -530,7 +600,7 @@ class TaxonomyXbrlWriter:
                     namespace=namespace,
                 )
             )
-        
+
         for company_id_no in company_id_nos:
             if not company_id_no.facts:
                 continue
@@ -555,7 +625,7 @@ class TaxonomyXbrlWriter:
                     namespace=namespace,
                 )
             )
- 
+
         for branch in domestic_branches:
             context_id = self.context_id_for(
                 context=branch.fact.context,
@@ -594,8 +664,8 @@ class TaxonomyXbrlWriter:
                     context_id=context_id,
                     namespace=namespace,
                 )
-            ) 
-        
+            )
+
         for report_element in report_elements:
             if not report_element.facts:
                 continue
@@ -620,7 +690,7 @@ class TaxonomyXbrlWriter:
                     namespace=namespace,
                 )
             )
-        
+
         for shareholder in shareholders:
             context_id = self.context_id_for(
                 context=shareholder.name.context,
@@ -648,8 +718,34 @@ class TaxonomyXbrlWriter:
                     namespace=namespace,
                     pure_unit_id=pure_unit_id,
                 )
-            )        
-        
+            )
+
+        for account_balance in account_balances:
+            context_id = self.context_id_for(
+                context=account_balance.position_name.context,
+                contexts=contexts,
+            )
+
+            namespace = self.namespace_for(
+                concept_id=(
+                    account_balance.position_name.concept.concept_id
+                ),
+                taxonomy_namespace=taxonomy_namespace,
+                taxonomy_namespaces=taxonomy_namespaces,
+            )
+
+            root.append(
+                self.account_balance_element(
+                    account_balance=account_balance,
+                    context_id=context_id,
+                    unit_id=self.unit_id_for(
+                        unit=account_balance.amount.unit,
+                        units=units,
+                    ),
+                    namespace=namespace,
+                )
+            )
+
         return root
 
     def schema_ref_element(
@@ -699,7 +795,7 @@ class TaxonomyXbrlWriter:
         )
 
         return xml_bytes.decode("utf-8")
-    
+
     def context_id_for(
         self,
         context: TaxonomyContext,
@@ -714,7 +810,7 @@ class TaxonomyXbrlWriter:
         raise ValueError(
             "context is not registered"
         )
-        
+
     def unit_id_for(
         self,
         unit: TaxonomyUnit,
@@ -729,7 +825,7 @@ class TaxonomyXbrlWriter:
         raise ValueError(
             "unit is not registered"
         )
-        
+
     def text_fact_element(
         self,
         fact: TaxonomyTextFact,

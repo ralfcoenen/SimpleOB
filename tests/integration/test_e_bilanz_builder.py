@@ -8,6 +8,9 @@ from uuid import uuid4
 import pytest
 
 from openbilanz.domain.company import Company
+from openbilanz.domain.e_bilanz_account_detail import (
+    EBilanzAccountDetail,
+)
 from openbilanz.domain.fiscal_year import FiscalYear
 from openbilanz.hgb.balance_sheet_structure import (
     create_hgb_balance_sheet_structure,
@@ -83,7 +86,7 @@ def test_builds_complete_e_bilanz_and_validates_with_arelle(
         "http://www.xbrl.de/taxonomies/"
         "de-gaap-ci-2026-04-01"
     )
-    
+
     resolver = TaxonomyResolver(
         root=TAXONOMY_ROOT
     )
@@ -202,6 +205,13 @@ def test_builds_complete_e_bilanz_and_validates_with_arelle(
             id_not_assigned="NO-ID",
         )
 
+        account_detail = EBilanzAccountDetail(
+            position=positions["HGB.266.AKTIVA.B.IV"],
+            account_number="1200",
+            account_description="Bank",
+            balance=Decimal("10000.00"),
+        )
+
         builder = EBilanzBuilder(
             gcd_model=gcd_model,
             gaap_ci_model=gaap_model,
@@ -235,6 +245,9 @@ def test_builds_complete_e_bilanz_and_validates_with_arelle(
             },
             entity_identifier="DE123456789",
             entity_scheme=TEST_ENTITY_SCHEME,
+            account_details=(
+                account_detail,
+            ),
             identifiers=identifiers,
             shareholders=(
                 shareholder,
@@ -260,6 +273,40 @@ def test_builds_complete_e_bilanz_and_validates_with_arelle(
             "genInfo.report.id.reportElement.reportElements.GuV"
             in xml
         )
+
+        assert (
+            "detailedInformation.accountBalances"
+            in xml
+        )
+        assert (
+            "detailedInformation."
+            "accountbalances.positionName"
+            in xml
+        )
+        assert (
+            "de-gaap-ci:bs.ass.currAss.cashEquiv"
+            in xml
+        )
+        assert (
+            "detailedInformation."
+            "accountbalances.accountNumber"
+            in xml
+        )
+        assert ">1200<" in xml
+
+        assert (
+            "detailedInformation."
+            "accountbalances.accountDescription"
+            in xml
+        )
+        assert ">Bank<" in xml
+
+        assert (
+            "detailedInformation."
+            "accountbalances.amount"
+            in xml
+        )
+        assert ">10000.00<" in xml
 
         assert "bs.ass.currAss.cashEquiv" in xml
         assert "bs.eqLiab.equity.subscribed" in xml
@@ -293,9 +340,5 @@ def test_builds_complete_e_bilanz_and_validates_with_arelle(
     finally:
         adapter.close()
 
-        
-
     assert result.is_valid
     assert result.errors == ()
-    
-    

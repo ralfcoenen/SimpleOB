@@ -7,8 +7,14 @@ from decimal import Decimal
 from openbilanz.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
+from openbilanz.domain.e_bilanz_account_detail import (
+    EBilanzAccountDetail,
+)
 from openbilanz.domain.fiscal_year import FiscalYear
 from openbilanz.exporter.xbrl_export import XbrlExporter
+from openbilanz.taxonomy.account_balance_builder import (
+    AccountBalanceBuilder,
+)
 from openbilanz.taxonomy.entry_point import TaxonomyEntryPoint
 from openbilanz.taxonomy.gaap_ci_statement_builder import (
     GaapCiStatement,
@@ -27,6 +33,10 @@ from openbilanz.taxonomy.gcd_entity_with_taxable_purpose_business import (
 from openbilanz.taxonomy.gcd_fact_builder import GcdFactBuilder
 from openbilanz.taxonomy.gcd_report_profile import GcdReportProfile
 from openbilanz.taxonomy.gcd_shareholder import GcdShareholder
+from openbilanz.taxonomy.hgb_gaap_ci_mapping import (
+    create_hgb_gaap_ci_mapping,
+)
+from openbilanz.taxonomy.mapper import TaxonomyMapper
 from openbilanz.taxonomy.model import TaxonomyModel
 from openbilanz.taxonomy.unit import TaxonomyUnit
 
@@ -87,6 +97,10 @@ class EBilanzBuilder:
             GcdEntityWithTaxablePurposeBusinessType,
             ...
         ] = (),
+        account_details: tuple[
+            EBilanzAccountDetail,
+            ...
+        ] = (),
         report_profile: GcdReportProfile | None = None,
     ) -> EBilanzDocument:
         """Erzeugt die vollständige E-Bilanz-XBRL-Instanz."""
@@ -107,6 +121,30 @@ class EBilanzBuilder:
         )
 
         duration_context = gaap_statement.duration_context
+
+        taxonomy_mappings = create_hgb_gaap_ci_mapping(
+            assets=self._assets,
+            liabilities=self._liabilities,
+            income_statement=self._income_statement,
+        )
+
+        taxonomy_mapper = TaxonomyMapper(
+            mappings=taxonomy_mappings,
+            taxonomy_model=self._gaap_ci_model,
+        )
+
+        account_balance_builder = AccountBalanceBuilder(
+            taxonomy_model=self._gaap_ci_model,
+            taxonomy_mapper=taxonomy_mapper,
+        )
+
+        account_balances = tuple(
+            account_balance_builder.build(
+                detail=detail,
+                context=duration_context,
+            )
+            for detail in account_details
+        )
 
         gcd_builder = GcdFactBuilder()
 
@@ -205,14 +243,15 @@ class EBilanzBuilder:
                 "PURE": pure_unit,
             },
             facts=facts,
+            account_balances=account_balances,
             report_elements=(
                 report_element,
             ),
             taxonomy_namespace=self._gaap_ci_namespace,
-                taxonomy_namespaces={
-                    "de-gcd": self._gcd_namespace,
-                    "de-gaap-ci": self._gaap_ci_namespace,
-                },
+            taxonomy_namespaces={
+                "de-gcd": self._gcd_namespace,
+                "de-gaap-ci": self._gaap_ci_namespace,
+            },
             entry_points=(
                 self._gcd_entry_point,
                 self._gaap_ci_entry_point,

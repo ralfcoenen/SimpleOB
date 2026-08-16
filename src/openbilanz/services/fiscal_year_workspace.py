@@ -29,6 +29,9 @@ from openbilanz.services.closing_consistency_service import (
     ClosingConsistencyService,
 )
 from openbilanz.services.closing_result import ClosingResult
+from openbilanz.services.e_bilanz_account_detail_service import (
+    EBilanzAccountDetailService,
+)
 from openbilanz.services.e_bilanz_export_service import (
     EBilanzExportService,
 )
@@ -70,9 +73,9 @@ class FiscalYearWorkspace:
         closing_consistency_service: ClosingConsistencyService,
         e_bilanz_preparation_service: EBilanzPreparationService,
         e_bilanz_service: EBilanzService,
+        e_bilanz_account_detail_service: EBilanzAccountDetailService,
         e_bilanz_export_service: EBilanzExportService,
         taxonomy_management_service: TaxonomyManagementService,
-
     ) -> None:
         self._context = context
         self._booking_repository = booking_repository
@@ -90,8 +93,15 @@ class FiscalYearWorkspace:
             e_bilanz_preparation_service
         )
         self._e_bilanz_service = e_bilanz_service
-        self._e_bilanz_export_service = e_bilanz_export_service
-        self._validated_e_bilanz_document: EBilanzDocument | None = None
+        self._e_bilanz_account_detail_service = (
+            e_bilanz_account_detail_service
+        )
+        self._e_bilanz_export_service = (
+            e_bilanz_export_service
+        )
+        self._validated_e_bilanz_document: (
+            EBilanzDocument | None
+        ) = None
         self._taxonomy_management_service = (
             taxonomy_management_service
         )
@@ -184,7 +194,7 @@ class FiscalYearWorkspace:
         self.reload()
 
     def install_required_taxonomy(self) -> None:
-        """Installiert die für das geöffnete Geschäftsjahr benötigte Taxonomie."""
+        """Installiert die benötigte Taxonomie."""
 
         self._taxonomy_management_service.install_required_taxonomy(
             self._context.fiscal_year
@@ -284,7 +294,6 @@ class FiscalYearWorkspace:
 
         return master_data
 
-
     def save_company_master_data(
         self,
         master_data: CompanyMasterData,
@@ -340,6 +349,13 @@ class FiscalYearWorkspace:
             self._context.company
         )
 
+        account_details = (
+            self._e_bilanz_account_detail_service.build_for_e_bilanz(
+                pre_closing_ledger=self._pre_closing_ledger,
+                closed_ledger=self._ledger,
+            )
+        )
+
         document = self._e_bilanz_service.build(
             master_data=master_data,
             fiscal_year=self._context.fiscal_year,
@@ -349,6 +365,7 @@ class FiscalYearWorkspace:
             previous_fiscal_year=(
                 self.managed_fiscal_year.opening_source
             ),
+            account_details=account_details,
         )
 
         self._validated_e_bilanz_document = None

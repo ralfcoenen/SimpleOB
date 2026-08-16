@@ -1,5 +1,8 @@
 """Export von Taxonomiedaten als XBRL-Instanz."""
 
+from openbilanz.taxonomy.account_balance_tuple import (
+    TaxonomyAccountBalance,
+)
 from openbilanz.taxonomy.context import TaxonomyContext
 from openbilanz.taxonomy.entry_point import TaxonomyEntryPoint
 from openbilanz.taxonomy.fact import TaxonomyFact
@@ -50,8 +53,12 @@ class XbrlExporter:
         taxable_purpose_businesses: tuple[
             GcdEntityWithTaxablePurposeBusiness,
             ...,
-        ] = (),        
+        ] = (),
         shareholders: tuple[GcdShareholderTuple, ...] = (),
+        account_balances: tuple[
+            TaxonomyAccountBalance,
+            ...
+        ] = (),
     ) -> str:
         """Erzeugt eine XBRL-Instanz als XML-String."""
 
@@ -66,7 +73,8 @@ class XbrlExporter:
             company_id_nos=company_id_nos,
             shareholders=shareholders,
             domestic_branches=domestic_branches,
-            taxable_purpose_businesses=taxable_purpose_businesses,            
+            taxable_purpose_businesses=taxable_purpose_businesses,
+            account_balances=account_balances,
         )
 
         return self._writer.to_xml_string(

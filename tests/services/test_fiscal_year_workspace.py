@@ -97,6 +97,7 @@ def test_reconstructs_empty_workspace(
         closing_consistency_service=Mock(),
         e_bilanz_preparation_service=Mock(),
         e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
         taxonomy_management_service=Mock(),
         e_bilanz_export_service=Mock(),
     )
@@ -142,6 +143,7 @@ def test_reports_open_fiscal_year(
         closing_consistency_service=Mock(),
         e_bilanz_preparation_service=Mock(),
         e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
         taxonomy_management_service=Mock(),
         e_bilanz_export_service=Mock(),
     )
@@ -177,6 +179,7 @@ def test_reports_closed_fiscal_year(
         closing_consistency_service=Mock(),
         e_bilanz_preparation_service=Mock(),
         e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
         taxonomy_management_service=Mock(),
         e_bilanz_export_service=Mock(),
     )
@@ -214,6 +217,7 @@ def test_reports_taxonomy_status_for_opened_fiscal_year(
         closing_consistency_service=Mock(),
         e_bilanz_preparation_service=Mock(),
         e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
         taxonomy_management_service=(
             taxonomy_management_service
         ),
@@ -248,6 +252,7 @@ def test_raises_when_managed_fiscal_year_is_missing(
         closing_consistency_service=Mock(),
         e_bilanz_preparation_service=Mock(),
         e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
         taxonomy_management_service=Mock(),
         e_bilanz_export_service=Mock(),
     )
@@ -300,6 +305,7 @@ def test_post_booking_persists_and_reloads_workspace(
         closing_consistency_service=Mock(),
         e_bilanz_preparation_service=Mock(),
         e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
         taxonomy_management_service=Mock(),
         e_bilanz_export_service=Mock(),
     )
@@ -364,6 +370,7 @@ def test_post_booking_does_not_change_workspace_when_persistence_fails(
         closing_consistency_service=Mock(),
         e_bilanz_preparation_service=Mock(),
         e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
         taxonomy_management_service=Mock(),
         e_bilanz_export_service=Mock(),
     )
@@ -455,6 +462,7 @@ def test_close_fiscal_year_uses_workflow_and_reloads_closed_bookings(
         closing_consistency_service=Mock(),
         e_bilanz_preparation_service=Mock(),
         e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
         taxonomy_management_service=Mock(),
         e_bilanz_export_service=Mock(),
     )
@@ -553,6 +561,7 @@ def test_validate_closing_delegates_to_consistency_service(
         ),
         e_bilanz_preparation_service=Mock(),
         e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
         taxonomy_management_service=Mock(),
         e_bilanz_export_service=Mock(),
     )
@@ -642,6 +651,7 @@ def test_loads_company_master_data(
         closing_consistency_service=Mock(),
         e_bilanz_preparation_service=Mock(),
         e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
         taxonomy_management_service=Mock(),
         e_bilanz_export_service=Mock(),
     )
@@ -692,6 +702,7 @@ def test_saves_company_master_data(
         closing_consistency_service=Mock(),
         e_bilanz_preparation_service=Mock(),
         e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
         taxonomy_management_service=Mock(),
         e_bilanz_export_service=Mock(),
     )
@@ -744,6 +755,7 @@ def test_prepares_e_bilanz_for_closed_fiscal_year(
             preparation_service
         ),
         e_bilanz_service=e_bilanz_service,
+        e_bilanz_account_detail_service=Mock(),
         taxonomy_management_service=Mock(),
         e_bilanz_export_service=Mock(),
     )
@@ -788,6 +800,7 @@ def test_rejects_e_bilanz_preparation_for_open_fiscal_year(
         closing_consistency_service=Mock(),
         e_bilanz_preparation_service=Mock(),
         e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
         taxonomy_management_service=Mock(),
         e_bilanz_export_service=Mock(),
     )
@@ -812,6 +825,7 @@ def test_builds_e_bilanz_from_prepared_data(
     company_repository = Mock()
     preparation_service = Mock()
     e_bilanz_service = Mock()
+    account_detail_service = Mock()
 
     booking_repository.list_for_fiscal_year.return_value = ()
 
@@ -843,7 +857,14 @@ def test_builds_e_bilanz_from_prepared_data(
         Mock(): Decimal("100.00"),
     }
 
+    account_details = Mock()
+
+    account_detail_service.build_for_e_bilanz.return_value = (
+        account_details
+    )
+
     expected_document = Mock()
+
     e_bilanz_service.build.return_value = (
         expected_document
     )
@@ -859,15 +880,11 @@ def test_builds_e_bilanz_from_prepared_data(
             preparation_service
         ),
         e_bilanz_service=e_bilanz_service,
+        e_bilanz_account_detail_service=(
+            account_detail_service
+        ),
         taxonomy_management_service=Mock(),
         e_bilanz_export_service=Mock(),
-    )
-
-    previous_document = Mock(
-        spec=EBilanzDocument
-    )
-    workspace._validated_e_bilanz_document = (
-        previous_document
     )
 
     result = workspace.build_e_bilanz(
@@ -876,7 +893,10 @@ def test_builds_e_bilanz_from_prepared_data(
 
     assert result is expected_document
 
-    assert workspace._validated_e_bilanz_document is None
+    account_detail_service.build_for_e_bilanz.assert_called_once_with(
+        pre_closing_ledger=workspace.pre_closing_ledger,
+        closed_ledger=workspace.ledger,
+    )
 
     e_bilanz_service.build.assert_called_once_with(
         master_data=master_data,
@@ -887,7 +907,9 @@ def test_builds_e_bilanz_from_prepared_data(
         ),
         entity_scheme="urn:openbilanz:company-id",
         previous_fiscal_year=previous_fiscal_year,
+        account_details=account_details,
     )
+
 
 def test_rejects_e_bilanz_build_for_open_fiscal_year(
     context: ApplicationContext,
@@ -914,6 +936,7 @@ def test_rejects_e_bilanz_build_for_open_fiscal_year(
         closing_consistency_service=Mock(),
         e_bilanz_preparation_service=Mock(),
         e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
         taxonomy_management_service=Mock(),
         e_bilanz_export_service=Mock(),
     )
@@ -972,6 +995,7 @@ def test_validates_e_bilanz_for_closed_fiscal_year(
             preparation_service
         ),
         e_bilanz_service=e_bilanz_service,
+        e_bilanz_account_detail_service=Mock(),
         taxonomy_management_service=Mock(),
         e_bilanz_export_service=Mock(),
     )
@@ -1016,6 +1040,7 @@ def test_rejects_e_bilanz_validation_for_open_fiscal_year(
         closing_consistency_service=Mock(),
         e_bilanz_preparation_service=Mock(),
         e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
         taxonomy_management_service=Mock(),
         e_bilanz_export_service=Mock(),
     )
@@ -1055,6 +1080,7 @@ def test_installs_required_taxonomy_for_opened_fiscal_year(
         closing_consistency_service=Mock(),
         e_bilanz_preparation_service=Mock(),
         e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
         taxonomy_management_service=(
             taxonomy_management_service
         ),
@@ -1110,6 +1136,7 @@ def test_exports_successfully_validated_e_bilanz(
         closing_consistency_service=Mock(),
         e_bilanz_preparation_service=Mock(),
         e_bilanz_service=e_bilanz_service,
+        e_bilanz_account_detail_service=Mock(),
         e_bilanz_export_service=export_service,
         taxonomy_management_service=Mock(),
     )
@@ -1161,6 +1188,7 @@ def test_rejects_export_of_unvalidated_e_bilanz(
         closing_consistency_service=Mock(),
         e_bilanz_preparation_service=Mock(),
         e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
         e_bilanz_export_service=export_service,
         taxonomy_management_service=Mock(),
     )

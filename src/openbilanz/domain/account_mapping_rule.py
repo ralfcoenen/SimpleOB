@@ -16,11 +16,11 @@ class AccountMappingRule:
             raise TypeError("account_number must be a string")
         
         if (
-                self.debit_position is None
-                and self.credit_position is None
-                ):
-                    raise ValueError(
-                    "at least one target position must be defined"
-                )
+            self.debit_position is None
+            and self.credit_position is None
+            ):
+                raise ValueError(
+                "at least one target position must be defined"
+            )
                     
             

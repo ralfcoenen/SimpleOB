@@ -18,6 +18,9 @@ from openbilanz.services.closing_consistency_service import (
     ClosingConsistencyService,
 )
 from openbilanz.services.closing_service import ClosingService
+from openbilanz.services.e_bilanz_account_detail_service import (
+    EBilanzAccountDetailService,
+)
 from openbilanz.services.e_bilanz_export_service import (
     EBilanzExportService,
 )
@@ -103,6 +106,17 @@ def main() -> None:
         )
     )
 
+    e_bilanz_account_detail_service = (
+        EBilanzAccountDetailService(
+            account_mapper=(
+                financial_statement_context.account_mapper
+            ),
+            accounts=(
+                financial_statement_context.accounts
+            ),
+        )
+    )
+
     e_bilanz_service = EBilanzService(
         resolver=resolver,
         adapter=arelle_adapter,
@@ -184,6 +198,9 @@ def main() -> None:
             e_bilanz_preparation_service=(
                 e_bilanz_preparation_service
             ),
+            e_bilanz_account_detail_service=(
+                e_bilanz_account_detail_service
+            ),
             e_bilanz_service=e_bilanz_service,
             e_bilanz_export_service=(
                 e_bilanz_export_service
@@ -192,7 +209,6 @@ def main() -> None:
                 taxonomy_management_service
             ),
         )
-
 
         window = MainWindow(
             workspace=workspace,

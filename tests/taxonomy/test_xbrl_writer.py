@@ -6,6 +6,9 @@ from xml.etree import ElementTree as ET
 
 import pytest
 
+from openbilanz.taxonomy.account_balance_tuple import (
+    TaxonomyAccountBalance,
+)
 from openbilanz.taxonomy.concept import (
     TaxonomyBalance,
     TaxonomyConcept,
@@ -1493,6 +1496,181 @@ def test_xbrl_writer_includes_gcd_report_element_in_instance() -> None:
     )
     assert children[1].attrib["contextRef"] == "ctx-2025"
     assert children[1].text == "GuV"
+
+def test_xbrl_writer_includes_account_balance_tuple_in_instance() -> None:
+    """Die XBRL-Instanz enthält einen vollständigen Kontennachweis."""
+
+    namespace = (
+        "http://www.xbrl.de/taxonomies/"
+        "de-gaap-ci-2025-04-01"
+    )
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    def concept(
+        name: str,
+        type_name: str,
+    ) -> TaxonomyConcept:
+        return TaxonomyConcept(
+            name=name,
+            concept_id="de-gaap-ci_" + name,
+            type_name=type_name,
+            substitution_group="xbrli:item",
+            period_type=TaxonomyPeriodType.DURATION,
+            balance=TaxonomyBalance.NONE,
+            abstract=False,
+            nillable=True,
+        )
+
+    position_name = TaxonomyTextFact(
+        concept=concept(
+            (
+                "detailedInformation."
+                "accountbalances.positionName"
+            ),
+            "xbrli:QNameItemType",
+        ),
+        value="de-gaap-ci:bs.ass.currAss.cashEquiv.bank",
+        context=context,
+    )
+
+    account_number = TaxonomyTextFact(
+        concept=concept(
+            (
+                "detailedInformation."
+                "accountbalances.accountNumber"
+            ),
+            "xbrli:stringItemType",
+        ),
+        value="1200",
+        context=context,
+    )
+
+    account_description = TaxonomyTextFact(
+        concept=concept(
+            (
+                "detailedInformation."
+                "accountbalances.accountDescription"
+            ),
+            "xbrli:stringItemType",
+        ),
+        value="Bank",
+        context=context,
+    )
+
+    eur = TaxonomyUnit.eur()
+
+    amount = TaxonomyFact(
+        concept=concept(
+            (
+                "detailedInformation."
+                "accountbalances.amount"
+            ),
+            "xbrli:monetaryItemType",
+        ),
+        amount=Decimal("1000.00"),
+        context=context,
+        unit=eur,
+    )
+
+    not_possible = TaxonomyTextFact(
+        concept=concept(
+            (
+                "detailedInformation."
+                "accountbalances.notPossible"
+            ),
+            "xbrli:booleanItemType",
+        ),
+        value="false",
+        context=context,
+    )
+
+    account_balance = TaxonomyAccountBalance(
+        position_name=position_name,
+        account_number=account_number,
+        account_description=account_description,
+        amount=amount,
+        not_possible=not_possible,
+    )
+
+    writer = TaxonomyXbrlWriter()
+
+    root = writer.instance_element(
+        contexts={
+            "ctx-2025": context,
+        },
+        units={
+            "EUR": eur,
+        },
+        facts=(),
+        taxonomy_namespace=namespace,
+        taxonomy_namespaces={
+            "de-gaap-ci": namespace,
+        },
+        entry_points=(),
+        account_balances=(
+            account_balance,
+        ),
+    )
+
+    tuples = root.findall(
+        f"{{{namespace}}}"
+        "detailedInformation.accountBalances"
+    )
+
+    assert len(tuples) == 1
+
+    element = tuples[0]
+
+    assert "contextRef" not in element.attrib
+
+    children = list(element)
+
+    assert len(children) == 5
+
+    assert children[0].tag == (
+        f"{{{namespace}}}"
+        "detailedInformation.accountbalances.positionName"
+    )
+    assert children[0].attrib["contextRef"] == "ctx-2025"
+    assert children[0].text == (
+        "de-gaap-ci:bs.ass.currAss.cashEquiv.bank"
+    )
+
+    assert children[1].tag == (
+        f"{{{namespace}}}"
+        "detailedInformation.accountbalances.accountNumber"
+    )
+    assert children[1].attrib["contextRef"] == "ctx-2025"
+    assert children[1].text == "1200"
+
+    assert children[2].tag == (
+        f"{{{namespace}}}"
+        "detailedInformation.accountbalances.accountDescription"
+    )
+    assert children[2].attrib["contextRef"] == "ctx-2025"
+    assert children[2].text == "Bank"
+
+    assert children[3].tag == (
+        f"{{{namespace}}}"
+        "detailedInformation.accountbalances.amount"
+    )
+    assert children[3].attrib["contextRef"] == "ctx-2025"
+    assert children[3].attrib["unitRef"] == "EUR"
+    assert children[3].text == "1000.00"
+
+    assert children[4].tag == (
+        f"{{{namespace}}}"
+        "detailedInformation.accountbalances.notPossible"
+    )
+    assert children[4].attrib["contextRef"] == "ctx-2025"
+    assert children[4].text == "false"
 
 def test_xbrl_writer_serializes_gcd_company_id_no_tuple() -> None:
     """Der Writer serialisiert das GCD-idNo-Tuple."""
