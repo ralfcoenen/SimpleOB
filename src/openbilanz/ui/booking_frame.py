@@ -2,7 +2,7 @@
 
 import tkinter as tk
 from collections.abc import Callable
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal, InvalidOperation
 from tkinter import ttk
 
@@ -11,6 +11,10 @@ from openbilanz.domain.booking import Booking
 from openbilanz.domain.booking_line import BookingLine
 from openbilanz.domain.entry_side import EntrySide
 from openbilanz.domain.money import ZERO
+from openbilanz.ui.date_input import (
+    normalize_german_date,
+    parse_german_date,
+)
 
 
 class BookingFrame(ttk.Frame):
@@ -79,6 +83,10 @@ class BookingFrame(ttk.Frame):
             column=1,
             sticky="w",
             pady=6,
+        )
+        self._booking_date_entry.bind(
+            "<FocusOut>",
+            self._normalize_booking_date,
         )
 
         ttk.Label(
@@ -424,6 +432,9 @@ class BookingFrame(ttk.Frame):
             booking_date = self._parse_booking_date(
                 self._booking_date_var.get()
             )
+            self._booking_date_var.set(
+                booking_date.strftime("%d.%m.%Y")
+            )
             amount = self._parse_amount(
                 self._booking_amount_var.get()
             )
@@ -535,18 +546,12 @@ class BookingFrame(ttk.Frame):
     @staticmethod
     def _parse_booking_date(
         value: str,
-    ) -> date:
-        """Wandelt ein deutsches Datum in date um."""
+    ):
+        """Liest eine deutsche Datumseingabe."""
 
-        try:
-            return datetime.strptime(
-                value.strip(),
-                "%d.%m.%Y",
-            ).date()
-        except ValueError as exc:
-            raise ValueError(
-                "Ungültiges Buchungsdatum."
-            ) from exc
+        return parse_german_date(
+            value
+        )
 
     @staticmethod
     def _parse_amount(
@@ -578,4 +583,26 @@ class BookingFrame(ttk.Frame):
 
         return amount.quantize(
             Decimal("0.01")
+        )
+
+    def _normalize_booking_date(
+        self,
+        _event: object | None = None,
+    ) -> None:
+        """Normalisiert das Buchungsdatum beim Verlassen des Feldes."""
+
+        value = self._booking_date_var.get().strip()
+
+        if not value:
+            return
+
+        try:
+            normalized = normalize_german_date(
+                value
+            )
+        except ValueError:
+            return
+
+        self._booking_date_var.set(
+            normalized
         )

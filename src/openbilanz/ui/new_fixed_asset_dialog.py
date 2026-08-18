@@ -1,11 +1,14 @@
 """Dialog zum Anlegen eines neuen Anlageguts."""
 
 import tkinter as tk
-from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from tkinter import messagebox, ttk
 
 from openbilanz.domain.fixed_asset import FixedAsset
+from openbilanz.ui.date_input import (
+    normalize_german_date,
+    parse_german_date,
+)
 
 
 class NewFixedAssetDialog(tk.Toplevel):
@@ -56,19 +59,23 @@ class NewFixedAssetDialog(tk.Toplevel):
             pady=(0, 18),
         )
 
-        form = ttk.Frame(container)
-        form.pack(fill="x")
+        form = ttk.Frame(
+            container
+        )
+        form.pack(
+            fill="x"
+        )
 
         form.columnconfigure(
             1,
             weight=1,
         )
 
-        self._asset_code_var = tk.StringVar()
-        self._description_var = tk.StringVar()
         self._asset_type_var = tk.StringVar(
             value="Betriebs- und Geschäftsausstattung"
-        )       
+        )
+        self._asset_code_var = tk.StringVar()
+        self._description_var = tk.StringVar()
         self._acquisition_date_var = tk.StringVar()
         self._acquisition_cost_var = tk.StringVar()
         self._depreciation_start_date_var = (
@@ -78,6 +85,32 @@ class NewFixedAssetDialog(tk.Toplevel):
             tk.StringVar()
         )
 
+        ttk.Label(
+            form,
+            text="Anlagenart",
+        ).grid(
+            row=0,
+            column=0,
+            sticky="w",
+            padx=(0, 12),
+            pady=7,
+        )
+
+        asset_type_combobox = ttk.Combobox(
+            form,
+            textvariable=self._asset_type_var,
+            values=(
+                "Technische Anlagen und Maschinen",
+                "Betriebs- und Geschäftsausstattung",
+            ),
+            state="readonly",
+        )
+        asset_type_combobox.grid(
+            row=0,
+            column=1,
+            sticky="ew",
+            pady=7,
+        )
 
         fields = (
             (
@@ -105,44 +138,19 @@ class NewFixedAssetDialog(tk.Toplevel):
                 self._useful_life_months_var,
             ),
         )
-        
-        ttk.Label(
-            form,
-            text="Anlagenart",
-        ).grid(
-            row=0,
-            column=0,
-            sticky="w",
-            padx=(0, 12),
-            pady=7,
-        )
 
-        asset_type_combobox = ttk.Combobox(
-            form,
-            textvariable=self._asset_type_var,
-            values=(
-                "Technische Anlagen und Maschinen",
-                "Betriebs- und Geschäftsausstattung",
-            ),
-            state="readonly",
-        )
-
-        asset_type_combobox.grid(
-            row=0,
-            column=1,
-            sticky="ew",
-            pady=7,
-        )
-        
         for row, (
             label_text,
             variable,
-        ) in enumerate(fields):
+        ) in enumerate(
+            fields,
+            start=1,
+        ):
             ttk.Label(
                 form,
                 text=label_text,
             ).grid(
-                row=row+1,
+                row=row,
                 column=0,
                 sticky="w",
                 padx=(0, 12),
@@ -154,20 +162,35 @@ class NewFixedAssetDialog(tk.Toplevel):
                 textvariable=variable,
             )
             entry.grid(
-                row=row+1,
+                row=row,
                 column=1,
                 sticky="ew",
                 pady=7,
             )
 
-            if row == 0:
+            if variable is self._asset_code_var:
                 self._asset_code_entry = entry
+
+            if variable in (
+                self._acquisition_date_var,
+                self._depreciation_start_date_var,
+            ):
+                entry.bind(
+                    "<FocusOut>",
+                    lambda _event, date_var=variable: (
+                        self._normalize_date_var(
+                            date_var
+                        )
+                    ),
+                )
+
+        afa_row = len(fields) + 1
 
         ttk.Label(
             form,
             text="AfA-Konto",
         ).grid(
-            row=len(fields) + 1,
+            row=afa_row,
             column=0,
             sticky="w",
             padx=(0, 12),
@@ -178,16 +201,17 @@ class NewFixedAssetDialog(tk.Toplevel):
             form,
             text="4830 – Abschreibungen auf Sachanlagen",
         ).grid(
-            row=len(fields) + 1,
+            row=afa_row,
             column=1,
             sticky="w",
             pady=7,
         )
-        
+
         ttk.Label(
             container,
             text=(
-                "Datumsformat: TT.MM.JJJJ · "
+                "Datum: TT.MM.JJJJ · "
+                "auch TTMMJJJJ oder TTMMJJ möglich · "
                 "Betrag z. B. 2400,00"
             ),
         ).pack(
@@ -195,7 +219,9 @@ class NewFixedAssetDialog(tk.Toplevel):
             pady=(12, 0),
         )
 
-        buttons = ttk.Frame(container)
+        buttons = ttk.Frame(
+            container
+        )
         buttons.pack(
             fill="x",
             side="bottom",
@@ -222,12 +248,33 @@ class NewFixedAssetDialog(tk.Toplevel):
     def _parse_date(
         value: str,
     ):
-        """Liest ein Datum im deutschen Format."""
+        """Liest eine deutsche Datumseingabe."""
 
-        return datetime.strptime(
-            value.strip(),
-            "%d.%m.%Y",
-        ).date()
+        return parse_german_date(
+            value
+        )
+
+    def _normalize_date_var(
+        self,
+        variable: tk.StringVar,
+    ) -> None:
+        """Normalisiert eine gültige Datumseingabe."""
+
+        value = variable.get().strip()
+
+        if not value:
+            return
+
+        try:
+            normalized = normalize_german_date(
+                value
+            )
+        except ValueError:
+            return
+
+        variable.set(
+            normalized
+        )
 
     @staticmethod
     def _parse_amount(
@@ -242,7 +289,9 @@ class NewFixedAssetDialog(tk.Toplevel):
         )
 
         try:
-            return Decimal(normalized)
+            return Decimal(
+                normalized
+            )
         except InvalidOperation as exc:
             raise ValueError(
                 "Die Anschaffungskosten sind ungültig."
@@ -262,6 +311,15 @@ class NewFixedAssetDialog(tk.Toplevel):
                 )
             )
 
+            self._acquisition_date_var.set(
+                acquisition_date.strftime("%d.%m.%Y")
+            )
+            self._depreciation_start_date_var.set(
+                depreciation_start_date.strftime(
+                    "%d.%m.%Y"
+                )
+            )
+
             acquisition_cost = self._parse_amount(
                 self._acquisition_cost_var.get()
             )
@@ -272,17 +330,27 @@ class NewFixedAssetDialog(tk.Toplevel):
 
             asset_type = self._asset_type_var.get()
 
-            if asset_type == "Technische Anlagen und Maschinen":
-                position_code = "HGB.266.AKTIVA.A.II.2"
+            if asset_type == (
+                "Technische Anlagen und Maschinen"
+            ):
+                position_code = (
+                    "HGB.266.AKTIVA.A.II.2"
+                )
                 asset_account_number = "0200"
-            elif asset_type == "Betriebs- und Geschäftsausstattung":
-                position_code = "HGB.266.AKTIVA.A.II.3"
+
+            elif asset_type == (
+                "Betriebs- und Geschäftsausstattung"
+            ):
+                position_code = (
+                    "HGB.266.AKTIVA.A.II.3"
+                )
                 asset_account_number = "0400"
+
             else:
                 raise ValueError(
                     "Die Anlagenart ist ungültig."
                 )
-            
+
             fixed_asset = FixedAsset(
                 company_id=self._company_id,
                 asset_code=(
@@ -292,10 +360,18 @@ class NewFixedAssetDialog(tk.Toplevel):
                     self._description_var.get()
                 ),
                 position_code=position_code,
-                asset_account_number=asset_account_number,
-                depreciation_expense_account_number="4830",
-                acquisition_date=acquisition_date,
-                acquisition_cost=acquisition_cost,
+                asset_account_number=(
+                    asset_account_number
+                ),
+                depreciation_expense_account_number=(
+                    "4830"
+                ),
+                acquisition_date=(
+                    acquisition_date
+                ),
+                acquisition_cost=(
+                    acquisition_cost
+                ),
                 depreciation_start_date=(
                     depreciation_start_date
                 ),
@@ -317,4 +393,3 @@ class NewFixedAssetDialog(tk.Toplevel):
 
         self.result = fixed_asset
         self.destroy()
-    

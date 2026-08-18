@@ -7,6 +7,10 @@ from tkinter import messagebox, ttk
 from openbilanz.database.company_repository import CompanyRepository
 from openbilanz.domain.company import Company
 from openbilanz.domain.fiscal_year import FiscalYear
+from openbilanz.ui.date_input import (
+    normalize_german_date,
+    parse_german_date,
+)
 
 
 class NewFiscalYearDialog(tk.Toplevel):
@@ -103,6 +107,12 @@ class NewFiscalYearDialog(tk.Toplevel):
             sticky="w",
             pady=8,
         )
+        self._start_date_entry.bind(
+            "<FocusOut>",
+            lambda _event: self._normalize_date_var(
+                self._start_date_var
+            ),
+        )
 
         ttk.Label(
             form,
@@ -115,15 +125,22 @@ class NewFiscalYearDialog(tk.Toplevel):
             pady=8,
         )
 
-        ttk.Entry(
+        self._end_date_entry = ttk.Entry(
             form,
             textvariable=self._end_date_var,
             width=16,
-        ).grid(
+        )
+        self._end_date_entry.grid(
             row=1,
             column=1,
             sticky="w",
             pady=8,
+        )
+        self._end_date_entry.bind(
+            "<FocusOut>",
+            lambda _event: self._normalize_date_var(
+                self._end_date_var
+            ),
         )
 
         ttk.Label(
@@ -184,13 +201,11 @@ class NewFiscalYearDialog(tk.Toplevel):
     def _parse_date(
         value: str,
     ):
-        """Liest ein Datum im deutschen Format."""
+        """Liest eine deutsche Datumseingabe."""
 
-        return datetime.strptime(
-            value.strip(),
-            "%d.%m.%Y",
-        ).date()
-
+        return parse_german_date(
+            value
+        )
     def _create_fiscal_year(self) -> None:
         """Erzeugt und speichert das Geschäftsjahr."""
 
@@ -200,6 +215,13 @@ class NewFiscalYearDialog(tk.Toplevel):
             )
             end_date = self._parse_date(
                 self._end_date_var.get()
+            )
+
+            self._start_date_var.set(
+                start_date.strftime("%d.%m.%Y")
+            )
+            self._end_date_var.set(
+                end_date.strftime("%d.%m.%Y")
             )
 
             fiscal_year = FiscalYear(
@@ -222,5 +244,25 @@ class NewFiscalYearDialog(tk.Toplevel):
 
         self.result = fiscal_year
         self.destroy()
-        
-    
+
+    def _normalize_date_var(
+        self,
+        variable: tk.StringVar,
+    ) -> None:
+        """Normalisiert eine gültige Datumseingabe."""
+
+        value = variable.get().strip()
+
+        if not value:
+            return
+
+        try:
+            normalized = normalize_german_date(
+                value
+            )
+        except ValueError:
+            return
+
+        variable.set(
+            normalized
+        )

@@ -1,7 +1,6 @@
 """Dialog zum Anlegen einer neuen Buchhaltung."""
 
 import tkinter as tk
-from datetime import datetime
 from tkinter import messagebox, ttk
 from uuid import uuid4
 
@@ -9,10 +8,14 @@ from openbilanz.core.context import ApplicationContext
 from openbilanz.database.company_repository import CompanyRepository
 from openbilanz.domain.company import Company
 from openbilanz.domain.fiscal_year import FiscalYear
+from openbilanz.ui.date_input import (
+    normalize_german_date,
+    parse_german_date,
+)
 
 
 class NewCompanyDialog(tk.Toplevel):
-    """Legt ein Unternehmen mit erstem Geschäftsjahr an."""
+    """Erfasst ein neues Unternehmen mit erstem Geschäftsjahr."""
 
     def __init__(
         self,
@@ -26,7 +29,7 @@ class NewCompanyDialog(tk.Toplevel):
         self.result: ApplicationContext | None = None
 
         self.title("OpenBilanz – Neue Buchhaltung")
-        self.geometry("600x330")
+        self.geometry("560x390")
         self.resizable(False, False)
 
         self.transient(parent)
@@ -56,10 +59,12 @@ class NewCompanyDialog(tk.Toplevel):
             font=("TkDefaultFont", 18, "bold"),
         ).pack(
             anchor="w",
-            pady=(0, 20),
+            pady=(0, 18),
         )
 
-        form = ttk.Frame(container)
+        form = ttk.Frame(
+            container
+        )
         form.pack(
             fill="x",
         )
@@ -70,6 +75,7 @@ class NewCompanyDialog(tk.Toplevel):
         )
 
         self._company_name_var = tk.StringVar()
+
         self._start_date_var = tk.StringVar(
             value="01.01.2026"
         )
@@ -79,13 +85,13 @@ class NewCompanyDialog(tk.Toplevel):
 
         ttk.Label(
             form,
-            text="Unternehmen",
+            text="Unternehmensname",
         ).grid(
             row=0,
             column=0,
             sticky="w",
             padx=(0, 12),
-            pady=8,
+            pady=7,
         )
 
         self._company_name_entry = ttk.Entry(
@@ -96,7 +102,7 @@ class NewCompanyDialog(tk.Toplevel):
             row=0,
             column=1,
             sticky="ew",
-            pady=8,
+            pady=7,
         )
 
         ttk.Label(
@@ -107,18 +113,25 @@ class NewCompanyDialog(tk.Toplevel):
             column=0,
             sticky="w",
             padx=(0, 12),
-            pady=8,
+            pady=7,
         )
 
-        ttk.Entry(
+        self._start_date_entry = ttk.Entry(
             form,
             textvariable=self._start_date_var,
-            width=16,
-        ).grid(
+        )
+        self._start_date_entry.grid(
             row=1,
             column=1,
-            sticky="w",
-            pady=8,
+            sticky="ew",
+            pady=7,
+        )
+
+        self._start_date_entry.bind(
+            "<FocusOut>",
+            lambda _event: self._normalize_date_var(
+                self._start_date_var
+            ),
         )
 
         ttk.Label(
@@ -129,29 +142,41 @@ class NewCompanyDialog(tk.Toplevel):
             column=0,
             sticky="w",
             padx=(0, 12),
-            pady=8,
+            pady=7,
         )
 
-        ttk.Entry(
+        self._end_date_entry = ttk.Entry(
             form,
             textvariable=self._end_date_var,
-            width=16,
-        ).grid(
+        )
+        self._end_date_entry.grid(
             row=2,
             column=1,
-            sticky="w",
-            pady=8,
+            sticky="ew",
+            pady=7,
+        )
+
+        self._end_date_entry.bind(
+            "<FocusOut>",
+            lambda _event: self._normalize_date_var(
+                self._end_date_var
+            ),
         )
 
         ttk.Label(
             container,
-            text="Datumsformat: TT.MM.JJJJ",
+            text=(
+                "Datum: TT.MM.JJJJ · "
+                "auch TTMMJJJJ oder TTMMJJ möglich"
+            ),
         ).pack(
             anchor="w",
-            pady=(10, 0),
+            pady=(12, 0),
         )
 
-        buttons = ttk.Frame(container)
+        buttons = ttk.Frame(
+            container
+        )
         buttons.pack(
             fill="x",
             side="bottom",
@@ -175,13 +200,36 @@ class NewCompanyDialog(tk.Toplevel):
         )
 
     @staticmethod
-    def _parse_date(value: str):
-        """Liest ein Datum im deutschen Format."""
+    def _parse_date(
+        value: str,
+    ):
+        """Liest eine deutsche Datumseingabe."""
 
-        return datetime.strptime(
-            value.strip(),
-            "%d.%m.%Y",
-        ).date()
+        return parse_german_date(
+            value
+        )
+
+    def _normalize_date_var(
+        self,
+        variable: tk.StringVar,
+    ) -> None:
+        """Normalisiert eine gültige Datumseingabe."""
+
+        value = variable.get().strip()
+
+        if not value:
+            return
+
+        try:
+            normalized = normalize_german_date(
+                value
+            )
+        except ValueError:
+            return
+
+        variable.set(
+            normalized
+        )
 
     def _create_company(self) -> None:
         """Erzeugt und speichert die neue Buchhaltung."""
@@ -206,6 +254,13 @@ class NewCompanyDialog(tk.Toplevel):
                 self._end_date_var.get()
             )
 
+            self._start_date_var.set(
+                start_date.strftime("%d.%m.%Y")
+            )
+            self._end_date_var.set(
+                end_date.strftime("%d.%m.%Y")
+            )
+
             company = Company(
                 company_id=uuid4(),
                 name=company_name,
@@ -219,6 +274,7 @@ class NewCompanyDialog(tk.Toplevel):
             self._repository.add(
                 company
             )
+
             self._repository.add_fiscal_year(
                 company.company_id,
                 fiscal_year,
@@ -226,7 +282,7 @@ class NewCompanyDialog(tk.Toplevel):
 
         except ValueError as exc:
             messagebox.showerror(
-                "Ungültige Eingabe",
+                "Buchhaltung kann nicht angelegt werden",
                 str(exc),
                 parent=self,
             )
