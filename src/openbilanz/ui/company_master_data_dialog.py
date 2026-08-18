@@ -53,8 +53,8 @@ class CompanyMasterDataDialog(tk.Toplevel):
         self.title(
             "OpenBilanz – Unternehmensstammdaten"
         )
-        self.geometry("720x640")
-        self.minsize(620, 560)
+        self.geometry("760x760")
+        self.minsize(700, 700)
 
         self.transient(parent)
         self.grab_set()
