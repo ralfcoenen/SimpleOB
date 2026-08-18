@@ -75,7 +75,7 @@ def test_sums_multiple_account_balances_for_same_position() -> None:
     assert amounts == {
         bank_position: Decimal("1500.00"),
     }
-    
+
 def test_aggregates_child_amounts_into_parent_position() -> None:
     cash_position = FinancialStatementPosition(
         code="HGB.266.AKTIVA.B.IV.1",
@@ -149,8 +149,8 @@ def test_aggregates_child_amounts_into_parent_position() -> None:
     assert amounts[cash_position] == Decimal("250.00")
     assert amounts[bank_position] == Decimal("1250.00")
     assert amounts[liquid_assets_position] == Decimal("1500.00")
-        
-        
+
+
 def test_aggregates_equity_positions_to_liabilities() -> None:
     _, liabilities = create_hgb_balance_sheet_structure()
 
@@ -284,8 +284,8 @@ def test_aggregates_equity_positions_to_liabilities() -> None:
 
     assert amounts[equity] == Decimal("55000.00")
     assert amounts[liabilities] == Decimal("55000.00")
-    
-    
+
+
 def test_build_includes_closing_result_in_result_position() -> None:
     net_income_position = FinancialStatementPosition(
         code="HGB.266.PASSIVA.A.V",
@@ -312,3 +312,66 @@ def test_build_includes_closing_result_in_result_position() -> None:
 
     assert amounts[net_income_position] == Decimal("300.00")
     assert amounts[liabilities] == Decimal("300.00")
+
+def test_maps_income_statement_counter_balances_as_negative() -> None:
+    expense_position = FinancialStatementPosition(
+        code="HGB.275.GKV.8",
+        name="Sonstige betriebliche Aufwendungen",
+    )
+    revenue_position = FinancialStatementPosition(
+        code="HGB.275.GKV.1",
+        name="Umsatzerlöse",
+    )
+
+    expense_account = TemplateAccount(
+        account_number="4930",
+        name="Bürobedarf",
+        account_type=AccountType.EXPENSE,
+    )
+    revenue_account = TemplateAccount(
+        account_number="8400",
+        name="Erlöse",
+        account_type=AccountType.REVENUE,
+    )
+
+    chart_of_accounts = ChartOfAccountsTemplate(
+        name="GuV-Gegensalden",
+        accounts=(
+            expense_account,
+            revenue_account,
+        ),
+        account_mapping_rules=(
+            AccountMappingRule(
+                account_number="4930",
+                debit_position=expense_position,
+                credit_position=None,
+            ),
+            AccountMappingRule(
+                account_number="8400",
+                debit_position=None,
+                credit_position=revenue_position,
+            ),
+        ),
+    )
+
+    balances = (
+        AccountBalance(
+            account_number="4930",
+            credit=Decimal("250.00"),
+        ),
+        AccountBalance(
+            account_number="8400",
+            debit=Decimal("400.00"),
+        ),
+    )
+
+    builder = FinancialStatementBuilder(
+        AccountMapper(chart_of_accounts)
+    )
+
+    amounts = builder.build(
+        balances=balances
+    )
+
+    assert amounts[expense_position] == Decimal("-250.00")
+    assert amounts[revenue_position] == Decimal("-400.00")

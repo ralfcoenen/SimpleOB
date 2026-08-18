@@ -162,6 +162,9 @@ class ClosingFrame(ttk.Frame):
                 ["!disabled"]
             )
 
+            self._close_button.state(
+                ["disabled"]
+            )
         else:
             text = "Geschäftsjahr: Abgeschlossen"
 

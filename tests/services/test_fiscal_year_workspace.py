@@ -27,9 +27,22 @@ from openbilanz.domain.company import Company
 from openbilanz.domain.company_master_data import (
     CompanyMasterData,
 )
+from openbilanz.domain.depreciation_kind import (
+    DepreciationKind,
+)
+from openbilanz.domain.depreciation_proposal import (
+    DepreciationProposal,
+)
+from openbilanz.domain.depreciation_source import (
+    DepreciationSource,
+)
 from openbilanz.domain.entry_side import EntrySide
 from openbilanz.domain.fiscal_year import FiscalYear
 from openbilanz.domain.fiscal_year_status import FiscalYearStatus
+from openbilanz.domain.fixed_asset import FixedAsset
+from openbilanz.domain.fixed_asset_depreciation import (
+    FixedAssetDepreciation,
+)
 from openbilanz.domain.journal import Journal
 from openbilanz.domain.managed_fiscal_year import ManagedFiscalYear
 from openbilanz.services.closing_result import ClosingResult
@@ -391,6 +404,219 @@ def test_post_booking_does_not_change_workspace_when_persistence_fails(
         fiscal_year=context.fiscal_year,
     )
 
+def test_builds_open_depreciation_proposal(
+    context: ApplicationContext,
+) -> None:
+    booking_repository = Mock()
+    company_repository = Mock()
+    fixed_asset_repository = Mock()
+    depreciation_repository = Mock()
+    depreciation_service = Mock()
+
+    booking_repository.list_for_fiscal_year.return_value = ()
+
+    company_repository.get_managed_fiscal_years.return_value = (
+        ManagedFiscalYear(
+            fiscal_year=context.fiscal_year,
+            status=FiscalYearStatus.OPEN,
+            opening_source=None,
+        ),
+    )
+
+    asset = FixedAsset(
+        company_id=context.company.company_id,
+        asset_code="A-0001",
+        description="MacBook Pro",
+        position_code="HGB.266.AKTIVA.A.II.3",
+        asset_account_number="0690",
+        depreciation_expense_account_number="4830",
+        acquisition_date=date(2026, 3, 15),
+        acquisition_cost=Decimal("2400.00"),
+        depreciation_start_date=date(2026, 3, 15),
+        useful_life_months=36,
+    )
+
+    proposal = DepreciationProposal(
+        fixed_asset_id=asset.fixed_asset_id,
+        depreciation_date=context.fiscal_year.end_date,
+        amount=Decimal("600.00"),
+        expense_account_number="4830",
+        asset_account_number="0690",
+    )
+
+    fixed_asset_repository.list_for_company.return_value = (
+        asset,
+    )
+
+    depreciation_repository.list_for_fixed_asset.return_value = ()
+
+    depreciation_service.build_proposal.return_value = (
+        proposal
+    )
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=company_repository,
+        posting_service=Mock(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
+        e_bilanz_export_service=Mock(),
+        taxonomy_management_service=Mock(),
+        fixed_asset_repository=(
+            fixed_asset_repository
+        ),
+        fixed_asset_depreciation_repository=(
+            depreciation_repository
+        ),
+        depreciation_service=(
+            depreciation_service
+        ),
+        fixed_asset_depreciation_workflow=Mock(),
+    )
+
+    proposals = (
+        workspace.build_depreciation_proposals()
+    )
+
+    assert proposals == (
+        proposal,
+    )
+
+    depreciation_service.build_proposal.assert_called_once_with(
+        fixed_asset=asset,
+        fiscal_year=context.fiscal_year,
+        previous_depreciation=Decimal("0.00"),
+        expense_account_number="4830",
+        asset_account_number="0690",
+    )
+
+def test_confirmed_depreciation_is_not_proposed_again(
+    context: ApplicationContext,
+) -> None:
+    booking_repository = Mock()
+    company_repository = Mock()
+    fixed_asset_repository = Mock()
+    depreciation_repository = Mock()
+    depreciation_service = Mock()
+    depreciation_workflow = Mock()
+
+    booking_repository.list_for_fiscal_year.return_value = ()
+
+    company_repository.get_managed_fiscal_years.return_value = (
+        ManagedFiscalYear(
+            fiscal_year=context.fiscal_year,
+            status=FiscalYearStatus.OPEN,
+            opening_source=None,
+        ),
+    )
+
+    asset = FixedAsset(
+        company_id=context.company.company_id,
+        asset_code="A-0001",
+        description="MacBook Pro",
+        position_code="HGB.266.AKTIVA.A.II.3",
+        asset_account_number="0690",
+        depreciation_expense_account_number="4830",
+        acquisition_date=date(2026, 3, 15),
+        acquisition_cost=Decimal("2400.00"),
+        depreciation_start_date=date(2026, 3, 15),
+        useful_life_months=36,
+    )
+
+    proposal = DepreciationProposal(
+        fixed_asset_id=asset.fixed_asset_id,
+        depreciation_date=context.fiscal_year.end_date,
+        amount=Decimal("600.00"),
+        expense_account_number="4830",
+        asset_account_number="0690",
+    )
+
+    confirmed = FixedAssetDepreciation(
+        fixed_asset_id=asset.fixed_asset_id,
+        fiscal_year_end=context.fiscal_year.end_date,
+        depreciation_date=context.fiscal_year.end_date,
+        amount=Decimal("600.00"),
+        booking_id=uuid4(),
+        kind=DepreciationKind.LINEAR,
+        source=DepreciationSource.CALCULATED,
+    )
+
+    fixed_asset_repository.list_for_company.return_value = (
+        asset,
+    )
+
+    depreciation_repository.list_for_fixed_asset.side_effect = (
+        (),
+        (confirmed,),
+    )
+
+    depreciation_service.build_proposal.return_value = (
+        proposal
+    )
+
+    depreciation_workflow.confirm.return_value = (
+        confirmed
+    )
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=company_repository,
+        posting_service=Mock(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
+        e_bilanz_export_service=Mock(),
+        taxonomy_management_service=Mock(),
+        fixed_asset_repository=(
+            fixed_asset_repository
+        ),
+        fixed_asset_depreciation_repository=(
+            depreciation_repository
+        ),
+        depreciation_service=(
+            depreciation_service
+        ),
+        fixed_asset_depreciation_workflow=(
+            depreciation_workflow
+        ),
+    )
+
+    first_proposals = (
+        workspace.build_depreciation_proposals()
+    )
+
+    assert first_proposals == (
+        proposal,
+    )
+
+    result = workspace.confirm_depreciation(
+        proposal
+    )
+
+    second_proposals = (
+        workspace.build_depreciation_proposals()
+    )
+
+    assert result == confirmed
+    assert second_proposals == ()
+
+    depreciation_workflow.confirm.assert_called_once_with(
+        company_id=context.company.company_id,
+        fiscal_year=context.fiscal_year,
+        proposal=proposal,
+    )
+
+    assert (
+        depreciation_service.build_proposal.call_count
+        == 1
+    )
 
 def test_close_fiscal_year_uses_workflow_and_reloads_closed_bookings(
     context: ApplicationContext,

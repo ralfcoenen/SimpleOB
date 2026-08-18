@@ -13,11 +13,23 @@ from openbilanz.database.company_repository import (
     CompanyRepository,
 )
 from openbilanz.database.database import Database
+from openbilanz.database.fixed_asset_depreciation_repository import (
+    FixedAssetDepreciationRepository,
+)
+from openbilanz.database.fixed_asset_repository import (
+    FixedAssetRepository,
+)
 from openbilanz.services.closing_accounts import ClosingAccounts
 from openbilanz.services.closing_consistency_service import (
     ClosingConsistencyService,
 )
 from openbilanz.services.closing_service import ClosingService
+from openbilanz.services.depreciation_booking_service import (
+    DepreciationBookingService,
+)
+from openbilanz.services.depreciation_service import (
+    DepreciationService,
+)
 from openbilanz.services.e_bilanz_account_detail_service import (
     EBilanzAccountDetailService,
 )
@@ -32,6 +44,9 @@ from openbilanz.services.fiscal_year_closing_workflow import (
     FiscalYearClosingWorkflow,
 )
 from openbilanz.services.fiscal_year_workspace import FiscalYearWorkspace
+from openbilanz.services.fixed_asset_depreciation_workflow import (
+    FixedAssetDepreciationWorkflow,
+)
 from openbilanz.services.posting_service import PostingService
 from openbilanz.services.taxonomy_management_service import (
     TaxonomyManagementService,
@@ -163,7 +178,37 @@ def main() -> None:
             session
         )
 
+
         posting_service = PostingService()
+
+        fixed_asset_repository = FixedAssetRepository(
+            session
+        )
+
+        fixed_asset_depreciation_repository = (
+            FixedAssetDepreciationRepository(
+                session
+            )
+        )
+
+        depreciation_service = DepreciationService()
+
+        depreciation_booking_service = (
+            DepreciationBookingService()
+        )
+
+        fixed_asset_depreciation_workflow = (
+            FixedAssetDepreciationWorkflow(
+                session=session,
+                booking_repository=booking_repository,
+                depreciation_repository=(
+                    fixed_asset_depreciation_repository
+                ),
+                booking_service=(
+                    depreciation_booking_service
+                ),
+            )
+        )
 
         closing_service = ClosingService(
             closing_accounts=ClosingAccounts(
@@ -207,6 +252,18 @@ def main() -> None:
             ),
             taxonomy_management_service=(
                 taxonomy_management_service
+            ),
+            fixed_asset_repository=(
+                fixed_asset_repository
+            ),
+            fixed_asset_depreciation_repository=(
+                fixed_asset_depreciation_repository
+            ),
+            depreciation_service=(
+                depreciation_service
+            ),
+            fixed_asset_depreciation_workflow=(
+                fixed_asset_depreciation_workflow
             ),
         )
 

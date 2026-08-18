@@ -61,7 +61,6 @@ class AccountBalanceBuilder:
             self._ACCOUNT_NUMBER,
             self._ACCOUNT_DESCRIPTION,
             self._AMOUNT,
-            self._NOT_POSSIBLE,
         )
 
         for name in required_names:
@@ -104,9 +103,13 @@ class AccountBalanceBuilder:
                 context=context,
                 unit=TaxonomyUnit.eur(),
             ),
-            not_possible=TaxonomyTextFact(
-                concept=concepts[self._NOT_POSSIBLE],
-                value="false",
-                context=context,
+            not_possible=(
+                TaxonomyTextFact(
+                    concept=concepts[self._NOT_POSSIBLE],
+                    value="false",
+                    context=context,
+                )
+                if self._NOT_POSSIBLE in concepts
+                else None
             ),
         )

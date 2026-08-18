@@ -2,7 +2,14 @@
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import Date, ForeignKey, Integer, Numeric, String
+from sqlalchemy import (
+    Date,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from openbilanz.database.database import Base
@@ -43,7 +50,7 @@ class Mandant(Base):
         String,
         nullable=True,
     )
-    
+
     steuer_id: Mapped[str | None] = mapped_column(
         String,
         nullable=True,
@@ -97,6 +104,11 @@ class Mandant(Base):
         cascade="all, delete-orphan",
     )
 
+    anlagegueter: Mapped[list["Anlagegut"]] = relationship(
+        back_populates="mandant",
+        cascade="all, delete-orphan",
+    )
+
 
 class Wirtschaftsjahr(Base):
     """Persistiertes Wirtschaftsjahr."""
@@ -122,7 +134,7 @@ class Wirtschaftsjahr(Base):
         Date,
         nullable=False,
     )
-    
+
     status: Mapped[str] = mapped_column(
         String,
         nullable=False,
@@ -132,12 +144,18 @@ class Wirtschaftsjahr(Base):
     mandant: Mapped[Mandant] = relationship(
         back_populates="wirtschaftsjahre",
     )
-    
+
     buchungen: Mapped[list["Buchung"]] = relationship(
         back_populates="wirtschaftsjahr",
         cascade="all, delete-orphan",
     )
-    
+
+    anlageabschreibungen: Mapped[
+            list["Anlageabschreibung"]
+        ] = relationship(
+            back_populates="wirtschaftsjahr",
+        )
+
     opening_source_id: Mapped[int | None] = mapped_column(
         ForeignKey("wirtschaftsjahre.id"),
         nullable=True,
@@ -147,7 +165,7 @@ class Wirtschaftsjahr(Base):
         remote_side="Wirtschaftsjahr.id",
         foreign_keys=[opening_source_id],
     )
-    
+
 class Buchung(Base):
     """Persistierte Buchung."""
 
@@ -190,7 +208,7 @@ class Buchung(Base):
         default="REGULAR",
         server_default="REGULAR",
     )
-    
+
     wirtschaftsjahr: Mapped[Wirtschaftsjahr] = relationship(
         back_populates="buchungen",
     )
@@ -239,4 +257,163 @@ class Buchungszeile(Base):
 
     buchung: Mapped[Buchung] = relationship(
         back_populates="zeilen",
+    )
+
+class Anlagegut(Base):
+    """Persistiertes Anlagegut."""
+
+    __tablename__ = "anlagegueter"
+
+    __table_args__ = (
+        UniqueConstraint(
+            "mandant_id",
+            "asset_code",
+            name="uq_anlagegueter_mandant_asset_code",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+    )
+
+    fixed_asset_id: Mapped[str] = mapped_column(
+        String(36),
+        unique=True,
+        nullable=False,
+    )
+
+    mandant_id: Mapped[int] = mapped_column(
+        ForeignKey("mandanten.id"),
+        nullable=False,
+    )
+
+    asset_code: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    description: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    position_code: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    acquisition_date: Mapped[date] = mapped_column(
+        Date,
+        nullable=False,
+    )
+
+    acquisition_cost: Mapped[Decimal] = mapped_column(
+        Numeric(18, 2),
+        nullable=False,
+    )
+
+    depreciation_start_date: Mapped[date] = mapped_column(
+        Date,
+        nullable=False,
+    )
+
+    useful_life_months: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+    )
+
+    mandant: Mapped[Mandant] = relationship(
+        back_populates="anlagegueter",
+    )
+
+    abschreibungen: Mapped[
+        list["Anlageabschreibung"]
+    ] = relationship(
+        back_populates="anlagegut",
+    )
+
+    status: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+        default="ACTIVE",
+        server_default="ACTIVE",
+    )
+
+    disposal_date: Mapped[date | None] = mapped_column(
+        Date,
+        nullable=True,
+    )
+
+    asset_account_number: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    depreciation_expense_account_number: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+
+class Anlageabschreibung(Base):
+    """Persistierte bestätigte Anlagenabschreibung."""
+
+    __tablename__ = "anlageabschreibungen"
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+    )
+
+    depreciation_id: Mapped[str] = mapped_column(
+        String(36),
+        unique=True,
+        nullable=False,
+    )
+
+    anlagegut_id: Mapped[int] = mapped_column(
+        ForeignKey("anlagegueter.id"),
+        nullable=False,
+    )
+
+    wirtschaftsjahr_id: Mapped[int] = mapped_column(
+        ForeignKey("wirtschaftsjahre.id"),
+        nullable=False,
+    )
+
+    buchungszeile_id: Mapped[int] = mapped_column(
+        ForeignKey("buchungszeilen.id"),
+        unique=True,
+        nullable=False,
+    )
+
+    depreciation_date: Mapped[date] = mapped_column(
+        Date,
+        nullable=False,
+    )
+
+    amount: Mapped[Decimal] = mapped_column(
+        Numeric(18, 2),
+        nullable=False,
+    )
+
+    anlagegut: Mapped[Anlagegut] = relationship(
+        back_populates="abschreibungen",
+    )
+
+    wirtschaftsjahr: Mapped[Wirtschaftsjahr] = relationship(
+        back_populates="anlageabschreibungen",
+    )
+
+    buchungszeile: Mapped[Buchungszeile] = relationship()
+
+    depreciation_kind: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    source: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
     )

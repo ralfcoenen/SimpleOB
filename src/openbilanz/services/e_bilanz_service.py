@@ -10,6 +10,7 @@ from openbilanz.accounting.financial_statement_position import (
 from openbilanz.domain.company_master_data import (
     CompanyMasterData,
 )
+from openbilanz.domain.e_bilanz_account_detail import EBilanzAccountDetail
 from openbilanz.domain.fiscal_year import FiscalYear
 from openbilanz.taxonomy.arelle_adapter import (
     ArelleAdapter,
@@ -63,6 +64,7 @@ class EBilanzService:
         entity_identifier: str,
         entity_scheme: str,
         previous_fiscal_year: FiscalYear | None = None,
+        account_details: tuple[EBilanzAccountDetail, ...] = (),
     ) -> EBilanzDocument:
         """Erzeugt die E-Bilanz-XBRL-Instanz."""
 
@@ -134,6 +136,7 @@ class EBilanzService:
             entity_scheme=entity_scheme,
             previous_fiscal_year=previous_fiscal_year,
             identifiers=mapping.identifiers,
+            account_details=account_details,
         )
 
 

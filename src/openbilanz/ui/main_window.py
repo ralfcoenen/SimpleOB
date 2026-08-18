@@ -38,6 +38,9 @@ from openbilanz.ui.company_master_data_dialog import (
 from openbilanz.ui.income_statement_frame import (
     IncomeStatementFrame,
 )
+from openbilanz.ui.new_fixed_asset_dialog import (
+    NewFixedAssetDialog,
+)
 from openbilanz.ui.opening_balance_dialog import (
     OpeningBalanceDialog,
 )
@@ -202,8 +205,9 @@ class MainWindow(tk.Tk):
 
         self._opening_balance_button = ttk.Button(
             container,
-            text="Eröffnungsbilanz erfassen",
+            text="Eröffnungsbilanz erfassen – derzeit deaktiviert",
             command=self._open_opening_balance,
+            state="disabled",
         )
         self._opening_balance_button.pack(
             anchor="w",
@@ -238,7 +242,10 @@ class MainWindow(tk.Tk):
             self._notebook,
             padding=16,
         )
-
+        self._fixed_assets_tab = ttk.Frame(
+            self._notebook,
+            padding=16,
+        )
         self._income_statement_tab = ttk.Frame(
             self._notebook,
             padding=16,
@@ -270,6 +277,11 @@ class MainWindow(tk.Tk):
         )
 
         self._notebook.add(
+            self._fixed_assets_tab,
+            text="Anlagen",
+        )
+
+        self._notebook.add(
             self._balance_sheet_tab,
             text="Bilanz",
         )
@@ -292,6 +304,7 @@ class MainWindow(tk.Tk):
         self._create_accounts_tab()
         self._create_journal_tab()
         self._create_booking_tab()
+        self._create_fixed_assets_tab()
         self._create_balance_sheet_tab()
         self._create_income_statement_tab()
         self._create_closing_tab()
@@ -514,6 +527,125 @@ class MainWindow(tk.Tk):
             expand=False,
         )
 
+    def _create_fixed_assets_tab(self) -> None:
+        """Erzeugt den Arbeitsbereich Anlagen."""
+
+        header = ttk.Frame(
+            self._fixed_assets_tab
+        )
+        header.pack(
+            fill="x",
+            pady=(0, 12),
+        )
+
+        ttk.Label(
+            header,
+            text="Anlagegüter",
+            font=("TkDefaultFont", 16, "bold"),
+        ).pack(
+            side="left",
+        )
+
+        self._process_depreciations_button = ttk.Button(
+            header,
+            text="Abschreibungen prüfen/buchen",
+            command=self._process_depreciations,
+        )
+        self._process_depreciations_button.pack(
+            side="right",
+            padx=(0, 8),
+        )
+
+        self._add_fixed_asset_button = ttk.Button(
+            header,
+            text="Anlagegut hinzufügen",
+            command=self._open_new_fixed_asset,
+        )
+        self._add_fixed_asset_button.pack(
+            side="right",
+        )
+
+        columns = (
+            "asset_code",
+            "description",
+            "acquisition_date",
+            "acquisition_cost",
+            "useful_life",
+            "asset_account",
+            "depreciation_account",
+            "status",
+        )
+
+        self._fixed_asset_table = ttk.Treeview(
+            self._fixed_assets_tab,
+            columns=columns,
+            show="headings",
+            height=14,
+        )
+
+        headings = {
+            "asset_code": "Anlagen-ID",
+            "description": "Bezeichnung",
+            "acquisition_date": "Anschaffung",
+            "acquisition_cost": "AK/HK",
+            "useful_life": "ND Monate",
+            "asset_account": "Anlagekonto",
+            "depreciation_account": "AfA-Konto",
+            "status": "Status",
+        }
+
+        for column, text in headings.items():
+            self._fixed_asset_table.heading(
+                column,
+                text=text,
+            )
+
+        self._fixed_asset_table.column(
+            "asset_code",
+            width=90,
+            anchor="w",
+        )
+        self._fixed_asset_table.column(
+            "description",
+            width=220,
+            anchor="w",
+        )
+        self._fixed_asset_table.column(
+            "acquisition_date",
+            width=100,
+            anchor="w",
+        )
+        self._fixed_asset_table.column(
+            "acquisition_cost",
+            width=110,
+            anchor="e",
+        )
+        self._fixed_asset_table.column(
+            "useful_life",
+            width=85,
+            anchor="e",
+        )
+        self._fixed_asset_table.column(
+            "asset_account",
+            width=90,
+            anchor="w",
+        )
+        self._fixed_asset_table.column(
+            "depreciation_account",
+            width=90,
+            anchor="w",
+        )
+        self._fixed_asset_table.column(
+            "status",
+            width=90,
+            anchor="w",
+        )
+
+        self._fixed_asset_table.pack(
+            fill="both",
+            expand=True,
+        )
+
     def _create_balance_sheet_tab(
         self,
     ) -> None:
@@ -725,6 +857,32 @@ class MainWindow(tk.Tk):
         ):
             return
 
+        try:
+            depreciation_proposals = (
+                self._workspace.build_depreciation_proposals()
+            )
+        except (ValueError, RuntimeError) as exc:
+            messagebox.showerror(
+                "Abschreibungen konnten nicht geprüft werden",
+                str(exc),
+                parent=self,
+            )
+            return
+
+        if depreciation_proposals:
+            messagebox.showwarning(
+                "Offene Abschreibungen",
+                (
+                    "Für dieses Geschäftsjahr sind noch "
+                    "Abschreibungen zu bearbeiten.\n\n"
+                    "Bitte führen Sie zuerst im Bereich "
+                    "\"Anlagen\" die Aktion "
+                    "\"Abschreibungen prüfen/buchen\" aus."
+                ),
+                parent=self,
+            )
+            return
+
         result = self._workspace.validate_closing(
             balance_sheet=self._current_balance_sheet,
             income_statement=self._current_income_statement,
@@ -737,6 +895,68 @@ class MainWindow(tk.Tk):
             result
         )
 
+    def _process_depreciations(self) -> None:
+        """Prüft und bucht offene Abschreibungen."""
+
+        try:
+            proposals = (
+                self._workspace.build_depreciation_proposals()
+            )
+        except (ValueError, RuntimeError) as exc:
+            messagebox.showerror(
+                "Abschreibungen konnten nicht vorbereitet werden",
+                str(exc),
+                parent=self,
+            )
+            return
+
+        if not proposals:
+            messagebox.showinfo(
+                "Abschreibungen",
+                (
+                    "Für dieses Geschäftsjahr sind keine "
+                    "offenen Abschreibungen vorhanden."
+                ),
+                parent=self,
+            )
+            return
+
+        for proposal in proposals:
+            confirmed = messagebox.askyesno(
+                "Abschreibung bestätigen",
+                (
+                    "Für ein Anlagegut wurde folgende lineare "
+                    "Abschreibung ermittelt:\n\n"
+                    f"Betrag: {proposal.amount:.2f} €\n"
+                    f"Aufwandskonto: "
+                    f"{proposal.expense_account_number}\n"
+                    f"Anlagenkonto: "
+                    f"{proposal.asset_account_number}\n"
+                    f"Datum: "
+                    f"{proposal.depreciation_date:%d.%m.%Y}\n\n"
+                    "Soll diese Abschreibung gebucht werden?"
+                ),
+                parent=self,
+            )
+
+            if not confirmed:
+                break
+
+            try:
+                self._workspace.confirm_depreciation(
+                    proposal
+                )
+            except (ValueError, RuntimeError) as exc:
+                messagebox.showerror(
+                    "Abschreibung konnte nicht gebucht werden",
+                    str(exc),
+                    parent=self,
+                )
+                break
+
+        # Gebuchte AfA verändert Journal, GuV und Bilanz.
+        self._refresh_all()
+
     def _close_fiscal_year(self) -> None:
         """Schließt das Geschäftsjahr persistent ab."""
 
@@ -746,12 +966,15 @@ class MainWindow(tk.Tk):
         if self._current_income_statement is None:
             return
 
+
         confirmed = messagebox.askyesno(
             "Geschäftsjahr abschließen",
             (
-                "Das Geschäftsjahr wird endgültig abgeschlossen.\n\n"
-                "Dabei werden die Erfolgskonten abgeschlossen und "
-                "weitere Buchungen in diesem Geschäftsjahr gesperrt.\n\n"
+                "Das Geschäftsjahr wird nun endgültig "
+                "abgeschlossen.\n\n"
+                "Dabei werden die Erfolgskonten abgeschlossen "
+                "und weitere Buchungen in diesem Geschäftsjahr "
+                "gesperrt.\n\n"
                 "Möchten Sie fortfahren?"
             ),
             parent=self,
@@ -792,6 +1015,7 @@ class MainWindow(tk.Tk):
 
         self._refresh_overview()
         self._refresh_journal()
+        self._refresh_fixed_assets()
         self._refresh_balance_sheet()
         self._refresh_closing()
         self._refresh_taxonomy_status()
@@ -1514,18 +1738,29 @@ class MainWindow(tk.Tk):
 
         enabled = self._workspace.is_open
 
-        if enabled:
-            self._opening_balance_button.state(
-                ["!disabled"]
-            )
-        else:
-            self._opening_balance_button.state(
-                ["disabled"]
-            )
+        self._opening_balance_button.state(
+            ["disabled"]
+        )
 
         self._booking_frame.set_enabled(
             enabled
         )
+
+        if enabled:
+            self._add_fixed_asset_button.state(
+                ["!disabled"]
+            )
+            self._process_depreciations_button.state(
+                ["!disabled"]
+            )
+        else:
+            self._add_fixed_asset_button.state(
+                ["disabled"]
+            )
+            self._process_depreciations_button.state(
+                ["disabled"]
+            )
+
 
     def _open_company_master_data(
         self,
@@ -1569,5 +1804,88 @@ class MainWindow(tk.Tk):
         messagebox.showinfo(
             "Unternehmensstammdaten",
             "Die Unternehmensstammdaten wurden gespeichert.",
+            parent=self,
+        )
+
+    def _refresh_fixed_assets(self) -> None:
+        """Aktualisiert die Liste der Anlagegüter."""
+
+        for item in self._fixed_asset_table.get_children():
+            self._fixed_asset_table.delete(
+                item
+            )
+
+        try:
+            assets = self._workspace.list_fixed_assets()
+        except RuntimeError:
+            return
+
+        for asset in assets:
+            status = (
+                "Aktiv"
+                if asset.status.value == "ACTIVE"
+                else "Abgegangen"
+            )
+
+            self._fixed_asset_table.insert(
+                "",
+                "end",
+                values=(
+                    asset.asset_code,
+                    asset.description,
+                    (
+                        f"{asset.acquisition_date:%d.%m.%Y}"
+                    ),
+                    self._format_amount(
+                        asset.acquisition_cost
+                    ),
+                    asset.useful_life_months,
+                    asset.asset_account_number,
+                    (
+                        asset
+                        .depreciation_expense_account_number
+                    ),
+                    status,
+                ),
+            )
+
+    def _open_new_fixed_asset(self) -> None:
+        """Öffnet den Dialog für ein neues Anlagegut."""
+
+        if not self._workspace.is_open:
+            return
+
+        dialog = NewFixedAssetDialog(
+            self,
+            company_id=(
+                self._context.company.company_id
+            ),
+        )
+
+        self.wait_window(dialog)
+
+        if dialog.result is None:
+            return
+
+        try:
+            self._workspace.add_fixed_asset(
+                dialog.result
+            )
+        except (
+            ValueError,
+            RuntimeError,
+        ) as exc:
+            messagebox.showerror(
+                "Anlagegut kann nicht angelegt werden",
+                str(exc),
+                parent=self,
+            )
+            return
+
+        self._refresh_fixed_assets()
+
+        messagebox.showinfo(
+            "Anlagegut",
+            "Das Anlagegut wurde angelegt.",
             parent=self,
         )

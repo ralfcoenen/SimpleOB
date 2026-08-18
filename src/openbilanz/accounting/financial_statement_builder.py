@@ -24,14 +24,14 @@ class FinancialStatementBuilder:
         amounts: dict[FinancialStatementPosition, Decimal] = {}
 
         for balance in balances:
-            position = self._mapper.position_for(balance)
+            position, amount = self._mapper.map_balance(
+                balance
+            )
 
-            if balance.debit_balance > ZERO:
-                amount = balance.debit_balance
-            else:
-                amount = balance.credit_balance
-
-            amounts[position] = amounts.get(position, ZERO) + amount
+            amounts[position] = (
+                amounts.get(position, ZERO)
+                + amount
+            )
 
         if closing_result is not None:
             if result_position is None:
@@ -46,7 +46,7 @@ class FinancialStatementBuilder:
             self._aggregate_position(root_position, amounts)
 
         return amounts
-    
+
     def _aggregate_position(
         self,
         position: FinancialStatementPosition,

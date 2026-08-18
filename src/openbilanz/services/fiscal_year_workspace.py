@@ -1,5 +1,6 @@
 """Anwendungszustand eines geöffneten Geschäftsjahres."""
 
+from decimal import Decimal
 from pathlib import Path
 
 from openbilanz.accounting.account_balance import AccountBalance
@@ -11,6 +12,12 @@ from openbilanz.accounting.trial_balance import TrialBalance
 from openbilanz.core.context import ApplicationContext
 from openbilanz.database.booking_repository import BookingRepository
 from openbilanz.database.company_repository import CompanyRepository
+from openbilanz.database.fixed_asset_depreciation_repository import (
+    FixedAssetDepreciationRepository,
+)
+from openbilanz.database.fixed_asset_repository import (
+    FixedAssetRepository,
+)
 from openbilanz.domain.booking import Booking
 from openbilanz.domain.booking_type import BookingType
 from openbilanz.domain.chart_of_accounts_template import (
@@ -22,13 +29,26 @@ from openbilanz.domain.closing_consistency_result import (
 from openbilanz.domain.company_master_data import (
     CompanyMasterData,
 )
+from openbilanz.domain.depreciation_proposal import (
+    DepreciationProposal,
+)
 from openbilanz.domain.fiscal_year_status import FiscalYearStatus
+from openbilanz.domain.fixed_asset import FixedAsset
+from openbilanz.domain.fixed_asset_depreciation import (
+    FixedAssetDepreciation,
+)
+from openbilanz.domain.fixed_asset_status import (
+    FixedAssetStatus,
+)
 from openbilanz.domain.journal import Journal
 from openbilanz.domain.managed_fiscal_year import ManagedFiscalYear
 from openbilanz.services.closing_consistency_service import (
     ClosingConsistencyService,
 )
 from openbilanz.services.closing_result import ClosingResult
+from openbilanz.services.depreciation_service import (
+    DepreciationService,
+)
 from openbilanz.services.e_bilanz_account_detail_service import (
     EBilanzAccountDetailService,
 )
@@ -42,6 +62,9 @@ from openbilanz.services.e_bilanz_preparation_service import (
 from openbilanz.services.e_bilanz_service import EBilanzService
 from openbilanz.services.fiscal_year_closing_workflow import (
     FiscalYearClosingWorkflow,
+)
+from openbilanz.services.fixed_asset_depreciation_workflow import (
+    FixedAssetDepreciationWorkflow,
 )
 from openbilanz.services.posting_service import PostingService
 from openbilanz.services.taxonomy_management_service import (
@@ -76,6 +99,14 @@ class FiscalYearWorkspace:
         e_bilanz_account_detail_service: EBilanzAccountDetailService,
         e_bilanz_export_service: EBilanzExportService,
         taxonomy_management_service: TaxonomyManagementService,
+        fixed_asset_repository: FixedAssetRepository | None = None,
+        fixed_asset_depreciation_repository: (
+            FixedAssetDepreciationRepository | None
+        ) = None,
+        depreciation_service: DepreciationService | None = None,
+        fixed_asset_depreciation_workflow: (
+            FixedAssetDepreciationWorkflow | None
+        ) = None,
     ) -> None:
         self._context = context
         self._booking_repository = booking_repository
@@ -104,6 +135,18 @@ class FiscalYearWorkspace:
         ) = None
         self._taxonomy_management_service = (
             taxonomy_management_service
+        )
+        self._fixed_asset_repository = (
+            fixed_asset_repository
+        )
+        self._fixed_asset_depreciation_repository = (
+            fixed_asset_depreciation_repository
+        )
+        self._depreciation_service = (
+            depreciation_service
+        )
+        self._fixed_asset_depreciation_workflow = (
+            fixed_asset_depreciation_workflow
         )
 
         self.reload()
@@ -223,6 +266,157 @@ class FiscalYearWorkspace:
             balances=balances,
             mapper=mapper,
         )
+
+    def list_fixed_assets(
+        self,
+    ) -> tuple[FixedAsset, ...]:
+        """Lädt die Anlagegüter des geöffneten Unternehmens."""
+
+        if self._fixed_asset_repository is None:
+            raise RuntimeError(
+                "Die Anlagenbuchhaltung ist nicht konfiguriert."
+            )
+
+        return self._fixed_asset_repository.list_for_company(
+            self._context.company.company_id
+        )
+
+    def add_fixed_asset(
+        self,
+        fixed_asset: FixedAsset,
+    ) -> None:
+        """Speichert ein Anlagegut des geöffneten Unternehmens."""
+
+        if not self.is_open:
+            raise ValueError(
+                "Das Geschäftsjahr ist abgeschlossen."
+            )
+
+        if self._fixed_asset_repository is None:
+            raise RuntimeError(
+                "Die Anlagenbuchhaltung ist nicht konfiguriert."
+            )
+
+        if fixed_asset.company_id != self._context.company.company_id:
+            raise ValueError(
+                "Das Anlagegut gehört nicht zum geöffneten Unternehmen."
+            )
+
+        self._fixed_asset_repository.add(
+            fixed_asset=fixed_asset
+        )
+
+    def build_depreciation_proposals(
+        self,
+    ) -> tuple[DepreciationProposal, ...]:
+        """Ermittelt noch offene lineare AfA-Vorschläge."""
+
+        if not self.is_open:
+            raise ValueError(
+                "Das Geschäftsjahr ist abgeschlossen."
+            )
+
+        if (
+            self._fixed_asset_repository is None
+            or self._fixed_asset_depreciation_repository
+            is None
+            or self._depreciation_service is None
+        ):
+            raise RuntimeError(
+                "Die Anlagenbuchhaltung ist nicht konfiguriert."
+            )
+
+        assets = (
+            self._fixed_asset_repository.list_for_company(
+                self._context.company.company_id
+            )
+        )
+
+        proposals: list[DepreciationProposal] = []
+
+        for asset in assets:
+            if asset.status is not FixedAssetStatus.ACTIVE:
+                continue
+
+            depreciations = (
+                self._fixed_asset_depreciation_repository
+                .list_for_fixed_asset(
+                    asset.fixed_asset_id
+                )
+            )
+
+            already_confirmed = any(
+                depreciation.fiscal_year_end
+                == self._context.fiscal_year.end_date
+                for depreciation in depreciations
+            )
+
+            if already_confirmed:
+                continue
+
+            previous_depreciation = sum(
+                (
+                    depreciation.amount
+                    for depreciation in depreciations
+                ),
+                start=Decimal("0.00"),
+            )
+
+            proposal = (
+                self._depreciation_service.build_proposal(
+                    fixed_asset=asset,
+                    fiscal_year=self._context.fiscal_year,
+                    previous_depreciation=(
+                        previous_depreciation
+                    ),
+                    expense_account_number=(
+                        asset.depreciation_expense_account_number
+                    ),
+                    asset_account_number=(
+                        asset.asset_account_number
+                    ),
+                )
+            )
+
+            if proposal is not None:
+                proposals.append(proposal)
+
+        return tuple(proposals)
+
+    def confirm_depreciation(
+        self,
+        proposal: DepreciationProposal,
+    ) -> FixedAssetDepreciation:
+        """Bucht einen bestätigten AfA-Vorschlag."""
+
+        if not self.is_open:
+            raise ValueError(
+                "Das Geschäftsjahr ist abgeschlossen."
+            )
+
+        if (
+            self._fixed_asset_depreciation_workflow
+            is None
+        ):
+            raise RuntimeError(
+                "Die Anlagenbuchhaltung ist nicht konfiguriert."
+            )
+
+        depreciation = (
+            self._fixed_asset_depreciation_workflow.confirm(
+                company_id=(
+                    self._context.company.company_id
+                ),
+                fiscal_year=(
+                    self._context.fiscal_year
+                ),
+                proposal=proposal,
+            )
+        )
+
+        self.reload()
+
+        return depreciation
 
     def close_fiscal_year(
         self,

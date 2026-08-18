@@ -14,7 +14,7 @@ class TaxonomyAccountBalance:
     account_number: TaxonomyTextFact
     account_description: TaxonomyTextFact
     amount: TaxonomyFact
-    not_possible: TaxonomyTextFact
+    not_possible: TaxonomyTextFact | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(
@@ -49,10 +49,13 @@ class TaxonomyAccountBalance:
                 "amount must be a TaxonomyFact"
             )
 
-        if not isinstance(
-            self.not_possible,
-            TaxonomyTextFact,
+        if (
+            self.not_possible is not None
+            and not isinstance(
+                self.not_possible,
+                TaxonomyTextFact,
+            )
         ):
             raise TypeError(
-                "not_possible must be a TaxonomyTextFact"
+                "not_possible must be a TaxonomyTextFact or None"
             )

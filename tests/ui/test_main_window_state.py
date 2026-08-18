@@ -23,6 +23,8 @@ def _create_window_double(
     window._workspace.is_closed = not is_open
 
     window._opening_balance_button = Mock()
+    window._add_fixed_asset_button = Mock()
+    window._process_depreciations_button = Mock()
     window._booking_frame = Mock()
 
     return window
@@ -54,7 +56,11 @@ def test_open_fiscal_year_enables_editing() -> None:
 
     window._update_editing_state()
 
-    window._opening_balance_button.state.assert_called_once_with(
+    window._add_fixed_asset_button.state.assert_called_once_with(
+        ["!disabled"]
+    )
+
+    window._process_depreciations_button.state.assert_called_once_with(
         ["!disabled"]
     )
 
@@ -70,7 +76,11 @@ def test_closed_fiscal_year_disables_editing() -> None:
 
     window._update_editing_state()
 
-    window._opening_balance_button.state.assert_called_once_with(
+    window._add_fixed_asset_button.state.assert_called_once_with(
+        ["disabled"]
+    )
+
+    window._process_depreciations_button.state.assert_called_once_with(
         ["disabled"]
     )
 
@@ -397,3 +407,27 @@ def test_e_bilanz_export_cancel_does_not_export() -> None:
         window._export_e_bilanz()
 
     window._workspace.export_e_bilanz.assert_not_called()
+
+def test_closing_validation_is_blocked_by_open_depreciations() -> None:
+    window = object.__new__(MainWindow)
+
+    window._workspace = Mock()
+    window._workspace.build_depreciation_proposals.return_value = (
+        Mock(),
+    )
+
+    window._current_income_statement = Mock()
+    window._current_closing_result = Mock()
+    window._current_balance_sheet = Mock()
+    window._current_closing_balances = Mock()
+    window._account_mapper = Mock()
+    window._closing_frame = Mock()
+
+    with patch(
+        "openbilanz.ui.main_window.messagebox.showwarning"
+    ) as showwarning:
+        window._validate_closing()
+
+    window._workspace.validate_closing.assert_not_called()
+
+    showwarning.assert_called_once()

@@ -242,13 +242,14 @@ class TaxonomyXbrlWriter:
             )
         )
 
-        element.append(
-            self.text_fact_element(
-                fact=account_balance.not_possible,
-                context_id=context_id,
-                namespace=namespace,
+        if account_balance.not_possible is not None:
+            element.append(
+                self.text_fact_element(
+                    fact=account_balance.not_possible,
+                    context_id=context_id,
+                    namespace=namespace,
+                )
             )
-        )
 
         return element
 
