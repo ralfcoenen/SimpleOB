@@ -69,6 +69,7 @@ def test_combines_pre_closing_income_statement_with_closed_balance_sheet(
         },
         assets=assets,
         liabilities=liabilities,
+        income_summary_account_number="8990",
     )
 
     result = service.prepare(
@@ -151,6 +152,7 @@ def test_excludes_income_summary_account_from_balance_sheet(
         },
         assets=assets,
         liabilities=liabilities,
+        income_summary_account_number="8990",
     )
 
     service.prepare(

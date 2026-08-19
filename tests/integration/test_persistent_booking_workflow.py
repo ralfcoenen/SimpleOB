@@ -435,6 +435,7 @@ def test_reconstructs_income_statement_and_balance_sheet() -> None:
             AccountType.LIABILITY,
             AccountType.EQUITY,
         )
+        and balance.account_number != "9000"
     )
 
     amounts = builder.build(

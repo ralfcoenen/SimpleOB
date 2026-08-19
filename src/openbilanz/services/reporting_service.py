@@ -101,7 +101,7 @@ class ReportingService:
         journal: Journal,
         start_date: date,
         end_date: date,
-        opening_balance_account_number: str = "9000",
+        opening_balance_account_number: str,
     ) -> TrialBalanceReport:
         """Erzeugt eine Summen- und Saldenliste für einen Zeitraum."""
 

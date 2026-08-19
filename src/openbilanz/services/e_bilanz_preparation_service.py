@@ -46,11 +46,15 @@ class EBilanzPreparationService:
         account_types: Mapping[str, AccountType],
         assets: FinancialStatementPosition,
         liabilities: FinancialStatementPosition,
+        income_summary_account_number: str,
     ) -> None:
         self._statement_builder = statement_builder
         self._account_types = account_types
         self._assets = assets
         self._liabilities = liabilities
+        self._income_summary_account_number = (
+            income_summary_account_number
+        )
 
     def prepare(
         self,
@@ -78,7 +82,10 @@ class EBilanzPreparationService:
                     balance.debit_balance > ZERO
                     or balance.credit_balance > ZERO
                 )
-                and balance.account_number != "8990"
+                and (
+                    balance.account_number
+                    != self._income_summary_account_number
+                )
             )
         )
 
@@ -108,4 +115,3 @@ class EBilanzPreparationService:
                 income_statement_amounts
             ),
         )
-    

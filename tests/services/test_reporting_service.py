@@ -340,6 +340,7 @@ def test_trial_balance_report_separates_opening_and_turnover() -> None:
         journal=journal,
         start_date=date(2026, 1, 1),
         end_date=date(2026, 12, 31),
+        opening_balance_account_number="9000",
     )
 
     bank = next(row for row in report.rows if row.account_number == "1200")
@@ -406,6 +407,7 @@ def test_trial_balance_report_uses_prior_movements_as_opening_balance() -> None:
         journal=journal,
         start_date=date(2026, 3, 1),
         end_date=date(2026, 6, 30),
+        opening_balance_account_number="9000",
     )
 
     row = next(row for row in report.rows if row.account_number == "1200")
@@ -431,6 +433,7 @@ def test_trial_balance_report_rejects_invalid_date_range() -> None:
             journal=Journal(),
             start_date=date(2026, 12, 31),
             end_date=date(2026, 1, 1),
+            opening_balance_account_number="9000",
         )
 
 

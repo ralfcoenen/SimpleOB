@@ -41,6 +41,7 @@ class NewCompanyDialog(tk.Toplevel):
             self._company_name_entry.focus_set
         )
 
+
     def _create_ui(self) -> None:
         """Erzeugt die Benutzeroberfläche."""
 
@@ -272,7 +273,7 @@ class NewCompanyDialog(tk.Toplevel):
             )
 
             self._repository.add(
-                company
+                company,
             )
 
             self._repository.add_fiscal_year(
@@ -280,7 +281,9 @@ class NewCompanyDialog(tk.Toplevel):
                 fiscal_year,
             )
 
+
         except ValueError as exc:
+
             messagebox.showerror(
                 "Buchhaltung kann nicht angelegt werden",
                 str(exc),

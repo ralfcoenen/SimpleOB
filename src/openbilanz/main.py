@@ -3,11 +3,18 @@
 import tkinter as tk
 
 from openbilanz.accounting.financial_statement_context import (
+    create_financial_statement_context,
     create_standard_financial_statement_context,
+)
+from openbilanz.accounting.hgb_financial_statement_position_provider import (
+    HgbFinancialStatementPositionProvider,
 )
 from openbilanz.core.config import load_config
 from openbilanz.database.booking_repository import (
     BookingRepository,
+)
+from openbilanz.database.chart_of_accounts_repository import (
+    ChartOfAccountsRepository,
 )
 from openbilanz.database.company_repository import (
     CompanyRepository,
@@ -18,6 +25,9 @@ from openbilanz.database.fixed_asset_depreciation_repository import (
 )
 from openbilanz.database.fixed_asset_repository import (
     FixedAssetRepository,
+)
+from openbilanz.services.chart_of_accounts_initialization_service import (
+    ChartOfAccountsInitializationService,
 )
 from openbilanz.services.closing_accounts import ClosingAccounts
 from openbilanz.services.closing_consistency_service import (
@@ -78,95 +88,118 @@ def main() -> None:
 
     database.create_database()
 
-    financial_statement_context = create_standard_financial_statement_context()
+    # Der Standardkontext liefert die unveränderten HGB-Strukturen
+    # sowie den ausgelieferten Standardkontenrahmen als Vorlage.
+    standard_financial_statement_context = (
+        create_standard_financial_statement_context()
+    )
 
-    resolver = TaxonomyResolver(root=config.taxonomy_dir)
+    position_provider = HgbFinancialStatementPositionProvider(
+        (
+            standard_financial_statement_context.assets,
+            standard_financial_statement_context.liabilities,
+            standard_financial_statement_context.income_statement,
+        )
+    )
 
-    taxonomy_catalog = TaxonomyCatalog(root=config.taxonomy_dir)
+    resolver = TaxonomyResolver(
+        root=config.taxonomy_dir
+    )
 
-    taxonomy_installation_service = TaxonomyInstallationService(
-        target_root=config.taxonomy_dir
+    taxonomy_catalog = TaxonomyCatalog(
+        root=config.taxonomy_dir
+    )
+
+    taxonomy_installation_service = (
+        TaxonomyInstallationService(
+            target_root=config.taxonomy_dir
+        )
     )
 
     taxonomy_downloader = TaxonomyDownloader()
 
-    taxonomy_management_service = TaxonomyManagementService(
-        catalog=taxonomy_catalog,
-        installation_service=taxonomy_installation_service,
-        download=taxonomy_downloader.download,
+    taxonomy_management_service = (
+        TaxonomyManagementService(
+            catalog=taxonomy_catalog,
+            installation_service=(
+                taxonomy_installation_service
+            ),
+            download=taxonomy_downloader.download,
+        )
     )
 
     arelle_adapter = ArelleAdapter()
 
-    e_bilanz_preparation_service = EBilanzPreparationService(
-        statement_builder=(financial_statement_context.statement_builder),
-        account_types=(financial_statement_context.account_types),
-        assets=(financial_statement_context.assets),
-        liabilities=(financial_statement_context.liabilities),
-    )
-
-    e_bilanz_account_detail_service = EBilanzAccountDetailService(
-        account_mapper=(financial_statement_context.account_mapper),
-        accounts=(financial_statement_context.accounts),
-    )
-
-    e_bilanz_service = EBilanzService(
-        resolver=resolver,
-        adapter=arelle_adapter,
-        company_data_mapper=GcdCompanyDataMapper(),
-        assets=financial_statement_context.assets,
-        liabilities=financial_statement_context.liabilities,
-        income_statement=(financial_statement_context.income_statement),
-    )
-
     session = database.create_session()
 
     try:
-        company_repository = CompanyRepository(session)
+        company_repository = CompanyRepository(
+            session
+        )
 
-        booking_repository = BookingRepository(session)
+        chart_of_accounts_repository = (
+            ChartOfAccountsRepository(
+                session
+            )
+        )
+
+        chart_of_accounts_initialization_service = (
+            ChartOfAccountsInitializationService(
+                repository=chart_of_accounts_repository,
+                position_provider=position_provider,
+            )
+        )
+
+        booking_repository = BookingRepository(
+            session
+        )
 
         posting_service = PostingService()
 
-        fixed_asset_repository = FixedAssetRepository(session)
+        fixed_asset_repository = (
+            FixedAssetRepository(
+                session
+            )
+        )
 
-        fixed_asset_depreciation_repository = FixedAssetDepreciationRepository(session)
+        fixed_asset_depreciation_repository = (
+            FixedAssetDepreciationRepository(
+                session
+            )
+        )
 
         depreciation_service = DepreciationService()
 
-        depreciation_booking_service = DepreciationBookingService()
-
-        fixed_asset_depreciation_workflow = FixedAssetDepreciationWorkflow(
-            session=session,
-            booking_repository=booking_repository,
-            depreciation_repository=(fixed_asset_depreciation_repository),
-            booking_service=(depreciation_booking_service),
+        depreciation_booking_service = (
+            DepreciationBookingService()
         )
 
-        closing_accounts = ClosingAccounts(
-            income_summary_account="8990",
-            profit_account="8020",
-            loss_account="8021",
+        fixed_asset_depreciation_workflow = (
+            FixedAssetDepreciationWorkflow(
+                session=session,
+                booking_repository=booking_repository,
+                depreciation_repository=(
+                    fixed_asset_depreciation_repository
+                ),
+                booking_service=(
+                    depreciation_booking_service
+                ),
+            )
         )
 
-        closing_service = ClosingService(
-            closing_accounts=closing_accounts,
+        closing_consistency_service = (
+            ClosingConsistencyService()
         )
 
-        closing_consistency_service = ClosingConsistencyService()
-
-        closing_workflow = FiscalYearClosingWorkflow(
-            session=session,
-            booking_repository=booking_repository,
-            company_repository=company_repository,
-            closing_service=closing_service,
+        e_bilanz_export_service = (
+            EBilanzExportService()
         )
-
-        e_bilanz_export_service = EBilanzExportService()
 
         reporting_service = ReportingService()
 
-        pdf_reporting_service = PdfReportingService()
+        pdf_reporting_service = (
+            PdfReportingService()
+        )
 
         while True:
             root = tk.Tk()
@@ -193,32 +226,224 @@ def main() -> None:
 
             root.destroy()
 
+            # Für neue und bestehende Mandanten wird einmalig
+            # ein eigener Kontenrahmen aus der Standardvorlage
+            # erzeugt. Vorhandene Mandantenkontenrahmen werden
+            # nicht überschrieben.
+            initialized = (
+                chart_of_accounts_initialization_service
+                .initialize(
+                    company=context.company,
+                    standard_chart_of_accounts=(
+                        standard_financial_statement_context
+                        .chart_of_accounts
+                    ),
+                )
+            )
+
+            if initialized:
+                session.commit()
+
+            loaded_chart_of_accounts = (
+                chart_of_accounts_repository
+                .load_for_company(
+                    company_id=(
+                        context.company.company_id
+                    ),
+                    position_provider=position_provider,
+                )
+            )
+
+            if loaded_chart_of_accounts is None:
+                raise RuntimeError(
+                    "Der Kontenrahmen des Unternehmens "
+                    "konnte nicht geladen werden."
+                )
+
+            (
+                chart_of_accounts,
+                accounts,
+            ) = loaded_chart_of_accounts
+
+            control_accounts = (
+                chart_of_accounts_repository
+                .load_control_accounts(
+                    context.company.company_id
+                )
+            )
+
+            if control_accounts is None:
+                raise RuntimeError(
+                    "Die technischen Konten des "
+                    "Unternehmens konnten nicht "
+                    "geladen werden."
+                )
+
+            # Der eigentliche Abschlusskontext wird erst jetzt
+            # für den ausgewählten Mandanten aufgebaut.
+            financial_statement_context = (
+                create_financial_statement_context(
+                    assets=(
+                        standard_financial_statement_context
+                        .assets
+                    ),
+                    liabilities=(
+                        standard_financial_statement_context
+                        .liabilities
+                    ),
+                    income_statement=(
+                        standard_financial_statement_context
+                        .income_statement
+                    ),
+                    chart_of_accounts=(
+                        chart_of_accounts
+                    ),
+                    accounts=accounts,
+                )
+            )
+
+            # Abschlusskonten kommen jetzt aus der
+            # mandantenspezifischen Konfiguration.
+            closing_accounts = ClosingAccounts(
+                income_summary_account=(
+                    control_accounts
+                    .income_summary_account
+                ),
+                profit_account=(
+                    control_accounts.profit_account
+                ),
+                loss_account=(
+                    control_accounts.loss_account
+                ),
+            )
+
+            closing_service = ClosingService(
+                closing_accounts=closing_accounts,
+            )
+
+            closing_workflow = (
+                FiscalYearClosingWorkflow(
+                    session=session,
+                    booking_repository=(
+                        booking_repository
+                    ),
+                    company_repository=(
+                        company_repository
+                    ),
+                    closing_service=closing_service,
+                )
+            )
+
+            # Auch die E-Bilanz-Dienste müssen mit dem
+            # Kontenrahmen des ausgewählten Mandanten arbeiten.
+            e_bilanz_preparation_service = (
+            EBilanzPreparationService(
+                statement_builder=(
+                    financial_statement_context
+                    .statement_builder
+                ),
+                account_types=(
+                    financial_statement_context
+                    .account_types
+                ),
+                assets=(
+                    financial_statement_context
+                    .assets
+                ),
+                liabilities=(
+                    financial_statement_context
+                    .liabilities
+                ),
+                income_summary_account_number=(
+                    control_accounts.income_summary_account
+                ),
+            )
+        )
+            e_bilanz_account_detail_service = (
+                EBilanzAccountDetailService(
+                    account_mapper=(
+                        financial_statement_context
+                        .account_mapper
+                    ),
+                    accounts=(
+                        financial_statement_context
+                        .accounts
+                    ),
+                )
+            )
+
+            e_bilanz_service = EBilanzService(
+                resolver=resolver,
+                adapter=arelle_adapter,
+                company_data_mapper=(
+                    GcdCompanyDataMapper()
+                ),
+                assets=(
+                    financial_statement_context.assets
+                ),
+                liabilities=(
+                    financial_statement_context
+                    .liabilities
+                ),
+                income_statement=(
+                    financial_statement_context
+                    .income_statement
+                ),
+            )
+
             workspace = FiscalYearWorkspace(
                 context=context,
-                booking_repository=booking_repository,
-                company_repository=company_repository,
+                booking_repository=(
+                    booking_repository
+                ),
+                company_repository=(
+                    company_repository
+                ),
                 posting_service=posting_service,
                 reporting_service=reporting_service,
                 closing_workflow=closing_workflow,
-                closing_consistency_service=(closing_consistency_service),
-                e_bilanz_preparation_service=(e_bilanz_preparation_service),
-                e_bilanz_account_detail_service=(e_bilanz_account_detail_service),
+                closing_consistency_service=(
+                    closing_consistency_service
+                ),
+                e_bilanz_preparation_service=(
+                    e_bilanz_preparation_service
+                ),
+                e_bilanz_account_detail_service=(
+                    e_bilanz_account_detail_service
+                ),
                 e_bilanz_service=e_bilanz_service,
-                e_bilanz_export_service=(e_bilanz_export_service),
-                taxonomy_management_service=(taxonomy_management_service),
-                fixed_asset_repository=(fixed_asset_repository),
+                e_bilanz_export_service=(
+                    e_bilanz_export_service
+                ),
+                taxonomy_management_service=(
+                    taxonomy_management_service
+                ),
+                fixed_asset_repository=(
+                    fixed_asset_repository
+                ),
                 fixed_asset_depreciation_repository=(
                     fixed_asset_depreciation_repository
                 ),
-                depreciation_service=(depreciation_service),
-                fixed_asset_depreciation_workflow=(fixed_asset_depreciation_workflow),
+                depreciation_service=(
+                    depreciation_service
+                ),
+                fixed_asset_depreciation_workflow=(
+                    fixed_asset_depreciation_workflow
+                ),
             )
 
             window = MainWindow(
                 workspace=workspace,
-                financial_statement_context=(financial_statement_context),
+                financial_statement_context=(
+                    financial_statement_context
+                ),
                 closing_accounts=closing_accounts,
-                pdf_reporting_service=pdf_reporting_service,
+                opening_balance_account_number=(
+                    control_accounts.opening_balance_account
+                ),
+                pdf_reporting_service=(
+                    pdf_reporting_service
+                ),
             )
 
             window.mainloop()

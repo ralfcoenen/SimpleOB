@@ -3,6 +3,7 @@ from datetime import date
 from decimal import Decimal
 
 from sqlalchemy import (
+    Boolean,
     Date,
     ForeignKey,
     Integer,
@@ -109,6 +110,117 @@ class Mandant(Base):
         cascade="all, delete-orphan",
     )
 
+    konten: Mapped[list["Konto"]] = relationship(
+        back_populates="mandant",
+        cascade="all, delete-orphan",
+    )
+
+    kontenrahmen_konfiguration: Mapped[
+        "KontenrahmenKonfiguration | None"
+    ] = relationship(
+        back_populates="mandant",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+
+class Konto(Base):
+    """Persistiertes Konto eines Mandanten."""
+
+    __tablename__ = "konten"
+
+    __table_args__ = (
+        UniqueConstraint(
+            "mandant_id",
+            "account_number",
+            name="uq_konten_mandant_account_number",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+    )
+
+    mandant_id: Mapped[int] = mapped_column(
+        ForeignKey("mandanten.id"),
+        nullable=False,
+    )
+
+    account_number: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    name: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    account_type: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    is_active: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+    )
+
+    debit_position_code: Mapped[str | None] = mapped_column(
+        String,
+        nullable=True,
+    )
+
+    credit_position_code: Mapped[str | None] = mapped_column(
+        String,
+        nullable=True,
+    )
+
+    mandant: Mapped[Mandant] = relationship(
+        back_populates="konten",
+    )
+
+
+class KontenrahmenKonfiguration(Base):
+    """Technische Kontenkonfiguration eines Mandanten."""
+
+    __tablename__ = "kontenrahmen_konfiguration"
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+    )
+
+    mandant_id: Mapped[int] = mapped_column(
+        ForeignKey("mandanten.id"),
+        nullable=False,
+        unique=True,
+    )
+
+    opening_balance_account: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    income_summary_account: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    profit_account: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    loss_account: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    mandant: Mapped[Mandant] = relationship(
+        back_populates="kontenrahmen_konfiguration",
+    )
 
 class Wirtschaftsjahr(Base):
     """Persistiertes Wirtschaftsjahr."""

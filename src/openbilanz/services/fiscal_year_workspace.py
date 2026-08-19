@@ -221,6 +221,7 @@ class FiscalYearWorkspace:
         *,
         start_date: date,
         end_date: date,
+        opening_balance_account_number: str,
     ) -> TrialBalanceReport:
         """Erzeugt die Summen- und Saldenliste."""
 
@@ -229,6 +230,9 @@ class FiscalYearWorkspace:
             journal=self._journal,
             start_date=start_date,
             end_date=end_date,
+            opening_balance_account_number=(
+                opening_balance_account_number
+            ),
         )
 
     def build_account_activity_report(

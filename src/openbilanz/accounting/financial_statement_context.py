@@ -43,58 +43,22 @@ class FinancialStatementContext:
     account_types: dict[str, AccountType]
 
 
-def create_standard_financial_statement_context(
+def create_financial_statement_context(
+    *,
+    assets: FinancialStatementPosition,
+    liabilities: FinancialStatementPosition,
+    income_statement: FinancialStatementPosition,
+    chart_of_accounts: ChartOfAccountsTemplate,
+    accounts: tuple[Account, ...],
 ) -> FinancialStatementContext:
-    """Erzeugt den OpenBilanz-Standardkontext."""
-
-    (
-        assets,
-        liabilities,
-    ) = create_hgb_balance_sheet_structure()
-
-    income_statement = (
-        create_hgb_income_statement_structure()
-    )
-
-    provider = (
-        HgbFinancialStatementPositionProvider(
-            (
-                assets,
-                liabilities,
-                income_statement,
-            ),
-        )
-    )
-
-    csv_file = (
-        Path(__file__).resolve().parent.parent
-        / "resources"
-        / "chart_of_accounts"
-        / "openbilanz_standard.csv"
-    )
-
-    chart_of_accounts = (
-        CsvChartOfAccountsImporter(
-            position_provider=provider,
-        ).load(csv_file)
-    )
-
-    accounts = tuple(
-        Account(
-            template=template_account
-        )
-        for template_account
-        in chart_of_accounts.accounts
-    )
+    """Erzeugt einen Abschlusskontext aus einem Kontenrahmen."""
 
     account_mapper = AccountMapper(
         chart_of_accounts
     )
 
-    statement_builder = (
-        FinancialStatementBuilder(
-            account_mapper
-        )
+    statement_builder = FinancialStatementBuilder(
+        account_mapper
     )
 
     account_types = {
@@ -113,4 +77,53 @@ def create_standard_financial_statement_context(
         account_mapper=account_mapper,
         statement_builder=statement_builder,
         account_types=account_types,
+    )
+
+
+def create_standard_financial_statement_context(
+) -> FinancialStatementContext:
+    """Erzeugt den OpenBilanz-Standardkontext."""
+
+    (
+        assets,
+        liabilities,
+    ) = create_hgb_balance_sheet_structure()
+
+    income_statement = (
+        create_hgb_income_statement_structure()
+    )
+
+    provider = HgbFinancialStatementPositionProvider(
+        (
+            assets,
+            liabilities,
+            income_statement,
+        )
+    )
+
+    csv_file = (
+        Path(__file__).resolve().parent.parent
+        / "resources"
+        / "chart_of_accounts"
+        / "openbilanz_standard.csv"
+    )
+
+    chart_of_accounts = CsvChartOfAccountsImporter(
+        position_provider=provider,
+    ).load(csv_file)
+
+    accounts = tuple(
+        Account(
+            template=template_account
+        )
+        for template_account
+        in chart_of_accounts.accounts
+    )
+
+    return create_financial_statement_context(
+        assets=assets,
+        liabilities=liabilities,
+        income_statement=income_statement,
+        chart_of_accounts=chart_of_accounts,
+        accounts=accounts,
     )

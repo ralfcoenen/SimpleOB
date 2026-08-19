@@ -63,6 +63,7 @@ class MainWindow(tk.Tk):
         workspace: FiscalYearWorkspace,
         financial_statement_context: FinancialStatementContext,
         closing_accounts: ClosingAccounts,
+        opening_balance_account_number: str,
         pdf_reporting_service: PdfReportingService,
     ) -> None:
         super().__init__()
@@ -72,6 +73,9 @@ class MainWindow(tk.Tk):
         self._return_to_start_requested = False
         self._financial_statement_context = financial_statement_context
         self._closing_accounts = closing_accounts
+        self._opening_balance_account_number = (
+            opening_balance_account_number
+        )
         self._pdf_reporting_service = pdf_reporting_service
 
         self._current_trial_balance_report = None
@@ -85,7 +89,9 @@ class MainWindow(tk.Tk):
         self.minsize(850, 550)
 
         self._opening_balance_service = OpeningBalanceService(
-            opening_balance_account_number="9000",
+            opening_balance_account_number=(
+                self._opening_balance_account_number
+            ),
         )
 
         self._closing_service = ClosingService()
@@ -1378,7 +1384,9 @@ class MainWindow(tk.Tk):
             )
 
         try:
-            opening_account = self._ledger.get_account("9000")
+            opening_account = self._ledger.get_account(
+                self._opening_balance_account_number
+            )
         except KeyError:
             return
 
@@ -1388,12 +1396,24 @@ class MainWindow(tk.Tk):
             else opening_account.credit_balance
         )
 
+        opening_account_name = next(
+        (
+            account.name
+            for account in self._accounts
+            if (
+                account.number
+                == self._opening_balance_account_number
+            )
+        ),
+        "Eröffnungsbilanzkonto",
+    )
+
         self._account_table.insert(
             "",
             "end",
             values=(
-                "9000",
-                "Eröffnungsbilanzkonto",
+                self._opening_balance_account_number,
+                opening_account_name,
                 self._format_amount(opening_account.debit),
                 self._format_amount(opening_account.credit),
                 self._format_amount(opening_balance),
@@ -1407,8 +1427,6 @@ class MainWindow(tk.Tk):
             self._journal_table.delete(item)
 
         account_names = {account.number: account.name for account in self._accounts}
-
-        account_names["9000"] = "Eröffnungsbilanzkonto"
 
         for booking in self._journal:
             first_line = True
@@ -1855,8 +1873,10 @@ class MainWindow(tk.Tk):
             report = self._workspace.build_trial_balance_report(
                 start_date=start_date,
                 end_date=end_date,
+                opening_balance_account_number=(
+                    self._opening_balance_account_number
+                ),
             )
-
 
         except ValueError as exc:
             messagebox.showerror(
@@ -2865,6 +2885,7 @@ class MainWindow(tk.Tk):
                 "",
                 "end",
                 values=(
+                    line.booking_number,
                     line.booking_date.strftime("%d.%m.%Y"),
                     line.voucher_no,
                     line.description,

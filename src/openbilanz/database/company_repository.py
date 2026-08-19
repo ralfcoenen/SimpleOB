@@ -26,6 +26,8 @@ class CompanyRepository:
     def add(
         self,
         company: Company,
+        *,
+        commit: bool = True,
     ) -> None:
         """Speichert ein Unternehmen."""
 
@@ -35,7 +37,9 @@ class CompanyRepository:
         )
 
         self._session.add(model)
-        self._session.commit()
+
+        if commit:
+            self._session.commit()
 
     def get(
         self,
@@ -63,6 +67,8 @@ class CompanyRepository:
         self,
         company_id: UUID,
         fiscal_year: FiscalYear,
+        *,
+        commit: bool = True,
     ) -> None:
         """Speichert ein Geschäftsjahr für ein Unternehmen."""
 
@@ -106,7 +112,9 @@ class CompanyRepository:
         )
 
         self._session.add(model)
-        self._session.commit()
+
+        if commit:
+            self._session.commit()
 
 
     def get_fiscal_years(
