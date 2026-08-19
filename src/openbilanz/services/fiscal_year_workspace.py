@@ -1,5 +1,6 @@
 """Anwendungszustand eines geöffneten Geschäftsjahres."""
 
+from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
@@ -42,6 +43,12 @@ from openbilanz.domain.fixed_asset_status import (
 )
 from openbilanz.domain.journal import Journal
 from openbilanz.domain.managed_fiscal_year import ManagedFiscalYear
+from openbilanz.reporting.account_activity_report import (
+    AccountActivityReport,
+)
+from openbilanz.reporting.trial_balance_report import (
+    TrialBalanceReport,
+)
 from openbilanz.services.closing_consistency_service import (
     ClosingConsistencyService,
 )
@@ -67,6 +74,7 @@ from openbilanz.services.fixed_asset_depreciation_workflow import (
     FixedAssetDepreciationWorkflow,
 )
 from openbilanz.services.posting_service import PostingService
+from openbilanz.services.reporting_service import ReportingService
 from openbilanz.services.taxonomy_management_service import (
     TaxonomyManagementService,
     TaxonomyStatus,
@@ -92,6 +100,7 @@ class FiscalYearWorkspace:
         booking_repository: BookingRepository,
         company_repository: CompanyRepository,
         posting_service: PostingService,
+        reporting_service: ReportingService | None = None,
         closing_workflow: FiscalYearClosingWorkflow,
         closing_consistency_service: ClosingConsistencyService,
         e_bilanz_preparation_service: EBilanzPreparationService,
@@ -112,42 +121,27 @@ class FiscalYearWorkspace:
         self._booking_repository = booking_repository
         self._company_repository = company_repository
         self._posting_service = posting_service
-        self._closing_workflow = closing_workflow
-        self._closing_consistency_service = (
-            closing_consistency_service
+        self._reporting_service = (
+            reporting_service
+            if reporting_service is not None
+            else ReportingService()
         )
+        self._closing_workflow = closing_workflow
+        self._closing_consistency_service = closing_consistency_service
 
         self._journal = Journal()
         self._ledger = Ledger()
         self._pre_closing_ledger = Ledger()
-        self._e_bilanz_preparation_service = (
-            e_bilanz_preparation_service
-        )
+        self._e_bilanz_preparation_service = e_bilanz_preparation_service
         self._e_bilanz_service = e_bilanz_service
-        self._e_bilanz_account_detail_service = (
-            e_bilanz_account_detail_service
-        )
-        self._e_bilanz_export_service = (
-            e_bilanz_export_service
-        )
-        self._validated_e_bilanz_document: (
-            EBilanzDocument | None
-        ) = None
-        self._taxonomy_management_service = (
-            taxonomy_management_service
-        )
-        self._fixed_asset_repository = (
-            fixed_asset_repository
-        )
-        self._fixed_asset_depreciation_repository = (
-            fixed_asset_depreciation_repository
-        )
-        self._depreciation_service = (
-            depreciation_service
-        )
-        self._fixed_asset_depreciation_workflow = (
-            fixed_asset_depreciation_workflow
-        )
+        self._e_bilanz_account_detail_service = e_bilanz_account_detail_service
+        self._e_bilanz_export_service = e_bilanz_export_service
+        self._validated_e_bilanz_document: EBilanzDocument | None = None
+        self._taxonomy_management_service = taxonomy_management_service
+        self._fixed_asset_repository = fixed_asset_repository
+        self._fixed_asset_depreciation_repository = fixed_asset_depreciation_repository
+        self._depreciation_service = depreciation_service
+        self._fixed_asset_depreciation_workflow = fixed_asset_depreciation_workflow
 
         self.reload()
 
@@ -161,9 +155,7 @@ class FiscalYearWorkspace:
     def taxonomy_status(self) -> TaxonomyStatus:
         """Liefert den Taxonomiestatus des geöffneten Geschäftsjahres."""
 
-        return self._taxonomy_management_service.status_for(
-            self._context.fiscal_year
-        )
+        return self._taxonomy_management_service.status_for(self._context.fiscal_year)
 
     @property
     def journal(self) -> Journal:
@@ -187,40 +179,27 @@ class FiscalYearWorkspace:
     def managed_fiscal_year(self) -> ManagedFiscalYear:
         """Liefert das Geschäftsjahr einschließlich Verwaltungsstatus."""
 
-        fiscal_years = (
-            self._company_repository.get_managed_fiscal_years(
-                self._context.company.company_id
-            )
+        fiscal_years = self._company_repository.get_managed_fiscal_years(
+            self._context.company.company_id
         )
 
         for managed_fiscal_year in fiscal_years:
-            if (
-                managed_fiscal_year.fiscal_year
-                == self._context.fiscal_year
-            ):
+            if managed_fiscal_year.fiscal_year == self._context.fiscal_year:
                 return managed_fiscal_year
 
-        raise ValueError(
-            "Das geöffnete Geschäftsjahr wurde nicht gefunden."
-        )
+        raise ValueError("Das geöffnete Geschäftsjahr wurde nicht gefunden.")
 
     @property
     def is_open(self) -> bool:
         """Gibt an, ob noch Buchungen zulässig sind."""
 
-        return (
-            self.managed_fiscal_year.status
-            is FiscalYearStatus.OPEN
-        )
+        return self.managed_fiscal_year.status is FiscalYearStatus.OPEN
 
     @property
     def is_closed(self) -> bool:
         """Gibt an, ob das Geschäftsjahr abgeschlossen ist."""
 
-        return (
-            self.managed_fiscal_year.status
-            is FiscalYearStatus.CLOSED
-        )
+        return self.managed_fiscal_year.status is FiscalYearStatus.CLOSED
 
     def post_booking(
         self,
@@ -235,6 +214,37 @@ class FiscalYearWorkspace:
         )
 
         self.reload()
+
+    def build_trial_balance_report(
+        self,
+        *,
+        start_date: date,
+        end_date: date,
+    ) -> TrialBalanceReport:
+        """Erzeugt die Summen- und Saldenliste."""
+
+        return self._reporting_service.trial_balance_report(
+            ledger=self._pre_closing_ledger,
+            journal=self._journal,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+    def build_account_activity_report(
+        self,
+        *,
+        account_number: str,
+        start_date: date,
+        end_date: date,
+    ) -> AccountActivityReport:
+        """Erzeugt eine Kontenauswertung für das geöffnete Geschäftsjahr."""
+
+        return self._reporting_service.account_activity_report(
+            journal=self._journal,
+            account_number=account_number,
+            start_date=start_date,
+            end_date=end_date,
+        )
 
     def install_required_taxonomy(self) -> None:
         """Installiert die benötigte Taxonomie."""
@@ -254,9 +264,7 @@ class FiscalYearWorkspace:
     ) -> ClosingConsistencyResult:
         """Prüft den aktuellen Jahresabschluss auf Konsistenz."""
 
-        trial_balance = TrialBalance(
-            self._ledger
-        )
+        trial_balance = TrialBalance(self._ledger)
 
         return self._closing_consistency_service.validate(
             trial_balance=trial_balance,
@@ -273,9 +281,7 @@ class FiscalYearWorkspace:
         """Lädt die Anlagegüter des geöffneten Unternehmens."""
 
         if self._fixed_asset_repository is None:
-            raise RuntimeError(
-                "Die Anlagenbuchhaltung ist nicht konfiguriert."
-            )
+            raise RuntimeError("Die Anlagenbuchhaltung ist nicht konfiguriert.")
 
         return self._fixed_asset_repository.list_for_company(
             self._context.company.company_id
@@ -288,23 +294,15 @@ class FiscalYearWorkspace:
         """Speichert ein Anlagegut des geöffneten Unternehmens."""
 
         if not self.is_open:
-            raise ValueError(
-                "Das Geschäftsjahr ist abgeschlossen."
-            )
+            raise ValueError("Das Geschäftsjahr ist abgeschlossen.")
 
         if self._fixed_asset_repository is None:
-            raise RuntimeError(
-                "Die Anlagenbuchhaltung ist nicht konfiguriert."
-            )
+            raise RuntimeError("Die Anlagenbuchhaltung ist nicht konfiguriert.")
 
         if fixed_asset.company_id != self._context.company.company_id:
-            raise ValueError(
-                "Das Anlagegut gehört nicht zum geöffneten Unternehmen."
-            )
+            raise ValueError("Das Anlagegut gehört nicht zum geöffneten Unternehmen.")
 
-        self._fixed_asset_repository.add(
-            fixed_asset=fixed_asset
-        )
+        self._fixed_asset_repository.add(fixed_asset=fixed_asset)
 
     def build_depreciation_proposals(
         self,
@@ -312,24 +310,17 @@ class FiscalYearWorkspace:
         """Ermittelt noch offene lineare AfA-Vorschläge."""
 
         if not self.is_open:
-            raise ValueError(
-                "Das Geschäftsjahr ist abgeschlossen."
-            )
+            raise ValueError("Das Geschäftsjahr ist abgeschlossen.")
 
         if (
             self._fixed_asset_repository is None
-            or self._fixed_asset_depreciation_repository
-            is None
+            or self._fixed_asset_depreciation_repository is None
             or self._depreciation_service is None
         ):
-            raise RuntimeError(
-                "Die Anlagenbuchhaltung ist nicht konfiguriert."
-            )
+            raise RuntimeError("Die Anlagenbuchhaltung ist nicht konfiguriert.")
 
-        assets = (
-            self._fixed_asset_repository.list_for_company(
-                self._context.company.company_id
-            )
+        assets = self._fixed_asset_repository.list_for_company(
+            self._context.company.company_id
         )
 
         proposals: list[DepreciationProposal] = []
@@ -339,15 +330,13 @@ class FiscalYearWorkspace:
                 continue
 
             depreciations = (
-                self._fixed_asset_depreciation_repository
-                .list_for_fixed_asset(
+                self._fixed_asset_depreciation_repository.list_for_fixed_asset(
                     asset.fixed_asset_id
                 )
             )
 
             already_confirmed = any(
-                depreciation.fiscal_year_end
-                == self._context.fiscal_year.end_date
+                depreciation.fiscal_year_end == self._context.fiscal_year.end_date
                 for depreciation in depreciations
             )
 
@@ -355,27 +344,16 @@ class FiscalYearWorkspace:
                 continue
 
             previous_depreciation = sum(
-                (
-                    depreciation.amount
-                    for depreciation in depreciations
-                ),
+                (depreciation.amount for depreciation in depreciations),
                 start=Decimal("0.00"),
             )
 
-            proposal = (
-                self._depreciation_service.build_proposal(
-                    fixed_asset=asset,
-                    fiscal_year=self._context.fiscal_year,
-                    previous_depreciation=(
-                        previous_depreciation
-                    ),
-                    expense_account_number=(
-                        asset.depreciation_expense_account_number
-                    ),
-                    asset_account_number=(
-                        asset.asset_account_number
-                    ),
-                )
+            proposal = self._depreciation_service.build_proposal(
+                fixed_asset=asset,
+                fiscal_year=self._context.fiscal_year,
+                previous_depreciation=(previous_depreciation),
+                expense_account_number=(asset.depreciation_expense_account_number),
+                asset_account_number=(asset.asset_account_number),
             )
 
             if proposal is not None:
@@ -390,28 +368,15 @@ class FiscalYearWorkspace:
         """Bucht einen bestätigten AfA-Vorschlag."""
 
         if not self.is_open:
-            raise ValueError(
-                "Das Geschäftsjahr ist abgeschlossen."
-            )
+            raise ValueError("Das Geschäftsjahr ist abgeschlossen.")
 
-        if (
-            self._fixed_asset_depreciation_workflow
-            is None
-        ):
-            raise RuntimeError(
-                "Die Anlagenbuchhaltung ist nicht konfiguriert."
-            )
+        if self._fixed_asset_depreciation_workflow is None:
+            raise RuntimeError("Die Anlagenbuchhaltung ist nicht konfiguriert.")
 
-        depreciation = (
-            self._fixed_asset_depreciation_workflow.confirm(
-                company_id=(
-                    self._context.company.company_id
-                ),
-                fiscal_year=(
-                    self._context.fiscal_year
-                ),
-                proposal=proposal,
-            )
+        depreciation = self._fixed_asset_depreciation_workflow.confirm(
+            company_id=(self._context.company.company_id),
+            fiscal_year=(self._context.fiscal_year),
+            proposal=proposal,
         )
 
         self.reload()
@@ -446,11 +411,9 @@ class FiscalYearWorkspace:
         ledger = Ledger()
         pre_closing_ledger = Ledger()
 
-        bookings = (
-            self._booking_repository.list_for_fiscal_year(
-                company_id=self._context.company.company_id,
-                fiscal_year=self._context.fiscal_year,
-            )
+        bookings = self._booking_repository.list_for_fiscal_year(
+            company_id=self._context.company.company_id,
+            fiscal_year=self._context.fiscal_year,
         )
 
         for booking in bookings:
@@ -475,16 +438,12 @@ class FiscalYearWorkspace:
     ) -> CompanyMasterData:
         """Lädt die Stammdaten des geöffneten Unternehmens."""
 
-        master_data = (
-            self._company_repository.get_master_data(
-                self._context.company.company_id
-            )
+        master_data = self._company_repository.get_master_data(
+            self._context.company.company_id
         )
 
         if master_data is None:
-            raise ValueError(
-                "Unternehmen wurde nicht gefunden."
-            )
+            raise ValueError("Unternehmen wurde nicht gefunden.")
 
         return master_data
 
@@ -494,18 +453,10 @@ class FiscalYearWorkspace:
     ) -> None:
         """Speichert die Stammdaten des geöffneten Unternehmens."""
 
-        if (
-            master_data.company
-            != self._context.company
-        ):
-            raise ValueError(
-                "Die Stammdaten gehören nicht zum "
-                "geöffneten Unternehmen."
-            )
+        if master_data.company != self._context.company:
+            raise ValueError("Die Stammdaten gehören nicht zum geöffneten Unternehmen.")
 
-        self._company_repository.save_master_data(
-            master_data
-        )
+        self._company_repository.save_master_data(master_data)
 
     def prepare_e_bilanz(
         self,
@@ -516,8 +467,7 @@ class FiscalYearWorkspace:
 
         if not self.is_closed:
             raise ValueError(
-                "Die E-Bilanz kann erst nach dem "
-                "Jahresabschluss vorbereitet werden."
+                "Die E-Bilanz kann erst nach dem Jahresabschluss vorbereitet werden."
             )
 
         return self._e_bilanz_preparation_service.prepare(
@@ -534,20 +484,15 @@ class FiscalYearWorkspace:
 
         if not self.is_closed:
             raise ValueError(
-                "Die E-Bilanz kann erst nach dem "
-                "Jahresabschluss erzeugt werden."
+                "Die E-Bilanz kann erst nach dem Jahresabschluss erzeugt werden."
             )
 
         master_data = self.load_company_master_data()
-        entity = EntityIdentifier.from_company(
-            self._context.company
-        )
+        entity = EntityIdentifier.from_company(self._context.company)
 
-        account_details = (
-            self._e_bilanz_account_detail_service.build_for_e_bilanz(
-                pre_closing_ledger=self._pre_closing_ledger,
-                closed_ledger=self._ledger,
-            )
+        account_details = self._e_bilanz_account_detail_service.build_for_e_bilanz(
+            pre_closing_ledger=self._pre_closing_ledger,
+            closed_ledger=self._ledger,
         )
 
         document = self._e_bilanz_service.build(
@@ -556,9 +501,7 @@ class FiscalYearWorkspace:
             amounts=preparation.amounts,
             entity_identifier=entity.value,
             entity_scheme=entity.scheme,
-            previous_fiscal_year=(
-                self.managed_fiscal_year.opening_source
-            ),
+            previous_fiscal_year=(self.managed_fiscal_year.opening_source),
             account_details=account_details,
         )
 
@@ -574,8 +517,7 @@ class FiscalYearWorkspace:
 
         if not self.is_closed:
             raise ValueError(
-                "Die E-Bilanz kann erst nach dem "
-                "Jahresabschluss validiert werden."
+                "Die E-Bilanz kann erst nach dem Jahresabschluss validiert werden."
             )
 
         result = self._e_bilanz_service.validate(
@@ -600,8 +542,7 @@ class FiscalYearWorkspace:
 
         if document is not self._validated_e_bilanz_document:
             raise ValueError(
-                "Die E-Bilanz muss vor dem Export "
-                "erfolgreich validiert werden."
+                "Die E-Bilanz muss vor dem Export erfolgreich validiert werden."
             )
 
         return self._e_bilanz_export_service.export(

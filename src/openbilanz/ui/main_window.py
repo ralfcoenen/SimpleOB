@@ -1,4 +1,5 @@
 """Hauptfenster der OpenBilanz-Anwendung."""
+
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
@@ -35,6 +36,10 @@ from openbilanz.ui.closing_frame import ClosingFrame
 from openbilanz.ui.company_master_data_dialog import (
     CompanyMasterDataDialog,
 )
+from openbilanz.ui.date_input import (
+    normalize_german_date,
+    parse_german_date,
+)
 from openbilanz.ui.income_statement_frame import (
     IncomeStatementFrame,
 )
@@ -59,9 +64,8 @@ class MainWindow(tk.Tk):
 
         self._workspace = workspace
         self._context = workspace.context
-        self._financial_statement_context = (
-            financial_statement_context
-        )
+        self._return_to_start_requested = False
+        self._financial_statement_context = financial_statement_context
 
         self.title("OpenBilanz")
         self.geometry("1100x700")
@@ -73,55 +77,29 @@ class MainWindow(tk.Tk):
 
         self._closing_service = ClosingService()
 
-        self._assets = (
-            financial_statement_context.assets
-        )
-        self._liabilities = (
-            financial_statement_context.liabilities
-        )
-        self._income_statement = (
-            financial_statement_context.income_statement
-        )
+        self._assets = financial_statement_context.assets
+        self._liabilities = financial_statement_context.liabilities
+        self._income_statement = financial_statement_context.income_statement
 
-        self._chart_of_accounts = (
-            financial_statement_context.chart_of_accounts
-        )
-        self._accounts = (
-            financial_statement_context.accounts
-        )
-        self._account_mapper = (
-            financial_statement_context.account_mapper
-        )
+        self._chart_of_accounts = financial_statement_context.chart_of_accounts
+        self._accounts = financial_statement_context.accounts
+        self._account_mapper = financial_statement_context.account_mapper
         self._financial_statement_builder = (
             financial_statement_context.statement_builder
         )
-        self._account_types = (
-            financial_statement_context.account_types
-        )
+        self._account_types = financial_statement_context.account_types
 
-        self._current_income_statement: (
-            IncomeStatement | None
-        ) = None
+        self._current_income_statement: IncomeStatement | None = None
 
-        self._current_closing_result: (
-            ClosingResult | None
-        ) = None
+        self._current_closing_result: ClosingResult | None = None
 
-        self._current_balance_sheet: (
-            BalanceSheet | None
-        ) = None
-
-
+        self._current_balance_sheet: BalanceSheet | None = None
 
         self._current_closing_balances = ()
 
-        self._current_e_bilanz_preparation: (
-            EBilanzPreparationResult | None
-        ) = None
+        self._current_e_bilanz_preparation: EBilanzPreparationResult | None = None
 
-        self._current_e_bilanz_document: (
-            EBilanzDocument | None
-        ) = None
+        self._current_e_bilanz_document: EBilanzDocument | None = None
 
         self._create_ui()
 
@@ -138,6 +116,12 @@ class MainWindow(tk.Tk):
         """Liefert das Hauptbuch des aktuellen Workspace."""
 
         return self._workspace.ledger
+
+    @property
+    def return_to_start_requested(self) -> bool:
+        """Zeigt an, ob zur Buchhaltungsauswahl zurückgekehrt werden soll."""
+
+        return self._return_to_start_requested
 
     def _create_ui(self) -> None:
         """Erzeugt die Benutzeroberfläche."""
@@ -185,22 +169,33 @@ class MainWindow(tk.Tk):
 
         ttk.Label(
             context_frame,
-            text=(
-                "Geschäftsjahr: "
-                f"{self._context.fiscal_year.display_name}"
-            ),
+            text=(f"Geschäftsjahr: {self._context.fiscal_year.display_name}"),
         ).pack(
             anchor="w",
             pady=(2, 0),
         )
 
+        context_buttons = ttk.Frame(context_frame)
+        context_buttons.pack(
+            anchor="w",
+            pady=(8, 0),
+        )
+
         ttk.Button(
-            context_frame,
+            context_buttons,
             text="Unternehmensstammdaten",
             command=self._open_company_master_data,
         ).pack(
-            anchor="w",
-            pady=(8, 0),
+            side="left",
+        )
+
+        ttk.Button(
+            context_buttons,
+            text="Buchhaltung wechseln",
+            command=self._return_to_start,
+        ).pack(
+            side="left",
+            padx=(8, 0),
         )
 
         self._opening_balance_button = ttk.Button(
@@ -214,9 +209,7 @@ class MainWindow(tk.Tk):
             pady=(0, 16),
         )
 
-        self._notebook = ttk.Notebook(
-            container
-        )
+        self._notebook = ttk.Notebook(container)
 
         self._notebook.pack(
             fill="both",
@@ -247,6 +240,10 @@ class MainWindow(tk.Tk):
             padding=16,
         )
         self._income_statement_tab = ttk.Frame(
+            self._notebook,
+            padding=16,
+        )
+        self._reports_tab = ttk.Frame(
             self._notebook,
             padding=16,
         )
@@ -292,6 +289,11 @@ class MainWindow(tk.Tk):
         )
 
         self._notebook.add(
+            self._reports_tab,
+            text="Auswertungen",
+        )
+
+        self._notebook.add(
             self._closing_tab,
             text="Jahresabschluss",
         )
@@ -309,6 +311,7 @@ class MainWindow(tk.Tk):
         self._create_income_statement_tab()
         self._create_closing_tab()
         self._create_e_bilanz_tab()
+        self._create_reports_tab()
 
     def _create_accounts_tab(self) -> None:
         """Erzeugt den Arbeitsbereich Konten."""
@@ -530,9 +533,7 @@ class MainWindow(tk.Tk):
     def _create_fixed_assets_tab(self) -> None:
         """Erzeugt den Arbeitsbereich Anlagen."""
 
-        header = ttk.Frame(
-            self._fixed_assets_tab
-        )
+        header = ttk.Frame(self._fixed_assets_tab)
         header.pack(
             fill="x",
             pady=(0, 12),
@@ -660,11 +661,7 @@ class MainWindow(tk.Tk):
             pady=(0, 12),
         )
 
-        self._balance_sheet_frame = (
-            BalanceSheetFrame(
-                self._balance_sheet_tab
-            )
-        )
+        self._balance_sheet_frame = BalanceSheetFrame(self._balance_sheet_tab)
 
         self._balance_sheet_frame.pack(
             fill="both",
@@ -685,11 +682,7 @@ class MainWindow(tk.Tk):
             pady=(0, 12),
         )
 
-        self._income_statement_frame = (
-            IncomeStatementFrame(
-                self._income_statement_tab
-            )
-        )
+        self._income_statement_frame = IncomeStatementFrame(self._income_statement_tab)
 
         self._income_statement_frame.pack(
             fill="both",
@@ -812,9 +805,7 @@ class MainWindow(tk.Tk):
         if self._workspace.is_closed:
             return
 
-        self._workspace.post_booking(
-            booking
-        )
+        self._workspace.post_booking(booking)
 
         self._refresh_all()
 
@@ -824,26 +815,20 @@ class MainWindow(tk.Tk):
         if self._workspace.is_closed:
             return
 
-        dialog = OpeningBalanceDialog(
-            self
-        )
+        dialog = OpeningBalanceDialog(self)
 
         self.wait_window(dialog)
 
         if dialog.result is None:
             return
 
-        bookings = (
-            self._opening_balance_service.create_bookings(
-                opening_balance=dialog.result,
-                booking_date=self._context.fiscal_year.start_date,
-            )
+        bookings = self._opening_balance_service.create_bookings(
+            opening_balance=dialog.result,
+            booking_date=self._context.fiscal_year.start_date,
         )
 
         for booking in bookings:
-            self._workspace.post_booking(
-                booking
-            )
+            self._workspace.post_booking(booking)
 
         self._refresh_all()
 
@@ -858,9 +843,7 @@ class MainWindow(tk.Tk):
             return
 
         try:
-            depreciation_proposals = (
-                self._workspace.build_depreciation_proposals()
-            )
+            depreciation_proposals = self._workspace.build_depreciation_proposals()
         except (ValueError, RuntimeError) as exc:
             messagebox.showerror(
                 "Abschreibungen konnten nicht geprüft werden",
@@ -876,8 +859,8 @@ class MainWindow(tk.Tk):
                     "Für dieses Geschäftsjahr sind noch "
                     "Abschreibungen zu bearbeiten.\n\n"
                     "Bitte führen Sie zuerst im Bereich "
-                    "\"Anlagen\" die Aktion "
-                    "\"Abschreibungen prüfen/buchen\" aus."
+                    '"Anlagen" die Aktion '
+                    '"Abschreibungen prüfen/buchen" aus.'
                 ),
                 parent=self,
             )
@@ -891,17 +874,13 @@ class MainWindow(tk.Tk):
             mapper=self._account_mapper,
         )
 
-        self._closing_frame.update_consistency(
-            result
-        )
+        self._closing_frame.update_consistency(result)
 
     def _process_depreciations(self) -> None:
         """Prüft und bucht offene Abschreibungen."""
 
         try:
-            proposals = (
-                self._workspace.build_depreciation_proposals()
-            )
+            proposals = self._workspace.build_depreciation_proposals()
         except (ValueError, RuntimeError) as exc:
             messagebox.showerror(
                 "Abschreibungen konnten nicht vorbereitet werden",
@@ -943,9 +922,7 @@ class MainWindow(tk.Tk):
                 break
 
             try:
-                self._workspace.confirm_depreciation(
-                    proposal
-                )
+                self._workspace.confirm_depreciation(proposal)
             except (ValueError, RuntimeError) as exc:
                 messagebox.showerror(
                     "Abschreibung konnte nicht gebucht werden",
@@ -965,7 +942,6 @@ class MainWindow(tk.Tk):
 
         if self._current_income_statement is None:
             return
-
 
         confirmed = messagebox.askyesno(
             "Geschäftsjahr abschließen",
@@ -998,9 +974,7 @@ class MainWindow(tk.Tk):
 
         self._refresh_all()
 
-        self._closing_frame.update_net_income(
-            result.net_income
-        )
+        self._closing_frame.update_net_income(result.net_income)
 
         self._closing_frame.mark_closed()
 
@@ -1017,6 +991,7 @@ class MainWindow(tk.Tk):
         self._refresh_journal()
         self._refresh_fixed_assets()
         self._refresh_balance_sheet()
+        self._refresh_trial_balance_report()
         self._refresh_closing()
         self._refresh_taxonomy_status()
         self._refresh_e_bilanz()
@@ -1037,13 +1012,9 @@ class MainWindow(tk.Tk):
             status_text = "nicht installiert"
 
         if status.usable:
-            self._install_taxonomy_button.config(
-                state="disabled"
-            )
+            self._install_taxonomy_button.config(state="disabled")
         else:
-            self._install_taxonomy_button.config(
-                state="normal"
-            )
+            self._install_taxonomy_button.config(state="normal")
 
         self._taxonomy_status.config(
             text=(
@@ -1144,7 +1115,6 @@ class MainWindow(tk.Tk):
                 state="disabled",
             )
 
-
         if self._current_e_bilanz_document is None:
             self._validate_e_bilanz_button.config(
                 state="disabled",
@@ -1164,9 +1134,7 @@ class MainWindow(tk.Tk):
 
         if not taxonomy_status.usable:
             status_text += (
-                "\n\n"
-                "Die benötigte Taxonomie ist nicht "
-                "vollständig installiert."
+                "\n\nDie benötigte Taxonomie ist nicht vollständig installiert."
             )
 
         self._e_bilanz_status.config(
@@ -1191,8 +1159,6 @@ class MainWindow(tk.Tk):
                 parent=self,
             )
             return
-
-
 
         try:
             preparation = self._workspace.prepare_e_bilanz(
@@ -1255,9 +1221,7 @@ class MainWindow(tk.Tk):
             return
 
         try:
-            result = self._workspace.validate_e_bilanz(
-                self._current_e_bilanz_document
-            )
+            result = self._workspace.validate_e_bilanz(self._current_e_bilanz_document)
         except (ValueError, RuntimeError) as exc:
             messagebox.showerror(
                 "E-Bilanz konnte nicht validiert werden",
@@ -1273,25 +1237,18 @@ class MainWindow(tk.Tk):
 
             messagebox.showinfo(
                 "E-Bilanz",
-                "Die E-Bilanz wurde von Arelle "
-                "erfolgreich validiert.",
+                "Die E-Bilanz wurde von Arelle erfolgreich validiert.",
                 parent=self,
             )
             return
 
-        errors = "\n".join(
-            result.errors
-        )
+        errors = "\n".join(result.errors)
         self._export_e_bilanz_button.config(
             state="disabled",
         )
         messagebox.showerror(
             "E-Bilanz-Validierung fehlgeschlagen",
-            (
-                "Arelle hat Fehler in der "
-                "E-Bilanz festgestellt.\n\n"
-                f"{errors}"
-            ),
+            (f"Arelle hat Fehler in der E-Bilanz festgestellt.\n\n{errors}"),
             parent=self,
         )
 
@@ -1336,22 +1293,14 @@ class MainWindow(tk.Tk):
 
         messagebox.showinfo(
             "E-Bilanz",
-            (
-                "Die E-Bilanz wurde erfolgreich exportiert.\n\n"
-                f"{exported_path}"
-            ),
+            (f"Die E-Bilanz wurde erfolgreich exportiert.\n\n{exported_path}"),
             parent=self,
         )
 
     def _refresh_overview(self) -> None:
         """Aktualisiert die Kontenübersicht."""
 
-        self._journal_status.config(
-            text=(
-                f"Journal: "
-                f"{len(self._journal)} Buchungen"
-            )
-        )
+        self._journal_status.config(text=(f"Journal: {len(self._journal)} Buchungen"))
 
         for item in self._account_table.get_children():
             self._account_table.delete(item)
@@ -1363,9 +1312,7 @@ class MainWindow(tk.Tk):
             credit_balance = ZERO
 
             try:
-                ledger_account = self._ledger.get_account(
-                    account.number
-                )
+                ledger_account = self._ledger.get_account(account.number)
             except KeyError:
                 pass
             else:
@@ -1393,9 +1340,7 @@ class MainWindow(tk.Tk):
             )
 
         try:
-            opening_account = self._ledger.get_account(
-                "9000"
-            )
+            opening_account = self._ledger.get_account("9000")
         except KeyError:
             return
 
@@ -1411,15 +1356,9 @@ class MainWindow(tk.Tk):
             values=(
                 "9000",
                 "Eröffnungsbilanzkonto",
-                self._format_amount(
-                    opening_account.debit
-                ),
-                self._format_amount(
-                    opening_account.credit
-                ),
-                self._format_amount(
-                    opening_balance
-                ),
+                self._format_amount(opening_account.debit),
+                self._format_amount(opening_account.credit),
+                self._format_amount(opening_balance),
             ),
         )
 
@@ -1429,10 +1368,7 @@ class MainWindow(tk.Tk):
         for item in self._journal_table.get_children():
             self._journal_table.delete(item)
 
-        account_names = {
-            account.number: account.name
-            for account in self._accounts
-        }
+        account_names = {account.number: account.name for account in self._accounts}
 
         account_names["9000"] = "Eröffnungsbilanzkonto"
 
@@ -1445,10 +1381,7 @@ class MainWindow(tk.Tk):
                     "Unbekanntes Konto",
                 )
 
-                account_display = (
-                    f"{line.account_number} – "
-                    f"{account_name}"
-                )
+                account_display = f"{line.account_number} – {account_name}"
 
                 if line.is_debit:
                     side = "Soll"
@@ -1460,27 +1393,15 @@ class MainWindow(tk.Tk):
                     "end",
                     values=(
                         (
-                            booking.booking_date.strftime(
-                                "%d.%m.%Y"
-                            )
+                            booking.booking_date.strftime("%d.%m.%Y")
                             if first_line
                             else ""
                         ),
-                        (
-                            booking.voucher_no or ""
-                            if first_line
-                            else ""
-                        ),
-                        (
-                            booking.description or ""
-                            if first_line
-                            else ""
-                        ),
+                        (booking.voucher_no or "" if first_line else ""),
+                        (booking.description or "" if first_line else ""),
                         account_display,
                         side,
-                        self._format_amount(
-                            line.amount
-                        ),
+                        self._format_amount(line.amount),
                     ),
                 )
 
@@ -1505,14 +1426,9 @@ class MainWindow(tk.Tk):
         balance_sheet_balances = tuple(
             balance
             for balance in self._ledger.balances()
-            if self._account_types.get(
-                balance.account_number
-            )
+            if self._account_types.get(balance.account_number)
             in balance_sheet_account_types
-            and (
-                balance.debit_balance > ZERO
-                or balance.credit_balance > ZERO
-            )
+            and (balance.debit_balance > ZERO or balance.credit_balance > ZERO)
         )
 
         income_statement_ledger = (
@@ -1524,28 +1440,18 @@ class MainWindow(tk.Tk):
         income_statement_balances = tuple(
             balance
             for balance in income_statement_ledger.balances()
-            if self._account_types.get(
-                balance.account_number
-            )
+            if self._account_types.get(balance.account_number)
             in income_statement_account_types
-            and (
-                balance.debit_balance > ZERO
-                or balance.credit_balance > ZERO
-            )
+            and (balance.debit_balance > ZERO or balance.credit_balance > ZERO)
         )
 
         self._current_closing_balances = (
-            balance_sheet_balances
-            + income_statement_balances
+            balance_sheet_balances + income_statement_balances
         )
 
-        income_statement_amounts = (
-            self._financial_statement_builder.build(
-                balances=income_statement_balances,
-                root_positions=(
-                    self._income_statement,
-                ),
-            )
+        income_statement_amounts = self._financial_statement_builder.build(
+            balances=income_statement_balances,
+            root_positions=(self._income_statement,),
         )
 
         income_statement = IncomeStatement(
@@ -1553,14 +1459,10 @@ class MainWindow(tk.Tk):
             amounts=income_statement_amounts,
         )
 
-        self._current_income_statement = (
-            income_statement
-        )
+        self._current_income_statement = income_statement
 
-        net_income = (
-            self._closing_service.calculate_net_income(
-                income_statement=income_statement,
-            )
+        net_income = self._closing_service.calculate_net_income(
+            income_statement=income_statement,
         )
 
         self._income_statement_frame.update_income_statement(
@@ -1572,9 +1474,7 @@ class MainWindow(tk.Tk):
             net_income=net_income,
         )
 
-        self._current_closing_result = (
-            closing_result
-        )
+        self._current_closing_result = closing_result
 
         equity = next(
             position
@@ -1589,16 +1489,14 @@ class MainWindow(tk.Tk):
         )
 
         try:
-            amounts = (
-                self._financial_statement_builder.build(
-                    balances=balance_sheet_balances,
-                    root_positions=(
-                        self._assets,
-                        self._liabilities,
-                    ),
-                    closing_result=closing_result,
-                    result_position=result_position,
-                )
+            amounts = self._financial_statement_builder.build(
+                balances=balance_sheet_balances,
+                root_positions=(
+                    self._assets,
+                    self._liabilities,
+                ),
+                closing_result=closing_result,
+                result_position=result_position,
             )
         except ValueError as exc:
             message = str(exc)
@@ -1621,31 +1519,21 @@ class MainWindow(tk.Tk):
             amounts=amounts,
         )
 
-        self._current_balance_sheet = (
-            balance_sheet
-        )
+        self._current_balance_sheet = balance_sheet
 
-        self._balance_sheet_frame.update_balance_sheet(
-            balance_sheet
-        )
+        self._balance_sheet_frame.update_balance_sheet(balance_sheet)
 
     def _refresh_closing(self) -> None:
         """Aktualisiert den sichtbaren Abschlussstatus."""
 
-        managed_fiscal_year = (
-            self._workspace.managed_fiscal_year
-        )
+        managed_fiscal_year = self._workspace.managed_fiscal_year
 
-        self._closing_frame.update_fiscal_year_status(
-            managed_fiscal_year.status
-        )
+        self._closing_frame.update_fiscal_year_status(managed_fiscal_year.status)
 
         if self._current_closing_result is None:
             return
 
-        self._closing_frame.update_net_income(
-            self._current_closing_result.net_income
-        )
+        self._closing_frame.update_net_income(self._current_closing_result.net_income)
 
     @staticmethod
     def _format_amount(
@@ -1655,12 +1543,7 @@ class MainWindow(tk.Tk):
 
         formatted = f"{amount:,.2f}"
 
-        return (
-            formatted
-            .replace(",", "X")
-            .replace(".", ",")
-            .replace("X", ".")
-        )
+        return formatted.replace(",", "X").replace(".", ",").replace("X", ".")
 
     @staticmethod
     def _format_mapping_error(
@@ -1701,17 +1584,10 @@ class MainWindow(tk.Tk):
             AccountType.EXPENSE,
         ):
             if debit_balance > ZERO:
-                return cls._format_amount(
-                    debit_balance
-                )
+                return cls._format_amount(debit_balance)
 
             if credit_balance > ZERO:
-                return (
-                    "-"
-                    + cls._format_amount(
-                        credit_balance
-                    )
-                )
+                return "-" + cls._format_amount(credit_balance)
 
         if account_type in (
             AccountType.LIABILITY,
@@ -1719,17 +1595,10 @@ class MainWindow(tk.Tk):
             AccountType.REVENUE,
         ):
             if credit_balance > ZERO:
-                return cls._format_amount(
-                    credit_balance
-                )
+                return cls._format_amount(credit_balance)
 
             if debit_balance > ZERO:
-                return (
-                    "-"
-                    + cls._format_amount(
-                        debit_balance
-                    )
-                )
+                return "-" + cls._format_amount(debit_balance)
 
         return cls._format_amount(ZERO)
 
@@ -1738,29 +1607,16 @@ class MainWindow(tk.Tk):
 
         enabled = self._workspace.is_open
 
-        self._opening_balance_button.state(
-            ["disabled"]
-        )
+        self._opening_balance_button.state(["disabled"])
 
-        self._booking_frame.set_enabled(
-            enabled
-        )
+        self._booking_frame.set_enabled(enabled)
 
         if enabled:
-            self._add_fixed_asset_button.state(
-                ["!disabled"]
-            )
-            self._process_depreciations_button.state(
-                ["!disabled"]
-            )
+            self._add_fixed_asset_button.state(["!disabled"])
+            self._process_depreciations_button.state(["!disabled"])
         else:
-            self._add_fixed_asset_button.state(
-                ["disabled"]
-            )
-            self._process_depreciations_button.state(
-                ["disabled"]
-            )
-
+            self._add_fixed_asset_button.state(["disabled"])
+            self._process_depreciations_button.state(["disabled"])
 
     def _open_company_master_data(
         self,
@@ -1768,9 +1624,7 @@ class MainWindow(tk.Tk):
         """Öffnet die Unternehmensstammdaten."""
 
         try:
-            master_data = (
-                self._workspace.load_company_master_data()
-            )
+            master_data = self._workspace.load_company_master_data()
         except ValueError as exc:
             messagebox.showerror(
                 "Unternehmensstammdaten",
@@ -1790,9 +1644,7 @@ class MainWindow(tk.Tk):
             return
 
         try:
-            self._workspace.save_company_master_data(
-                dialog.result
-            )
+            self._workspace.save_company_master_data(dialog.result)
         except ValueError as exc:
             messagebox.showerror(
                 "Unternehmensstammdaten",
@@ -1811,9 +1663,7 @@ class MainWindow(tk.Tk):
         """Aktualisiert die Liste der Anlagegüter."""
 
         for item in self._fixed_asset_table.get_children():
-            self._fixed_asset_table.delete(
-                item
-            )
+            self._fixed_asset_table.delete(item)
 
         try:
             assets = self._workspace.list_fixed_assets()
@@ -1821,11 +1671,7 @@ class MainWindow(tk.Tk):
             return
 
         for asset in assets:
-            status = (
-                "Aktiv"
-                if asset.status.value == "ACTIVE"
-                else "Abgegangen"
-            )
+            status = "Aktiv" if asset.status.value == "ACTIVE" else "Abgegangen"
 
             self._fixed_asset_table.insert(
                 "",
@@ -1833,18 +1679,11 @@ class MainWindow(tk.Tk):
                 values=(
                     asset.asset_code,
                     asset.description,
-                    (
-                        f"{asset.acquisition_date:%d.%m.%Y}"
-                    ),
-                    self._format_amount(
-                        asset.acquisition_cost
-                    ),
+                    (f"{asset.acquisition_date:%d.%m.%Y}"),
+                    self._format_amount(asset.acquisition_cost),
                     asset.useful_life_months,
                     asset.asset_account_number,
-                    (
-                        asset
-                        .depreciation_expense_account_number
-                    ),
+                    (asset.depreciation_expense_account_number),
                     status,
                 ),
             )
@@ -1857,9 +1696,7 @@ class MainWindow(tk.Tk):
 
         dialog = NewFixedAssetDialog(
             self,
-            company_id=(
-                self._context.company.company_id
-            ),
+            company_id=(self._context.company.company_id),
         )
 
         self.wait_window(dialog)
@@ -1868,9 +1705,7 @@ class MainWindow(tk.Tk):
             return
 
         try:
-            self._workspace.add_fixed_asset(
-                dialog.result
-            )
+            self._workspace.add_fixed_asset(dialog.result)
         except (
             ValueError,
             RuntimeError,
@@ -1889,3 +1724,611 @@ class MainWindow(tk.Tk):
             "Das Anlagegut wurde angelegt.",
             parent=self,
         )
+
+    def _return_to_start(self) -> None:
+        """Schließt die aktuelle Buchhaltung und kehrt zur Auswahl zurück."""
+
+        confirmed = messagebox.askyesno(
+            "Buchhaltung wechseln",
+            (
+                "Möchten Sie die aktuelle Buchhaltung schließen "
+                "und zur Buchhaltungsauswahl zurückkehren?"
+            ),
+            parent=self,
+        )
+
+        if not confirmed:
+            return
+
+        self._return_to_start_requested = True
+        self.destroy()
+
+    def _create_reports_tab(self) -> None:
+        """Erzeugt den Arbeitsbereich Auswertungen."""
+
+        self._reports_notebook = ttk.Notebook(self._reports_tab)
+        self._reports_notebook.pack(
+            fill="both",
+            expand=True,
+        )
+
+        self._trial_balance_report_tab = ttk.Frame(
+            self._reports_notebook,
+            padding=12,
+        )
+
+        self._account_statement_report_tab = ttk.Frame(
+            self._reports_notebook,
+            padding=12,
+        )
+
+        self._reports_notebook.add(
+            self._trial_balance_report_tab,
+            text="Summen- und Saldenliste",
+        )
+
+        self._reports_notebook.add(
+            self._account_statement_report_tab,
+            text="Kontenauswertung",
+        )
+
+        self._create_trial_balance_report()
+        self._create_account_statement_report()
+
+    def _normalize_report_date(
+        self,
+        variable: tk.StringVar,
+    ) -> None:
+        """Normalisiert ein Datum im Auswertungsfilter."""
+
+        value = variable.get().strip()
+
+        if not value:
+            return
+
+        try:
+            normalized = normalize_german_date(value)
+        except ValueError:
+            return
+
+        variable.set(normalized)
+
+    def _refresh_trial_balance_report(self) -> None:
+        """Aktualisiert die Summen- und Saldenliste."""
+
+        try:
+            start_date = parse_german_date(self._trial_balance_start_date_var.get())
+            end_date = parse_german_date(self._trial_balance_end_date_var.get())
+
+            report = self._workspace.build_trial_balance_report(
+                start_date=start_date,
+                end_date=end_date,
+            )
+
+        except ValueError as exc:
+            messagebox.showerror(
+                "Summen- und Saldenliste",
+                str(exc),
+                parent=self,
+            )
+            return
+
+        self._trial_balance_start_date_var.set(start_date.strftime("%d.%m.%Y"))
+        self._trial_balance_end_date_var.set(end_date.strftime("%d.%m.%Y"))
+
+        for item in self._trial_balance_table.get_children():
+            self._trial_balance_table.delete(item)
+
+        account_names = {account.number: account.name for account in self._accounts}
+
+        for row in report.rows:
+            self._trial_balance_table.insert(
+                "",
+                "end",
+                values=(
+                    row.account_number,
+                    account_names.get(
+                        row.account_number,
+                        "Unbekanntes Konto",
+                    ),
+                    f"{row.opening_debit:.2f}",
+                    f"{row.opening_credit:.2f}",
+                    f"{row.debit_turnover:.2f}",
+                    f"{row.credit_turnover:.2f}",
+                    f"{row.closing_debit:.2f}",
+                    f"{row.closing_credit:.2f}",
+                ),
+            )
+
+        self._trial_balance_totals_var.set(
+            (
+                "Summen: "
+                f"Anfang Soll {report.opening_debit_total:.2f} · "
+                f"Anfang Haben {report.opening_credit_total:.2f} · "
+                f"Soll-Umsatz {report.debit_turnover_total:.2f} · "
+                f"Haben-Umsatz {report.credit_turnover_total:.2f} · "
+                f"Endsaldo Soll {report.closing_debit_total:.2f} · "
+                f"Endsaldo Haben {report.closing_credit_total:.2f}"
+            )
+        )
+
+    def _create_trial_balance_report(self) -> None:
+        """Erzeugt die Summen- und Saldenliste."""
+
+        ttk.Label(
+            self._trial_balance_report_tab,
+            text="Summen- und Saldenliste",
+            font=("TkDefaultFont", 16, "bold"),
+        ).pack(
+            anchor="w",
+        )
+
+        ttk.Label(
+            self._trial_balance_report_tab,
+            text=("Auswertung der Kontenbewegungen vor Jahresabschlussbuchungen."),
+        ).pack(
+            anchor="w",
+            pady=(4, 12),
+        )
+
+        filter_frame = ttk.Frame(self._trial_balance_report_tab)
+        filter_frame.pack(
+            fill="x",
+            pady=(0, 12),
+        )
+
+        self._trial_balance_start_date_var = tk.StringVar(
+            value=self._context.fiscal_year.start_date.strftime("%d.%m.%Y")
+        )
+
+        self._trial_balance_end_date_var = tk.StringVar(
+            value=self._context.fiscal_year.end_date.strftime("%d.%m.%Y")
+        )
+
+        ttk.Label(
+            filter_frame,
+            text="Von",
+        ).pack(
+            side="left",
+        )
+
+        self._trial_balance_start_date_entry = ttk.Entry(
+            filter_frame,
+            textvariable=self._trial_balance_start_date_var,
+            width=12,
+        )
+        self._trial_balance_start_date_entry.pack(
+            side="left",
+            padx=(6, 16),
+        )
+
+        self._trial_balance_start_date_entry.bind(
+            "<FocusOut>",
+            lambda _event: self._normalize_report_date(
+                self._trial_balance_start_date_var
+            ),
+        )
+
+        ttk.Label(
+            filter_frame,
+            text="Bis",
+        ).pack(
+            side="left",
+        )
+
+        self._trial_balance_end_date_entry = ttk.Entry(
+            filter_frame,
+            textvariable=self._trial_balance_end_date_var,
+            width=12,
+        )
+        self._trial_balance_end_date_entry.pack(
+            side="left",
+            padx=(6, 16),
+        )
+
+        self._trial_balance_end_date_entry.bind(
+            "<FocusOut>",
+            lambda _event: self._normalize_report_date(
+                self._trial_balance_end_date_var
+            ),
+        )
+
+        ttk.Button(
+            filter_frame,
+            text="Aktualisieren",
+            command=self._refresh_trial_balance_report,
+        ).pack(
+            side="left",
+        )
+
+        columns = (
+            "account_number",
+            "account_name",
+            "opening_debit",
+            "opening_credit",
+            "debit_turnover",
+            "credit_turnover",
+            "closing_debit",
+            "closing_credit",
+        )
+
+        table_frame = ttk.Frame(self._trial_balance_report_tab)
+        table_frame.pack(
+            fill="both",
+            expand=True,
+        )
+
+        self._trial_balance_table = ttk.Treeview(
+            table_frame,
+            columns=columns,
+            show="headings",
+            height=15,
+        )
+
+        headings = {
+            "account_number": "Konto",
+            "account_name": "Bezeichnung",
+            "opening_debit": "Anfang Soll",
+            "opening_credit": "Anfang Haben",
+            "debit_turnover": "Soll-Umsatz",
+            "credit_turnover": "Haben-Umsatz",
+            "closing_debit": "Endsaldo Soll",
+            "closing_credit": "Endsaldo Haben",
+        }
+
+        for column, heading in headings.items():
+            self._trial_balance_table.heading(
+                column,
+                text=heading,
+            )
+
+        self._trial_balance_table.column(
+            "account_number",
+            width=80,
+            anchor="w",
+        )
+        self._trial_balance_table.column(
+            "account_name",
+            width=240,
+            anchor="w",
+        )
+
+        for column in (
+            "opening_debit",
+            "opening_credit",
+            "debit_turnover",
+            "credit_turnover",
+            "closing_debit",
+            "closing_credit",
+        ):
+            self._trial_balance_table.column(
+                column,
+                width=105,
+                anchor="e",
+            )
+
+        scrollbar = ttk.Scrollbar(
+            table_frame,
+            orient="vertical",
+            command=self._trial_balance_table.yview,
+        )
+
+        self._trial_balance_table.configure(yscrollcommand=scrollbar.set)
+
+        self._trial_balance_table.pack(
+            side="left",
+            fill="both",
+            expand=True,
+        )
+
+        scrollbar.pack(
+            side="right",
+            fill="y",
+        )
+
+        self._trial_balance_totals_var = tk.StringVar()
+
+        ttk.Label(
+            self._trial_balance_report_tab,
+            textvariable=self._trial_balance_totals_var,
+        ).pack(
+            anchor="e",
+            pady=(8, 0),
+        )
+
+    def _create_account_statement_report(self) -> None:
+        """Erzeugt die gefilterte Kontenauswertung."""
+
+        ttk.Label(
+            self._account_statement_report_tab,
+            text="Kontenauswertung",
+            font=("TkDefaultFont", 16, "bold"),
+        ).pack(
+            anchor="w",
+        )
+
+        ttk.Label(
+            self._account_statement_report_tab,
+            text=("Kontenbewegungen mit Zeitraum- und Kontennummernfilter."),
+        ).pack(
+            anchor="w",
+            pady=(4, 12),
+        )
+
+        filter_frame = ttk.Frame(self._account_statement_report_tab)
+        filter_frame.pack(
+            fill="x",
+            pady=(0, 12),
+        )
+
+        self._account_statement_start_date_var = tk.StringVar(
+            value=self._context.fiscal_year.start_date.strftime("%d.%m.%Y")
+        )
+
+        self._account_statement_end_date_var = tk.StringVar(
+            value=self._context.fiscal_year.end_date.strftime("%d.%m.%Y")
+        )
+
+        self._account_statement_from_account_var = tk.StringVar()
+        self._account_statement_to_account_var = tk.StringVar()
+
+        ttk.Label(
+            filter_frame,
+            text="Von",
+        ).pack(
+            side="left",
+        )
+
+        start_entry = ttk.Entry(
+            filter_frame,
+            textvariable=self._account_statement_start_date_var,
+            width=12,
+        )
+        start_entry.pack(
+            side="left",
+            padx=(6, 12),
+        )
+
+        start_entry.bind(
+            "<FocusOut>",
+            lambda _event: self._normalize_report_date(
+                self._account_statement_start_date_var
+            ),
+        )
+
+        ttk.Label(
+            filter_frame,
+            text="Bis",
+        ).pack(
+            side="left",
+        )
+
+        end_entry = ttk.Entry(
+            filter_frame,
+            textvariable=self._account_statement_end_date_var,
+            width=12,
+        )
+        end_entry.pack(
+            side="left",
+            padx=(6, 12),
+        )
+
+        end_entry.bind(
+            "<FocusOut>",
+            lambda _event: self._normalize_report_date(
+                self._account_statement_end_date_var
+            ),
+        )
+
+        ttk.Label(
+            filter_frame,
+            text="Konto von",
+        ).pack(
+            side="left",
+        )
+
+        ttk.Entry(
+            filter_frame,
+            textvariable=self._account_statement_from_account_var,
+            width=8,
+        ).pack(
+            side="left",
+            padx=(6, 12),
+        )
+
+        ttk.Label(
+            filter_frame,
+            text="Konto bis",
+        ).pack(
+            side="left",
+        )
+
+        ttk.Entry(
+            filter_frame,
+            textvariable=self._account_statement_to_account_var,
+            width=8,
+        ).pack(
+            side="left",
+            padx=(6, 12),
+        )
+
+        ttk.Button(
+            filter_frame,
+            text="Aktualisieren",
+            command=self._refresh_account_statement_report,
+        ).pack(
+            side="left",
+        )
+
+        columns = (
+            "booking_date",
+            "voucher_no",
+            "account_number",
+            "account_name",
+            "description",
+            "debit",
+            "credit",
+            "balance",
+        )
+
+        table_frame = ttk.Frame(self._account_statement_report_tab)
+        table_frame.pack(
+            fill="both",
+            expand=True,
+        )
+
+        self._account_statement_table = ttk.Treeview(
+            table_frame,
+            columns=columns,
+            show="headings",
+            height=15,
+        )
+
+        headings = {
+            "booking_date": "Datum",
+            "voucher_no": "Beleg",
+            "account_number": "Konto",
+            "account_name": "Bezeichnung",
+            "description": "Buchungstext",
+            "debit": "Soll",
+            "credit": "Haben",
+            "balance": "Saldo",
+        }
+
+        for column, heading in headings.items():
+            self._account_statement_table.heading(
+                column,
+                text=heading,
+            )
+
+        self._account_statement_table.column(
+            "booking_date",
+            width=95,
+            anchor="w",
+        )
+        self._account_statement_table.column(
+            "voucher_no",
+            width=90,
+            anchor="w",
+        )
+        self._account_statement_table.column(
+            "account_number",
+            width=75,
+            anchor="w",
+        )
+        self._account_statement_table.column(
+            "account_name",
+            width=210,
+            anchor="w",
+        )
+        self._account_statement_table.column(
+            "description",
+            width=280,
+            anchor="w",
+        )
+
+        for column in (
+            "debit",
+            "credit",
+            "balance",
+        ):
+            self._account_statement_table.column(
+                column,
+                width=110,
+                anchor="e",
+            )
+
+        scrollbar = ttk.Scrollbar(
+            table_frame,
+            orient="vertical",
+            command=self._account_statement_table.yview,
+        )
+
+        self._account_statement_table.configure(yscrollcommand=scrollbar.set)
+
+        self._account_statement_table.pack(
+            side="left",
+            fill="both",
+            expand=True,
+        )
+
+        scrollbar.pack(
+            side="right",
+            fill="y",
+        )
+
+    def _refresh_account_statement_report(self) -> None:
+        """Aktualisiert die gefilterte Kontenauswertung."""
+
+        try:
+            start_date = parse_german_date(self._account_statement_start_date_var.get())
+            end_date = parse_german_date(self._account_statement_end_date_var.get())
+
+            from_account = self._account_statement_from_account_var.get().strip()
+            to_account = self._account_statement_to_account_var.get().strip()
+
+            if not from_account:
+                raise ValueError("Bitte geben Sie mindestens 'Konto von' ein.")
+
+            if not to_account:
+                to_account = from_account
+                self._account_statement_to_account_var.set(to_account)
+
+            if not from_account.isdigit() or not to_account.isdigit():
+                raise ValueError("Die Kontonummern müssen numerisch sein.")
+
+            if int(to_account) < int(from_account):
+                raise ValueError("'Konto bis' darf nicht kleiner als 'Konto von' sein.")
+
+            account_numbers = tuple(
+                account.number
+                for account in self._accounts
+                if (int(from_account) <= int(account.number) <= int(to_account))
+            )
+
+            statements = tuple(
+                self._workspace.build_account_activity_report(
+                    account_number=account_number,
+                    start_date=start_date,
+                    end_date=end_date,
+                )
+                for account_number in account_numbers
+            )
+
+        except ValueError as exc:
+            messagebox.showerror(
+                "Kontenauswertung",
+                str(exc),
+                parent=self,
+            )
+            return
+
+        self._account_statement_start_date_var.set(start_date.strftime("%d.%m.%Y"))
+        self._account_statement_end_date_var.set(end_date.strftime("%d.%m.%Y"))
+
+        for item in self._account_statement_table.get_children():
+            self._account_statement_table.delete(item)
+
+        account_names = {account.number: account.name for account in self._accounts}
+
+        for statement in statements:
+            account_name = account_names.get(
+                statement.account_number,
+                "Unbekanntes Konto",
+            )
+
+            for line in statement.lines:
+                self._account_statement_table.insert(
+                    "",
+                    "end",
+                    values=(
+                        line.booking_date.strftime("%d.%m.%Y"),
+                        line.voucher_no,
+                        statement.account_number,
+                        account_name,
+                        line.description,
+                        f"{line.debit:.2f}",
+                        f"{line.credit:.2f}",
+                        f"{line.running_balance:.2f}",
+                    ),
+                )

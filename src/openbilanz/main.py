@@ -48,6 +48,7 @@ from openbilanz.services.fixed_asset_depreciation_workflow import (
     FixedAssetDepreciationWorkflow,
 )
 from openbilanz.services.posting_service import PostingService
+from openbilanz.services.reporting_service import ReportingService
 from openbilanz.services.taxonomy_management_service import (
     TaxonomyManagementService,
 )
@@ -72,23 +73,15 @@ def main() -> None:
 
     config = load_config()
 
-    database = Database(
-        config
-    )
+    database = Database(config)
 
     database.create_database()
 
-    financial_statement_context = (
-        create_standard_financial_statement_context()
-    )
+    financial_statement_context = create_standard_financial_statement_context()
 
-    resolver = TaxonomyResolver(
-        root=config.taxonomy_dir
-    )
+    resolver = TaxonomyResolver(root=config.taxonomy_dir)
 
-    taxonomy_catalog = TaxonomyCatalog(
-        root=config.taxonomy_dir
-    )
+    taxonomy_catalog = TaxonomyCatalog(root=config.taxonomy_dir)
 
     taxonomy_installation_service = TaxonomyInstallationService(
         target_root=config.taxonomy_dir
@@ -104,32 +97,16 @@ def main() -> None:
 
     arelle_adapter = ArelleAdapter()
 
-    e_bilanz_preparation_service = (
-        EBilanzPreparationService(
-            statement_builder=(
-                financial_statement_context.statement_builder
-            ),
-            account_types=(
-                financial_statement_context.account_types
-            ),
-            assets=(
-                financial_statement_context.assets
-            ),
-            liabilities=(
-                financial_statement_context.liabilities
-            ),
-        )
+    e_bilanz_preparation_service = EBilanzPreparationService(
+        statement_builder=(financial_statement_context.statement_builder),
+        account_types=(financial_statement_context.account_types),
+        assets=(financial_statement_context.assets),
+        liabilities=(financial_statement_context.liabilities),
     )
 
-    e_bilanz_account_detail_service = (
-        EBilanzAccountDetailService(
-            account_mapper=(
-                financial_statement_context.account_mapper
-            ),
-            accounts=(
-                financial_statement_context.accounts
-            ),
-        )
+    e_bilanz_account_detail_service = EBilanzAccountDetailService(
+        account_mapper=(financial_statement_context.account_mapper),
+        accounts=(financial_statement_context.accounts),
     )
 
     e_bilanz_service = EBilanzService(
@@ -138,76 +115,31 @@ def main() -> None:
         company_data_mapper=GcdCompanyDataMapper(),
         assets=financial_statement_context.assets,
         liabilities=financial_statement_context.liabilities,
-        income_statement=(
-            financial_statement_context.income_statement
-        ),
+        income_statement=(financial_statement_context.income_statement),
     )
-
-    root = tk.Tk()
-    root.title("OpenBilanz")
 
     session = database.create_session()
 
     try:
-        company_repository = CompanyRepository(
-            session
-        )
+        company_repository = CompanyRepository(session)
 
-        dialog = StartDialog(
-            root,
-            repository=company_repository,
-        )
-
-        root.withdraw()
-
-        dialog.deiconify()
-        dialog.lift()
-        dialog.focus_force()
-
-        root.wait_window(dialog)
-
-        if dialog.result is None:
-            root.destroy()
-            return
-
-        context = dialog.result
-
-        root.destroy()
-
-        booking_repository = BookingRepository(
-            session
-        )
-
+        booking_repository = BookingRepository(session)
 
         posting_service = PostingService()
 
-        fixed_asset_repository = FixedAssetRepository(
-            session
-        )
+        fixed_asset_repository = FixedAssetRepository(session)
 
-        fixed_asset_depreciation_repository = (
-            FixedAssetDepreciationRepository(
-                session
-            )
-        )
+        fixed_asset_depreciation_repository = FixedAssetDepreciationRepository(session)
 
         depreciation_service = DepreciationService()
 
-        depreciation_booking_service = (
-            DepreciationBookingService()
-        )
+        depreciation_booking_service = DepreciationBookingService()
 
-        fixed_asset_depreciation_workflow = (
-            FixedAssetDepreciationWorkflow(
-                session=session,
-                booking_repository=booking_repository,
-                depreciation_repository=(
-                    fixed_asset_depreciation_repository
-                ),
-                booking_service=(
-                    depreciation_booking_service
-                ),
-            )
+        fixed_asset_depreciation_workflow = FixedAssetDepreciationWorkflow(
+            session=session,
+            booking_repository=booking_repository,
+            depreciation_repository=(fixed_asset_depreciation_repository),
+            booking_service=(depreciation_booking_service),
         )
 
         closing_service = ClosingService(
@@ -218,9 +150,7 @@ def main() -> None:
             )
         )
 
-        closing_consistency_service = (
-            ClosingConsistencyService()
-        )
+        closing_consistency_service = ClosingConsistencyService()
 
         closing_workflow = FiscalYearClosingWorkflow(
             session=session,
@@ -231,55 +161,68 @@ def main() -> None:
 
         e_bilanz_export_service = EBilanzExportService()
 
-        workspace = FiscalYearWorkspace(
-            context=context,
-            booking_repository=booking_repository,
-            company_repository=company_repository,
-            posting_service=posting_service,
-            closing_workflow=closing_workflow,
-            closing_consistency_service=(
-                closing_consistency_service
-            ),
-            e_bilanz_preparation_service=(
-                e_bilanz_preparation_service
-            ),
-            e_bilanz_account_detail_service=(
-                e_bilanz_account_detail_service
-            ),
-            e_bilanz_service=e_bilanz_service,
-            e_bilanz_export_service=(
-                e_bilanz_export_service
-            ),
-            taxonomy_management_service=(
-                taxonomy_management_service
-            ),
-            fixed_asset_repository=(
-                fixed_asset_repository
-            ),
-            fixed_asset_depreciation_repository=(
-                fixed_asset_depreciation_repository
-            ),
-            depreciation_service=(
-                depreciation_service
-            ),
-            fixed_asset_depreciation_workflow=(
-                fixed_asset_depreciation_workflow
-            ),
-        )
+        reporting_service = ReportingService()
 
-        window = MainWindow(
-            workspace=workspace,
-            financial_statement_context=(
-                financial_statement_context
-            ),
-        )
+        while True:
+            root = tk.Tk()
+            root.title("OpenBilanz")
 
-        window.mainloop()
+            dialog = StartDialog(
+                root,
+                repository=company_repository,
+            )
+
+            root.withdraw()
+
+            dialog.deiconify()
+            dialog.lift()
+            dialog.focus_force()
+
+            root.wait_window(dialog)
+
+            if dialog.result is None:
+                root.destroy()
+                break
+
+            context = dialog.result
+
+            root.destroy()
+
+            workspace = FiscalYearWorkspace(
+                context=context,
+                booking_repository=booking_repository,
+                company_repository=company_repository,
+                posting_service=posting_service,
+                reporting_service=reporting_service,
+                closing_workflow=closing_workflow,
+                closing_consistency_service=(closing_consistency_service),
+                e_bilanz_preparation_service=(e_bilanz_preparation_service),
+                e_bilanz_account_detail_service=(e_bilanz_account_detail_service),
+                e_bilanz_service=e_bilanz_service,
+                e_bilanz_export_service=(e_bilanz_export_service),
+                taxonomy_management_service=(taxonomy_management_service),
+                fixed_asset_repository=(fixed_asset_repository),
+                fixed_asset_depreciation_repository=(
+                    fixed_asset_depreciation_repository
+                ),
+                depreciation_service=(depreciation_service),
+                fixed_asset_depreciation_workflow=(fixed_asset_depreciation_workflow),
+            )
+
+            window = MainWindow(
+                workspace=workspace,
+                financial_statement_context=(financial_statement_context),
+            )
+
+            window.mainloop()
+
+            if not window.return_to_start_requested:
+                break
 
     finally:
         session.close()
         arelle_adapter.close()
-        database.dispose
+        database.dispose()
 
 
 if __name__ == "__main__":
