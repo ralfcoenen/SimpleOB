@@ -14,6 +14,7 @@ from openbilanz.accounting.income_statement import IncomeStatement
 from openbilanz.accounting.ledger import Ledger
 from openbilanz.domain.account_type import AccountType
 from openbilanz.domain.booking import Booking
+from openbilanz.domain.entry_side import EntrySide
 from openbilanz.domain.journal import Journal
 from openbilanz.domain.money import ZERO
 from openbilanz.services.closing_accounts import ClosingAccounts
@@ -28,6 +29,7 @@ from openbilanz.services.fiscal_year_workspace import (
 from openbilanz.services.opening_balance_service import (
     OpeningBalanceService,
 )
+from openbilanz.services.pdf_reporting_service import PdfReportingService
 from openbilanz.taxonomy.e_bilanz_builder import (
     EBilanzDocument,
 )
@@ -61,6 +63,7 @@ class MainWindow(tk.Tk):
         workspace: FiscalYearWorkspace,
         financial_statement_context: FinancialStatementContext,
         closing_accounts: ClosingAccounts,
+        pdf_reporting_service: PdfReportingService,
     ) -> None:
         super().__init__()
 
@@ -69,6 +72,13 @@ class MainWindow(tk.Tk):
         self._return_to_start_requested = False
         self._financial_statement_context = financial_statement_context
         self._closing_accounts = closing_accounts
+        self._pdf_reporting_service = pdf_reporting_service
+
+        self._current_trial_balance_report = None
+        self._current_account_activity_reports = ()
+        self._current_account_activity_start_date = None
+        self._current_account_activity_end_date = None
+        self._current_journal_report = None
 
         self.title("OpenBilanz")
         self.geometry("1100x700")
@@ -663,6 +673,15 @@ class MainWindow(tk.Tk):
             pady=(0, 12),
         )
 
+        ttk.Button(
+            self._balance_sheet_tab,
+            text="PDF exportieren",
+            command=self._export_balance_sheet_pdf,
+        ).pack(
+            anchor="w",
+            pady=(0, 12),
+        )
+
         self._balance_sheet_frame = BalanceSheetFrame(self._balance_sheet_tab)
 
         self._balance_sheet_frame.pack(
@@ -679,6 +698,15 @@ class MainWindow(tk.Tk):
             self._income_statement_tab,
             text="Gewinn- und Verlustrechnung nach § 275 HGB",
             font=("TkDefaultFont", 16, "bold"),
+        ).pack(
+            anchor="w",
+            pady=(0, 12),
+        )
+
+        ttk.Button(
+            self._income_statement_tab,
+            text="PDF exportieren",
+            command=self._export_income_statement_pdf,
         ).pack(
             anchor="w",
             pady=(0, 12),
@@ -1775,6 +1803,11 @@ class MainWindow(tk.Tk):
             padding=12,
         )
 
+        self._journal_report_tab = ttk.Frame(
+            self._reports_notebook,
+            padding=12,
+        )
+
         self._reports_notebook.add(
             self._trial_balance_report_tab,
             text="Summen- und Saldenliste",
@@ -1785,8 +1818,14 @@ class MainWindow(tk.Tk):
             text="Kontenauswertung",
         )
 
+        self._reports_notebook.add(
+            self._journal_report_tab,
+            text="Journal",
+        )
+
         self._create_trial_balance_report()
         self._create_account_statement_report()
+        self._create_journal_report()
 
     def _normalize_report_date(
         self,
@@ -1818,6 +1857,7 @@ class MainWindow(tk.Tk):
                 end_date=end_date,
             )
 
+
         except ValueError as exc:
             messagebox.showerror(
                 "Summen- und Saldenliste",
@@ -1825,6 +1865,8 @@ class MainWindow(tk.Tk):
                 parent=self,
             )
             return
+
+        self._current_trial_balance_report = report
 
         self._trial_balance_start_date_var.set(start_date.strftime("%d.%m.%Y"))
         self._trial_balance_end_date_var.set(end_date.strftime("%d.%m.%Y"))
@@ -1952,6 +1994,15 @@ class MainWindow(tk.Tk):
             command=self._refresh_trial_balance_report,
         ).pack(
             side="left",
+        )
+
+        ttk.Button(
+            filter_frame,
+            text="PDF exportieren",
+            command=self._export_trial_balance_pdf,
+        ).pack(
+            side="left",
+            padx=(8, 0),
         )
 
         columns = (
@@ -2173,6 +2224,15 @@ class MainWindow(tk.Tk):
             side="left",
         )
 
+        ttk.Button(
+            filter_frame,
+            text="PDF exportieren",
+            command=self._export_account_activity_pdf,
+        ).pack(
+            side="left",
+            padx=(8, 0),
+        )
+
         columns = (
             "booking_date",
             "voucher_no",
@@ -2270,6 +2330,208 @@ class MainWindow(tk.Tk):
             fill="y",
         )
 
+    def _create_journal_report(self) -> None:
+        """Erzeugt die gefilterte Journalauswertung."""
+
+        ttk.Label(
+            self._journal_report_tab,
+            text="Journal",
+            font=("TkDefaultFont", 16, "bold"),
+        ).pack(
+            anchor="w",
+        )
+
+        ttk.Label(
+            self._journal_report_tab,
+            text="Auswertung der Buchungen für einen gewählten Zeitraum.",
+        ).pack(
+            anchor="w",
+            pady=(4, 12),
+        )
+
+        filter_frame = ttk.Frame(self._journal_report_tab)
+        filter_frame.pack(
+            fill="x",
+            pady=(0, 12),
+        )
+
+        self._journal_report_start_date_var = tk.StringVar(
+            value=self._context.fiscal_year.start_date.strftime("%d.%m.%Y")
+        )
+
+        self._journal_report_end_date_var = tk.StringVar(
+            value=self._context.fiscal_year.end_date.strftime("%d.%m.%Y")
+        )
+
+        ttk.Label(
+            filter_frame,
+            text="Von",
+        ).pack(
+            side="left",
+        )
+
+        self._journal_report_start_date_entry = ttk.Entry(
+            filter_frame,
+            textvariable=self._journal_report_start_date_var,
+            width=12,
+        )
+        self._journal_report_start_date_entry.pack(
+            side="left",
+            padx=(6, 16),
+        )
+
+        self._journal_report_start_date_entry.bind(
+            "<FocusOut>",
+            lambda _event: self._normalize_report_date(
+                self._journal_report_start_date_var
+            ),
+        )
+
+        ttk.Label(
+            filter_frame,
+            text="Bis",
+        ).pack(
+            side="left",
+        )
+
+        self._journal_report_end_date_entry = ttk.Entry(
+            filter_frame,
+            textvariable=self._journal_report_end_date_var,
+            width=12,
+        )
+        self._journal_report_end_date_entry.pack(
+            side="left",
+            padx=(6, 16),
+        )
+
+        self._journal_report_end_date_entry.bind(
+            "<FocusOut>",
+            lambda _event: self._normalize_report_date(
+                self._journal_report_end_date_var
+            ),
+        )
+
+        ttk.Button(
+            filter_frame,
+            text="Aktualisieren",
+            command=self._refresh_journal_report,
+        ).pack(
+            side="left",
+        )
+
+        ttk.Button(
+            filter_frame,
+            text="PDF exportieren",
+            command=self._export_journal_pdf,
+        ).pack(
+            side="left",
+            padx=(8, 0),
+        )
+
+        columns = (
+            "booking_number",
+            "booking_date",
+            "voucher_no",
+            "description",
+            "account_number",
+            "account_name",
+            "side",
+            "amount",
+        )
+
+        table_frame = ttk.Frame(self._journal_report_tab)
+        table_frame.pack(
+            fill="both",
+            expand=True,
+        )
+
+        self._journal_report_table = ttk.Treeview(
+            table_frame,
+            columns=columns,
+            show="headings",
+            height=15,
+        )
+
+        headings = {
+            "booking_number": "Nr.",
+            "booking_date": "Datum",
+            "voucher_no": "Beleg",
+            "description": "Buchungstext",
+            "account_number": "Konto",
+            "account_name": "Bezeichnung",
+            "side": "S/H",
+            "amount": "Betrag",
+        }
+
+        for column, heading in headings.items():
+            self._journal_report_table.heading(
+                column,
+                text=heading,
+            )
+
+        self._journal_report_table.column(
+            "booking_number",
+            width=55,
+            anchor="e",
+        )
+
+        self._journal_report_table.column(
+            "booking_date",
+            width=95,
+            anchor="w",
+        )
+        self._journal_report_table.column(
+            "voucher_no",
+            width=90,
+            anchor="w",
+        )
+        self._journal_report_table.column(
+            "description",
+            width=280,
+            anchor="w",
+        )
+        self._journal_report_table.column(
+            "account_number",
+            width=75,
+            anchor="w",
+        )
+        self._journal_report_table.column(
+            "account_name",
+            width=220,
+            anchor="w",
+        )
+        self._journal_report_table.column(
+            "side",
+            width=55,
+            anchor="center",
+        )
+        self._journal_report_table.column(
+            "amount",
+            width=110,
+            anchor="e",
+        )
+
+        scrollbar = ttk.Scrollbar(
+            table_frame,
+            orient="vertical",
+            command=self._journal_report_table.yview,
+        )
+
+        self._journal_report_table.configure(
+            yscrollcommand=scrollbar.set
+        )
+
+        self._journal_report_table.pack(
+            side="left",
+            fill="both",
+            expand=True,
+        )
+
+        scrollbar.pack(
+            side="right",
+            fill="y",
+        )
+
     def _refresh_account_statement_report(self) -> None:
         """Aktualisiert die gefilterte Kontenauswertung."""
 
@@ -2316,6 +2578,10 @@ class MainWindow(tk.Tk):
             )
             return
 
+        self._current_account_activity_reports = statements
+        self._current_account_activity_start_date = start_date
+        self._current_account_activity_end_date = end_date
+
         self._account_statement_start_date_var.set(start_date.strftime("%d.%m.%Y"))
         self._account_statement_end_date_var.set(end_date.strftime("%d.%m.%Y"))
 
@@ -2345,3 +2611,320 @@ class MainWindow(tk.Tk):
                         f"{line.running_balance:.2f}",
                     ),
                 )
+
+    def _select_pdf_target(
+        self,
+        *,
+        title: str,
+        initialfile: str,
+    ) -> Path | None:
+        """Wählt eine Zieldatei für einen PDF-Bericht."""
+
+        filename = filedialog.asksaveasfilename(
+            parent=self,
+            title=title,
+            initialfile=initialfile,
+            defaultextension=".pdf",
+            filetypes=(
+                ("PDF-Dateien", "*.pdf"),
+                ("Alle Dateien", "*.*"),
+            ),
+        )
+
+        if not filename:
+            return None
+
+        return Path(filename)
+
+    def _export_balance_sheet_pdf(self) -> None:
+        """Exportiert die aktuelle Bilanz als PDF."""
+
+        if self._current_balance_sheet is None:
+            messagebox.showwarning(
+                "Bilanz",
+                "Es steht keine Bilanz für den PDF-Export zur Verfügung.",
+                parent=self,
+            )
+            return
+
+        target = self._select_pdf_target(
+            title="Bilanz als PDF exportieren",
+            initialfile="Bilanz.pdf",
+        )
+
+        if target is None:
+            return
+
+        try:
+            exported_path = self._pdf_reporting_service.export_balance_sheet(
+                balance_sheet=self._current_balance_sheet,
+                company_name=self._context.company.name,
+                fiscal_year_name=self._context.fiscal_year.display_name,
+                target=target,
+            )
+        except OSError as exc:
+            messagebox.showerror(
+                "Bilanz konnte nicht exportiert werden",
+                str(exc),
+                parent=self,
+            )
+            return
+
+        messagebox.showinfo(
+            "Bilanz",
+            f"PDF erfolgreich exportiert.\n\n{exported_path}",
+            parent=self,
+        )
+
+    def _export_income_statement_pdf(self) -> None:
+        """Exportiert die aktuelle GuV als PDF."""
+
+        if (
+            self._current_income_statement is None
+            or self._current_closing_result is None
+        ):
+            messagebox.showwarning(
+                "Gewinn- und Verlustrechnung",
+                "Es steht keine GuV für den PDF-Export zur Verfügung.",
+                parent=self,
+            )
+            return
+
+        target = self._select_pdf_target(
+            title="GuV als PDF exportieren",
+            initialfile="GuV.pdf",
+        )
+
+        if target is None:
+            return
+
+        try:
+            exported_path = (
+                self._pdf_reporting_service.export_income_statement(
+                    income_statement=self._current_income_statement,
+                    net_income=self._current_closing_result.net_income,
+                    company_name=self._context.company.name,
+                    fiscal_year_name=self._context.fiscal_year.display_name,
+                    target=target,
+                )
+            )
+        except OSError as exc:
+            messagebox.showerror(
+                "GuV konnte nicht exportiert werden",
+                str(exc),
+                parent=self,
+            )
+            return
+
+        messagebox.showinfo(
+            "Gewinn- und Verlustrechnung",
+            f"PDF erfolgreich exportiert.\n\n{exported_path}",
+            parent=self,
+        )
+
+    def _export_trial_balance_pdf(self) -> None:
+        """Exportiert die aktuelle Summen- und Saldenliste als PDF."""
+
+        report = self._current_trial_balance_report
+
+        if report is None:
+            messagebox.showwarning(
+                "Summen- und Saldenliste",
+                "Bitte aktualisieren Sie zuerst die Auswertung.",
+                parent=self,
+            )
+            return
+
+        target = self._select_pdf_target(
+            title="Summen- und Saldenliste als PDF exportieren",
+            initialfile="Summen-und-Saldenliste.pdf",
+        )
+
+        if target is None:
+            return
+
+        account_names = {
+            account.number: account.name
+            for account in self._accounts
+        }
+
+        try:
+            exported_path = self._pdf_reporting_service.export_trial_balance(
+                report=report,
+                account_names=account_names,
+                company_name=self._context.company.name,
+                target=target,
+            )
+        except OSError as exc:
+            messagebox.showerror(
+                "Summen- und Saldenliste konnte nicht exportiert werden",
+                str(exc),
+                parent=self,
+            )
+            return
+
+        messagebox.showinfo(
+            "Summen- und Saldenliste",
+            f"PDF erfolgreich exportiert.\n\n{exported_path}",
+            parent=self,
+        )
+
+    def _export_account_activity_pdf(self) -> None:
+        """Exportiert die aktuelle Kontenauswertung als PDF."""
+
+        if (
+            self._current_account_activity_start_date is None
+            or self._current_account_activity_end_date is None
+        ):
+            messagebox.showwarning(
+                "Kontenauswertung",
+                "Bitte aktualisieren Sie zuerst die Auswertung.",
+                parent=self,
+            )
+            return
+
+        target = self._select_pdf_target(
+            title="Kontenauswertung als PDF exportieren",
+            initialfile="Kontenauswertung.pdf",
+        )
+
+        if target is None:
+            return
+
+        account_names = {
+            account.number: account.name
+            for account in self._accounts
+        }
+
+        try:
+            exported_path = self._pdf_reporting_service.export_account_activity(
+                reports=self._current_account_activity_reports,
+                account_names=account_names,
+                company_name=self._context.company.name,
+                start_date=self._current_account_activity_start_date,
+                end_date=self._current_account_activity_end_date,
+                target=target,
+            )
+        except OSError as exc:
+            messagebox.showerror(
+                "Kontenauswertung konnte nicht exportiert werden",
+                str(exc),
+                parent=self,
+            )
+            return
+
+        messagebox.showinfo(
+            "Kontenauswertung",
+            f"PDF erfolgreich exportiert.\n\n{exported_path}",
+            parent=self,
+        )
+
+    def _refresh_journal_report(self) -> None:
+        """Aktualisiert die gefilterte Journalauswertung."""
+
+        try:
+            start_date = parse_german_date(
+                self._journal_report_start_date_var.get()
+            )
+            end_date = parse_german_date(
+                self._journal_report_end_date_var.get()
+            )
+
+            report = self._workspace.build_journal_report(
+                start_date=start_date,
+                end_date=end_date,
+            )
+
+        except ValueError as exc:
+            messagebox.showerror(
+                "Journal",
+                str(exc),
+                parent=self,
+            )
+            return
+
+        self._current_journal_report = report
+
+        self._journal_report_start_date_var.set(
+            start_date.strftime("%d.%m.%Y")
+        )
+        self._journal_report_end_date_var.set(
+            end_date.strftime("%d.%m.%Y")
+        )
+
+        for item in self._journal_report_table.get_children():
+            self._journal_report_table.delete(item)
+
+        account_names = {
+            account.number: account.name
+            for account in self._accounts
+        }
+
+        for line in report.lines:
+            self._journal_report_table.insert(
+                "",
+                "end",
+                values=(
+                    line.booking_date.strftime("%d.%m.%Y"),
+                    line.voucher_no,
+                    line.description,
+                    line.account_number,
+                    account_names.get(
+                        line.account_number,
+                        "Unbekanntes Konto",
+                    ),
+                    (
+                        "S"
+                        if line.side is EntrySide.DEBIT
+                        else "H"
+                    ),
+                    f"{line.amount:.2f}",
+                ),
+            )
+
+    def _export_journal_pdf(self) -> None:
+        """Exportiert die aktuelle Journalauswertung als PDF."""
+
+        report = self._current_journal_report
+
+        if report is None:
+            messagebox.showwarning(
+                "Journal",
+                "Bitte aktualisieren Sie zuerst die Auswertung.",
+                parent=self,
+            )
+            return
+
+        target = self._select_pdf_target(
+            title="Journal als PDF exportieren",
+            initialfile="Journal.pdf",
+        )
+
+        if target is None:
+            return
+
+        account_names = {
+            account.number: account.name
+            for account in self._accounts
+        }
+
+        try:
+            exported_path = self._pdf_reporting_service.export_journal(
+                report=report,
+                account_names=account_names,
+                company_name=self._context.company.name,
+                target=target,
+            )
+        except OSError as exc:
+            messagebox.showerror(
+                "Journal konnte nicht exportiert werden",
+                str(exc),
+                parent=self,
+            )
+            return
+
+        messagebox.showinfo(
+            "Journal",
+            f"PDF erfolgreich exportiert.\n\n{exported_path}",
+            parent=self,
+        )

@@ -539,3 +539,117 @@ def test_account_statement_rejects_invalid_date_range() -> None:
             start_date=date(2026, 12, 31),
             end_date=date(2026, 1, 1),
         )
+
+def test_journal_report_filters_and_groups_bookings() -> None:
+    """Das Journal filtert nach Zeitraum und gruppiert Buchungszeilen."""
+
+    journal = Journal()
+
+    first_booking = Booking(
+        booking_id=uuid4(),
+        booking_date=date(2026, 3, 15),
+        voucher_no="B-001",
+        description="Einzahlung",
+        lines=(
+            BookingLine(
+                account_number="1200",
+                side=EntrySide.DEBIT,
+                amount=Decimal("1000.00"),
+            ),
+            BookingLine(
+                account_number="8400",
+                side=EntrySide.CREDIT,
+                amount=Decimal("1000.00"),
+            ),
+        ),
+    )
+
+    second_booking = Booking(
+        booking_id=uuid4(),
+        booking_date=date(2026, 4, 10),
+        voucher_no="B-002",
+        description="Bürobedarf",
+        lines=(
+            BookingLine(
+                account_number="4930",
+                side=EntrySide.DEBIT,
+                amount=Decimal("250.00"),
+            ),
+            BookingLine(
+                account_number="1200",
+                side=EntrySide.CREDIT,
+                amount=Decimal("250.00"),
+            ),
+        ),
+    )
+
+    outside_booking = Booking(
+        booking_id=uuid4(),
+        booking_date=date(2026, 1, 15),
+        voucher_no="B-000",
+        description="Außerhalb Zeitraum",
+        lines=(
+            BookingLine(
+                account_number="1200",
+                side=EntrySide.DEBIT,
+                amount=Decimal("100.00"),
+            ),
+            BookingLine(
+                account_number="8400",
+                side=EntrySide.CREDIT,
+                amount=Decimal("100.00"),
+            ),
+        ),
+    )
+
+    closing_booking = Booking(
+        booking_id=uuid4(),
+        booking_date=date(2026, 4, 30),
+        voucher_no="AB-001",
+        description="Abschlussbuchung",
+        booking_type=BookingType.CLOSING,
+        lines=(
+            BookingLine(
+                account_number="8400",
+                side=EntrySide.DEBIT,
+                amount=Decimal("500.00"),
+            ),
+            BookingLine(
+                account_number="8990",
+                side=EntrySide.CREDIT,
+                amount=Decimal("500.00"),
+            ),
+        ),
+    )
+
+    journal.add(outside_booking)
+    journal.add(first_booking)
+    journal.add(second_booking)
+    journal.add(closing_booking)
+
+    report = ReportingService().journal_report(
+        journal=journal,
+        start_date=date(2026, 3, 1),
+        end_date=date(2026, 4, 30),
+    )
+
+    assert len(report.lines) == 4
+
+    assert report.lines[0].booking_id == first_booking.booking_id
+    assert report.lines[1].booking_id == first_booking.booking_id
+    assert report.lines[0].booking_number == 1
+    assert report.lines[1].booking_number == 1
+
+    assert report.lines[2].booking_id == second_booking.booking_id
+    assert report.lines[3].booking_id == second_booking.booking_id
+    assert report.lines[2].booking_number == 2
+    assert report.lines[3].booking_number == 2
+
+    assert all(
+        line.booking_id != outside_booking.booking_id
+        for line in report.lines
+    )
+    assert all(
+        line.booking_id != closing_booking.booking_id
+        for line in report.lines
+    )

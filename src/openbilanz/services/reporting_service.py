@@ -16,6 +16,10 @@ from openbilanz.reporting.account_statement import AccountStatement
 from openbilanz.reporting.account_statement_line import (
     AccountStatementLine,
 )
+from openbilanz.reporting.journal_report import (
+    JournalReport,
+    JournalReportLine,
+)
 from openbilanz.reporting.trial_balance_report import (
     TrialBalanceReport,
     TrialBalanceReportRow,
@@ -328,5 +332,62 @@ class ReportingService:
 
         return AccountActivityReport(
             account_number=normalized_account_number,
+            lines=tuple(lines),
+        )
+
+    def journal_report(
+        self,
+        *,
+        journal: Journal,
+        start_date: date,
+        end_date: date,
+    ) -> JournalReport:
+        """Erzeugt ein Journal für einen Berichtszeitraum."""
+
+        if not isinstance(journal, Journal):
+            raise TypeError("journal muss ein Journal sein.")
+
+        if not isinstance(start_date, date):
+            raise TypeError("start_date muss ein Datum sein.")
+
+        if not isinstance(end_date, date):
+            raise TypeError("end_date muss ein Datum sein.")
+
+        if end_date < start_date:
+            raise ValueError("Das Enddatum darf nicht vor dem Startdatum liegen.")
+
+        lines: list[JournalReportLine] = []
+
+        booking_number = 0
+
+        for booking in journal:
+            if booking.booking_type is BookingType.CLOSING:
+                continue
+
+            if booking.booking_date < start_date:
+                continue
+
+            if booking.booking_date > end_date:
+                continue
+
+            booking_number += 1
+
+            for line in booking.lines:
+                lines.append(
+                    JournalReportLine(
+                        booking_id=booking.booking_id,
+                        booking_number=booking_number,
+                        booking_date=booking.booking_date,
+                        voucher_no=booking.voucher_no or "",
+                        description=booking.description or "",
+                        account_number=line.account_number,
+                        side=line.side,
+                        amount=line.amount,
+                    )
+                )
+
+        return JournalReport(
+            start_date=start_date,
+            end_date=end_date,
             lines=tuple(lines),
         )

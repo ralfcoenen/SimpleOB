@@ -46,6 +46,7 @@ from openbilanz.domain.managed_fiscal_year import ManagedFiscalYear
 from openbilanz.reporting.account_activity_report import (
     AccountActivityReport,
 )
+from openbilanz.reporting.journal_report import JournalReport
 from openbilanz.reporting.trial_balance_report import (
     TrialBalanceReport,
 )
@@ -242,6 +243,20 @@ class FiscalYearWorkspace:
         return self._reporting_service.account_activity_report(
             journal=self._journal,
             account_number=account_number,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+    def build_journal_report(
+        self,
+        *,
+        start_date: date,
+        end_date: date,
+    ) -> JournalReport:
+        """Erzeugt das Journal für einen Berichtszeitraum."""
+
+        return self._reporting_service.journal_report(
+            journal=self._journal,
             start_date=start_date,
             end_date=end_date,
         )

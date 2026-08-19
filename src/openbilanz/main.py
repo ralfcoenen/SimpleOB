@@ -47,6 +47,7 @@ from openbilanz.services.fiscal_year_workspace import FiscalYearWorkspace
 from openbilanz.services.fixed_asset_depreciation_workflow import (
     FixedAssetDepreciationWorkflow,
 )
+from openbilanz.services.pdf_reporting_service import PdfReportingService
 from openbilanz.services.posting_service import PostingService
 from openbilanz.services.reporting_service import ReportingService
 from openbilanz.services.taxonomy_management_service import (
@@ -165,6 +166,8 @@ def main() -> None:
 
         reporting_service = ReportingService()
 
+        pdf_reporting_service = PdfReportingService()
+
         while True:
             root = tk.Tk()
             root.title("OpenBilanz")
@@ -215,6 +218,7 @@ def main() -> None:
                 workspace=workspace,
                 financial_statement_context=(financial_statement_context),
                 closing_accounts=closing_accounts,
+                pdf_reporting_service=pdf_reporting_service,
             )
 
             window.mainloop()
