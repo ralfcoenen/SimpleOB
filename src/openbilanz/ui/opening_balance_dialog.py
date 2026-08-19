@@ -2,13 +2,12 @@
 
 import tkinter as tk
 from decimal import Decimal, InvalidOperation
-from tkinter import ttk
+from tkinter import messagebox, ttk
 
 from openbilanz.domain.account import Account
 from openbilanz.domain.account_type import AccountType
 from openbilanz.domain.opening_balance import OpeningBalance
 from openbilanz.domain.opening_balance_item import OpeningBalanceItem
-from openbilanz.domain.template_account import TemplateAccount
 
 
 class OpeningBalanceDialog(tk.Toplevel):
@@ -17,28 +16,59 @@ class OpeningBalanceDialog(tk.Toplevel):
     def __init__(
         self,
         parent: tk.Misc,
+        *,
+        accounts: tuple[Account, ...],
+        excluded_account_numbers: set[str],
     ) -> None:
         super().__init__(parent)
 
         self.title("Eröffnungsbilanz")
-        self.geometry("800x500")
-        self.minsize(650, 400)
+        self.geometry("800x550")
+        self.minsize(650, 450)
 
         self.transient(parent)
         self.grab_set()
 
-        self._amount_vars: list[
-            tuple[AccountType, tk.StringVar]
-        ] = []
+        self._accounts = self._filter_accounts(
+            accounts=accounts,
+            excluded_account_numbers=excluded_account_numbers,
+        )
+
+        self._accounts_by_display = {
+            str(account): account
+            for account in self._accounts
+        }
+
+        self._items: list[OpeningBalanceItem] = []
+
+        self._account_var = tk.StringVar()
+        self._amount_var = tk.StringVar()
 
         self.result: OpeningBalance | None = None
 
-        self._amount_vars: list[
-            tuple[Account, tk.StringVar]
-        ] = []
-        
         self._create_ui()
         self._update_totals()
+
+    @staticmethod
+    def _filter_accounts(
+        *,
+        accounts: tuple[Account, ...],
+        excluded_account_numbers: set[str],
+    ) -> tuple[Account, ...]:
+        """Filtert die für die Eröffnungsbilanz zulässigen Konten."""
+
+        return tuple(
+            account
+            for account in accounts
+            if account.is_active
+            and account.number not in excluded_account_numbers
+            and account.account_type
+            in (
+                AccountType.ASSET,
+                AccountType.LIABILITY,
+                AccountType.EQUITY,
+            )
+        )
 
     def _create_ui(self) -> None:
         """Erzeugt die Benutzeroberfläche."""
@@ -52,99 +82,157 @@ class OpeningBalanceDialog(tk.Toplevel):
             expand=True,
         )
 
-        title = ttk.Label(
+        ttk.Label(
             container,
             text="Eröffnungsbilanz",
             font=("TkDefaultFont", 20, "bold"),
-        )
-        title.pack(
+        ).pack(
             anchor="w",
         )
 
-        description = ttk.Label(
+        ttk.Label(
             container,
             text=(
-                "Erfassen Sie die Anfangsbestände "
-                "der Bilanzkonten."
+                "Erfassen Sie nur die Konten, "
+                "für die ein Anfangsbestand vorhanden ist."
             ),
-        )
-        description.pack(
+        ).pack(
             anchor="w",
             pady=(4, 16),
         )
 
-        table = ttk.Frame(container)
-        table.pack(
+        entry_frame = ttk.Frame(container)
+        entry_frame.pack(
             fill="x",
-            expand=False,
         )
 
         ttk.Label(
-            table,
+            entry_frame,
             text="Konto",
         ).grid(
             row=0,
             column=0,
             sticky="w",
             padx=(0, 12),
-            pady=(0, 8),
         )
 
         ttk.Label(
-            table,
-            text="Bezeichnung",
+            entry_frame,
+            text="Anfangsbestand",
         ).grid(
             row=0,
             column=1,
             sticky="w",
             padx=(0, 12),
-            pady=(0, 8),
         )
 
-        ttk.Label(
-            table,
-            text="Anfangsbestand",
+        self._account_combo = ttk.Combobox(
+            entry_frame,
+            textvariable=self._account_var,
+            values=tuple(
+                str(account)
+                for account in self._accounts
+            ),
+            state="readonly",
+        )
+        self._account_combo.grid(
+            row=1,
+            column=0,
+            sticky="ew",
+            padx=(0, 12),
+            pady=(4, 0),
+        )
+
+        self._amount_entry = ttk.Entry(
+            entry_frame,
+            textvariable=self._amount_var,
+            justify="right",
+            width=18,
+        )
+        self._amount_entry.grid(
+            row=1,
+            column=1,
+            sticky="ew",
+            padx=(0, 12),
+            pady=(4, 0),
+        )
+
+        ttk.Button(
+            entry_frame,
+            text="Hinzufügen",
+            command=self._add_item,
         ).grid(
-            row=0,
+            row=1,
             column=2,
             sticky="e",
-            pady=(0, 8),
+            pady=(4, 0),
         )
 
-        table.columnconfigure(
-            1,
+        entry_frame.columnconfigure(
+            0,
             weight=1,
         )
 
-        self._add_account_row(
-            table=table,
-            row=1,
-            account_number="1200",
-            name="Bank",
-            account_type=AccountType.ASSET,
-        )
-        self._add_account_row(
-            table=table,
-            row=2,
-            account_number="1600",
-            name="Verbindlichkeiten",
-            account_type=AccountType.LIABILITY,
-        )
-        self._add_account_row(
-            table=table,
-            row=3,
-            account_number="1800",
-            name="Eigenkapital",
-            account_type=AccountType.EQUITY,
+        self._item_table = ttk.Treeview(
+            container,
+            columns=(
+                "account",
+                "name",
+                "amount",
+            ),
+            show="headings",
+            height=10,
         )
 
-        separator = ttk.Separator(
+        self._item_table.heading(
+            "account",
+            text="Konto",
+        )
+        self._item_table.heading(
+            "name",
+            text="Bezeichnung",
+        )
+        self._item_table.heading(
+            "amount",
+            text="Anfangsbestand",
+        )
+
+        self._item_table.column(
+            "account",
+            width=100,
+            anchor="w",
+        )
+        self._item_table.column(
+            "name",
+            width=350,
+            anchor="w",
+        )
+        self._item_table.column(
+            "amount",
+            width=150,
+            anchor="e",
+        )
+
+        self._item_table.pack(
+            fill="both",
+            expand=True,
+            pady=(16, 8),
+        )
+
+        ttk.Button(
+            container,
+            text="Position entfernen",
+            command=self._remove_item,
+        ).pack(
+            anchor="w",
+        )
+
+        ttk.Separator(
             container,
             orient="horizontal",
-        )
-        separator.pack(
+        ).pack(
             fill="x",
-            pady=(20, 12),
+            pady=(16, 12),
         )
 
         summary = ttk.Frame(container)
@@ -200,107 +288,107 @@ class OpeningBalanceDialog(tk.Toplevel):
             padx=(0, 8),
         )
 
-    def _add_account_row(
-        self,
-        *,
-        table: ttk.Frame,
-        row: int,
-        account_number: str,
-        name: str,
-        account_type: AccountType,
-    ) -> None:
-        """Erzeugt eine editierbare Kontozeile."""
+    def _add_item(self) -> None:
+        """Fügt eine Eröffnungsposition hinzu."""
 
-        account = Account(
-            template=TemplateAccount(
-                account_number=account_number,
-                name=name,
-                account_type=account_type,
+        account_display = self._account_var.get().strip()
+
+        if not account_display:
+            messagebox.showerror(
+                "Eröffnungsbilanz",
+                "Bitte wählen Sie ein Konto aus.",
+                parent=self,
+            )
+            return
+
+        account = self._accounts_by_display[account_display]
+
+        if any(
+            item.account.number == account.number
+            for item in self._items
+        ):
+            messagebox.showerror(
+                "Eröffnungsbilanz",
+                "Das Konto wurde bereits erfasst.",
+                parent=self,
+            )
+            return
+
+        try:
+            amount = self._parse_amount(
+                self._amount_var.get()
+            )
+        except ValueError as exc:
+            messagebox.showerror(
+                "Eröffnungsbilanz",
+                str(exc),
+                parent=self,
+            )
+            return
+
+        if amount == Decimal("0.00"):
+            messagebox.showerror(
+                "Eröffnungsbilanz",
+                "Der Anfangsbestand muss größer als 0,00 € sein.",
+                parent=self,
+            )
+            return
+
+        item = OpeningBalanceItem(
+            account=account,
+            amount=amount,
+        )
+
+        self._items.append(item)
+
+        self._item_table.insert(
+            "",
+            "end",
+            iid=account.number,
+            values=(
+                account.number,
+                account.name,
+                self._format_amount(amount),
             ),
         )
-        
-        ttk.Label(
-            table,
-            text=account_number,
-        ).grid(
-            row=row,
-            column=0,
-            sticky="w",
-            padx=(0, 12),
-            pady=4,
-        )
 
-        ttk.Label(
-            table,
-            text=name,
-        ).grid(
-            row=row,
-            column=1,
-            sticky="w",
-            padx=(0, 12),
-            pady=4,
-        )
+        self._account_var.set("")
+        self._amount_var.set("")
 
-        amount_var = tk.StringVar()
+        self._update_totals()
 
-        amount_var.trace_add(
-            "write",
-            self._on_amount_changed,
-        )
+    def _remove_item(self) -> None:
+        """Entfernt die ausgewählte Eröffnungsposition."""
 
-        amount_entry = ttk.Entry(
-            table,
-            textvariable=amount_var,
-            justify="right",
-            width=18,
-        )
-        amount_entry.grid(
-            row=row,
-            column=2,
-            sticky="e",
-            pady=4,
-        )
+        selection = self._item_table.selection()
 
-        self._amount_vars.append(
-            (
-                account,
-                amount_var,
-            )
-        )
+        if not selection:
+            return
 
-    def _on_amount_changed(
-        self,
-        *_args: object,
-    ) -> None:
-        """Reagiert auf Änderungen der Betragseingaben."""
+        account_numbers = set(selection)
+
+        self._items = [
+            item
+            for item in self._items
+            if item.account.number not in account_numbers
+        ]
+
+        for item_id in selection:
+            self._item_table.delete(item_id)
 
         self._update_totals()
 
     def _update_totals(self) -> None:
         """Berechnet Aktiva, Passiva und Differenz neu."""
 
-        total_assets = Decimal("0.00")
-        total_liabilities = Decimal("0.00")
+        opening_balance = OpeningBalance(
+            items=tuple(self._items),
+        )
 
-        has_invalid_value = False
-
-        for account, amount_var in self._amount_vars:
-            try:
-                amount = self._parse_amount(
-                    amount_var.get()
-                )
-            except ValueError:
-                has_invalid_value = True
-                continue
-
-            if account.account_type is AccountType.ASSET:
-                total_assets += amount
-            elif account.account_type in (
-                AccountType.LIABILITY,
-                AccountType.EQUITY,
-            ):
-                total_liabilities += amount
-
+        total_assets = opening_balance.total_assets
+        total_liabilities = (
+            opening_balance.total_liabilities_and_equity
+        )
         difference = (
             total_assets
             - total_liabilities
@@ -328,8 +416,8 @@ class OpeningBalanceDialog(tk.Toplevel):
         )
 
         if (
-            not has_invalid_value
-            and difference == Decimal("0.00")
+            self._items
+            and opening_balance.is_balanced
         ):
             self._accept_button.state(
                 ["!disabled"]
@@ -391,27 +479,10 @@ class OpeningBalanceDialog(tk.Toplevel):
         )
 
     def _accept(self) -> None:
-        """Erzeugt die Eröffnungsbilanz aus den Eingaben."""
-
-        items: list[OpeningBalanceItem] = []
-
-        for account, amount_var in self._amount_vars:
-            amount = self._parse_amount(
-                amount_var.get()
-            )
-
-            if amount == Decimal("0.00"):
-                continue
-
-            items.append(
-                OpeningBalanceItem(
-                    account=account,
-                    amount=amount,
-                )
-            )
+        """Übernimmt die erfasste Eröffnungsbilanz."""
 
         opening_balance = OpeningBalance(
-            items=tuple(items),
+            items=tuple(self._items),
         )
 
         if not opening_balance.is_balanced:

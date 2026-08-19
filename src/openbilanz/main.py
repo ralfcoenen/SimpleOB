@@ -142,12 +142,14 @@ def main() -> None:
             booking_service=(depreciation_booking_service),
         )
 
+        closing_accounts = ClosingAccounts(
+            income_summary_account="8990",
+            profit_account="8020",
+            loss_account="8021",
+        )
+
         closing_service = ClosingService(
-            closing_accounts=ClosingAccounts(
-                income_summary_account="8990",
-                profit_account="8020",
-                loss_account="8021",
-            )
+            closing_accounts=closing_accounts,
         )
 
         closing_consistency_service = ClosingConsistencyService()
@@ -212,6 +214,7 @@ def main() -> None:
             window = MainWindow(
                 workspace=workspace,
                 financial_statement_context=(financial_statement_context),
+                closing_accounts=closing_accounts,
             )
 
             window.mainloop()

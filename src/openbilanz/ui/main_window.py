@@ -16,6 +16,7 @@ from openbilanz.domain.account_type import AccountType
 from openbilanz.domain.booking import Booking
 from openbilanz.domain.journal import Journal
 from openbilanz.domain.money import ZERO
+from openbilanz.services.closing_accounts import ClosingAccounts
 from openbilanz.services.closing_result import ClosingResult
 from openbilanz.services.closing_service import ClosingService
 from openbilanz.services.e_bilanz_preparation_service import (
@@ -59,6 +60,7 @@ class MainWindow(tk.Tk):
         *,
         workspace: FiscalYearWorkspace,
         financial_statement_context: FinancialStatementContext,
+        closing_accounts: ClosingAccounts,
     ) -> None:
         super().__init__()
 
@@ -66,6 +68,7 @@ class MainWindow(tk.Tk):
         self._context = workspace.context
         self._return_to_start_requested = False
         self._financial_statement_context = financial_statement_context
+        self._closing_accounts = closing_accounts
 
         self.title("OpenBilanz")
         self.geometry("1100x700")
@@ -200,9 +203,8 @@ class MainWindow(tk.Tk):
 
         self._opening_balance_button = ttk.Button(
             container,
-            text="Eröffnungsbilanz erfassen – derzeit deaktiviert",
+            text="Eröffnungsbilanz erfassen",
             command=self._open_opening_balance,
-            state="disabled",
         )
         self._opening_balance_button.pack(
             anchor="w",
@@ -815,7 +817,15 @@ class MainWindow(tk.Tk):
         if self._workspace.is_closed:
             return
 
-        dialog = OpeningBalanceDialog(self)
+        dialog = OpeningBalanceDialog(
+            self,
+            accounts=self._accounts,
+            excluded_account_numbers={
+                self._closing_accounts.income_summary_account,
+                self._closing_accounts.profit_account,
+                self._closing_accounts.loss_account,
+            },
+        )
 
         self.wait_window(dialog)
 
@@ -1607,7 +1617,10 @@ class MainWindow(tk.Tk):
 
         enabled = self._workspace.is_open
 
-        self._opening_balance_button.state(["disabled"])
+        if enabled:
+            self._opening_balance_button.state(["!disabled"])
+        else:
+            self._opening_balance_button.state(["disabled"])
 
         self._booking_frame.set_enabled(enabled)
 
