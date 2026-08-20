@@ -47,8 +47,32 @@ def test_imports_complete_openbilanz_standard_chart() -> None:
     )
 
     assert template.name == "openbilanz_standard"
-    assert len(template.accounts) == 32
-    assert len(template.account_mapping_rules) == 30
+    account_numbers = {
+        account.account_number
+        for account in template.accounts
+    }
+
+    assert "1571" in account_numbers
+    assert "1576" in account_numbers
+    assert "1771" in account_numbers
+    assert "1776" in account_numbers
+    assert "8990" in account_numbers
+    assert "9000" in account_numbers
+
+    assert len(account_numbers) == len(template.accounts)
+    mapped_account_numbers = {
+        rule.account_number
+        for rule in template.account_mapping_rules
+    }
+
+    assert "1571" in mapped_account_numbers
+    assert "1576" in mapped_account_numbers
+    assert "1771" in mapped_account_numbers
+    assert "1776" in mapped_account_numbers
+
+    assert len(mapped_account_numbers) == len(
+        template.account_mapping_rules
+    )
 
     accounts = {
         account.account_number: account

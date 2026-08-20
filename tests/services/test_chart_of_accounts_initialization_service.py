@@ -37,18 +37,47 @@ def _standard_chart_of_accounts() -> ChartOfAccountsTemplate:
 
     return ChartOfAccountsTemplate(
         name="OpenBilanz Standard",
-        accounts=tuple(
+        accounts=(
             TemplateAccount(
-                account_number=number,
-                name=name,
+                account_number="9000",
+                name="Eröffnungsbilanzkonto",
                 account_type=AccountType.EQUITY,
-            )
-            for number, name in (
-                ("9000", "Eröffnungsbilanzkonto"),
-                ("8990", "GuV-Sammelkonto"),
-                ("8020", "Jahresüberschuss"),
-                ("8021", "Jahresfehlbetrag"),
-            )
+            ),
+            TemplateAccount(
+                account_number="8990",
+                name="GuV-Sammelkonto",
+                account_type=AccountType.EQUITY,
+            ),
+            TemplateAccount(
+                account_number="8020",
+                name="Jahresüberschuss",
+                account_type=AccountType.EQUITY,
+            ),
+            TemplateAccount(
+                account_number="8021",
+                name="Jahresfehlbetrag",
+                account_type=AccountType.EQUITY,
+            ),
+            TemplateAccount(
+                account_number="1571",
+                name="Abziehbare Vorsteuer 7 %",
+                account_type=AccountType.ASSET,
+            ),
+            TemplateAccount(
+                account_number="1576",
+                name="Abziehbare Vorsteuer 19 %",
+                account_type=AccountType.ASSET,
+            ),
+            TemplateAccount(
+                account_number="1771",
+                name="Umsatzsteuer 7 %",
+                account_type=AccountType.LIABILITY,
+            ),
+            TemplateAccount(
+                account_number="1776",
+                name="Umsatzsteuer 19 %",
+                account_type=AccountType.LIABILITY,
+            ),
         ),
     )
 
@@ -114,9 +143,14 @@ def test_initializes_chart_of_accounts_for_company() -> None:
 
         session.commit()
 
-        loaded = repository.load_control_accounts(
+    loaded = repository.load_control_accounts(
             company.company_id
         )
+    loaded_vat_accounts = (
+        repository.load_vat_accounts(
+            company.company_id
+        )
+    )
 
     assert initialized is True
     assert loaded is not None
@@ -124,6 +158,11 @@ def test_initializes_chart_of_accounts_for_company() -> None:
     assert loaded.income_summary_account == "8990"
     assert loaded.profit_account == "8020"
     assert loaded.loss_account == "8021"
+    assert loaded_vat_accounts is not None
+    assert loaded_vat_accounts.input_tax_7 == "1571"
+    assert loaded_vat_accounts.input_tax_19 == "1576"
+    assert loaded_vat_accounts.output_tax_7 == "1771"
+    assert loaded_vat_accounts.output_tax_19 == "1776"
 
 
 def test_does_not_replace_existing_chart_of_accounts() -> None:
@@ -193,9 +232,12 @@ def test_does_not_replace_existing_chart_of_accounts() -> None:
         account.account_number
         for account in chart_of_accounts.accounts
     } == {
-        "9000",
-        "8990",
+        "1571",
+        "1576",
+        "1771",
+        "1776",
         "8020",
         "8021",
+        "8990",
+        "9000",
     }
-    

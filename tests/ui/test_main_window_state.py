@@ -28,6 +28,8 @@ def _create_window_double(
     window._add_fixed_asset_button = Mock()
     window._process_depreciations_button = Mock()
     window._booking_frame = Mock()
+    window._vat_booking_frame = Mock()
+    window._booking_mode_box = Mock()
 
     return window
 
@@ -69,6 +71,13 @@ def test_open_fiscal_year_enables_editing() -> None:
     window._booking_frame.set_enabled.assert_called_once_with(
         True
     )
+    window._vat_booking_frame.set_enabled.assert_called_once_with(
+        True
+    )
+
+    window._booking_mode_box.configure.assert_called_once_with(
+        state="readonly"
+    )
 
 
 def test_closed_fiscal_year_disables_editing() -> None:
@@ -88,6 +97,13 @@ def test_closed_fiscal_year_disables_editing() -> None:
 
     window._booking_frame.set_enabled.assert_called_once_with(
         False
+    )
+    window._vat_booking_frame.set_enabled.assert_called_once_with(
+        False
+    )
+
+    window._booking_mode_box.configure.assert_called_once_with(
+        state="disabled"
     )
 
 

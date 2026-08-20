@@ -272,6 +272,20 @@ def main() -> None:
                 )
             )
 
+            vat_accounts = (
+                chart_of_accounts_repository
+                .load_vat_accounts(
+                    context.company.company_id
+                )
+            )
+
+            if vat_accounts is None:
+                raise RuntimeError(
+                    "Die Umsatzsteuerkonten des "
+                    "Unternehmens konnten nicht "
+                    "geladen werden."
+                )
+
             if control_accounts is None:
                 raise RuntimeError(
                     "Die technischen Konten des "
@@ -444,6 +458,7 @@ def main() -> None:
                 opening_balance_account_number=(
                     control_accounts.opening_balance_account
                 ),
+                vat_accounts=vat_accounts,
                 pdf_reporting_service=(
                     pdf_reporting_service
                 ),

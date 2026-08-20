@@ -218,6 +218,26 @@ class KontenrahmenKonfiguration(Base):
         nullable=False,
     )
 
+    input_tax_7: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    input_tax_19: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    output_tax_7: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    output_tax_19: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
     mandant: Mapped[Mandant] = relationship(
         back_populates="kontenrahmen_konfiguration",
     )

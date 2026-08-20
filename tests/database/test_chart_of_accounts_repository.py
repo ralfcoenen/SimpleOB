@@ -32,6 +32,7 @@ from openbilanz.domain.chart_of_accounts_template import (
 )
 from openbilanz.domain.company import Company
 from openbilanz.domain.template_account import TemplateAccount
+from openbilanz.domain.vat_accounts import VatAccounts
 
 
 def test_saves_and_loads_chart_of_accounts() -> None:
@@ -209,18 +210,47 @@ def test_saves_and_validates_control_accounts() -> None:
         bind=engine
     )
 
-    template_accounts = tuple(
+    template_accounts = (
         TemplateAccount(
-            account_number=account_number,
-            name=name,
+            account_number="9000",
+            name="Eröffnungsbilanzkonto",
             account_type=AccountType.EQUITY,
-        )
-        for account_number, name in (
-            ("9000", "Eröffnungsbilanzkonto"),
-            ("8990", "GuV-Sammelkonto"),
-            ("8020", "Jahresüberschuss"),
-            ("8021", "Jahresfehlbetrag"),
-        )
+        ),
+        TemplateAccount(
+            account_number="8990",
+            name="GuV-Sammelkonto",
+            account_type=AccountType.EQUITY,
+        ),
+        TemplateAccount(
+            account_number="8020",
+            name="Jahresüberschuss",
+            account_type=AccountType.EQUITY,
+        ),
+        TemplateAccount(
+            account_number="8021",
+            name="Jahresfehlbetrag",
+            account_type=AccountType.EQUITY,
+        ),
+        TemplateAccount(
+            account_number="1571",
+            name="Abziehbare Vorsteuer 7 %",
+            account_type=AccountType.ASSET,
+        ),
+        TemplateAccount(
+            account_number="1576",
+            name="Abziehbare Vorsteuer 19 %",
+            account_type=AccountType.ASSET,
+        ),
+        TemplateAccount(
+            account_number="1771",
+            name="Umsatzsteuer 7 %",
+            account_type=AccountType.LIABILITY,
+        ),
+        TemplateAccount(
+            account_number="1776",
+            name="Umsatzsteuer 19 %",
+            account_type=AccountType.LIABILITY,
+        ),
     )
 
     chart_of_accounts = ChartOfAccountsTemplate(
@@ -247,6 +277,13 @@ def test_saves_and_validates_control_accounts() -> None:
         loss_account="8021",
     )
 
+    vat_accounts = VatAccounts(
+        input_tax_7="1571",
+        input_tax_19="1576",
+        output_tax_7="1771",
+        output_tax_19="1776",
+    )
+
     with Session() as session:
         company_repository = CompanyRepository(
             session
@@ -270,8 +307,19 @@ def test_saves_and_validates_control_accounts() -> None:
             control_accounts=control_accounts,
         )
 
+        repository.save_vat_accounts(
+            company_id=company.company_id,
+            vat_accounts=vat_accounts,
+        )
+
         loaded = repository.load_control_accounts(
             company.company_id
+        )
+
+        loaded_vat_accounts = (
+            repository.load_vat_accounts(
+                company.company_id
+            )
         )
 
         invalid_control_accounts = (
@@ -293,6 +341,7 @@ def test_saves_and_validates_control_accounts() -> None:
             )
 
     assert loaded == control_accounts
+    assert loaded_vat_accounts == vat_accounts
 
 def test_adds_account_to_existing_chart_of_accounts() -> None:
     """Ein neues Konto wird dem Mandantenkontenrahmen hinzugefügt."""

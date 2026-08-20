@@ -24,6 +24,7 @@ from openbilanz.domain.chart_of_accounts_template import (
     ChartOfAccountsTemplate,
 )
 from openbilanz.domain.template_account import TemplateAccount
+from openbilanz.domain.vat_accounts import VatAccounts
 
 
 class ChartOfAccountsRepository:
@@ -585,10 +586,13 @@ class ChartOfAccountsRepository:
                 loss_account=(
                     control_accounts.loss_account
                 ),
+                input_tax_7="1571",
+                input_tax_19="1576",
+                output_tax_7="1771",
+                output_tax_19="1776",
             )
 
             self._session.add(model)
-
         else:
             model.opening_balance_account = (
                 control_accounts
@@ -604,6 +608,97 @@ class ChartOfAccountsRepository:
             model.loss_account = (
                 control_accounts.loss_account
             )
+
+        if commit:
+            self._session.commit()
+
+    def save_vat_accounts(
+        self,
+        *,
+        company_id: UUID,
+        vat_accounts: VatAccounts,
+        commit: bool = True,
+    ) -> None:
+        """Speichert die Umsatzsteuerkonten eines Mandanten."""
+
+        if not isinstance(company_id, UUID):
+            raise TypeError(
+                "company_id must be a UUID"
+            )
+
+        if not isinstance(vat_accounts, VatAccounts):
+            raise TypeError(
+                "vat_accounts must be VatAccounts"
+            )
+
+        company_model = self._find_company(
+            company_id
+        )
+
+        if company_model is None:
+            raise ValueError(
+                "Das Unternehmen ist nicht vorhanden."
+            )
+
+        self._session.flush()
+
+        account_numbers = {
+            model.account_number
+            for model in (
+                self._session.query(Konto)
+                .filter(
+                    Konto.mandant_id
+                    == company_model.id
+                )
+                .all()
+            )
+        }
+
+        missing_accounts = (
+            vat_accounts.account_numbers
+            - account_numbers
+        )
+
+        if missing_accounts:
+            missing = ", ".join(
+                sorted(missing_accounts)
+            )
+
+            raise ValueError(
+                "Umsatzsteuerkonten sind im "
+                "Kontenrahmen nicht vorhanden: "
+                f"{missing}"
+            )
+
+        model = (
+            self._session.query(
+                KontenrahmenKonfiguration
+            )
+            .filter(
+                KontenrahmenKonfiguration.mandant_id
+                == company_model.id
+            )
+            .one_or_none()
+        )
+
+        if model is None:
+            raise ValueError(
+                "Die Kontenrahmenkonfiguration "
+                "ist nicht vorhanden."
+            )
+
+        model.input_tax_7 = (
+            vat_accounts.input_tax_7
+        )
+        model.input_tax_19 = (
+            vat_accounts.input_tax_19
+        )
+        model.output_tax_7 = (
+            vat_accounts.output_tax_7
+        )
+        model.output_tax_19 = (
+            vat_accounts.output_tax_19
+        )
 
         if commit:
             self._session.commit()
@@ -651,6 +746,45 @@ class ChartOfAccountsRepository:
             loss_account=model.loss_account,
         )
 
+    def load_vat_accounts(
+        self,
+        company_id: UUID,
+    ) -> VatAccounts | None:
+        """Lädt die Umsatzsteuerkonten eines Mandanten."""
+
+        if not isinstance(company_id, UUID):
+            raise TypeError(
+                "company_id must be a UUID"
+            )
+
+        company_model = self._find_company(
+            company_id
+        )
+
+        if company_model is None:
+            return None
+
+        model = (
+            self._session.query(
+                KontenrahmenKonfiguration
+            )
+            .filter(
+                KontenrahmenKonfiguration.mandant_id
+                == company_model.id
+            )
+            .one_or_none()
+        )
+
+        if model is None:
+            return None
+
+        return VatAccounts(
+            input_tax_7=model.input_tax_7,
+            input_tax_19=model.input_tax_19,
+            output_tax_7=model.output_tax_7,
+            output_tax_19=model.output_tax_19,
+        )
+
     def _find_company(
         self,
         company_id: UUID,
@@ -665,4 +799,3 @@ class ChartOfAccountsRepository:
             )
             .one_or_none()
         )
-        

@@ -17,6 +17,7 @@ from openbilanz.domain.booking import Booking
 from openbilanz.domain.entry_side import EntrySide
 from openbilanz.domain.journal import Journal
 from openbilanz.domain.money import ZERO
+from openbilanz.domain.vat_accounts import VatAccounts
 from openbilanz.services.closing_accounts import ClosingAccounts
 from openbilanz.services.closing_result import ClosingResult
 from openbilanz.services.closing_service import ClosingService
@@ -55,6 +56,7 @@ from openbilanz.ui.new_fixed_asset_dialog import (
 from openbilanz.ui.opening_balance_dialog import (
     OpeningBalanceDialog,
 )
+from openbilanz.ui.vat_booking_frame import VatBookingFrame
 
 
 class MainWindow(tk.Tk):
@@ -67,6 +69,7 @@ class MainWindow(tk.Tk):
         financial_statement_context: FinancialStatementContext,
         closing_accounts: ClosingAccounts,
         opening_balance_account_number: str,
+        vat_accounts: VatAccounts,
         pdf_reporting_service: PdfReportingService,
     ) -> None:
         super().__init__()
@@ -79,6 +82,7 @@ class MainWindow(tk.Tk):
         self._opening_balance_account_number = (
             opening_balance_account_number
         )
+        self._vat_accounts = vat_accounts
         self._pdf_reporting_service = pdf_reporting_service
 
         self._current_trial_balance_report = None
@@ -539,6 +543,7 @@ class MainWindow(tk.Tk):
             self._closing_accounts.income_summary_account,
             self._closing_accounts.profit_account,
             self._closing_accounts.loss_account,
+            *self._vat_accounts.account_numbers,
         }
 
         if account_number in technical_account_numbers:
@@ -732,11 +737,46 @@ class MainWindow(tk.Tk):
             pady=(0, 16),
         )
 
+        mode_frame = ttk.Frame(
+            self._booking_tab
+        )
+        mode_frame.pack(
+            fill="x",
+            pady=(0, 16),
+        )
+
+        ttk.Label(
+            mode_frame,
+            text="Buchungsart",
+        ).pack(
+            side="left",
+            padx=(0, 12),
+        )
+
+        self._booking_mode_var = tk.StringVar(
+            value="Einfache Buchung"
+        )
+
+        self._booking_mode_box = ttk.Combobox(
+            mode_frame,
+            textvariable=self._booking_mode_var,
+            values=(
+                "Einfache Buchung",
+                "Rechnung mit Umsatzsteuer",
+            ),
+            state="readonly",
+            width=28,
+        )
+        self._booking_mode_box.pack(
+            side="left",
+        )
+
         technical_account_numbers = {
             self._opening_balance_account_number,
             self._closing_accounts.income_summary_account,
             self._closing_accounts.profit_account,
             self._closing_accounts.loss_account,
+            *self._vat_accounts.account_numbers,
         }
 
         bookable_accounts = tuple(
@@ -748,9 +788,24 @@ class MainWindow(tk.Tk):
             )
         )
 
+        self._booking_frame_container = ttk.Frame(
+            self._booking_tab
+        )
+        self._booking_frame_container.pack(
+            fill="x",
+            expand=False,
+        )
+
         self._booking_frame = BookingFrame(
-            self._booking_tab,
+            self._booking_frame_container,
             accounts=bookable_accounts,
+            on_booking_created=self._post_booking,
+        )
+
+        self._vat_booking_frame = VatBookingFrame(
+            self._booking_frame_container,
+            accounts=bookable_accounts,
+            vat_accounts=self._vat_accounts,
             on_booking_created=self._post_booking,
         )
 
@@ -758,6 +813,34 @@ class MainWindow(tk.Tk):
             fill="x",
             expand=False,
         )
+
+        self._booking_mode_var.trace_add(
+            "write",
+            self._update_booking_mode,
+        )
+
+    def _update_booking_mode(
+        self,
+        *_args: object,
+    ) -> None:
+        """Schaltet zwischen einfacher und Umsatzsteuerbuchung um."""
+
+        self._booking_frame.pack_forget()
+        self._vat_booking_frame.pack_forget()
+
+        if (
+            self._booking_mode_var.get()
+            == "Rechnung mit Umsatzsteuer"
+        ):
+            self._vat_booking_frame.pack(
+                fill="x",
+                expand=False,
+            )
+        else:
+            self._booking_frame.pack(
+                fill="x",
+                expand=False,
+            )
 
     def _create_fixed_assets_tab(self) -> None:
         """Erzeugt den Arbeitsbereich Anlagen."""
@@ -1849,6 +1932,15 @@ class MainWindow(tk.Tk):
             self._edit_account_button.state(["disabled"])
 
         self._booking_frame.set_enabled(enabled)
+        self._vat_booking_frame.set_enabled(enabled)
+
+        self._booking_mode_box.configure(
+            state=(
+                "readonly"
+                if enabled
+                else "disabled"
+            )
+        )
 
         if enabled:
             self._add_fixed_asset_button.state(["!disabled"])
