@@ -139,7 +139,7 @@ class ClosingService:
             expense_total += child_expenses
 
         return income_total, expense_total
-   
+
     def _create_account_closing_bookings(
         self,
         *,
@@ -194,56 +194,113 @@ class ClosingService:
         if self._closing_accounts is None:
             return None
 
-        if (
-            account_type is AccountType.REVENUE
-            and credit_balance > Decimal("0.00")
-        ):
-            return Booking(
-                booking_date=closing_date,
-                voucher_no=None,
-                description=f"Abschluss des Erlöskontos {account_number}",
-                booking_type=BookingType.CLOSING,
-                lines=(
-                    BookingLine(
-                        account_number=account_number,
-                        side=EntrySide.DEBIT,
-                        amount=credit_balance,
+        if account_type is AccountType.REVENUE:
+            if credit_balance > Decimal("0.00"):
+                return Booking(
+                    booking_date=closing_date,
+                    voucher_no=None,
+                    description=(
+                        f"Abschluss des Erlöskontos "
+                        f"{account_number}"
                     ),
-                    BookingLine(
-                        account_number=(
-                            self._closing_accounts.income_summary_account
+                    booking_type=BookingType.CLOSING,
+                    lines=(
+                        BookingLine(
+                            account_number=account_number,
+                            side=EntrySide.DEBIT,
+                            amount=credit_balance,
                         ),
-                        side=EntrySide.CREDIT,
-                        amount=credit_balance,
-                    ),
-                ),
-                            )
-
-        if (
-            account_type is AccountType.EXPENSE
-            and debit_balance > Decimal("0.00")
-        ):
-            return Booking(
-                booking_date=closing_date,
-                voucher_no=None,
-                description=f"Abschluss des Aufwandskontos {account_number}",
-                booking_type=BookingType.CLOSING,
-                lines=(
-                    BookingLine(
-                        account_number=(
-                            self._closing_accounts.income_summary_account
+                        BookingLine(
+                            account_number=(
+                                self._closing_accounts
+                                .income_summary_account
+                            ),
+                            side=EntrySide.CREDIT,
+                            amount=credit_balance,
                         ),
-                        side=EntrySide.DEBIT,
-                        amount=debit_balance,
                     ),
-                    BookingLine(
-                        account_number=account_number,
-                        side=EntrySide.CREDIT,
-                        amount=debit_balance,
-                    ),
-                ),
-            )
+                )
 
+            if debit_balance > Decimal("0.00"):
+                return Booking(
+                    booking_date=closing_date,
+                    voucher_no=None,
+                    description=(
+                        f"Abschluss des Erlöskontos "
+                        f"{account_number}"
+                    ),
+                    booking_type=BookingType.CLOSING,
+                    lines=(
+                        BookingLine(
+                            account_number=(
+                                self._closing_accounts
+                                .income_summary_account
+                            ),
+                            side=EntrySide.DEBIT,
+                            amount=debit_balance,
+                        ),
+                        BookingLine(
+                            account_number=account_number,
+                            side=EntrySide.CREDIT,
+                            amount=debit_balance,
+                        ),
+                    ),
+                )
+
+        if account_type is AccountType.EXPENSE:
+            if debit_balance > Decimal("0.00"):
+                return Booking(
+                    booking_date=closing_date,
+                    voucher_no=None,
+                    description=(
+                        f"Abschluss des Aufwandskontos "
+                        f"{account_number}"
+                    ),
+                    booking_type=BookingType.CLOSING,
+                    lines=(
+                        BookingLine(
+                            account_number=(
+                                self._closing_accounts
+                                .income_summary_account
+                            ),
+                            side=EntrySide.DEBIT,
+                            amount=debit_balance,
+                        ),
+                        BookingLine(
+                            account_number=account_number,
+                            side=EntrySide.CREDIT,
+                            amount=debit_balance,
+                        ),
+                    ),
+                )
+
+            if credit_balance > Decimal("0.00"):
+                return Booking(
+                    booking_date=closing_date,
+                    voucher_no=None,
+                    description=(
+                        f"Abschluss des Aufwandskontos "
+                        f"{account_number}"
+                    ),
+                    booking_type=BookingType.CLOSING,
+                    lines=(
+                        BookingLine(
+                            account_number=account_number,
+                            side=EntrySide.DEBIT,
+                            amount=credit_balance,
+                        ),
+                        BookingLine(
+                            account_number=(
+                                self._closing_accounts
+                                .income_summary_account
+                            ),
+                            side=EntrySide.CREDIT,
+                            amount=credit_balance,
+                        ),
+                    ),
+                )
+
+        return None
         return None
 
     def _create_result_booking(
@@ -285,7 +342,7 @@ class ClosingService:
             booking_date=closing_date,
             voucher_no=None,
             description="Abschluss des GuV-Kontos",
-            booking_type=BookingType.CLOSING,            
+            booking_type=BookingType.CLOSING,
             lines=(
                 BookingLine(
                     account_number=(
@@ -316,7 +373,7 @@ class ClosingService:
             booking_date=closing_date,
             voucher_no=None,
             description="Abschluss des GuV-Kontos",
-            booking_type=BookingType.CLOSING,            
+            booking_type=BookingType.CLOSING,
             lines=(
                 BookingLine(
                     account_number=self._closing_accounts.loss_account,

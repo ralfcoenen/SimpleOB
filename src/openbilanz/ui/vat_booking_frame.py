@@ -7,6 +7,7 @@ from decimal import Decimal, InvalidOperation
 from tkinter import ttk
 
 from openbilanz.domain.account import Account
+from openbilanz.domain.account_type import AccountType
 from openbilanz.domain.booking import Booking
 from openbilanz.domain.vat_accounts import VatAccounts
 from openbilanz.domain.vat_booking_item import VatBookingItem
@@ -20,6 +21,9 @@ from openbilanz.ui.date_input import (
 
 _INPUT_INVOICE = "Eingangsrechnung"
 _OUTPUT_INVOICE = "Ausgangsrechnung"
+_CUSTOMER_CREDIT_NOTE = "Kundengutschrift"
+_SUPPLIER_CREDIT_NOTE = "Lieferantengutschrift"
+
 _TAX_RATES = ("0 %", "7 %", "19 %")
 
 
@@ -96,6 +100,8 @@ class VatBookingFrame(ttk.Frame):
             values=(
                 _INPUT_INVOICE,
                 _OUTPUT_INVOICE,
+                _CUSTOMER_CREDIT_NOTE,
+                _SUPPLIER_CREDIT_NOTE,
             ),
             state="readonly",
             width=24,
@@ -579,6 +585,22 @@ class VatBookingFrame(ttk.Frame):
             if account is None:
                 valid = False
 
+            invoice_type = self._invoice_type_var.get()
+
+            if account is not None:
+                if invoice_type in (
+                    _OUTPUT_INVOICE,
+                    _CUSTOMER_CREDIT_NOTE,
+                ):
+                    if account.account_type is not AccountType.REVENUE:
+                        valid = False
+
+                if invoice_type in (
+                    _INPUT_INVOICE,
+                    _SUPPLIER_CREDIT_NOTE,
+                ):
+                    if account.account_type is not AccountType.EXPENSE:
+                        valid = False
             try:
                 self._parse_amount(
                     row["amount_var"].get()
@@ -666,10 +688,9 @@ class VatBookingFrame(ttk.Frame):
             or None
         )
 
-        if (
-            self._invoice_type_var.get()
-            == _INPUT_INVOICE
-        ):
+        invoice_type = self._invoice_type_var.get()
+
+        if invoice_type == _INPUT_INVOICE:
             booking = (
                 self._vat_booking_service
                 .build_input_booking(
@@ -683,7 +704,8 @@ class VatBookingFrame(ttk.Frame):
                     description=description,
                 )
             )
-        else:
+
+        elif invoice_type == _OUTPUT_INVOICE:
             booking = (
                 self._vat_booking_service
                 .build_output_booking(
@@ -697,6 +719,39 @@ class VatBookingFrame(ttk.Frame):
                     description=description,
                 )
             )
+
+        elif invoice_type == _CUSTOMER_CREDIT_NOTE:
+            booking = (
+                self._vat_booking_service
+                .build_customer_credit_note(
+                    booking_date=booking_date,
+                    counter_account_number=(
+                        counter_account.number
+                    ),
+                    items=items,
+                    vat_accounts=self._vat_accounts,
+                    voucher_no=voucher_no,
+                    description=description,
+                )
+            )
+
+        elif invoice_type == _SUPPLIER_CREDIT_NOTE:
+            booking = (
+                self._vat_booking_service
+                .build_supplier_credit_note(
+                    booking_date=booking_date,
+                    counter_account_number=(
+                        counter_account.number
+                    ),
+                    items=items,
+                    vat_accounts=self._vat_accounts,
+                    voucher_no=voucher_no,
+                    description=description,
+                )
+            )
+
+        else:
+            return
 
         self._on_booking_created(
             booking

@@ -32,7 +32,7 @@ def test_calculates_net_income_from_income_and_expenses() -> None:
     )
 
     assert net_income == Decimal("300.00")
-    
+
 def test_calculates_net_loss_when_expenses_exceed_income() -> None:
     service = ClosingService()
 
@@ -42,9 +42,9 @@ def test_calculates_net_loss_when_expenses_exceed_income() -> None:
     )
 
     assert net_income == Decimal("-300.00")
-    
+
 def test_calculates_net_income_from_income_statement() -> None:
-    
+
     revenue = FinancialStatementPosition(
         code="HGB.275.GKV.1",
         name="Umsatzerlöse",
@@ -80,7 +80,7 @@ def test_calculates_net_income_from_income_statement() -> None:
     )
 
     assert net_income == Decimal("300.00")
-    
+
 
 
 
@@ -265,6 +265,134 @@ def test_close_creates_closing_booking_for_expense_account() -> None:
             account_number="4930",
             side=EntrySide.CREDIT,
             amount=Decimal("200.00"),
+        ),
+    )
+
+def test_close_creates_closing_booking_for_revenue_account_with_debit_balance(
+) -> None:
+    closing_accounts = ClosingAccounts(
+        income_summary_account="8990",
+        profit_account="8020",
+        loss_account="8021",
+    )
+
+    chart_of_accounts = ChartOfAccountsTemplate(
+        name="Abschlusstest",
+        accounts=(
+            TemplateAccount(
+                account_number="8410",
+                name="Umsatzerlöse 7 %",
+                account_type=AccountType.REVENUE,
+            ),
+        ),
+        account_mapping_rules=(),
+    )
+
+    ledger = Ledger()
+    ledger.post(
+        debit_account="8410",
+        credit_account="1200",
+        amount=Decimal("19.00"),
+    )
+
+    income_statement = IncomeStatement(
+        income_statement=FinancialStatementPosition(
+            code="HGB.275.GKV",
+            name="GuV",
+        ),
+        amounts={},
+    )
+
+    result = ClosingService(
+        closing_accounts=closing_accounts,
+    ).close(
+        ledger=ledger,
+        chart_of_accounts=chart_of_accounts,
+        income_statement=income_statement,
+        closing_date=date(2026, 12, 31),
+    )
+
+    assert len(result.bookings) == 1
+
+    booking = result.bookings[0]
+
+    assert booking.booking_type is BookingType.CLOSING
+    assert booking.description == "Abschluss des Erlöskontos 8410"
+
+    assert booking.lines == (
+        BookingLine(
+            account_number="8990",
+            side=EntrySide.DEBIT,
+            amount=Decimal("19.00"),
+        ),
+        BookingLine(
+            account_number="8410",
+            side=EntrySide.CREDIT,
+            amount=Decimal("19.00"),
+        ),
+    )
+
+def test_close_creates_closing_booking_for_expense_account_with_credit_balance(
+) -> None:
+    closing_accounts = ClosingAccounts(
+        income_summary_account="8990",
+        profit_account="8020",
+        loss_account="8021",
+    )
+
+    chart_of_accounts = ChartOfAccountsTemplate(
+        name="Abschlusstest",
+        accounts=(
+            TemplateAccount(
+                account_number="4930",
+                name="Bürobedarf",
+                account_type=AccountType.EXPENSE,
+            ),
+        ),
+        account_mapping_rules=(),
+    )
+
+    ledger = Ledger()
+    ledger.post(
+        debit_account="1200",
+        credit_account="4930",
+        amount=Decimal("25.00"),
+    )
+
+    income_statement = IncomeStatement(
+        income_statement=FinancialStatementPosition(
+            code="HGB.275.GKV",
+            name="GuV",
+        ),
+        amounts={},
+    )
+
+    result = ClosingService(
+        closing_accounts=closing_accounts,
+    ).close(
+        ledger=ledger,
+        chart_of_accounts=chart_of_accounts,
+        income_statement=income_statement,
+        closing_date=date(2026, 12, 31),
+    )
+
+    assert len(result.bookings) == 1
+
+    booking = result.bookings[0]
+
+    assert booking.booking_type is BookingType.CLOSING
+    assert booking.description == "Abschluss des Aufwandskontos 4930"
+
+    assert booking.lines == (
+        BookingLine(
+            account_number="4930",
+            side=EntrySide.DEBIT,
+            amount=Decimal("25.00"),
+        ),
+        BookingLine(
+            account_number="8990",
+            side=EntrySide.CREDIT,
+            amount=Decimal("25.00"),
         ),
     )
 

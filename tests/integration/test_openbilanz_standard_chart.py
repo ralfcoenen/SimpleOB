@@ -74,6 +74,9 @@ def test_imports_complete_openbilanz_standard_chart() -> None:
         template.account_mapping_rules
     )
 
+    assert "8990" not in mapped_account_numbers
+    assert "9000" not in mapped_account_numbers
+
     accounts = {
         account.account_number: account
         for account in template.accounts

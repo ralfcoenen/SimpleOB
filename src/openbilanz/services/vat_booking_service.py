@@ -138,6 +138,125 @@ class VatBookingService:
             lines=tuple(lines),
         )
 
+    def build_customer_credit_note(
+        self,
+        *,
+        booking_date: date,
+        counter_account_number: str,
+        items: tuple[VatBookingItem, ...],
+        vat_accounts: VatAccounts,
+        voucher_no: str | None = None,
+        description: str | None = None,
+    ) -> Booking:
+        """Erzeugt eine Kundengutschrift."""
+
+        lines: list[BookingLine] = []
+        gross_total = ZERO
+
+        for item in self._validate_items(items):
+            net_amount, tax_amount = (
+                self._split_gross_amount(item)
+            )
+
+            gross_total += item.gross_amount
+
+            lines.append(
+                BookingLine(
+                    account_number=item.account_number,
+                    side=EntrySide.DEBIT,
+                    amount=net_amount,
+                )
+            )
+
+            if tax_amount > ZERO:
+                lines.append(
+                    BookingLine(
+                        account_number=(
+                            self._output_tax_account(
+                                item.tax_rate,
+                                vat_accounts,
+                            )
+                        ),
+                        side=EntrySide.DEBIT,
+                        amount=tax_amount,
+                    )
+                )
+
+        lines.append(
+            BookingLine(
+                account_number=counter_account_number,
+                side=EntrySide.CREDIT,
+                amount=gross_total,
+            )
+        )
+
+        return Booking(
+            booking_date=booking_date,
+            voucher_no=voucher_no,
+            description=description,
+            lines=tuple(lines),
+        )
+
+    def build_supplier_credit_note(
+        self,
+        *,
+        booking_date: date,
+        counter_account_number: str,
+        items: tuple[VatBookingItem, ...],
+        vat_accounts: VatAccounts,
+        voucher_no: str | None = None,
+        description: str | None = None,
+    ) -> Booking:
+        """Erzeugt eine Lieferantengutschrift."""
+
+        lines: list[BookingLine] = []
+        gross_total = ZERO
+
+        for item in self._validate_items(items):
+            net_amount, tax_amount = (
+                self._split_gross_amount(item)
+            )
+
+            gross_total += item.gross_amount
+
+            lines.append(
+                BookingLine(
+                    account_number=item.account_number,
+                    side=EntrySide.CREDIT,
+                    amount=net_amount,
+                )
+            )
+
+            if tax_amount > ZERO:
+                lines.append(
+                    BookingLine(
+                        account_number=(
+                            self._input_tax_account(
+                                item.tax_rate,
+                                vat_accounts,
+                            )
+                        ),
+                        side=EntrySide.CREDIT,
+                        amount=tax_amount,
+                    )
+                )
+
+        lines.insert(
+            0,
+            BookingLine(
+                account_number=counter_account_number,
+                side=EntrySide.DEBIT,
+                amount=gross_total,
+            ),
+        )
+
+        return Booking(
+            booking_date=booking_date,
+            voucher_no=voucher_no,
+            description=description,
+            lines=tuple(lines),
+        )
+
     @staticmethod
     def _validate_items(
         items: tuple[VatBookingItem, ...],

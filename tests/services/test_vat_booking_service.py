@@ -246,3 +246,100 @@ def test_rounds_vat_amounts_to_cents() -> None:
         Decimal("8.40"),
         Decimal("1.60"),
     )
+
+def test_builds_customer_credit_note_with_7_percent_vat() -> None:
+    """Eine Kundengutschrift mindert Erlös und Umsatzsteuer."""
+
+    service = VatBookingService()
+
+    booking = service.build_customer_credit_note(
+        booking_date=date(2026, 8, 20),
+        counter_account_number="1400",
+        items=(
+            VatBookingItem(
+                account_number="8410",
+                gross_amount=Decimal("107.00"),
+                tax_rate=7,
+            ),
+        ),
+        vat_accounts=VAT_ACCOUNTS,
+        voucher_no="KG-001",
+        description="Kundengutschrift",
+    )
+
+    assert booking.debit_total == Decimal("107.00")
+    assert booking.credit_total == Decimal("107.00")
+
+    assert tuple(
+        (
+            line.account_number,
+            line.side,
+            line.amount,
+        )
+        for line in booking.lines
+    ) == (
+        (
+            "8410",
+            EntrySide.DEBIT,
+            Decimal("100.00"),
+        ),
+        (
+            "1771",
+            EntrySide.DEBIT,
+            Decimal("7.00"),
+        ),
+        (
+            "1400",
+            EntrySide.CREDIT,
+            Decimal("107.00"),
+        ),
+    )
+
+
+def test_builds_supplier_credit_note_with_19_percent_vat() -> None:
+    """Eine Lieferantengutschrift mindert Aufwand und Vorsteuer."""
+
+    service = VatBookingService()
+
+    booking = service.build_supplier_credit_note(
+        booking_date=date(2026, 8, 20),
+        counter_account_number="1600",
+        items=(
+            VatBookingItem(
+                account_number="4930",
+                gross_amount=Decimal("119.00"),
+                tax_rate=19,
+            ),
+        ),
+        vat_accounts=VAT_ACCOUNTS,
+        voucher_no="LG-001",
+        description="Lieferantengutschrift",
+    )
+
+    assert booking.debit_total == Decimal("119.00")
+    assert booking.credit_total == Decimal("119.00")
+
+    assert tuple(
+        (
+            line.account_number,
+            line.side,
+            line.amount,
+        )
+        for line in booking.lines
+    ) == (
+        (
+            "1600",
+            EntrySide.DEBIT,
+            Decimal("119.00"),
+        ),
+        (
+            "4930",
+            EntrySide.CREDIT,
+            Decimal("100.00"),
+        ),
+        (
+            "1576",
+            EntrySide.CREDIT,
+            Decimal("19.00"),
+        ),
+    )

@@ -20,18 +20,46 @@ def _account(
         is_active=is_active,
     )
 
-
 def test_filters_accounts_for_opening_balance() -> None:
     accounts = (
         _account("1200", "Bank", AccountType.ASSET),
-        _account("1600", "Verbindlichkeiten", AccountType.LIABILITY),
-        _account("1800", "Eigenkapital", AccountType.EQUITY),
-        _account("8020", "Jahresüberschuss", AccountType.EQUITY),
-        _account("8021", "Jahresfehlbetrag", AccountType.EQUITY),
-        _account("8990", "GuV-Sammelkonto", AccountType.EQUITY),
-        _account("4000", "Umsatzerlöse", AccountType.REVENUE),
         _account(
             "1210",
+            "Weiteres Bankkonto",
+            AccountType.ASSET,
+        ),
+        _account(
+            "1600",
+            "Verbindlichkeiten",
+            AccountType.LIABILITY,
+        ),
+        _account(
+            "1800",
+            "Eigenkapital",
+            AccountType.EQUITY,
+        ),
+        _account(
+            "8020",
+            "Jahresüberschuss",
+            AccountType.EQUITY,
+        ),
+        _account(
+            "8021",
+            "Jahresfehlbetrag",
+            AccountType.EQUITY,
+        ),
+        _account(
+            "8990",
+            "GuV-Sammelkonto",
+            AccountType.EQUITY,
+        ),
+        _account(
+            "4000",
+            "Umsatzerlöse",
+            AccountType.REVENUE,
+        ),
+        _account(
+            "1220",
             "Inaktives Bankkonto",
             AccountType.ASSET,
             is_active=False,
@@ -47,8 +75,12 @@ def test_filters_accounts_for_opening_balance() -> None:
         },
     )
 
-    assert tuple(account.number for account in filtered) == (
+    assert tuple(
+        account.number
+        for account in filtered
+    ) == (
         "1200",
+        "1210",
         "1600",
         "1800",
     )
