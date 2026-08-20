@@ -23,6 +23,8 @@ def _create_window_double(
     window._workspace.is_closed = not is_open
 
     window._opening_balance_button = Mock()
+    window._new_account_button = Mock()
+    window._edit_account_button = Mock()
     window._add_fixed_asset_button = Mock()
     window._process_depreciations_button = Mock()
     window._booking_frame = Mock()

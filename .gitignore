@@ -32,4 +32,8 @@ data/taxonomy-backup-*/
 docs/development/*Uebergabe*.docx
 docs/development/*Übergabe*.docx
 
+# Lokale ERiC-Unterlagen
+docs/development/eric/
+
+# Lokale ERiC-SDK- und Arbeitsdateien
 /ERIC/

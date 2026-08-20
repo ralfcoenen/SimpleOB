@@ -12,12 +12,19 @@ from openbilanz.accounting.mapper import AccountMapper
 from openbilanz.accounting.trial_balance import TrialBalance
 from openbilanz.core.context import ApplicationContext
 from openbilanz.database.booking_repository import BookingRepository
+from openbilanz.database.chart_of_accounts_repository import (
+    ChartOfAccountsRepository,
+)
 from openbilanz.database.company_repository import CompanyRepository
 from openbilanz.database.fixed_asset_depreciation_repository import (
     FixedAssetDepreciationRepository,
 )
 from openbilanz.database.fixed_asset_repository import (
     FixedAssetRepository,
+)
+from openbilanz.domain.account import Account
+from openbilanz.domain.account_mapping_rule import (
+    AccountMappingRule,
 )
 from openbilanz.domain.booking import Booking
 from openbilanz.domain.booking_type import BookingType
@@ -100,6 +107,7 @@ class FiscalYearWorkspace:
         context: ApplicationContext,
         booking_repository: BookingRepository,
         company_repository: CompanyRepository,
+        chart_of_accounts_repository: ChartOfAccountsRepository | None = None,
         posting_service: PostingService,
         reporting_service: ReportingService | None = None,
         closing_workflow: FiscalYearClosingWorkflow,
@@ -121,6 +129,9 @@ class FiscalYearWorkspace:
         self._context = context
         self._booking_repository = booking_repository
         self._company_repository = company_repository
+        self._chart_of_accounts_repository = (
+            chart_of_accounts_repository
+        )
         self._posting_service = posting_service
         self._reporting_service = (
             reporting_service
@@ -151,6 +162,45 @@ class FiscalYearWorkspace:
         """Liefert den aktuellen Anwendungskontext."""
 
         return self._context
+
+    def add_account(
+        self,
+        *,
+        account: Account,
+        mapping_rule: AccountMappingRule | None,
+    ) -> None:
+        """Fügt dem Mandantenkontenrahmen ein Konto hinzu."""
+
+        if self._chart_of_accounts_repository is None:
+            raise RuntimeError(
+                "Die Kontenrahmenverwaltung ist nicht konfiguriert."
+            )
+
+        self._chart_of_accounts_repository.add_account(
+            company_id=self._context.company.company_id,
+            account=account,
+            mapping_rule=mapping_rule,
+        )
+
+    def update_account(
+        self,
+        *,
+        account: Account,
+        mapping_rule: AccountMappingRule | None,
+    ) -> None:
+        """Aktualisiert ein Konto des Mandantenkontenrahmens."""
+
+        if self._chart_of_accounts_repository is None:
+            raise RuntimeError(
+                "Die Kontenrahmenverwaltung ist nicht konfiguriert."
+            )
+
+        self._chart_of_accounts_repository.update_account(
+            company_id=self._context.company.company_id,
+            account=account,
+            mapping_rule=mapping_rule,
+        )
+
 
     @property
     def taxonomy_status(self) -> TaxonomyStatus:

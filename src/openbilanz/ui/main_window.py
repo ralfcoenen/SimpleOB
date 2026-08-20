@@ -33,6 +33,9 @@ from openbilanz.services.pdf_reporting_service import PdfReportingService
 from openbilanz.taxonomy.e_bilanz_builder import (
     EBilanzDocument,
 )
+from openbilanz.ui.account_editor_dialog import (
+    AccountEditorDialog,
+)
 from openbilanz.ui.balance_sheet_frame import BalanceSheetFrame
 from openbilanz.ui.booking_frame import BookingFrame
 from openbilanz.ui.closing_frame import ClosingFrame
@@ -342,13 +345,40 @@ class MainWindow(tk.Tk):
             anchor="w",
         )
 
+        button_frame = ttk.Frame(
+            self._accounts_tab
+        )
+        button_frame.pack(
+            fill="x",
+            pady=(8, 12),
+        )
+
+        self._new_account_button = ttk.Button(
+            button_frame,
+            text="Neues Konto",
+            command=self._open_new_account,
+        )
+        self._new_account_button.pack(
+            side="left",
+        )
+
+        self._edit_account_button = ttk.Button(
+            button_frame,
+            text="Konto bearbeiten",
+            command=self._open_edit_account,
+        )
+        self._edit_account_button.pack(
+            side="left",
+            padx=(8, 0),
+        )
+
         self._journal_status = ttk.Label(
             self._accounts_tab,
             text="Journal: noch keine Buchungen",
         )
         self._journal_status.pack(
             anchor="w",
-            pady=(8, 12),
+            pady=(0, 12),
         )
 
         columns = (
@@ -364,6 +394,11 @@ class MainWindow(tk.Tk):
             columns=columns,
             show="headings",
             height=12,
+        )
+
+        self._account_table.bind(
+            "<Double-1>",
+            lambda _event: self._open_edit_account(),
         )
 
         self._account_table.heading(
@@ -425,6 +460,166 @@ class MainWindow(tk.Tk):
             fill="both",
             expand=True,
         )
+
+    def _open_new_account(self) -> None:
+        """Öffnet den Dialog zum Anlegen eines Kontos."""
+
+        if self._workspace.is_closed:
+            return
+
+        dialog = AccountEditorDialog(
+            self,
+            assets=self._assets,
+            liabilities=self._liabilities,
+            income_statement=self._income_statement,
+        )
+
+        self.wait_window(dialog)
+
+        if dialog.result is None:
+            return
+
+        try:
+            self._workspace.add_account(
+                account=dialog.result.account,
+                mapping_rule=dialog.result.mapping_rule,
+            )
+        except ValueError as exc:
+            messagebox.showerror(
+                "Konto kann nicht angelegt werden",
+                str(exc),
+                parent=self,
+            )
+            return
+
+        messagebox.showinfo(
+            "Konto angelegt",
+            (
+                "Das Konto wurde gespeichert.\n\n"
+                "Die Buchhaltung wird neu geöffnet, "
+                "damit der geänderte Kontenrahmen "
+                "vollständig wirksam wird."
+            ),
+            parent=self,
+        )
+
+        self._return_to_start_requested = True
+        self.destroy()
+
+    def _open_edit_account(self) -> None:
+        """Öffnet den Dialog zum Bearbeiten des ausgewählten Kontos."""
+
+        if self._workspace.is_closed:
+            return
+
+        selection = self._account_table.selection()
+
+        if not selection:
+            messagebox.showinfo(
+                "Konto bearbeiten",
+                "Bitte wählen Sie zuerst ein Konto aus.",
+                parent=self,
+            )
+            return
+
+        values = self._account_table.item(
+            selection[0],
+            "values",
+        )
+
+        if not values:
+            return
+
+        account_number = str(
+            values[0]
+        )
+
+        technical_account_numbers = {
+            self._opening_balance_account_number,
+            self._closing_accounts.income_summary_account,
+            self._closing_accounts.profit_account,
+            self._closing_accounts.loss_account,
+        }
+
+        if account_number in technical_account_numbers:
+            messagebox.showinfo(
+                "Konto bearbeiten",
+                (
+                    "Dieses Konto ist als technisches "
+                    "Steuerungskonto konfiguriert und kann "
+                    "hier nicht bearbeitet werden."
+                ),
+                parent=self,
+            )
+            return
+
+        account = next(
+            (
+                item
+                for item in self._accounts
+                if item.number == account_number
+            ),
+            None,
+        )
+
+        if account is None:
+            messagebox.showerror(
+                "Konto bearbeiten",
+                "Das ausgewählte Konto wurde nicht gefunden.",
+                parent=self,
+            )
+            return
+
+        mapping_rule = next(
+            (
+                rule
+                for rule
+                in self._chart_of_accounts.account_mapping_rules
+                if rule.account_number == account_number
+            ),
+            None,
+        )
+
+        dialog = AccountEditorDialog(
+            self,
+            assets=self._assets,
+            liabilities=self._liabilities,
+            income_statement=self._income_statement,
+            account=account,
+            mapping_rule=mapping_rule,
+        )
+
+        self.wait_window(dialog)
+
+        if dialog.result is None:
+            return
+
+        try:
+            self._workspace.update_account(
+                account=dialog.result.account,
+                mapping_rule=dialog.result.mapping_rule,
+            )
+        except ValueError as exc:
+            messagebox.showerror(
+                "Konto kann nicht geändert werden",
+                str(exc),
+                parent=self,
+            )
+            return
+
+        messagebox.showinfo(
+            "Konto geändert",
+            (
+                "Das Konto wurde gespeichert.\n\n"
+                "Die Buchhaltung wird neu geöffnet, "
+                "damit der geänderte Kontenrahmen "
+                "vollständig wirksam wird."
+            ),
+            parent=self,
+        )
+
+        self._return_to_start_requested = True
+        self.destroy()
 
     def _create_journal_tab(self) -> None:
         """Erzeugt den Arbeitsbereich Journal."""
@@ -537,9 +732,25 @@ class MainWindow(tk.Tk):
             pady=(0, 16),
         )
 
+        technical_account_numbers = {
+            self._opening_balance_account_number,
+            self._closing_accounts.income_summary_account,
+            self._closing_accounts.profit_account,
+            self._closing_accounts.loss_account,
+        }
+
+        bookable_accounts = tuple(
+            account
+            for account in self._accounts
+            if (
+                account.is_active
+                and account.number not in technical_account_numbers
+            )
+        )
+
         self._booking_frame = BookingFrame(
             self._booking_tab,
-            accounts=self._accounts,
+            accounts=bookable_accounts,
             on_booking_created=self._post_booking,
         )
 
@@ -855,6 +1066,7 @@ class MainWindow(tk.Tk):
             self,
             accounts=self._accounts,
             excluded_account_numbers={
+                self._opening_balance_account_number,
                 self._closing_accounts.income_summary_account,
                 self._closing_accounts.profit_account,
                 self._closing_accounts.loss_account,
@@ -1383,42 +1595,6 @@ class MainWindow(tk.Tk):
                 ),
             )
 
-        try:
-            opening_account = self._ledger.get_account(
-                self._opening_balance_account_number
-            )
-        except KeyError:
-            return
-
-        opening_balance = (
-            opening_account.debit_balance
-            if opening_account.debit_balance > ZERO
-            else opening_account.credit_balance
-        )
-
-        opening_account_name = next(
-        (
-            account.name
-            for account in self._accounts
-            if (
-                account.number
-                == self._opening_balance_account_number
-            )
-        ),
-        "Eröffnungsbilanzkonto",
-    )
-
-        self._account_table.insert(
-            "",
-            "end",
-            values=(
-                self._opening_balance_account_number,
-                opening_account_name,
-                self._format_amount(opening_account.debit),
-                self._format_amount(opening_account.credit),
-                self._format_amount(opening_balance),
-            ),
-        )
 
     def _refresh_journal(self) -> None:
         """Aktualisiert die Journalanzeige."""
@@ -1665,8 +1841,12 @@ class MainWindow(tk.Tk):
 
         if enabled:
             self._opening_balance_button.state(["!disabled"])
+            self._new_account_button.state(["!disabled"])
+            self._edit_account_button.state(["!disabled"])
         else:
             self._opening_balance_button.state(["disabled"])
+            self._new_account_button.state(["disabled"])
+            self._edit_account_button.state(["disabled"])
 
         self._booking_frame.set_enabled(enabled)
 

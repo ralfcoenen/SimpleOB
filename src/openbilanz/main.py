@@ -399,6 +399,9 @@ def main() -> None:
                 company_repository=(
                     company_repository
                 ),
+                chart_of_accounts_repository=(
+                    chart_of_accounts_repository
+                ),
                 posting_service=posting_service,
                 reporting_service=reporting_service,
                 closing_workflow=closing_workflow,

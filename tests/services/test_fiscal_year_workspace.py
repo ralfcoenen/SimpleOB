@@ -1436,3 +1436,45 @@ def test_rejects_export_of_unvalidated_e_bilanz(
         )
 
     export_service.export.assert_not_called()
+
+def test_updates_account_via_chart_of_accounts_repository(
+    context: ApplicationContext,
+) -> None:
+    """Kontenänderungen werden an das Kontenrahmen-Repository delegiert."""
+
+    booking_repository = Mock()
+    company_repository = Mock()
+    chart_of_accounts_repository = Mock()
+
+    booking_repository.list_for_fiscal_year.return_value = ()
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=company_repository,
+        chart_of_accounts_repository=(
+            chart_of_accounts_repository
+        ),
+        posting_service=Mock(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
+        taxonomy_management_service=Mock(),
+        e_bilanz_export_service=Mock(),
+    )
+
+    account = Mock()
+    mapping_rule = Mock()
+
+    workspace.update_account(
+        account=account,
+        mapping_rule=mapping_rule,
+    )
+
+    chart_of_accounts_repository.update_account.assert_called_once_with(
+        company_id=context.company.company_id,
+        account=account,
+        mapping_rule=mapping_rule,
+    )

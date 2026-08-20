@@ -293,3 +293,204 @@ def test_saves_and_validates_control_accounts() -> None:
             )
 
     assert loaded == control_accounts
+
+def test_adds_account_to_existing_chart_of_accounts() -> None:
+    """Ein neues Konto wird dem Mandantenkontenrahmen hinzugefügt."""
+
+    engine = create_engine(
+        "sqlite:///:memory:"
+    )
+    Base.metadata.create_all(engine)
+
+    Session = sessionmaker(
+        bind=engine
+    )
+
+    company = Company(
+        company_id=uuid4(),
+        name="Muster UG",
+    )
+
+    position = FinancialStatementPosition(
+        code="HGB.266.AKTIVA.B.IV",
+        name="Guthaben bei Kreditinstituten",
+    )
+
+    provider = HgbFinancialStatementPositionProvider(
+        (
+            FinancialStatementPosition(
+                code="HGB.266.AKTIVA",
+                name="Aktiva",
+                children=(position,),
+            ),
+        )
+    )
+
+    template_account = TemplateAccount(
+        account_number="1210",
+        name="Weitere Bank",
+        account_type=AccountType.ASSET,
+    )
+
+    account = Account(
+        template=template_account,
+    )
+
+    mapping_rule = AccountMappingRule(
+        account_number="1210",
+        debit_position=position,
+        credit_position=None,
+    )
+
+    with Session() as session:
+        CompanyRepository(session).add(
+            company
+        )
+
+        repository = ChartOfAccountsRepository(
+            session
+        )
+
+        repository.add_account(
+            company_id=company.company_id,
+            account=account,
+            mapping_rule=mapping_rule,
+        )
+
+        loaded = repository.load_for_company(
+            company_id=company.company_id,
+            position_provider=provider,
+        )
+
+    assert loaded is not None
+
+    chart_of_accounts, accounts = loaded
+
+    assert tuple(
+        item.account_number
+        for item in chart_of_accounts.accounts
+    ) == ("1210",)
+
+    assert accounts == (account,)
+
+    assert (
+        chart_of_accounts
+        .account_mapping_rules[0]
+        .debit_position
+        == position
+    )
+
+def test_updates_existing_account() -> None:
+    """Ein vorhandenes Konto kann geändert werden."""
+
+    engine = create_engine(
+        "sqlite:///:memory:"
+    )
+    Base.metadata.create_all(engine)
+
+    Session = sessionmaker(
+        bind=engine
+    )
+
+    company = Company(
+        company_id=uuid4(),
+        name="Muster UG",
+    )
+
+    first_position = FinancialStatementPosition(
+        code="HGB.266.AKTIVA.B.IV",
+        name="Guthaben bei Kreditinstituten",
+    )
+
+    second_position = FinancialStatementPosition(
+        code="HGB.266.AKTIVA.B.II.4",
+        name="Sonstige Vermögensgegenstände",
+    )
+
+    assets = FinancialStatementPosition(
+        code="HGB.266.AKTIVA",
+        name="Aktiva",
+        children=(
+            first_position,
+            second_position,
+        ),
+    )
+
+    provider = HgbFinancialStatementPositionProvider(
+        assets
+    )
+
+    original_template = TemplateAccount(
+        account_number="1210",
+        name="Weitere Bank",
+        account_type=AccountType.ASSET,
+    )
+
+    updated_template = TemplateAccount(
+        account_number="1210",
+        name="Verrechnungskonto",
+        account_type=AccountType.ASSET,
+    )
+
+    original_account = Account(
+        template=original_template,
+    )
+
+    updated_account = Account(
+        template=updated_template,
+        is_active=False,
+    )
+
+    original_mapping = AccountMappingRule(
+        account_number="1210",
+        debit_position=first_position,
+        credit_position=None,
+    )
+
+    updated_mapping = AccountMappingRule(
+        account_number="1210",
+        debit_position=second_position,
+        credit_position=None,
+    )
+
+    with Session() as session:
+        CompanyRepository(session).add(
+            company
+        )
+
+        repository = ChartOfAccountsRepository(
+            session
+        )
+
+        repository.add_account(
+            company_id=company.company_id,
+            account=original_account,
+            mapping_rule=original_mapping,
+        )
+
+        repository.update_account(
+            company_id=company.company_id,
+            account=updated_account,
+            mapping_rule=updated_mapping,
+        )
+
+        loaded = repository.load_for_company(
+            company_id=company.company_id,
+            position_provider=provider,
+        )
+
+    assert loaded is not None
+
+    chart_of_accounts, accounts = loaded
+
+    assert accounts == (updated_account,)
+
+    mapping_rule = (
+        chart_of_accounts
+        .account_mapping_rules[0]
+    )
+
+    assert (
+        mapping_rule.debit_position
+        == second_position
+    )

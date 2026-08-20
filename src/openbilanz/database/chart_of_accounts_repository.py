@@ -170,6 +170,198 @@ class ChartOfAccountsRepository:
         if commit:
             self._session.commit()
 
+    def add_account(
+        self,
+        *,
+        company_id: UUID,
+        account: Account,
+        mapping_rule: AccountMappingRule | None,
+        commit: bool = True,
+    ) -> None:
+        """Fügt dem Kontenrahmen eines Mandanten ein Konto hinzu."""
+
+        if not isinstance(company_id, UUID):
+            raise TypeError(
+                "company_id must be a UUID"
+            )
+
+        if not isinstance(account, Account):
+            raise TypeError(
+                "account must be an Account"
+            )
+
+        if (
+            mapping_rule is not None
+            and not isinstance(
+                mapping_rule,
+                AccountMappingRule,
+            )
+        ):
+            raise TypeError(
+                "mapping_rule must be an "
+                "AccountMappingRule or None"
+            )
+
+        if (
+            mapping_rule is not None
+            and mapping_rule.account_number
+            != account.number
+        ):
+            raise ValueError(
+                "Zuordnungsregel und Konto stimmen "
+                "nicht überein."
+            )
+
+        company_model = self._find_company(
+            company_id
+        )
+
+        if company_model is None:
+            raise ValueError(
+                "Das Unternehmen ist nicht vorhanden."
+            )
+
+        existing = (
+            self._session.query(Konto)
+            .filter(
+                Konto.mandant_id
+                == company_model.id,
+                Konto.account_number
+                == account.number,
+            )
+            .one_or_none()
+        )
+
+        if existing is not None:
+            raise ValueError(
+                "Das Konto ist bereits vorhanden."
+            )
+
+        model = Konto(
+            mandant_id=company_model.id,
+            account_number=account.number,
+            name=account.name,
+            account_type=account.account_type.name,
+            is_active=account.is_active,
+            debit_position_code=(
+                mapping_rule.debit_position.code
+                if (
+                    mapping_rule is not None
+                    and mapping_rule.debit_position
+                    is not None
+                )
+                else None
+            ),
+            credit_position_code=(
+                mapping_rule.credit_position.code
+                if (
+                    mapping_rule is not None
+                    and mapping_rule.credit_position
+                    is not None
+                )
+                else None
+            ),
+        )
+
+        self._session.add(model)
+
+        if commit:
+            self._session.commit()
+
+    def update_account(
+        self,
+        *,
+        company_id: UUID,
+        account: Account,
+        mapping_rule: AccountMappingRule | None,
+        commit: bool = True,
+    ) -> None:
+        """Aktualisiert ein vorhandenes Konto eines Mandanten."""
+
+        if not isinstance(company_id, UUID):
+            raise TypeError(
+                "company_id must be a UUID"
+            )
+
+        if not isinstance(account, Account):
+            raise TypeError(
+                "account must be an Account"
+            )
+
+        if (
+            mapping_rule is not None
+            and not isinstance(
+                mapping_rule,
+                AccountMappingRule,
+            )
+        ):
+            raise TypeError(
+                "mapping_rule must be an "
+                "AccountMappingRule or None"
+            )
+
+        if (
+            mapping_rule is not None
+            and mapping_rule.account_number
+            != account.number
+        ):
+            raise ValueError(
+                "Zuordnungsregel und Konto stimmen "
+                "nicht überein."
+            )
+
+        company_model = self._find_company(
+            company_id
+        )
+
+        if company_model is None:
+            raise ValueError(
+                "Das Unternehmen ist nicht vorhanden."
+            )
+
+        model = (
+            self._session.query(Konto)
+            .filter(
+                Konto.mandant_id
+                == company_model.id,
+                Konto.account_number
+                == account.number,
+            )
+            .one_or_none()
+        )
+
+        if model is None:
+            raise ValueError(
+                "Das Konto ist nicht vorhanden."
+            )
+
+        model.name = account.name
+        model.account_type = account.account_type.name
+        model.is_active = account.is_active
+
+        model.debit_position_code = (
+            mapping_rule.debit_position.code
+            if (
+                mapping_rule is not None
+                and mapping_rule.debit_position
+                is not None
+            )
+            else None
+        )
+
+        model.credit_position_code = (
+            mapping_rule.credit_position.code
+            if (
+                mapping_rule is not None
+                and mapping_rule.credit_position
+                is not None
+            )
+            else None
+        )
+
+        if commit:
+            self._session.commit()
+
     def load_for_company(
         self,
         *,
