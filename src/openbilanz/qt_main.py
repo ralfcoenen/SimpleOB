@@ -2,7 +2,9 @@
 
 import sys
 
-from PySide6.QtWidgets import QApplication, QLabel, QMainWindow
+from PySide6.QtWidgets import QApplication
+
+from openbilanz.ui_qt.main_window import MainWindow
 
 
 def main() -> None:
@@ -10,13 +12,7 @@ def main() -> None:
 
     app = QApplication(sys.argv)
 
-    window = QMainWindow()
-    window.setWindowTitle("OpenBilanz – PySide6")
-    window.resize(900, 600)
-
-    label = QLabel("OpenBilanz – PySide6-Prototyp")
-    window.setCentralWidget(label)
-
+    window = MainWindow()
     window.show()
 
     sys.exit(app.exec())
