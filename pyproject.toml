@@ -20,6 +20,7 @@ dependencies = [
     "odfpy",
     "lxml",
     "reportlab",
+    "PySide6",
 ]
 
 [project.optional-dependencies]
@@ -45,7 +46,7 @@ markers = [
 
 [project.scripts]
 openbilanz = "openbilanz.main:main"
-
+openbilanz-qt = "openbilanz.qt_main:main"
 
 [tool.ruff]
 target-version = "py312"
