@@ -7,6 +7,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from openbilanz.ui_qt.accounts_page import AccountsPage
+
 
 class MainWindow(QMainWindow):
     """Hauptfenster der PySide6-Oberfläche."""
@@ -30,8 +32,14 @@ class MainWindow(QMainWindow):
     def _create_tabs(self) -> None:
         """Erzeugt die Hauptarbeitsbereiche."""
 
-        tab_names = (
+        self._accounts_page = AccountsPage()
+
+        self._tabs.addTab(
+            self._accounts_page,
             "Konten",
+        )
+
+        for tab_name in (
             "Journal",
             "Buchen",
             "Anlagen",
@@ -40,7 +48,5 @@ class MainWindow(QMainWindow):
             "Auswertungen",
             "Jahresabschluss",
             "E-Bilanz",
-        )
-
-        for tab_name in tab_names:
+        ):
             self._tabs.addTab(QWidget(), tab_name)
