@@ -50,6 +50,7 @@ from openbilanz.domain.fixed_asset_status import (
 )
 from openbilanz.domain.journal import Journal
 from openbilanz.domain.managed_fiscal_year import ManagedFiscalYear
+from openbilanz.domain.vat_accounts import VatAccounts
 from openbilanz.reporting.account_activity_report import (
     AccountActivityReport,
 )
@@ -57,6 +58,7 @@ from openbilanz.reporting.journal_report import JournalReport
 from openbilanz.reporting.trial_balance_report import (
     TrialBalanceReport,
 )
+from openbilanz.reporting.vat_report import VatReport
 from openbilanz.services.closing_consistency_service import (
     ClosingConsistencyService,
 )
@@ -313,6 +315,22 @@ class FiscalYearWorkspace:
             journal=self._journal,
             start_date=start_date,
             end_date=end_date,
+        )
+
+    def build_vat_report(
+        self,
+        *,
+        start_date: date,
+        end_date: date,
+        vat_accounts: VatAccounts,
+    ) -> VatReport:
+        """Erzeugt die Umsatzsteuer-Auswertung."""
+
+        return self._reporting_service.vat_report(
+            journal=self._journal,
+            start_date=start_date,
+            end_date=end_date,
+            vat_accounts=vat_accounts,
         )
 
     def install_required_taxonomy(self) -> None:

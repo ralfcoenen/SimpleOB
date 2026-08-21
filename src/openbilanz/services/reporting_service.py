@@ -8,6 +8,7 @@ from openbilanz.domain.booking_type import BookingType
 from openbilanz.domain.entry_side import EntrySide
 from openbilanz.domain.journal import Journal
 from openbilanz.domain.money import ZERO
+from openbilanz.domain.vat_accounts import VatAccounts
 from openbilanz.reporting.account_activity_report import (
     AccountActivityReport,
     AccountActivityReportLine,
@@ -24,6 +25,7 @@ from openbilanz.reporting.trial_balance_report import (
     TrialBalanceReport,
     TrialBalanceReportRow,
 )
+from openbilanz.reporting.vat_report import VatReport
 
 
 class ReportingService:
@@ -390,4 +392,76 @@ class ReportingService:
             start_date=start_date,
             end_date=end_date,
             lines=tuple(lines),
+        )
+
+    def vat_report(
+        self,
+        *,
+        journal: Journal,
+        start_date: date,
+        end_date: date,
+        vat_accounts: VatAccounts,
+    ) -> VatReport:
+        """Erzeugt eine Umsatzsteuer-Auswertung für einen Zeitraum."""
+
+        if not isinstance(journal, Journal):
+            raise TypeError("journal muss ein Journal sein.")
+
+        if not isinstance(start_date, date):
+            raise TypeError("start_date muss ein Datum sein.")
+
+        if not isinstance(end_date, date):
+            raise TypeError("end_date muss ein Datum sein.")
+
+        if end_date < start_date:
+            raise ValueError(
+                "Das Enddatum darf nicht vor dem Startdatum liegen."
+            )
+
+        if not isinstance(vat_accounts, VatAccounts):
+            raise TypeError(
+                "vat_accounts muss ein VatAccounts-Objekt sein."
+            )
+
+        output_tax_7 = ZERO
+        output_tax_19 = ZERO
+        input_tax_7 = ZERO
+        input_tax_19 = ZERO
+
+        for booking in journal:
+            if booking.booking_type is BookingType.CLOSING:
+                continue
+
+            if booking.booking_date < start_date:
+                continue
+
+            if booking.booking_date > end_date:
+                continue
+
+            for line in booking.lines:
+                signed_amount = (
+                    line.amount
+                    if line.side is EntrySide.CREDIT
+                    else -line.amount
+                )
+
+                if line.account_number == vat_accounts.output_tax_7:
+                    output_tax_7 += signed_amount
+
+                elif line.account_number == vat_accounts.output_tax_19:
+                    output_tax_19 += signed_amount
+
+                elif line.account_number == vat_accounts.input_tax_7:
+                    input_tax_7 -= signed_amount
+
+                elif line.account_number == vat_accounts.input_tax_19:
+                    input_tax_19 -= signed_amount
+
+        return VatReport(
+            start_date=start_date,
+            end_date=end_date,
+            output_tax_7=output_tax_7,
+            output_tax_19=output_tax_19,
+            input_tax_7=input_tax_7,
+            input_tax_19=input_tax_19,
         )

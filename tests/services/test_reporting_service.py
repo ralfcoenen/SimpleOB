@@ -13,9 +13,16 @@ from openbilanz.domain.booking_line import BookingLine
 from openbilanz.domain.booking_type import BookingType
 from openbilanz.domain.entry_side import EntrySide
 from openbilanz.domain.journal import Journal
+from openbilanz.domain.vat_accounts import VatAccounts
 from openbilanz.reporting.account_statement import AccountStatement
 from openbilanz.services.reporting_service import ReportingService
 
+VAT_ACCOUNTS = VatAccounts(
+    input_tax_7="1571",
+    input_tax_19="1576",
+    output_tax_7="1771",
+    output_tax_19="1776",
+)
 
 def test_reporting_service_returns_entries_for_account() -> None:
     """Das Kontoblatt enthält alle Buchungen des angegebenen Kontos."""
@@ -656,3 +663,211 @@ def test_journal_report_filters_and_groups_bookings() -> None:
         line.booking_id != closing_booking.booking_id
         for line in report.lines
     )
+
+def test_vat_report_calculates_tax_amounts_and_payable() -> None:
+    """Die USt-Auswertung saldiert Vor- und Umsatzsteuer."""
+
+    journal = Journal()
+
+    output_booking = Booking(
+        booking_date=date(2026, 3, 15),
+        lines=(
+            BookingLine(
+                account_number="1200",
+                side=EntrySide.DEBIT,
+                amount=Decimal("899.32"),
+            ),
+            BookingLine(
+                account_number="8400",
+                side=EntrySide.CREDIT,
+                amount=Decimal("700.00"),
+            ),
+            BookingLine(
+                account_number="1771",
+                side=EntrySide.CREDIT,
+                amount=Decimal("49.00"),
+            ),
+            BookingLine(
+                account_number="8300",
+                side=EntrySide.CREDIT,
+                amount=Decimal("126.32"),
+            ),
+            BookingLine(
+                account_number="1776",
+                side=EntrySide.CREDIT,
+                amount=Decimal("24.00"),
+            ),
+        ),
+    )
+
+    input_booking = Booking(
+        booking_date=date(2026, 3, 20),
+        lines=(
+            BookingLine(
+                account_number="4930",
+                side=EntrySide.DEBIT,
+                amount=Decimal("200.00"),
+            ),
+            BookingLine(
+                account_number="1571",
+                side=EntrySide.DEBIT,
+                amount=Decimal("7.00"),
+            ),
+            BookingLine(
+                account_number="1576",
+                side=EntrySide.DEBIT,
+                amount=Decimal("19.00"),
+            ),
+            BookingLine(
+                account_number="1200",
+                side=EntrySide.CREDIT,
+                amount=Decimal("226.00"),
+            ),
+        ),
+    )
+
+    journal.add(output_booking)
+    journal.add(input_booking)
+
+    report = ReportingService().vat_report(
+        journal=journal,
+        start_date=date(2026, 1, 1),
+        end_date=date(2026, 12, 31),
+        vat_accounts=VAT_ACCOUNTS,
+    )
+
+    assert report.output_tax_7 == Decimal("49.00")
+    assert report.output_tax_19 == Decimal("24.00")
+    assert report.output_tax_total == Decimal("73.00")
+
+    assert report.input_tax_7 == Decimal("7.00")
+    assert report.input_tax_19 == Decimal("19.00")
+    assert report.input_tax_total == Decimal("26.00")
+
+    assert report.vat_payable == Decimal("47.00")
+    assert report.input_tax_surplus == Decimal("0.00")
+
+
+def test_vat_report_accounts_for_credit_notes() -> None:
+    """Gutschriften mindern Umsatzsteuer und Vorsteuer."""
+
+    journal = Journal()
+
+    customer_credit_note = Booking(
+        booking_date=date(2026, 4, 10),
+        lines=(
+            BookingLine(
+                account_number="8400",
+                side=EntrySide.DEBIT,
+                amount=Decimal("100.00"),
+            ),
+            BookingLine(
+                account_number="1776",
+                side=EntrySide.DEBIT,
+                amount=Decimal("19.00"),
+            ),
+            BookingLine(
+                account_number="1200",
+                side=EntrySide.CREDIT,
+                amount=Decimal("119.00"),
+            ),
+        ),
+    )
+
+    supplier_credit_note = Booking(
+        booking_date=date(2026, 4, 15),
+        lines=(
+            BookingLine(
+                account_number="1200",
+                side=EntrySide.DEBIT,
+                amount=Decimal("107.00"),
+            ),
+            BookingLine(
+                account_number="4930",
+                side=EntrySide.CREDIT,
+                amount=Decimal("100.00"),
+            ),
+            BookingLine(
+                account_number="1571",
+                side=EntrySide.CREDIT,
+                amount=Decimal("7.00"),
+            ),
+        ),
+    )
+
+    journal.add(customer_credit_note)
+    journal.add(supplier_credit_note)
+
+    report = ReportingService().vat_report(
+        journal=journal,
+        start_date=date(2026, 1, 1),
+        end_date=date(2026, 12, 31),
+        vat_accounts=VAT_ACCOUNTS,
+    )
+
+    assert report.output_tax_19 == Decimal("-19.00")
+    assert report.input_tax_7 == Decimal("-7.00")
+    assert report.vat_payable == Decimal("-12.00")
+    assert report.input_tax_surplus == Decimal("12.00")
+
+
+def test_vat_report_filters_date_range() -> None:
+    """Die USt-Auswertung berücksichtigt nur den gewählten Zeitraum."""
+
+    journal = Journal()
+
+    before = Booking(
+        booking_date=date(2026, 1, 15),
+        lines=(
+            BookingLine(
+                account_number="1200",
+                side=EntrySide.DEBIT,
+                amount=Decimal("119.00"),
+            ),
+            BookingLine(
+                account_number="8400",
+                side=EntrySide.CREDIT,
+                amount=Decimal("100.00"),
+            ),
+            BookingLine(
+                account_number="1776",
+                side=EntrySide.CREDIT,
+                amount=Decimal("19.00"),
+            ),
+        ),
+    )
+
+    inside = Booking(
+        booking_date=date(2026, 3, 15),
+        lines=(
+            BookingLine(
+                account_number="1200",
+                side=EntrySide.DEBIT,
+                amount=Decimal("107.00"),
+            ),
+            BookingLine(
+                account_number="8300",
+                side=EntrySide.CREDIT,
+                amount=Decimal("100.00"),
+            ),
+            BookingLine(
+                account_number="1771",
+                side=EntrySide.CREDIT,
+                amount=Decimal("7.00"),
+            ),
+        ),
+    )
+
+    journal.add(before)
+    journal.add(inside)
+
+    report = ReportingService().vat_report(
+        journal=journal,
+        start_date=date(2026, 3, 1),
+        end_date=date(2026, 3, 31),
+        vat_accounts=VAT_ACCOUNTS,
+    )
+
+    assert report.output_tax_7 == Decimal("7.00")
+    assert report.output_tax_19 == Decimal("0.00")
+    assert report.output_tax_total == Decimal("7.00")

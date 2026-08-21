@@ -37,3 +37,6 @@ docs/development/eric/
 
 # Lokale ERiC-SDK- und Arbeitsdateien
 /ERIC/
+
+# Build-Artefakte
+/build/
