@@ -27,6 +27,16 @@ class Database:
     ) -> None:
         self._config = config
 
+        config.data_dir.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        config.database_file.parent.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
         self._engine = create_engine(
             config.database_url,
             echo=False,

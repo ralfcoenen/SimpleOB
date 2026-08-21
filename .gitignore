@@ -37,3 +37,7 @@ docs/development/eric/
 
 # Lokale ERiC-SDK- und Arbeitsdateien
 /ERIC/
+
+# PyInstaller build artifacts
+build/
+dist/

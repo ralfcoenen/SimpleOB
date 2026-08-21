@@ -2,13 +2,43 @@
 
 from __future__ import annotations
 
+import os
+import sys
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parents[3]
 
-DEFAULT_DATA_DIR = BASE_DIR / "data"
+
+def _default_data_dir() -> Path:
+    """Liefert das Standard-Datenverzeichnis der Anwendung."""
+
+    if (
+        sys.platform == "win32"
+        and getattr(sys, "frozen", False)
+    ):
+        local_app_data = os.environ.get(
+            "LOCALAPPDATA"
+        )
+
+        if local_app_data:
+            return (
+                Path(local_app_data)
+                / "OpenBilanz"
+            )
+
+        return (
+            Path.home()
+            / "AppData"
+            / "Local"
+            / "OpenBilanz"
+        )
+
+    return BASE_DIR / "data"
+
+
+DEFAULT_DATA_DIR = _default_data_dir()
 
 DEFAULT_CONFIG_FILE = (
     DEFAULT_DATA_DIR
@@ -133,4 +163,3 @@ DATA_DIR = _current_config.data_dir
 DATABASE_FILE = _current_config.database_file
 DATABASE_URL = _current_config.database_url
 TAXONOMY_DIR = _current_config.taxonomy_dir
-
