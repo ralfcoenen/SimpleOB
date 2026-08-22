@@ -38,6 +38,10 @@ from openbilanz.ui_qt.journal_table_model import JournalTableRow
 from openbilanz.ui_qt.new_fixed_asset_dialog import (
     NewFixedAssetDialog,
 )
+from openbilanz.ui_qt.reports_page import ReportsPage
+from openbilanz.ui_qt.trial_balance_report_page import (
+    TrialBalanceReportPage,
+)
 
 
 class MainWindow(QMainWindow):
@@ -155,10 +159,52 @@ class MainWindow(QMainWindow):
             "GuV",
         )
 
+        self._trial_balance_report_page = (
+            TrialBalanceReportPage(
+                fiscal_year_start=(
+                    self._workspace_context
+                    .workspace
+                    .context
+                    .fiscal_year
+                    .start_date
+                ),
+                fiscal_year_end=(
+                    self._workspace_context
+                    .workspace
+                    .context
+                    .fiscal_year
+                    .end_date
+                ),
+                account_names={
+                    account.number: account.name
+                    for account in (
+                        self._workspace_context
+                        .financial_statement_context
+                        .accounts
+                    )
+                },
+                build_report=(
+                    self._build_trial_balance_report
+                ),
+            )
+        )
+
+        self._reports_page = ReportsPage(
+            trial_balance_page=(
+                self._trial_balance_report_page
+            ),
+        )
+
+        self._tabs.addTab(
+            self._reports_page,
+            "Auswertungen",
+        )
+
+        self._trial_balance_report_page.refresh_report()
+
         self._refresh_financial_statements()
 
         for tab_name in (
-            "Auswertungen",
             "Jahresabschluss",
             "E-Bilanz",
         ):
@@ -572,6 +618,19 @@ class MainWindow(QMainWindow):
 
         self._refresh_financial_statements()
 
+        self._trial_balance_report_page.refresh_report()
+
+        self._trial_balance_report_page.set_account_names(
+            {
+                account.number: account.name
+                for account in (
+                    self._workspace_context
+                    .financial_statement_context
+                    .accounts
+                )
+            }
+        )
+
     def _return_to_start(self) -> None:
         """Schließt das Hauptfenster und kehrt zur Auswahl zurück."""
 
@@ -767,3 +826,19 @@ class MainWindow(QMainWindow):
         )
 
         self._refresh_financial_statements()
+
+    def _build_trial_balance_report(
+        self,
+        start_date,
+        end_date,
+    ):
+        workspace = self._workspace_context.workspace
+
+        return workspace.build_trial_balance_report(
+            start_date=start_date,
+            end_date=end_date,
+            opening_balance_account_number=(
+                self._workspace_context
+                .opening_balance_account_number
+            ),
+        )
