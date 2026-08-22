@@ -23,6 +23,8 @@ from openbilanz.ui_qt.accounts_page import AccountsPage
 from openbilanz.ui_qt.accounts_table_model import (
     AccountTableRow,
 )
+from openbilanz.ui_qt.journal_page import JournalPage
+from openbilanz.ui_qt.journal_table_model import JournalTableRow
 
 
 class MainWindow(QMainWindow):
@@ -74,26 +76,22 @@ class MainWindow(QMainWindow):
         self._accounts_page.set_editing_enabled(
             self._workspace_context.workspace.is_open
         )
-        print(
-            "workspace.is_open =",
-            self._workspace_context.workspace.is_open,
-        )
-        print(
-            "workspace.is_closed =",
-            self._workspace_context.workspace.is_closed,
-        )
-        print(
-            "status =",
-            self._workspace_context.workspace.managed_fiscal_year.status,
-        )
 
         self._tabs.addTab(
             self._accounts_page,
             "Konten",
         )
 
-        for tab_name in (
+        self._journal_page = JournalPage(
+            rows=self._build_journal_rows()
+        )
+
+        self._tabs.addTab(
+            self._journal_page,
             "Journal",
+        )
+
+        for tab_name in (
             "Buchen",
             "Anlagen",
             "Bilanz",
@@ -147,6 +145,10 @@ class MainWindow(QMainWindow):
             return
 
         self._reload_after_account_change()
+
+        self._journal_page.model.replace_rows(
+            self._build_journal_rows()
+        )
 
         QMessageBox.information(
             self,
@@ -351,3 +353,70 @@ class MainWindow(QMainWindow):
             return debit_balance - credit_balance
 
         return credit_balance - debit_balance
+
+    def _build_journal_rows(
+        self,
+    ) -> tuple[JournalTableRow, ...]:
+        """Erzeugt die Darstellungszeilen des Journals."""
+
+        workspace = self._workspace_context.workspace
+
+        accounts = (
+            self._workspace_context
+            .financial_statement_context
+            .accounts
+        )
+
+        account_names = {
+            account.number: account.name
+            for account in accounts
+        }
+
+        rows: list[JournalTableRow] = []
+
+        for booking in workspace.journal:
+            first_line = True
+
+            for line in booking.lines:
+                account_name = account_names.get(
+                    line.account_number,
+                    "Unbekanntes Konto",
+                )
+
+                account_display = (
+                    f"{line.account_number} – "
+                    f"{account_name}"
+                )
+
+                rows.append(
+                    JournalTableRow(
+                        booking_date=(
+                            booking.booking_date.strftime(
+                                "%d.%m.%Y"
+                            )
+                            if first_line
+                            else ""
+                        ),
+                        voucher_no=(
+                            booking.voucher_no or ""
+                            if first_line
+                            else ""
+                        ),
+                        description=(
+                            booking.description or ""
+                            if first_line
+                            else ""
+                        ),
+                        account=account_display,
+                        side=(
+                            "Soll"
+                            if line.is_debit
+                            else "Haben"
+                        ),
+                        amount=line.amount,
+                    )
+                )
+
+                first_line = False
+
+        return tuple(rows)
