@@ -15,6 +15,7 @@ from openbilanz.application.workspace_factory import (
     WorkspaceContext,
 )
 from openbilanz.domain.account_type import AccountType
+from openbilanz.domain.booking import Booking
 from openbilanz.domain.money import ZERO
 from openbilanz.ui_qt.account_editor_dialog import (
     AccountEditorDialog,
@@ -23,6 +24,7 @@ from openbilanz.ui_qt.accounts_page import AccountsPage
 from openbilanz.ui_qt.accounts_table_model import (
     AccountTableRow,
 )
+from openbilanz.ui_qt.booking_page import BookingPage
 from openbilanz.ui_qt.journal_page import JournalPage
 from openbilanz.ui_qt.journal_table_model import JournalTableRow
 
@@ -91,8 +93,19 @@ class MainWindow(QMainWindow):
             "Journal",
         )
 
-        for tab_name in (
+        self._booking_page = BookingPage(
+            accounts=self._bookable_accounts(),
+            vat_accounts=self._workspace_context.vat_accounts,
+            on_booking_created=self._post_booking,
+            enabled=self._workspace_context.workspace.is_open,
+        )
+
+        self._tabs.addTab(
+            self._booking_page,
             "Buchen",
+        )
+
+        for tab_name in (
             "Anlagen",
             "Bilanz",
             "GuV",
@@ -420,3 +433,47 @@ class MainWindow(QMainWindow):
                 first_line = False
 
         return tuple(rows)
+
+    def _bookable_accounts(self):
+        technical_account_numbers = {
+            self._workspace_context.opening_balance_account_number,
+            self._workspace_context.closing_accounts.income_summary_account,
+            self._workspace_context.closing_accounts.profit_account,
+            self._workspace_context.closing_accounts.loss_account,
+            *self._workspace_context.vat_accounts.account_numbers,
+        }
+
+        return tuple(
+            account
+            for account in (
+                self._workspace_context
+                .financial_statement_context
+                .accounts
+            )
+            if (
+                account.is_active
+                and account.number
+                not in technical_account_numbers
+            )
+        )
+
+    def _post_booking(
+        self,
+        booking: Booking,
+    ) -> None:
+        """Verbucht eine Buchung und aktualisiert die Qt-Anzeige."""
+
+        workspace = self._workspace_context.workspace
+
+        if workspace.is_closed:
+            return
+
+        workspace.post_booking(booking)
+
+        self._journal_page.model.replace_rows(
+            self._build_journal_rows()
+        )
+
+        self._accounts_page.model.replace_rows(
+            self._build_account_rows()
+        )
