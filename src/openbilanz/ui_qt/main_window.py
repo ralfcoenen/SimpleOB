@@ -27,11 +27,17 @@ from openbilanz.ui_qt.accounts_table_model import (
 )
 from openbilanz.ui_qt.balance_sheet_page import BalanceSheetPage
 from openbilanz.ui_qt.booking_page import BookingPage
+from openbilanz.ui_qt.fixed_assets_page import (
+    FixedAssetsPage,
+)
 from openbilanz.ui_qt.income_statement_page import (
     IncomeStatementPage,
 )
 from openbilanz.ui_qt.journal_page import JournalPage
 from openbilanz.ui_qt.journal_table_model import JournalTableRow
+from openbilanz.ui_qt.new_fixed_asset_dialog import (
+    NewFixedAssetDialog,
+)
 
 
 class MainWindow(QMainWindow):
@@ -125,10 +131,19 @@ class MainWindow(QMainWindow):
         self._balance_sheet_page = BalanceSheetPage()
         self._income_statement_page = IncomeStatementPage()
 
+        self._fixed_assets_page = FixedAssetsPage(
+            on_add=self._open_new_fixed_asset,
+            on_process_depreciations=(
+                self._process_depreciations
+            ),
+        )
+
         self._tabs.addTab(
-            QWidget(),
+            self._fixed_assets_page,
             "Anlagen",
         )
+
+        self._refresh_fixed_assets()
 
         self._tabs.addTab(
             self._balance_sheet_page,
@@ -568,3 +583,187 @@ class MainWindow(QMainWindow):
         """Gibt an, ob zur Buchhaltungsauswahl zurückgekehrt werden soll."""
 
         return self._return_to_start_requested
+
+    def _refresh_fixed_assets(self) -> None:
+        """Aktualisiert die Anlagegüter."""
+
+        workspace = self._workspace_context.workspace
+
+        try:
+            assets = workspace.list_fixed_assets()
+        except RuntimeError:
+            return
+
+        self._fixed_assets_page.set_assets(
+            assets
+        )
+
+        self._fixed_assets_page.set_editing_enabled(
+            workspace.is_open
+        )
+
+
+    def _open_new_fixed_asset(self) -> None:
+        """Öffnet den Dialog für ein neues Anlagegut."""
+
+        workspace = self._workspace_context.workspace
+
+        if not workspace.is_open:
+            return
+
+        dialog = NewFixedAssetDialog(
+            company_id=(
+                workspace.context.company.company_id
+            ),
+            parent=self,
+        )
+
+        if (
+            dialog.exec()
+            != QDialog.DialogCode.Accepted
+        ):
+            return
+
+        if dialog.result is None:
+            return
+
+        try:
+            workspace.add_fixed_asset(
+                dialog.result
+            )
+        except (
+            ValueError,
+            RuntimeError,
+        ) as exc:
+            QMessageBox.critical(
+                self,
+                "Anlagegut kann nicht angelegt werden",
+                str(exc),
+            )
+            return
+
+        self._refresh_fixed_assets()
+
+        QMessageBox.information(
+            self,
+            "Anlagegut",
+            "Das Anlagegut wurde angelegt.",
+        )
+
+    def _process_depreciations(self) -> None:
+        """Prüft und bucht offene Abschreibungen."""
+
+        workspace = self._workspace_context.workspace
+
+        try:
+            proposals = (
+                workspace.build_depreciation_proposals()
+            )
+        except (
+            ValueError,
+            RuntimeError,
+        ) as exc:
+            QMessageBox.critical(
+                self,
+                "Abschreibungen konnten nicht vorbereitet werden",
+                str(exc),
+            )
+            return
+
+        if not proposals:
+            QMessageBox.information(
+                self,
+                "Abschreibungen",
+                (
+                    "Für dieses Geschäftsjahr sind keine "
+                    "offenen Abschreibungen vorhanden."
+                ),
+            )
+            return
+
+        try:
+            fixed_assets = workspace.list_fixed_assets()
+        except RuntimeError as exc:
+            QMessageBox.critical(
+                self,
+                "Anlagegüter konnten nicht geladen werden",
+                str(exc),
+            )
+            return
+
+        fixed_assets_by_id = {
+            asset.fixed_asset_id: asset
+            for asset in fixed_assets
+        }
+
+        for proposal in proposals:
+            fixed_asset = fixed_assets_by_id.get(
+                proposal.fixed_asset_id
+            )
+
+            if fixed_asset is None:
+                QMessageBox.critical(
+                    self,
+                    "Abschreibung konnte nicht zugeordnet werden",
+                    (
+                        "Das zur Abschreibung gehörende "
+                        "Anlagegut wurde nicht gefunden."
+                    ),
+                )
+                break
+
+            answer = QMessageBox.question(
+                self,
+                "Abschreibung bestätigen",
+                (
+                    "Für folgendes Anlagegut wurde eine "
+                    "lineare Abschreibung ermittelt:\n\n"
+                    f"Anlagen-ID: {fixed_asset.asset_code}\n"
+                    f"Bezeichnung: {fixed_asset.description}\n\n"
+                    f"Betrag: {proposal.amount:.2f} €\n"
+                    "Aufwandskonto: "
+                    f"{proposal.expense_account_number}\n"
+                    "Anlagenkonto: "
+                    f"{proposal.asset_account_number}\n"
+                    "Datum: "
+                    f"{proposal.depreciation_date:%d.%m.%Y}\n\n"
+                    "Soll diese Abschreibung gebucht werden?"
+                ),
+                (
+                    QMessageBox.StandardButton.Yes
+                    | QMessageBox.StandardButton.No
+                ),
+                QMessageBox.StandardButton.No,
+            )
+
+            if answer != QMessageBox.StandardButton.Yes:
+                break
+
+            try:
+                workspace.confirm_depreciation(
+                    proposal
+                )
+            except (
+                ValueError,
+                RuntimeError,
+            ) as exc:
+                QMessageBox.critical(
+                    self,
+                    "Abschreibung konnte nicht gebucht werden",
+                    str(exc),
+                )
+                break
+
+        # Gebuchte AfA verändert Anlagen, Journal,
+        # Konten, GuV und Bilanz.
+        self._refresh_fixed_assets()
+
+        self._journal_page.model.replace_rows(
+            self._build_journal_rows()
+        )
+
+        self._accounts_page.model.replace_rows(
+            self._build_account_rows()
+        )
+
+        self._refresh_financial_statements()
