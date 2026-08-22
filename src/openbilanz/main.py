@@ -48,6 +48,10 @@ def main() -> None:
                     workspace_context
                     .financial_statement_context
                 ),
+                financial_statement_service=(
+                    workspace_context
+                    .financial_statement_service
+                ),
                 closing_accounts=(
                     workspace_context.closing_accounts
                 ),

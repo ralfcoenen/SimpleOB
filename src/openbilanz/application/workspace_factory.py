@@ -39,6 +39,9 @@ from openbilanz.services.e_bilanz_preparation_service import (
     EBilanzPreparationService,
 )
 from openbilanz.services.e_bilanz_service import EBilanzService
+from openbilanz.services.financial_statement_service import (
+    FinancialStatementService,
+)
 from openbilanz.services.fiscal_year_closing_workflow import (
     FiscalYearClosingWorkflow,
 )
@@ -62,6 +65,7 @@ class WorkspaceContext:
 
     workspace: FiscalYearWorkspace
     financial_statement_context: FinancialStatementContext
+    financial_statement_service: FinancialStatementService
     closing_accounts: ClosingAccounts
     opening_balance_account_number: str
     vat_accounts: VatAccounts
@@ -205,6 +209,10 @@ class WorkspaceFactory:
             closing_accounts=closing_accounts,
         )
 
+        financial_statement_service = FinancialStatementService(
+            closing_service=closing_service,
+        )
+
         closing_workflow = FiscalYearClosingWorkflow(
             session=self._session,
             booking_repository=self._booking_repository,
@@ -277,6 +285,7 @@ class WorkspaceFactory:
         return WorkspaceContext(
             workspace=workspace,
             financial_statement_context=financial_statement_context,
+            financial_statement_service=financial_statement_service,
             closing_accounts=closing_accounts,
             opening_balance_account_number=(
                 control_accounts.opening_balance_account

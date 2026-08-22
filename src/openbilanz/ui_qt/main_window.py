@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (
     QDialog,
     QMainWindow,
     QMessageBox,
+    QPushButton,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -24,7 +25,11 @@ from openbilanz.ui_qt.accounts_page import AccountsPage
 from openbilanz.ui_qt.accounts_table_model import (
     AccountTableRow,
 )
+from openbilanz.ui_qt.balance_sheet_page import BalanceSheetPage
 from openbilanz.ui_qt.booking_page import BookingPage
+from openbilanz.ui_qt.income_statement_page import (
+    IncomeStatementPage,
+)
 from openbilanz.ui_qt.journal_page import JournalPage
 from openbilanz.ui_qt.journal_table_model import JournalTableRow
 
@@ -47,6 +52,7 @@ class MainWindow(QMainWindow):
         self._reload_workspace_context = (
             reload_workspace_context
         )
+        self._return_to_start_requested = False
 
         self.setWindowTitle("OpenBilanz – PySide6")
         self.resize(1100, 700)
@@ -56,6 +62,17 @@ class MainWindow(QMainWindow):
 
         self._tabs = QTabWidget()
         layout.addWidget(self._tabs)
+
+        self._back_button = QPushButton(
+            "Zurück zur Buchhaltungsauswahl"
+        )
+        self._back_button.clicked.connect(
+            self._return_to_start
+        )
+
+        layout.addWidget(
+            self._back_button
+        )
 
         self.setCentralWidget(central_widget)
 
@@ -105,10 +122,27 @@ class MainWindow(QMainWindow):
             "Buchen",
         )
 
-        for tab_name in (
+        self._balance_sheet_page = BalanceSheetPage()
+        self._income_statement_page = IncomeStatementPage()
+
+        self._tabs.addTab(
+            QWidget(),
             "Anlagen",
+        )
+
+        self._tabs.addTab(
+            self._balance_sheet_page,
             "Bilanz",
+        )
+
+        self._tabs.addTab(
+            self._income_statement_page,
             "GuV",
+        )
+
+        self._refresh_financial_statements()
+
+        for tab_name in (
             "Auswertungen",
             "Jahresabschluss",
             "E-Bilanz",
@@ -298,6 +332,8 @@ class MainWindow(QMainWindow):
             self._workspace_context.workspace.is_open
         )
 
+        self._refresh_financial_statements()
+
     def _build_account_rows(
         self,
     ) -> tuple[AccountTableRow, ...]:
@@ -457,6 +493,47 @@ class MainWindow(QMainWindow):
             )
         )
 
+    def _refresh_financial_statements(
+        self,
+    ) -> None:
+        """Aktualisiert Bilanz und GuV."""
+
+        workspace = self._workspace_context.workspace
+
+        result = (
+            self._workspace_context
+            .financial_statement_service
+            .build(
+                ledger=workspace.ledger,
+                pre_closing_ledger=(
+                    workspace.pre_closing_ledger
+                ),
+                is_closed=workspace.is_closed,
+                context=(
+                    self._workspace_context
+                    .financial_statement_context
+                ),
+            )
+        )
+
+        self._income_statement_page.update_income_statement(
+            income_statement=result.income_statement,
+            net_income=result.net_income,
+        )
+
+        if result.mapping_error is not None:
+            self._balance_sheet_page.show_mapping_error(
+                result.mapping_error
+            )
+            return
+
+        if result.balance_sheet is None:
+            return
+
+        self._balance_sheet_page.update_balance_sheet(
+            result.balance_sheet
+        )
+
     def _post_booking(
         self,
         booking: Booking,
@@ -477,3 +554,17 @@ class MainWindow(QMainWindow):
         self._accounts_page.model.replace_rows(
             self._build_account_rows()
         )
+
+        self._refresh_financial_statements()
+
+    def _return_to_start(self) -> None:
+        """Schließt das Hauptfenster und kehrt zur Auswahl zurück."""
+
+        self._return_to_start_requested = True
+        self.close()
+
+    @property
+    def return_to_start_requested(self) -> bool:
+        """Gibt an, ob zur Buchhaltungsauswahl zurückgekehrt werden soll."""
+
+        return self._return_to_start_requested

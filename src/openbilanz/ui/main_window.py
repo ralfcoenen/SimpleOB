@@ -24,6 +24,9 @@ from openbilanz.services.closing_service import ClosingService
 from openbilanz.services.e_bilanz_preparation_service import (
     EBilanzPreparationResult,
 )
+from openbilanz.services.financial_statement_service import (
+    FinancialStatementService,
+)
 from openbilanz.services.fiscal_year_workspace import (
     FiscalYearWorkspace,
 )
@@ -67,6 +70,7 @@ class MainWindow(tk.Tk):
         *,
         workspace: FiscalYearWorkspace,
         financial_statement_context: FinancialStatementContext,
+        financial_statement_service: FinancialStatementService,
         closing_accounts: ClosingAccounts,
         opening_balance_account_number: str,
         vat_accounts: VatAccounts,
@@ -78,6 +82,9 @@ class MainWindow(tk.Tk):
         self._context = workspace.context
         self._return_to_start_requested = False
         self._financial_statement_context = financial_statement_context
+        self._financial_statement_service = (
+            financial_statement_service
+        )
         self._closing_accounts = closing_accounts
         self._opening_balance_account_number = (
             opening_balance_account_number
@@ -1723,120 +1730,54 @@ class MainWindow(tk.Tk):
                 first_line = False
 
     def _refresh_balance_sheet(self) -> None:
-        """Erzeugt und aktualisiert die laufende Bilanz."""
+        """Erzeugt und aktualisiert Bilanz und GuV."""
 
         self._current_balance_sheet = None
 
-        balance_sheet_account_types = (
-            AccountType.ASSET,
-            AccountType.LIABILITY,
-            AccountType.EQUITY,
-        )
-
-        income_statement_account_types = (
-            AccountType.REVENUE,
-            AccountType.EXPENSE,
-        )
-
-        balance_sheet_balances = tuple(
-            balance
-            for balance in self._ledger.balances()
-            if self._account_types.get(balance.account_number)
-            in balance_sheet_account_types
-            and (balance.debit_balance > ZERO or balance.credit_balance > ZERO)
-        )
-
-        income_statement_ledger = (
-            self._workspace.pre_closing_ledger
-            if self._workspace.is_closed
-            else self._ledger
-        )
-
-        income_statement_balances = tuple(
-            balance
-            for balance in income_statement_ledger.balances()
-            if self._account_types.get(balance.account_number)
-            in income_statement_account_types
-            and (balance.debit_balance > ZERO or balance.credit_balance > ZERO)
+        result = self._financial_statement_service.build(
+            ledger=self._ledger,
+            pre_closing_ledger=(
+                self._workspace.pre_closing_ledger
+            ),
+            is_closed=self._workspace.is_closed,
+            context=self._financial_statement_context,
         )
 
         self._current_closing_balances = (
-            balance_sheet_balances + income_statement_balances
+            result.closing_balances
         )
 
-        income_statement_amounts = self._financial_statement_builder.build(
-            balances=income_statement_balances,
-            root_positions=(self._income_statement,),
+        self._current_income_statement = (
+            result.income_statement
         )
 
-        income_statement = IncomeStatement(
-            income_statement=self._income_statement,
-            amounts=income_statement_amounts,
-        )
-
-        self._current_income_statement = income_statement
-
-        net_income = self._closing_service.calculate_net_income(
-            income_statement=income_statement,
+        self._current_closing_result = (
+            result.closing_result
         )
 
         self._income_statement_frame.update_income_statement(
-            income_statement=income_statement,
-            net_income=net_income,
+            income_statement=result.income_statement,
+            net_income=result.net_income,
         )
 
-        closing_result = ClosingResult(
-            net_income=net_income,
-        )
-
-        self._current_closing_result = closing_result
-
-        equity = next(
-            position
-            for position in self._liabilities.children
-            if position.code == "HGB.266.PASSIVA.A"
-        )
-
-        result_position = next(
-            position
-            for position in equity.children
-            if position.code == "HGB.266.PASSIVA.A.V"
-        )
-
-        try:
-            amounts = self._financial_statement_builder.build(
-                balances=balance_sheet_balances,
-                root_positions=(
-                    self._assets,
-                    self._liabilities,
-                ),
-                closing_result=closing_result,
-                result_position=result_position,
-            )
-        except ValueError as exc:
-            message = str(exc)
-
-            if (
-                "no debit position defined for account" not in message
-                and "no credit position defined for account" not in message
-            ):
-                raise
-
+        if result.mapping_error is not None:
             self._balance_sheet_frame.show_mapping_error(
-                self._format_mapping_error(message)
+                self._format_mapping_error(
+                    result.mapping_error
+                )
             )
-
             return
 
-        balance_sheet = BalanceSheet(
-            assets=self._assets,
-            liabilities=self._liabilities,
-            amounts=amounts,
+        if result.balance_sheet is None:
+            return
+
+        self._current_balance_sheet = (
+            result.balance_sheet
         )
 
-        self._current_balance_sheet = balance_sheet
-
-        self._balance_sheet_frame.update_balance_sheet(balance_sheet)
+        self._balance_sheet_frame.update_balance_sheet(
+            result.balance_sheet
+        )
 
     def _refresh_closing(self) -> None:
         """Aktualisiert den sichtbaren Abschlussstatus."""

@@ -17,42 +17,51 @@ def main() -> None:
     bootstrap = ApplicationBootstrap.create()
 
     try:
-        dialog = StartDialog(
-            repository=bootstrap.company_repository
-        )
-
-        if dialog.exec() != QDialog.DialogCode.Accepted:
-            return
-
-        if dialog.result is None:
-            return
-
-        application_context = dialog.result
-
-        workspace_context = (
-            bootstrap.workspace_factory.create(
-                application_context
-            )
-        )
-
-        def reload_workspace_context():
-            return bootstrap.workspace_factory.create(
-                application_context
+        while True:
+            dialog = StartDialog(
+                repository=bootstrap.company_repository
             )
 
-        window = MainWindow(
-            workspace_context=workspace_context,
-            reload_workspace_context=(
-                reload_workspace_context
-            ),
-        )
-        window.show()
+            if (
+                dialog.exec()
+                != QDialog.DialogCode.Accepted
+            ):
+                break
 
-        app.exec()
+            if dialog.result is None:
+                break
+
+            application_context = dialog.result
+
+            workspace_context = (
+                bootstrap.workspace_factory.create(
+                    application_context
+                )
+            )
+
+            def reload_workspace_context():
+                return (
+                    bootstrap.workspace_factory.create(
+                        application_context
+                    )
+                )
+
+            window = MainWindow(
+                workspace_context=workspace_context,
+                reload_workspace_context=(
+                    reload_workspace_context
+                ),
+            )
+
+            window.show()
+
+            app.exec()
+
+            if not window.return_to_start_requested:
+                break
 
     finally:
         bootstrap.close()
-
 
 if __name__ == "__main__":
     main()
