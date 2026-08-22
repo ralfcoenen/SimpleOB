@@ -39,7 +39,7 @@ def main() -> None:
             root.destroy()
 
             workspace_context = bootstrap.workspace_factory.create(
-                context
+               context
             )
 
             window = MainWindow(
