@@ -17,9 +17,21 @@ class FiscalYearTransferService:
         self,
         *,
         opening_balance_account_number: str,
+        profit_account_number: str,
+        loss_account_number: str,
+        retained_earnings_account_number: str,
     ) -> None:
         self._opening_balance_account_number = (
             opening_balance_account_number
+        )
+        self._profit_account_number = (
+            profit_account_number
+        )
+        self._loss_account_number = (
+            loss_account_number
+        )
+        self._retained_earnings_account_number = (
+            retained_earnings_account_number
         )
 
     def create_opening_bookings(
@@ -58,8 +70,18 @@ class FiscalYearTransferService:
             ):
                 continue
 
+            target_account_number = (
+                self._retained_earnings_account_number
+                if account_number
+                in {
+                    self._profit_account_number,
+                    self._loss_account_number,
+                }
+                else account_number
+            )
+
             booking = self._create_opening_booking(
-                account_number=account_number,
+                account_number=target_account_number,
                 debit_balance=balance.debit_balance,
                 credit_balance=balance.credit_balance,
                 opening_date=opening_date,

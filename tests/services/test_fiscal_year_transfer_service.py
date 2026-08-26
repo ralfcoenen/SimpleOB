@@ -91,6 +91,9 @@ def test_creates_opening_bookings_for_balance_sheet_accounts() -> None:
 
     service = FiscalYearTransferService(
         opening_balance_account_number="9000",
+        profit_account_number="8020",
+        loss_account_number="8021",
+        retained_earnings_account_number="2970",
     )
 
     transfer_bookings = service.create_opening_bookings(
@@ -186,6 +189,9 @@ def test_creates_opening_bookings_for_credit_balances() -> None:
 
     service = FiscalYearTransferService(
         opening_balance_account_number="9000",
+        profit_account_number="8020",
+        loss_account_number="8021",
+        retained_earnings_account_number="2970",
     )
 
     transfer_bookings = service.create_opening_bookings(

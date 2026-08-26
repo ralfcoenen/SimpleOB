@@ -395,7 +395,10 @@ class VatBookingWidget(QWidget):
                     _INPUT_INVOICE,
                     _SUPPLIER_CREDIT_NOTE,
                 ):
-                    if account.account_type is not AccountType.EXPENSE:
+                    if account.account_type not in (
+                        AccountType.EXPENSE,
+                        AccountType.ASSET,
+                    ):
                         valid = False
 
                 if (
@@ -659,3 +662,11 @@ class VatBookingWidget(QWidget):
             return
 
         self._booking_date.setText(normalized)
+
+    def set_vat_accounts(
+    self,
+    vat_accounts: VatAccounts,
+) -> None:
+        """Aktualisiert die verwendeten Umsatzsteuerkonten."""
+
+        self._vat_accounts = vat_accounts

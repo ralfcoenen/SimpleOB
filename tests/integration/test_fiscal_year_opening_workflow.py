@@ -112,6 +112,9 @@ def test_opens_fiscal_year_and_persists_opening_source() -> None:
 
         transfer_service = FiscalYearTransferService(
             opening_balance_account_number="9000",
+            profit_account_number="8020",
+            loss_account_number="8021",
+            retained_earnings_account_number="2970",
         )
 
         workflow = FiscalYearOpeningWorkflow(
@@ -174,7 +177,7 @@ def test_opens_fiscal_year_and_persists_opening_source() -> None:
         == source_fiscal_year
     )
 
-  
+
 def test_rejects_opening_from_open_fiscal_year() -> None:
     """Ein offenes Geschäftsjahr darf nicht als Eröffnungsquelle dienen."""
 
@@ -202,7 +205,7 @@ def test_rejects_opening_from_open_fiscal_year() -> None:
         end_date=date(2027, 12, 31),
     )
 
-    
+
 
     account_types = {
         "1200": AccountType.ASSET,
@@ -232,6 +235,9 @@ def test_rejects_opening_from_open_fiscal_year() -> None:
 
         transfer_service = FiscalYearTransferService(
             opening_balance_account_number="9000",
+            profit_account_number="8020",
+            loss_account_number="8021",
+            retained_earnings_account_number="2970",
         )
 
         workflow = FiscalYearOpeningWorkflow(
@@ -341,6 +347,9 @@ def test_rolls_back_opening_when_opening_source_fails() -> None:
 
         transfer_service = FiscalYearTransferService(
             opening_balance_account_number="9000",
+            profit_account_number="8020",
+            loss_account_number="8021",
+            retained_earnings_account_number="2970",
         )
 
         workflow = FiscalYearOpeningWorkflow(
@@ -492,6 +501,9 @@ def test_rolls_back_session_when_opening_fails(
 
         transfer_service = FiscalYearTransferService(
             opening_balance_account_number="9000",
+            profit_account_number="8020",
+            loss_account_number="8021",
+            retained_earnings_account_number="2970",
         )
 
         workflow = FiscalYearOpeningWorkflow(
@@ -608,6 +620,9 @@ def test_rejects_opening_when_target_fiscal_year_is_missing() -> None:
 
         transfer_service = FiscalYearTransferService(
             opening_balance_account_number="9000",
+            profit_account_number="8020",
+            loss_account_number="8021",
+            retained_earnings_account_number="2970",
         )
 
         workflow = FiscalYearOpeningWorkflow(
@@ -696,6 +711,9 @@ def test_rejects_opening_into_closed_target_fiscal_year() -> None:
 
         transfer_service = FiscalYearTransferService(
             opening_balance_account_number="9000",
+            profit_account_number="8020",
+            loss_account_number="8021",
+            retained_earnings_account_number="2970",
         )
 
         workflow = FiscalYearOpeningWorkflow(
@@ -768,6 +786,9 @@ def test_rejects_opening_into_same_fiscal_year() -> None:
 
         transfer_service = FiscalYearTransferService(
             opening_balance_account_number="9000",
+            profit_account_number="8020",
+            loss_account_number="8021",
+            retained_earnings_account_number="2970",
         )
 
         workflow = FiscalYearOpeningWorkflow(
@@ -859,6 +880,9 @@ def test_rejects_opening_when_target_already_has_opening_source() -> None:
 
         transfer_service = FiscalYearTransferService(
             opening_balance_account_number="9000",
+            profit_account_number="8020",
+            loss_account_number="8021",
+            retained_earnings_account_number="2970",
         )
 
         workflow = FiscalYearOpeningWorkflow(
@@ -941,6 +965,9 @@ def test_rejects_non_consecutive_fiscal_years() -> None:
 
         transfer_service = FiscalYearTransferService(
             opening_balance_account_number="9000",
+            profit_account_number="8020",
+            loss_account_number="8021",
+            retained_earnings_account_number="2970",
         )
 
         workflow = FiscalYearOpeningWorkflow(
@@ -1048,6 +1075,9 @@ def test_opens_fiscal_year_after_short_fiscal_year() -> None:
 
         transfer_service = FiscalYearTransferService(
             opening_balance_account_number="9000",
+            profit_account_number="8020",
+            loss_account_number="8021",
+            retained_earnings_account_number="2970",
         )
 
         workflow = FiscalYearOpeningWorkflow(
@@ -1168,6 +1198,9 @@ def test_reconstructs_source_ledger_from_persisted_bookings() -> None:
 
         transfer_service = FiscalYearTransferService(
             opening_balance_account_number="9000",
+            profit_account_number="8020",
+            loss_account_number="8021",
+            retained_earnings_account_number="2970",
         )
 
         workflow = FiscalYearOpeningWorkflow(
@@ -1251,6 +1284,9 @@ def test_opens_fiscal_year_without_opening_bookings() -> None:
 
         transfer_service = FiscalYearTransferService(
             opening_balance_account_number="9000",
+            profit_account_number="8020",
+            loss_account_number="8021",
+            retained_earnings_account_number="2970",
         )
 
         workflow = FiscalYearOpeningWorkflow(
@@ -1396,6 +1432,9 @@ def test_rolls_back_when_source_ledger_reconstruction_fails(
             company_repository=company_repository,
             transfer_service=FiscalYearTransferService(
                 opening_balance_account_number="9000",
+                profit_account_number="8020",
+                loss_account_number="8021",
+                retained_earnings_account_number="2970",
             ),
             posting_service=posting_service,
         )
@@ -1566,6 +1605,9 @@ def test_reconstructs_source_ledger_only_from_company_bookings() -> None:
             company_repository=company_repository,
             transfer_service=FiscalYearTransferService(
                 opening_balance_account_number="9000",
+                profit_account_number="8020",
+                loss_account_number="8021",
+                retained_earnings_account_number="2970",
             ),
             posting_service=PostingService(),
         )

@@ -62,6 +62,7 @@ class ChartOfAccountsInitializationService:
             income_summary_account="8990",
             profit_account="8020",
             loss_account="8021",
+            retained_earnings_account="2970",
         )
 
         vat_accounts = VatAccounts(

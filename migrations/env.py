@@ -7,18 +7,28 @@ from sqlalchemy import engine_from_config, pool
 from openbilanz.core.config import DATABASE_URL
 from openbilanz.database.database import Base
 
-target_metadata = Base.metadata 
+target_metadata = Base.metadata
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
-config.set_main_option(
-    "sqlalchemy.url",
-    os.getenv(
-        "OPENBILANZ_DATABASE_URL",
-        DATABASE_URL,
-    ),
+
+configured_url = config.get_main_option(
+    "sqlalchemy.url"
 )
+
+if (
+    not configured_url
+    or configured_url
+    == "driver://user:pass@localhost/dbname"
+):
+    config.set_main_option(
+        "sqlalchemy.url",
+        os.getenv(
+            "OPENBILANZ_DATABASE_URL",
+            DATABASE_URL,
+        ),
+    )
 
 
 

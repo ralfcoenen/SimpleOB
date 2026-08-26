@@ -50,11 +50,13 @@ class FixedAssetDepreciationWorkflow:
         company_id: UUID,
         fiscal_year: FiscalYear,
         proposal: DepreciationProposal,
+        asset_code: str,
     ) -> FixedAssetDepreciation:
         """Bestätigt und persistiert einen linearen AfA-Vorschlag."""
 
         booking = self._booking_service.build_booking(
             proposal=proposal,
+            asset_code=asset_code,
         )
 
         depreciation = FixedAssetDepreciation(

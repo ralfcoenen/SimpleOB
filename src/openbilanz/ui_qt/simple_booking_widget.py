@@ -72,6 +72,7 @@ class SimpleBookingWidget(QWidget):
         self._voucher_no.setMaximumWidth(240)
 
         self._description = QLineEdit()
+        self._description.setMinimumWidth(500)
 
         self._debit_account = self._create_account_box()
         self._credit_account = self._create_account_box()

@@ -12,10 +12,16 @@ from openbilanz.domain.e_bilanz_account_detail import (
 )
 from openbilanz.domain.fiscal_year import FiscalYear
 from openbilanz.exporter.xbrl_export import XbrlExporter
+from openbilanz.reporting.fixed_asset_schedule import (
+    FixedAssetSchedule,
+)
 from openbilanz.taxonomy.account_balance_builder import (
     AccountBalanceBuilder,
 )
 from openbilanz.taxonomy.entry_point import TaxonomyEntryPoint
+from openbilanz.taxonomy.fixed_asset_schedule_fact_builder import (
+    FixedAssetScheduleFactBuilder,
+)
 from openbilanz.taxonomy.gaap_ci_statement_builder import (
     GaapCiStatement,
     GaapCiStatementBuilder,
@@ -102,6 +108,7 @@ class EBilanzBuilder:
             ...
         ] = (),
         report_profile: GcdReportProfile | None = None,
+        fixed_asset_schedule: FixedAssetSchedule | None = None,
     ) -> EBilanzDocument:
         """Erzeugt die vollständige E-Bilanz-XBRL-Instanz."""
 
@@ -219,10 +226,26 @@ class EBilanzBuilder:
             for business_type in taxable_purpose_business_types
         )
 
+        fixed_asset_schedule_facts = (
+            ()
+            if fixed_asset_schedule is None
+            else FixedAssetScheduleFactBuilder(
+                taxonomy_model=self._gaap_ci_model
+            ).build(
+                schedule=fixed_asset_schedule,
+                entity_identifier=entity_identifier,
+                entity_scheme=entity_scheme,
+                fiscal_year_start=fiscal_year.start_date,
+                fiscal_year_end=fiscal_year.end_date,
+                unit=gaap_statement.unit,
+            )
+        )
+
         facts = (
             gcd_facts
             + profile_facts
             + gaap_statement.facts
+            + fixed_asset_schedule_facts
         )
 
         pure_unit = TaxonomyUnit.pure()
@@ -231,13 +254,30 @@ class EBilanzBuilder:
 
         year = fiscal_year.end_date.year
 
+        contexts = {
+            f"ctx-instant-{year}":
+                gaap_statement.instant_context,
+            f"ctx-duration-{year}":
+                gaap_statement.duration_context,
+        }
+
+        fixed_asset_contexts = tuple(
+            {
+                id(fact.context): fact.context
+                for fact in fixed_asset_schedule_facts
+            }.values()
+        )
+
+        for index, context in enumerate(
+            fixed_asset_contexts,
+            start=1,
+        ):
+            contexts[
+                f"ctx-fixed-assets-{year}-{index}"
+            ] = context
+
         xml = exporter.export(
-            contexts={
-                f"ctx-instant-{year}":
-                    gaap_statement.instant_context,
-                f"ctx-duration-{year}":
-                    gaap_statement.duration_context,
-            },
+            contexts=contexts,
             units={
                 "EUR": gaap_statement.unit,
                 "PURE": pure_unit,

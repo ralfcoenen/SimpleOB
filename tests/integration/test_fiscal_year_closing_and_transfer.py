@@ -200,6 +200,9 @@ def test_closes_profit_and_transfers_it_to_next_fiscal_year() -> None:
 
     transfer_service = FiscalYearTransferService(
         opening_balance_account_number="9000",
+        profit_account_number="8020",
+        loss_account_number="8021",
+        retained_earnings_account_number="2970",
     )
 
     transfer_bookings = transfer_service.create_opening_bookings(
@@ -215,7 +218,8 @@ def test_closes_profit_and_transfers_it_to_next_fiscal_year() -> None:
     }
 
     assert "1200" in transferred_accounts
-    assert "8020" in transferred_accounts
+    assert "2970" in transferred_accounts
+    assert "8020" not in transferred_accounts
 
     assert "8400" not in transferred_accounts
     assert "4980" not in transferred_accounts
@@ -237,11 +241,56 @@ def test_closes_profit_and_transfers_it_to_next_fiscal_year() -> None:
     }
 
     assert balances_2027["1200"].debit_balance == Decimal("26500.00")
-    assert balances_2027["8020"].credit_balance == Decimal("1500.00")
+    assert balances_2027["2970"].credit_balance == Decimal("1500.00")
+    assert "8020" not in balances_2027
 
     assert "8400" not in balances_2027
     assert "4980" not in balances_2027
     assert "8990" not in balances_2027
+
+    balance_sheet_balances_2027 = tuple(
+        balance
+        for balance in ledger_2027.balances()
+        if account_types.get(
+            balance.account_number
+        )
+        in (
+            AccountType.ASSET,
+            AccountType.LIABILITY,
+            AccountType.EQUITY,
+        )
+        and balance.account_number != "9000"
+    )
+
+    balance_sheet_amounts_2027 = builder.build(
+        balances=balance_sheet_balances_2027,
+        root_positions=(
+            assets,
+            liabilities,
+        ),
+    )
+
+    retained_earnings_position = provider.get(
+        "HGB.266.PASSIVA.A.IV"
+    )
+    current_result_position = provider.get(
+        "HGB.266.PASSIVA.A.V"
+    )
+
+    assert (
+        balance_sheet_amounts_2027[
+            retained_earnings_position
+        ]
+        == Decimal("1500.00")
+    )
+
+    assert (
+        balance_sheet_amounts_2027.get(
+            current_result_position,
+            Decimal("0.00"),
+        )
+        == Decimal("0.00")
+    )
 
 def test_closes_loss_and_transfers_it_to_next_fiscal_year() -> None:
     """Ein Jahresfehlbetrag wird abgeschlossen und vorgetragen."""
@@ -408,6 +457,9 @@ def test_closes_loss_and_transfers_it_to_next_fiscal_year() -> None:
 
     transfer_service = FiscalYearTransferService(
         opening_balance_account_number="9000",
+        profit_account_number="8020",
+        loss_account_number="8021",
+        retained_earnings_account_number="2970",
     )
 
     transfer_bookings = transfer_service.create_opening_bookings(
@@ -423,7 +475,8 @@ def test_closes_loss_and_transfers_it_to_next_fiscal_year() -> None:
     }
 
     assert "1200" in transferred_accounts
-    assert "8021" in transferred_accounts
+    assert "2970" in transferred_accounts
+    assert "8021" not in transferred_accounts
 
     assert "8400" not in transferred_accounts
     assert "4980" not in transferred_accounts
@@ -445,7 +498,8 @@ def test_closes_loss_and_transfers_it_to_next_fiscal_year() -> None:
     }
 
     assert balances_2027["1200"].debit_balance == Decimal("23500.00")
-    assert balances_2027["8021"].debit_balance == Decimal("1500.00")
+    assert balances_2027["2970"].debit_balance == Decimal("1500.00")
+    assert "8021" not in balances_2027
 
     assert "8400" not in balances_2027
     assert "4980" not in balances_2027

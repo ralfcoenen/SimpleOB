@@ -23,6 +23,7 @@ class AccountsPage(QWidget):
 
     new_account_requested = Signal()
     edit_account_requested = Signal()
+    account_configuration_requested = Signal()
 
     def __init__(
         self,
@@ -61,6 +62,16 @@ class AccountsPage(QWidget):
         )
         buttons.addWidget(
             self._edit_account_button
+        )
+
+        self._account_configuration_button = QPushButton(
+            "Technische Konten"
+        )
+        self._account_configuration_button.clicked.connect(
+            self.account_configuration_requested.emit
+        )
+        buttons.addWidget(
+            self._account_configuration_button
         )
 
         buttons.addStretch()
@@ -143,3 +154,6 @@ class AccountsPage(QWidget):
 
         self._new_account_button.setEnabled(enabled)
         self._edit_account_button.setEnabled(enabled)
+        self._account_configuration_button.setEnabled(
+            enabled
+        )

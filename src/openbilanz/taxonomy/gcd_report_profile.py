@@ -56,6 +56,7 @@ class GcdReportProfile:
             report_elements=(
                 "genInfo.report.id.reportElement.reportElements.B",
                 "genInfo.report.id.reportElement.reportElements.GuV",
+                "genInfo.report.id.reportElement.reportElements.BAL",
             ),
         )
 
@@ -81,4 +82,3 @@ class GcdReportProfile:
             "unsupported legal form: "
             f"{legal_form}"
         )
-    

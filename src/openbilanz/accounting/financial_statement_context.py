@@ -1,7 +1,6 @@
 """Gemeinsamer Kontext für HGB-Abschluss und E-Bilanz."""
 
 from dataclasses import dataclass
-from pathlib import Path
 
 from openbilanz.accounting.financial_statement_builder import (
     FinancialStatementBuilder,
@@ -13,6 +12,9 @@ from openbilanz.accounting.hgb_financial_statement_position_provider import (
     HgbFinancialStatementPositionProvider,
 )
 from openbilanz.accounting.mapper import AccountMapper
+from openbilanz.accounting.standard_chart_of_accounts import (
+    create_standard_chart_of_accounts,
+)
 from openbilanz.domain.account import Account
 from openbilanz.domain.account_type import AccountType
 from openbilanz.domain.chart_of_accounts_template import (
@@ -23,9 +25,6 @@ from openbilanz.hgb.balance_sheet_structure import (
 )
 from openbilanz.hgb.income_statement_structure import (
     create_hgb_income_statement_structure,
-)
-from openbilanz.importers.csv_chart_of_accounts_importer import (
-    CsvChartOfAccountsImporter,
 )
 
 
@@ -101,17 +100,11 @@ def create_standard_financial_statement_context(
         )
     )
 
-    csv_file = (
-        Path(__file__).resolve().parent.parent
-        / "resources"
-        / "chart_of_accounts"
-        / "openbilanz_standard.csv"
+    chart_of_accounts = (
+        create_standard_chart_of_accounts(
+            position_provider=provider,
+        )
     )
-
-    chart_of_accounts = CsvChartOfAccountsImporter(
-        position_provider=provider,
-    ).load(csv_file)
-
     accounts = tuple(
         Account(
             template=template_account

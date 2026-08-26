@@ -1,5 +1,6 @@
 """Bilanzdarstellung der PySide6-Oberfläche."""
 
+from collections.abc import Mapping
 from decimal import Decimal
 
 from PySide6.QtCore import Qt
@@ -114,17 +115,24 @@ class BalanceSheetPage(QWidget):
     def update_balance_sheet(
         self,
         balance_sheet: BalanceSheet,
+        *,
+        account_details: Mapping[
+            str,
+            tuple[tuple[str, Decimal], ...],
+        ] | None = None,
     ) -> None:
         """Aktualisiert die sichtbare Bilanz."""
 
         self._assets_tree.replace_positions(
             positions=(balance_sheet.assets,),
             amount_for=balance_sheet.amount_for,
+            account_details=account_details,
         )
 
         self._liabilities_tree.replace_positions(
             positions=(balance_sheet.liabilities,),
             amount_for=balance_sheet.amount_for,
+            account_details=account_details,
         )
 
         assets_total = balance_sheet.amount_for(

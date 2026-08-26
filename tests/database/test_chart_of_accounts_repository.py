@@ -232,6 +232,11 @@ def test_saves_and_validates_control_accounts() -> None:
             account_type=AccountType.EQUITY,
         ),
         TemplateAccount(
+            account_number="2970",
+            name="Gewinnvortrag / Verlustvortrag",
+            account_type=AccountType.EQUITY,
+        ),
+        TemplateAccount(
             account_number="1571",
             name="Abziehbare Vorsteuer 7 %",
             account_type=AccountType.ASSET,
@@ -275,6 +280,7 @@ def test_saves_and_validates_control_accounts() -> None:
         income_summary_account="8990",
         profit_account="8020",
         loss_account="8021",
+        retained_earnings_account="2970",
     )
 
     vat_accounts = VatAccounts(
@@ -328,6 +334,7 @@ def test_saves_and_validates_control_accounts() -> None:
                 income_summary_account="8990",
                 profit_account="8020",
                 loss_account="8021",
+                retained_earnings_account="2970",
             )
         )
 
@@ -338,10 +345,298 @@ def test_saves_and_validates_control_accounts() -> None:
             repository.save_control_accounts(
                 company_id=company.company_id,
                 control_accounts=invalid_control_accounts,
+
             )
 
     assert loaded == control_accounts
     assert loaded_vat_accounts == vat_accounts
+
+def test_saves_account_configuration_atomically() -> None:
+    """Technische Konten und USt-Konten werden gemeinsam gespeichert."""
+
+    engine = create_engine(
+        "sqlite:///:memory:"
+    )
+    Base.metadata.create_all(engine)
+
+    Session = sessionmaker(
+        bind=engine
+    )
+
+    template_accounts = (
+        TemplateAccount(
+            account_number="9000",
+            name="Eröffnungsbilanzkonto",
+            account_type=AccountType.EQUITY,
+        ),
+        TemplateAccount(
+            account_number="8990",
+            name="GuV-Sammelkonto",
+            account_type=AccountType.EQUITY,
+        ),
+        TemplateAccount(
+            account_number="8020",
+            name="Jahresüberschuss",
+            account_type=AccountType.EQUITY,
+        ),
+        TemplateAccount(
+            account_number="8021",
+            name="Jahresfehlbetrag",
+            account_type=AccountType.EQUITY,
+        ),
+        TemplateAccount(
+            account_number="2970",
+            name="Gewinnvortrag / Verlustvortrag",
+            account_type=AccountType.EQUITY,
+        ),
+        TemplateAccount(
+            account_number="1571",
+            name="Abziehbare Vorsteuer 7 %",
+            account_type=AccountType.ASSET,
+        ),
+        TemplateAccount(
+            account_number="1576",
+            name="Abziehbare Vorsteuer 19 %",
+            account_type=AccountType.ASSET,
+        ),
+        TemplateAccount(
+            account_number="1771",
+            name="Umsatzsteuer 7 %",
+            account_type=AccountType.LIABILITY,
+        ),
+        TemplateAccount(
+            account_number="1776",
+            name="Umsatzsteuer 19 %",
+            account_type=AccountType.LIABILITY,
+        ),
+    )
+
+    chart_of_accounts = ChartOfAccountsTemplate(
+        name="Testkontenrahmen",
+        accounts=template_accounts,
+    )
+
+    accounts = tuple(
+        Account(
+            template=template_account
+        )
+        for template_account in template_accounts
+    )
+
+    company = Company(
+        company_id=uuid4(),
+        name="Muster UG",
+    )
+
+    control_accounts = AccountingControlAccounts(
+        opening_balance_account="9000",
+        income_summary_account="8990",
+        profit_account="8020",
+        loss_account="8021",
+        retained_earnings_account="2970",
+    )
+
+    vat_accounts = VatAccounts(
+        input_tax_7="1571",
+        input_tax_19="1576",
+        output_tax_7="1771",
+        output_tax_19="1776",
+    )
+
+    with Session() as session:
+        company_repository = CompanyRepository(
+            session
+        )
+        repository = ChartOfAccountsRepository(
+            session
+        )
+
+        company_repository.add(
+            company
+        )
+
+        repository.save_for_company(
+            company_id=company.company_id,
+            chart_of_accounts=chart_of_accounts,
+            accounts=accounts,
+        )
+
+        repository.save_account_configuration(
+            company_id=company.company_id,
+            control_accounts=control_accounts,
+            vat_accounts=vat_accounts,
+        )
+
+        loaded_control_accounts = (
+            repository.load_control_accounts(
+                company.company_id
+            )
+        )
+
+        loaded_vat_accounts = (
+            repository.load_vat_accounts(
+                company.company_id
+            )
+        )
+
+    assert loaded_control_accounts == control_accounts
+    assert loaded_vat_accounts == vat_accounts
+
+def test_rolls_back_account_configuration_on_invalid_vat_account() -> None:
+    """Ein Fehler bei USt-Konten verwirft auch Control-Account-Änderungen."""
+
+    engine = create_engine(
+        "sqlite:///:memory:"
+    )
+    Base.metadata.create_all(engine)
+
+    Session = sessionmaker(
+        bind=engine
+    )
+
+    template_accounts = (
+        TemplateAccount(
+            account_number="9000",
+            name="Eröffnungsbilanzkonto",
+            account_type=AccountType.EQUITY,
+        ),
+        TemplateAccount(
+            account_number="8990",
+            name="GuV-Sammelkonto",
+            account_type=AccountType.EQUITY,
+        ),
+        TemplateAccount(
+            account_number="8020",
+            name="Jahresüberschuss",
+            account_type=AccountType.EQUITY,
+        ),
+        TemplateAccount(
+            account_number="8021",
+            name="Jahresfehlbetrag",
+            account_type=AccountType.EQUITY,
+        ),
+        TemplateAccount(
+            account_number="2970",
+            name="Gewinnvortrag / Verlustvortrag",
+            account_type=AccountType.EQUITY,
+        ),
+        TemplateAccount(
+            account_number="1571",
+            name="Abziehbare Vorsteuer 7 %",
+            account_type=AccountType.ASSET,
+        ),
+        TemplateAccount(
+            account_number="1576",
+            name="Abziehbare Vorsteuer 19 %",
+            account_type=AccountType.ASSET,
+        ),
+        TemplateAccount(
+            account_number="1771",
+            name="Umsatzsteuer 7 %",
+            account_type=AccountType.LIABILITY,
+        ),
+        TemplateAccount(
+            account_number="1776",
+            name="Umsatzsteuer 19 %",
+            account_type=AccountType.LIABILITY,
+        ),
+    )
+
+    chart_of_accounts = ChartOfAccountsTemplate(
+        name="Testkontenrahmen",
+        accounts=template_accounts,
+    )
+
+    accounts = tuple(
+        Account(
+            template=template_account
+        )
+        for template_account in template_accounts
+    )
+
+    company = Company(
+        company_id=uuid4(),
+        name="Muster UG",
+    )
+
+    original_control_accounts = AccountingControlAccounts(
+        opening_balance_account="9000",
+        income_summary_account="8990",
+        profit_account="8020",
+        loss_account="8021",
+        retained_earnings_account="2970",
+    )
+
+    original_vat_accounts = VatAccounts(
+        input_tax_7="1571",
+        input_tax_19="1576",
+        output_tax_7="1771",
+        output_tax_19="1776",
+    )
+
+    changed_control_accounts = AccountingControlAccounts(
+        opening_balance_account="8990",
+        income_summary_account="9000",
+        profit_account="8021",
+        loss_account="8020",
+        retained_earnings_account="2970",
+    )
+
+    invalid_vat_accounts = VatAccounts(
+        input_tax_7="1571",
+        input_tax_19="1576",
+        output_tax_7="1771",
+        output_tax_19="9999",
+    )
+
+    with Session() as session:
+        company_repository = CompanyRepository(
+            session
+        )
+        repository = ChartOfAccountsRepository(
+            session
+        )
+
+        company_repository.add(
+            company
+        )
+
+        repository.save_for_company(
+            company_id=company.company_id,
+            chart_of_accounts=chart_of_accounts,
+            accounts=accounts,
+        )
+
+        repository.save_account_configuration(
+            company_id=company.company_id,
+            control_accounts=original_control_accounts,
+            vat_accounts=original_vat_accounts,
+        )
+
+        with pytest.raises(
+            ValueError,
+            match="9999",
+        ):
+            repository.save_account_configuration(
+                company_id=company.company_id,
+                control_accounts=changed_control_accounts,
+                vat_accounts=invalid_vat_accounts,
+            )
+
+        loaded_control_accounts = (
+            repository.load_control_accounts(
+                company.company_id
+            )
+        )
+
+        loaded_vat_accounts = (
+            repository.load_vat_accounts(
+                company.company_id
+            )
+        )
+
+    assert loaded_control_accounts == original_control_accounts
+    assert loaded_vat_accounts == original_vat_accounts
 
 def test_adds_account_to_existing_chart_of_accounts() -> None:
     """Ein neues Konto wird dem Mandantenkontenrahmen hinzugefügt."""

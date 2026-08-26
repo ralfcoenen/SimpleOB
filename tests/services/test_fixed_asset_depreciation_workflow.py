@@ -143,6 +143,7 @@ def test_confirms_depreciation_atomically() -> None:
             proposal=_proposal(
                 fixed_asset_id=asset.fixed_asset_id
             ),
+            asset_code=asset.asset_code,
         )
 
         bookings = (
@@ -231,6 +232,7 @@ def test_rolls_back_booking_when_depreciation_fails() -> None:
                         unknown_fixed_asset_id
                     )
                 ),
+                asset_code="A-0001",
             )
 
     # Neue Session: Der vorher bereits vorgemerkte Booking-Datensatz
@@ -248,4 +250,3 @@ def test_rolls_back_booking_when_depreciation_fails() -> None:
         )
 
     assert bookings == ()
-

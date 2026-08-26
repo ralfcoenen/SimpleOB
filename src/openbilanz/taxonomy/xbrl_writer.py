@@ -31,6 +31,7 @@ XBRLI_NAMESPACE = "http://www.xbrl.org/2003/instance"
 ISO4217_NAMESPACE = "http://www.xbrl.org/2003/iso4217"
 LINK_NAMESPACE = "http://www.xbrl.org/2003/linkbase"
 XLINK_NAMESPACE = "http://www.w3.org/1999/xlink"
+XBRLDI_NAMESPACE = "http://xbrl.org/2006/xbrldi"
 
 
 class TaxonomyXbrlWriter:
@@ -114,6 +115,22 @@ class TaxonomyXbrlWriter:
                 f"{{{XBRLI_NAMESPACE}}}endDate",
             )
             end_date.text = context.end_date.isoformat()
+
+        if context.dimensions:
+            scenario = ET.SubElement(
+                element,
+                f"{{{XBRLI_NAMESPACE}}}scenario",
+            )
+
+            for dimension in context.dimensions:
+                explicit_member = ET.SubElement(
+                    scenario,
+                    f"{{{XBRLDI_NAMESPACE}}}explicitMember",
+                    {
+                        "dimension": dimension.dimension,
+                    },
+                )
+                explicit_member.text = dimension.member
 
         return element
 
@@ -774,6 +791,10 @@ class TaxonomyXbrlWriter:
         ET.register_namespace(
             "xbrli",
             XBRLI_NAMESPACE,
+        )
+        ET.register_namespace(
+            "xbrldi",
+            XBRLDI_NAMESPACE,
         )
         ET.register_namespace(
             "link",

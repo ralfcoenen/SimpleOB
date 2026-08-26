@@ -137,6 +137,9 @@ class TrialBalanceReportPage(QWidget):
         )
         self._table.setAlternatingRowColors(True)
         self._table.verticalHeader().setVisible(False)
+        self._table.setHorizontalScrollMode(
+            QTableWidget.ScrollMode.ScrollPerPixel
+        )
 
         header = self._table.horizontalHeader()
 

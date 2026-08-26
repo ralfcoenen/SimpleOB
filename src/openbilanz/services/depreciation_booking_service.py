@@ -16,6 +16,7 @@ class DepreciationBookingService:
         self,
         *,
         proposal: DepreciationProposal,
+        asset_code: str,
     ) -> Booking:
         """Erzeugt die Hauptbuchbuchung für eine lineare AfA."""
 
@@ -27,9 +28,23 @@ class DepreciationBookingService:
                 "proposal must be a DepreciationProposal"
             )
 
+        if not isinstance(asset_code, str):
+            raise TypeError(
+                "asset_code must be a string"
+            )
+
+        asset_code = asset_code.strip()
+
+        if not asset_code:
+            raise ValueError(
+                "asset_code must not be blank"
+            )
+
         return Booking(
             booking_date=proposal.depreciation_date,
-            description="Lineare Abschreibung",
+            description=(
+                f"Lineare Abschreibung – {asset_code}"
+            ),
             booking_type=BookingType.REGULAR,
             lines=(
                 BookingLine(
@@ -48,4 +63,3 @@ class DepreciationBookingService:
                 ),
             ),
         )
-    

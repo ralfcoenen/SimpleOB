@@ -586,6 +586,10 @@ class ChartOfAccountsRepository:
                 loss_account=(
                     control_accounts.loss_account
                 ),
+                retained_earnings_account=(
+                    control_accounts
+                    .retained_earnings_account
+                ),
                 input_tax_7="1571",
                 input_tax_19="1576",
                 output_tax_7="1771",
@@ -607,6 +611,10 @@ class ChartOfAccountsRepository:
             )
             model.loss_account = (
                 control_accounts.loss_account
+            )
+            model.retained_earnings_account = (
+                control_accounts
+                .retained_earnings_account
             )
 
         if commit:
@@ -703,6 +711,33 @@ class ChartOfAccountsRepository:
         if commit:
             self._session.commit()
 
+    def save_account_configuration(
+        self,
+        *,
+        company_id: UUID,
+        control_accounts: AccountingControlAccounts,
+        vat_accounts: VatAccounts,
+    ) -> None:
+        """Speichert die technischen Konten eines Mandanten atomar."""
+
+        try:
+            self.save_control_accounts(
+                company_id=company_id,
+                control_accounts=control_accounts,
+                commit=False,
+            )
+
+            self.save_vat_accounts(
+                company_id=company_id,
+                vat_accounts=vat_accounts,
+                commit=False,
+            )
+
+            self._session.commit()
+        except Exception:
+            self._session.rollback()
+            raise
+
     def load_control_accounts(
         self,
         company_id: UUID,
@@ -744,6 +779,9 @@ class ChartOfAccountsRepository:
             ),
             profit_account=model.profit_account,
             loss_account=model.loss_account,
+            retained_earnings_account=(
+                model.retained_earnings_account
+            ),
         )
 
     def load_vat_accounts(

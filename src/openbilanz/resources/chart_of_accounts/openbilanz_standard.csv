@@ -1,6 +1,6 @@
 account_number;name;account_type;statement_type;debit_position_code;credit_position_code
-0200;Technische Anlagen und Maschinen;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.A.II.2;
-0400;Betriebs- und Geschäftsausstattung;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.A.II.3;
+0200;Technische Anlagen und Maschinen;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.A.II.2;HGB.266.AKTIVA.A.II.2
+0400;Betriebs- und Geschäftsausstattung;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.A.II.3;HGB.266.AKTIVA.A.II.3
 0800;Gezeichnetes Kapital;EQUITY;BALANCE_SHEET;;HGB.266.PASSIVA.A.I
 1000;Kasse;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.IV;
 1200;Bank;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.IV;
@@ -9,6 +9,9 @@ account_number;name;account_type;statement_type;debit_position_code;credit_posit
 1576;Abziehbare Vorsteuer 19 %;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.II.4;
 1600;Verbindlichkeiten aus Lieferungen und Leistungen;LIABILITY;BALANCE_SHEET;;HGB.266.PASSIVA.C.4
 1700;Sonstige Verbindlichkeiten;LIABILITY;BALANCE_SHEET;;HGB.266.PASSIVA.C.8
+1705;Verbindlichkeiten gegenüber Gesellschaftern;LIABILITY;BALANCE_SHEET;;HGB.266.PASSIVA.C.8
+1780;Kapitalertragsteuer-Verbindlichkeit;LIABILITY;BALANCE_SHEET;;HGB.266.PASSIVA.C.8
+1781;Solidaritätszuschlag auf Kapitalertragsteuer;LIABILITY;BALANCE_SHEET;;HGB.266.PASSIVA.C.8
 1771;Umsatzsteuer 7 %;LIABILITY;BALANCE_SHEET;;HGB.266.PASSIVA.C.8
 1776;Umsatzsteuer 19 %;LIABILITY;BALANCE_SHEET;;HGB.266.PASSIVA.C.8
 2970;Gewinnvortrag / Verlustvortrag;EQUITY;BALANCE_SHEET;;HGB.266.PASSIVA.A.IV

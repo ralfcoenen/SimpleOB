@@ -1,4 +1,5 @@
 """Startdialog der experimentellen PySide6-Oberfläche."""
+from collections.abc import Callable
 
 from PySide6.QtWidgets import (
     QComboBox,
@@ -14,6 +15,12 @@ from openbilanz.core.context import ApplicationContext
 from openbilanz.database.company_repository import CompanyRepository
 from openbilanz.domain.company import Company
 from openbilanz.domain.fiscal_year import FiscalYear
+from openbilanz.ui_qt.new_company_dialog import (
+    NewCompanyDialog,
+)
+from openbilanz.ui_qt.new_fiscal_year_dialog import (
+    NewFiscalYearDialog,
+)
 
 
 class StartDialog(QDialog):
@@ -23,6 +30,10 @@ class StartDialog(QDialog):
         self,
         *,
         repository: CompanyRepository,
+        create_fiscal_year: Callable[
+            [Company, FiscalYear],
+            None,
+        ],
     ) -> None:
         super().__init__()
 
@@ -30,7 +41,12 @@ class StartDialog(QDialog):
         self.result: ApplicationContext | None = None
 
         self._companies: tuple[Company, ...] = ()
+
         self._fiscal_years: tuple[FiscalYear, ...] = ()
+
+        self._create_fiscal_year_callback = (
+            create_fiscal_year
+        )
 
         self.setWindowTitle("OpenBilanz – Buchhaltung öffnen")
         self.setMinimumWidth(520)
@@ -79,6 +95,31 @@ class StartDialog(QDialog):
 
         buttons = QDialogButtonBox()
 
+        self._new_company_button = QPushButton(
+            "Neue Buchhaltung anlegen"
+        )
+        self._new_company_button.clicked.connect(
+            self._create_new_company
+        )
+        buttons.addButton(
+            self._new_company_button,
+            QDialogButtonBox.ButtonRole.ActionRole,
+        )
+
+        self._new_fiscal_year_button = QPushButton(
+            "Neues Geschäftsjahr"
+        )
+        self._new_fiscal_year_button.clicked.connect(
+            self._create_new_fiscal_year
+        )
+        buttons.addButton(
+            self._new_fiscal_year_button,
+            QDialogButtonBox.ButtonRole.ActionRole,
+        )
+
+        self._new_fiscal_year_button.setEnabled(
+            False
+        )
         self._open_button = QPushButton("Öffnen")
         self._open_button.clicked.connect(self._open)
         buttons.addButton(
@@ -106,7 +147,14 @@ class StartDialog(QDialog):
 
         self._company_box.blockSignals(False)
 
+        self._new_fiscal_year_button.setEnabled(
+            bool(self._companies)
+        )
+
         if not self._companies:
+            self._fiscal_years = ()
+            self._fiscal_year_box.clear()
+
             self._status_label.setText(
                 "Es ist noch keine Buchhaltung vorhanden."
             )
@@ -157,6 +205,74 @@ class StartDialog(QDialog):
         self._fiscal_year_box.setCurrentIndex(0)
         self._status_label.clear()
         self._open_button.setEnabled(True)
+
+    def _create_new_company(self) -> None:
+        """Öffnet den Dialog zum Anlegen einer Buchhaltung."""
+
+        dialog = NewCompanyDialog(
+            repository=self._repository,
+            parent=self,
+        )
+
+        if (
+            dialog.exec()
+            != QDialog.DialogCode.Accepted
+        ):
+            return
+
+        if dialog.result is None:
+            return
+
+        self.result = dialog.result
+        self.accept()
+
+    def _create_new_fiscal_year(self) -> None:
+        """Legt für das ausgewählte Unternehmen ein Geschäftsjahr an."""
+
+        company_index = (
+            self._company_box.currentIndex()
+        )
+
+        if (
+            company_index < 0
+            or company_index >= len(self._companies)
+        ):
+            return
+
+        company = self._companies[
+            company_index
+        ]
+
+        dialog = NewFiscalYearDialog(
+            repository=self._repository,
+            company=company,
+            create_fiscal_year=(
+                self._create_fiscal_year_callback
+            ),
+            parent=self,
+        )
+
+        if (
+            dialog.exec()
+            != QDialog.DialogCode.Accepted
+        ):
+            return
+
+        if dialog.result is None:
+            return
+
+        self._load_fiscal_years(
+            company
+        )
+
+        for index, fiscal_year in enumerate(
+            self._fiscal_years
+        ):
+            if fiscal_year == dialog.result:
+                self._fiscal_year_box.setCurrentIndex(
+                    index
+                )
+                break
 
     def _open(self) -> None:
         company_index = self._company_box.currentIndex()

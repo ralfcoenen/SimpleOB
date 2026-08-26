@@ -97,3 +97,13 @@ class BookingPage(QWidget):
         self._vat_booking.set_enabled(
             enabled
         )
+
+    def set_vat_accounts(
+        self,
+        vat_accounts: VatAccounts,
+    ) -> None:
+        """Aktualisiert die Umsatzsteuerkonten."""
+
+        self._vat_booking.set_vat_accounts(
+            vat_accounts
+        )

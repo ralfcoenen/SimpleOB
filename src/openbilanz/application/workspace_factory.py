@@ -20,7 +20,13 @@ from openbilanz.database.company_repository import CompanyRepository
 from openbilanz.database.fixed_asset_depreciation_repository import (
     FixedAssetDepreciationRepository,
 )
+from openbilanz.database.fixed_asset_movement_repository import (
+    FixedAssetMovementRepository,
+)
 from openbilanz.database.fixed_asset_repository import FixedAssetRepository
+from openbilanz.domain.accounting_control_accounts import (
+    AccountingControlAccounts,
+)
 from openbilanz.domain.vat_accounts import VatAccounts
 from openbilanz.services.chart_of_accounts_initialization_service import (
     ChartOfAccountsInitializationService,
@@ -49,6 +55,18 @@ from openbilanz.services.fiscal_year_workspace import FiscalYearWorkspace
 from openbilanz.services.fixed_asset_depreciation_workflow import (
     FixedAssetDepreciationWorkflow,
 )
+from openbilanz.services.fixed_asset_disposal_workflow import (
+    FixedAssetDisposalWorkflow,
+)
+from openbilanz.services.fixed_asset_loss_workflow import (
+    FixedAssetLossWorkflow,
+)
+from openbilanz.services.fixed_asset_reporting_service import (
+    FixedAssetReportingService,
+)
+from openbilanz.services.fixed_asset_schedule_service import (
+    FixedAssetScheduleService,
+)
 from openbilanz.services.posting_service import PostingService
 from openbilanz.services.reporting_service import ReportingService
 from openbilanz.services.taxonomy_management_service import (
@@ -68,6 +86,7 @@ class WorkspaceContext:
     financial_statement_service: FinancialStatementService
     closing_accounts: ClosingAccounts
     opening_balance_account_number: str
+    control_accounts: AccountingControlAccounts
     vat_accounts: VatAccounts
 
 
@@ -97,6 +116,13 @@ class WorkspaceFactory:
         fixed_asset_depreciation_workflow: (
             FixedAssetDepreciationWorkflow
         ),
+        fixed_asset_movement_repository: (
+            FixedAssetMovementRepository
+        ),
+        fixed_asset_loss_workflow: FixedAssetLossWorkflow,
+        fixed_asset_disposal_workflow: (
+            FixedAssetDisposalWorkflow
+        ),
         resolver: TaxonomyResolver,
         arelle_adapter: ArelleAdapter,
         standard_financial_statement_context: FinancialStatementContext,
@@ -118,9 +144,21 @@ class WorkspaceFactory:
         self._fixed_asset_depreciation_repository = (
             fixed_asset_depreciation_repository
         )
+        self._fixed_asset_movement_repository = (
+            fixed_asset_movement_repository
+        )
         self._depreciation_service = depreciation_service
         self._fixed_asset_depreciation_workflow = (
             fixed_asset_depreciation_workflow
+        )
+        self._fixed_asset_movement_repository = (
+            fixed_asset_movement_repository
+        )
+        self._fixed_asset_loss_workflow = (
+            fixed_asset_loss_workflow
+        )
+        self._fixed_asset_disposal_workflow = (
+            fixed_asset_disposal_workflow
         )
         self._resolver = resolver
         self._arelle_adapter = arelle_adapter
@@ -248,6 +286,36 @@ class WorkspaceFactory:
             ),
         )
 
+        fixed_asset_reporting_service = (
+            FixedAssetReportingService(
+                fixed_asset_repository=(
+                    self._fixed_asset_repository
+                ),
+                depreciation_repository=(
+                    self._fixed_asset_depreciation_repository
+                ),
+                movement_repository=(
+                    self._fixed_asset_movement_repository
+                ),
+            )
+        )
+
+        fixed_asset_schedule_service = (
+            FixedAssetScheduleService(
+                fixed_asset_repository=(
+                    self._fixed_asset_repository
+                ),
+                depreciation_repository=(
+                    self._fixed_asset_depreciation_repository
+                ),
+                movement_repository=(
+                    self._fixed_asset_movement_repository
+                ),
+            )
+        )
+
+
+
         workspace = FiscalYearWorkspace(
             context=context,
             booking_repository=self._booking_repository,
@@ -267,18 +335,39 @@ class WorkspaceFactory:
             e_bilanz_account_detail_service=(
                 e_bilanz_account_detail_service
             ),
+            fixed_asset_schedule_service=(
+                fixed_asset_schedule_service
+            ),
             e_bilanz_service=e_bilanz_service,
-            e_bilanz_export_service=self._e_bilanz_export_service,
+            e_bilanz_export_service=(
+                self._e_bilanz_export_service
+            ),
             taxonomy_management_service=(
                 self._taxonomy_management_service
             ),
-            fixed_asset_repository=self._fixed_asset_repository,
+            fixed_asset_repository=(
+                self._fixed_asset_repository
+            ),
             fixed_asset_depreciation_repository=(
                 self._fixed_asset_depreciation_repository
             ),
-            depreciation_service=self._depreciation_service,
+            depreciation_service=(
+                self._depreciation_service
+            ),
             fixed_asset_depreciation_workflow=(
                 self._fixed_asset_depreciation_workflow
+            ),
+            fixed_asset_movement_repository=(
+                self._fixed_asset_movement_repository
+            ),
+            fixed_asset_reporting_service=(
+                fixed_asset_reporting_service
+            ),
+            fixed_asset_loss_workflow=(
+                self._fixed_asset_loss_workflow
+            ),
+            fixed_asset_disposal_workflow=(
+                self._fixed_asset_disposal_workflow
             ),
         )
 
@@ -290,5 +379,6 @@ class WorkspaceFactory:
             opening_balance_account_number=(
                 control_accounts.opening_balance_account
             ),
+            control_accounts=control_accounts,
             vat_accounts=vat_accounts,
         )

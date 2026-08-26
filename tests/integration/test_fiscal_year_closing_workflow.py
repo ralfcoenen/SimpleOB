@@ -523,4 +523,3 @@ def test_rolls_back_when_closing_booking_cannot_be_persisted() -> None:
         "Abschluss des GuV-Kontos"
         not in descriptions
     )
-

@@ -22,9 +22,15 @@ class FixedAssetsPage(QWidget):
         self,
         *,
         on_add,
+        on_edit,
+        on_delete,
+        on_link_acquisition,
+        on_loss,
         on_process_depreciations,
+        on_dispose,
     ) -> None:
         super().__init__()
+        self._assets: tuple[FixedAsset, ...] = ()
 
         layout = QVBoxLayout(self)
 
@@ -39,6 +45,27 @@ class FixedAssetsPage(QWidget):
         header.addWidget(title)
         header.addStretch()
 
+        self._link_acquisition_button = QPushButton(
+            "Anschaffungsbuchung zuordnen"
+        )
+        self._loss_button = QPushButton(
+            "Totalverlust ausbuchen"
+        )
+        self._loss_button.clicked.connect(
+            on_loss
+        )
+
+        header.addWidget(
+            self._loss_button
+        )
+        self._link_acquisition_button.clicked.connect(
+            on_link_acquisition
+        )
+
+        header.addWidget(
+            self._link_acquisition_button
+        )
+
         self._process_button = QPushButton(
             "Abschreibungen prüfen/buchen"
         )
@@ -46,6 +73,33 @@ class FixedAssetsPage(QWidget):
             on_process_depreciations
         )
         header.addWidget(self._process_button)
+
+        self._dispose_button = QPushButton(
+            "Anlagegut verkaufen"
+        )
+        self._dispose_button.clicked.connect(
+            on_dispose
+        )
+        header.addWidget(self._dispose_button)
+
+        self._edit_button = QPushButton(
+            "Anlagegut bearbeiten"
+        )
+        self._edit_button.clicked.connect(
+            on_edit
+        )
+        header.addWidget(
+            self._edit_button
+        )
+        self._delete_button = QPushButton(
+            "Anlagegut löschen"
+        )
+        self._delete_button.clicked.connect(
+            on_delete
+        )
+        header.addWidget(
+            self._delete_button
+        )
 
         self._add_button = QPushButton(
             "Anlagegut hinzufügen"
@@ -80,6 +134,9 @@ class FixedAssetsPage(QWidget):
             QTableWidget.SelectionMode.SingleSelection
         )
         self._table.setAlternatingRowColors(True)
+        self._table.setHorizontalScrollMode(
+            QTableWidget.ScrollMode.ScrollPerPixel
+        )
 
         self._table.verticalHeader().setVisible(False)
 
@@ -91,7 +148,7 @@ class FixedAssetsPage(QWidget):
         )
         header_view.setSectionResizeMode(
             1,
-            QHeaderView.ResizeMode.Stretch,
+            QHeaderView.ResizeMode.Interactive,
         )
 
         for column in range(2, 8):
@@ -107,6 +164,8 @@ class FixedAssetsPage(QWidget):
         assets: tuple[FixedAsset, ...],
     ) -> None:
         """Zeigt die vorhandenen Anlagegüter."""
+
+        self._assets = assets
 
         self._table.setRowCount(
             len(assets)
@@ -145,6 +204,21 @@ class FixedAssetsPage(QWidget):
                     item,
                 )
 
+    def selected_asset(
+        self,
+    ) -> FixedAsset | None:
+        """Liefert das aktuell ausgewählte Anlagegut."""
+
+        row = self._table.currentRow()
+
+        if row < 0:
+            return None
+
+        if row >= len(self._assets):
+            return None
+
+        return self._assets[row]
+
     def set_editing_enabled(
         self,
         enabled: bool,
@@ -152,4 +226,7 @@ class FixedAssetsPage(QWidget):
         """Aktiviert Funktionen für offene Geschäftsjahre."""
 
         self._add_button.setEnabled(enabled)
+        self._link_acquisition_button.setEnabled(enabled)
         self._process_button.setEnabled(enabled)
+        self._edit_button.setEnabled(enabled)
+        self._delete_button.setEnabled(enabled)

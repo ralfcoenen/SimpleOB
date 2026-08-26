@@ -1,6 +1,6 @@
 """Gemeinsame Qt-Baumdarstellung für HGB-Abschlusspositionen."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from decimal import Decimal
 
 from PySide6.QtCore import Qt
@@ -31,14 +31,27 @@ class StatementTree(QTreeView):
         self.setUniformRowHeights(True)
 
         header = self.header()
+
         header.setSectionResizeMode(
             0,
-            QHeaderView.ResizeMode.Stretch,
+            QHeaderView.ResizeMode.Interactive,
         )
         header.setSectionResizeMode(
             1,
-            QHeaderView.ResizeMode.ResizeToContents,
+            QHeaderView.ResizeMode.Interactive,
         )
+
+        header.resizeSection(
+            0,
+            420,
+        )
+        header.resizeSection(
+            1,
+            120,
+        )
+
+        header.setStretchLastSection(True)
+
 
     def replace_positions(
         self,
@@ -48,6 +61,10 @@ class StatementTree(QTreeView):
             [FinancialStatementPosition],
             Decimal,
         ],
+        account_details: Mapping[
+            str,
+            tuple[tuple[str, Decimal], ...],
+        ] | None = None,
     ) -> None:
         """Ersetzt den vollständigen Inhalt."""
 
@@ -58,11 +75,18 @@ class StatementTree(QTreeView):
 
         root = self._model.invisibleRootItem()
 
+        details = (
+            account_details
+            if account_details is not None
+            else {}
+        )
+
         for position in positions:
             self._append_position(
                 parent=root,
                 position=position,
                 amount_for=amount_for,
+                account_details=details,
             )
 
         self.expandAll()
@@ -83,6 +107,10 @@ class StatementTree(QTreeView):
         amount_for: Callable[
             [FinancialStatementPosition],
             Decimal,
+        ],
+        account_details: Mapping[
+            str,
+            tuple[tuple[str, Decimal], ...],
         ],
     ) -> None:
         amount = amount_for(position)
@@ -113,6 +141,38 @@ class StatementTree(QTreeView):
                 parent=position_item,
                 position=child,
                 amount_for=amount_for,
+                account_details=account_details,
+            )
+
+        for label, detail_amount in account_details.get(
+            position.code,
+            (),
+        ):
+            account_item = QStandardItem(
+                label
+            )
+            account_item.setEditable(False)
+
+            font = account_item.font()
+            font.setItalic(True)
+            account_item.setFont(font)
+
+            account_amount_item = QStandardItem(
+                self._format_amount(
+                    detail_amount
+                )
+            )
+            account_amount_item.setEditable(False)
+            account_amount_item.setTextAlignment(
+                Qt.AlignmentFlag.AlignRight
+                | Qt.AlignmentFlag.AlignVCenter
+            )
+
+            position_item.appendRow(
+                (
+                    account_item,
+                    account_amount_item,
+                )
             )
 
     @staticmethod

@@ -22,6 +22,95 @@ from openbilanz.domain.entry_side import EntrySide
 from openbilanz.domain.fiscal_year import FiscalYear
 
 
+def test_gets_booking_by_booking_id() -> None:
+    engine = create_engine(
+        "sqlite:///:memory:"
+    )
+    Base.metadata.create_all(engine)
+
+    Session = sessionmaker(
+        bind=engine
+    )
+
+    with Session() as session:
+        company_repository = CompanyRepository(
+            session
+        )
+
+        company = Company(
+            company_id=uuid4(),
+            name="Muster UG",
+        )
+
+        fiscal_year = FiscalYear(
+            start_date=date(2026, 1, 1),
+            end_date=date(2026, 12, 31),
+        )
+
+        company_repository.add(
+            company
+        )
+        company_repository.add_fiscal_year(
+            company.company_id,
+            fiscal_year,
+        )
+
+        booking_repository = BookingRepository(
+            session
+        )
+
+        booking = Booking(
+            booking_id=uuid4(),
+            booking_date=date(2026, 8, 8),
+            voucher_no="RE-001",
+            description="Büromaterial",
+            lines=(
+                BookingLine(
+                    account_number="4980",
+                    side=EntrySide.DEBIT,
+                    amount=Decimal("500.00"),
+                ),
+                BookingLine(
+                    account_number="1200",
+                    side=EntrySide.CREDIT,
+                    amount=Decimal("500.00"),
+                ),
+            ),
+        )
+
+        booking_repository.add(
+            company_id=company.company_id,
+            fiscal_year=fiscal_year,
+            booking=booking,
+        )
+
+        loaded = booking_repository.get(
+            booking.booking_id
+        )
+
+    assert loaded == booking
+
+def test_get_returns_none_for_unknown_booking_id() -> None:
+    engine = create_engine(
+        "sqlite:///:memory:"
+    )
+    Base.metadata.create_all(engine)
+
+    Session = sessionmaker(
+        bind=engine
+    )
+
+    with Session() as session:
+        booking_repository = BookingRepository(
+            session
+        )
+
+        loaded = booking_repository.get(
+            uuid4()
+        )
+
+    assert loaded is None
+
 def test_adds_and_loads_booking() -> None:
     engine = create_engine(
         "sqlite:///:memory:"
@@ -589,4 +678,3 @@ def test_add_can_defer_commit() -> None:
         )
 
     assert loaded == ()
-

@@ -28,7 +28,8 @@ def test_builds_closing_booking_from_proposal() -> None:
     booking = (
         DepreciationBookingService()
         .build_booking(
-            proposal=proposal
+            proposal=proposal,
+            asset_code="A-0001",
         )
     )
 
@@ -38,7 +39,10 @@ def test_builds_closing_booking_from_proposal() -> None:
         31,
     )
     assert booking.booking_type is BookingType.REGULAR
-    assert booking.description == "Lineare Abschreibung"
+    assert (
+            booking.description
+            == "Lineare Abschreibung – A-0001"
+        )
 
     assert len(booking.lines) == 2
 
@@ -49,11 +53,15 @@ def test_builds_closing_booking_from_proposal() -> None:
     assert booking.lines[1].account_number == "0690"
     assert booking.lines[1].side is EntrySide.CREDIT
     assert booking.lines[1].amount == Decimal("800.00")
+    assert (
+            booking.description
+            == "Lineare Abschreibung – A-0001"
+        )
 
 
 def test_rejects_invalid_proposal() -> None:
     with pytest.raises(TypeError):
         DepreciationBookingService().build_booking(
-            proposal="invalid"  # type: ignore[arg-type]
+            proposal="invalid",  # type: ignore[arg-type]
+            asset_code="A-0001",
         )
-    

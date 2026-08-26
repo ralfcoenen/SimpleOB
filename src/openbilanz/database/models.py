@@ -218,6 +218,11 @@ class KontenrahmenKonfiguration(Base):
         nullable=False,
     )
 
+    retained_earnings_account: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
     input_tax_7: Mapped[str] = mapped_column(
         String,
         nullable=False,
@@ -284,6 +289,12 @@ class Wirtschaftsjahr(Base):
 
     anlageabschreibungen: Mapped[
             list["Anlageabschreibung"]
+        ] = relationship(
+            back_populates="wirtschaftsjahr",
+        )
+
+    anlagebewegungen: Mapped[
+            list["Anlagebewegung"]
         ] = relationship(
             back_populates="wirtschaftsjahr",
         )
@@ -465,6 +476,12 @@ class Anlagegut(Base):
         back_populates="anlagegut",
     )
 
+    bewegungen: Mapped[
+        list["Anlagebewegung"]
+    ] = relationship(
+        back_populates="anlagegut",
+    )
+
     status: Mapped[str] = mapped_column(
         String,
         nullable=False,
@@ -486,6 +503,93 @@ class Anlagegut(Base):
         String,
         nullable=False,
     )
+
+
+class Anlagebewegung(Base):
+    """Persistierte buchungswirksame Anlagenbewegung."""
+
+    __tablename__ = "anlagebewegungen"
+
+    __table_args__ = (
+        UniqueConstraint(
+            "reversed_movement_id",
+            name=(
+                "uq_anlagebewegungen_"
+                "reversed_movement_id"
+            ),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+    )
+
+    movement_id: Mapped[str] = mapped_column(
+        String(36),
+        unique=True,
+        nullable=False,
+    )
+
+    anlagegut_id: Mapped[int] = mapped_column(
+        ForeignKey("anlagegueter.id"),
+        nullable=False,
+    )
+
+    wirtschaftsjahr_id: Mapped[int] = mapped_column(
+        ForeignKey("wirtschaftsjahre.id"),
+        nullable=False,
+    )
+
+    buchungszeile_id: Mapped[int] = mapped_column(
+        ForeignKey("buchungszeilen.id"),
+        unique=True,
+        nullable=False,
+    )
+
+    movement_date: Mapped[date] = mapped_column(
+        Date,
+        nullable=False,
+    )
+
+    amount: Mapped[Decimal] = mapped_column(
+        Numeric(18, 2),
+        nullable=False,
+    )
+
+    movement_type: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    reversed_movement_id: Mapped[int | None] = (
+        mapped_column(
+            ForeignKey("anlagebewegungen.id"),
+            nullable=True,
+        )
+    )
+
+    anlagegut: Mapped[Anlagegut] = relationship(
+        back_populates="bewegungen",
+    )
+
+    wirtschaftsjahr: Mapped[Wirtschaftsjahr] = (
+        relationship(
+            back_populates="anlagebewegungen",
+        )
+    )
+
+    buchungszeile: Mapped[Buchungszeile] = (
+        relationship()
+    )
+
+    reversed_movement: Mapped[
+        "Anlagebewegung | None"
+    ] = relationship(
+        remote_side=[id],
+        foreign_keys=[reversed_movement_id],
+    )
+
 
 
 class Anlageabschreibung(Base):

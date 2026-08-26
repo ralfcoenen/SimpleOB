@@ -6,6 +6,9 @@ import pytest
 
 from openbilanz.taxonomy.concept import TaxonomyPeriodType
 from openbilanz.taxonomy.context import TaxonomyContext
+from openbilanz.taxonomy.context_dimension import (
+    TaxonomyContextDimension,
+)
 
 TEST_ENTITY_SCHEME = "http://www.bundesfinanzministerium.de"
 
@@ -119,4 +122,52 @@ def test_taxonomy_context_rejects_blank_entity_scheme(
             period_type=TaxonomyPeriodType.INSTANT,
             start_date=None,
             end_date=date(2025, 12, 31),
+        )
+
+def test_accepts_explicit_dimensions() -> None:
+    """Ein Kontext kann explizite Dimensionen enthalten."""
+
+    dimensions = (
+        TaxonomyContextDimension(
+            dimension=(
+                "de-gaap-ci:"
+                "dim_changes.nt.ass.gross_short"
+            ),
+            member=(
+                "de-gaap-ci:"
+                "bs.ass.fixAss.tan.machinery"
+            ),
+        ),
+        TaxonomyContextDimension(
+            dimension="de-gaap-ci:dim_taxTrans",
+            member="de-gaap-ci:taxTrans",
+        ),
+    )
+
+    context = TaxonomyContext(
+        entity_identifier="123456789",
+        entity_scheme="http://example.com",
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2026, 1, 1),
+        end_date=date(2026, 12, 31),
+        dimensions=dimensions,
+    )
+
+    assert context.dimensions == dimensions
+
+
+def test_rejects_invalid_dimension_entry() -> None:
+    """Dimensions dürfen nur typisierte Einträge enthalten."""
+
+    with pytest.raises(
+        TypeError,
+        match="TaxonomyContextDimension",
+    ):
+        TaxonomyContext(
+            entity_identifier="123456789",
+            entity_scheme="http://example.com",
+            period_type=TaxonomyPeriodType.DURATION,
+            start_date=date(2026, 1, 1),
+            end_date=date(2026, 12, 31),
+            dimensions=("invalid",),  # type: ignore[arg-type]
         )

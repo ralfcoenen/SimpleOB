@@ -12,6 +12,9 @@ from openbilanz.domain.company_master_data import (
 )
 from openbilanz.domain.e_bilanz_account_detail import EBilanzAccountDetail
 from openbilanz.domain.fiscal_year import FiscalYear
+from openbilanz.reporting.fixed_asset_schedule import (
+    FixedAssetSchedule,
+)
 from openbilanz.taxonomy.arelle_adapter import (
     ArelleAdapter,
     ArelleValidationResult,
@@ -65,6 +68,7 @@ class EBilanzService:
         entity_scheme: str,
         previous_fiscal_year: FiscalYear | None = None,
         account_details: tuple[EBilanzAccountDetail, ...] = (),
+        fixed_asset_schedule: FixedAssetSchedule | None = None,
     ) -> EBilanzDocument:
         """Erzeugt die E-Bilanz-XBRL-Instanz."""
 
@@ -115,7 +119,7 @@ class EBilanzService:
             gaap_ci_entry_point.namespace
             .removesuffix("/shell-fiscal")
         )
-        
+
         builder = EBilanzBuilder(
             gcd_model=gcd_model,
             gaap_ci_model=gaap_ci_model,
@@ -137,6 +141,7 @@ class EBilanzService:
             previous_fiscal_year=previous_fiscal_year,
             identifiers=mapping.identifiers,
             account_details=account_details,
+            fixed_asset_schedule=fixed_asset_schedule,
         )
 
 

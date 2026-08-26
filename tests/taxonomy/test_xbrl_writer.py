@@ -15,6 +15,9 @@ from openbilanz.taxonomy.concept import (
     TaxonomyPeriodType,
 )
 from openbilanz.taxonomy.context import TaxonomyContext
+from openbilanz.taxonomy.context_dimension import (
+    TaxonomyContextDimension,
+)
 from openbilanz.taxonomy.entry_point import TaxonomyEntryPoint
 from openbilanz.taxonomy.fact import TaxonomyFact
 from openbilanz.taxonomy.gcd_company_id_no import (
@@ -36,7 +39,10 @@ from openbilanz.taxonomy.gcd_shareholder_tuple import (
 )
 from openbilanz.taxonomy.text_fact import TaxonomyTextFact
 from openbilanz.taxonomy.unit import TaxonomyUnit
-from openbilanz.taxonomy.xbrl_writer import TaxonomyXbrlWriter
+from openbilanz.taxonomy.xbrl_writer import (
+    XBRLDI_NAMESPACE,
+    TaxonomyXbrlWriter,
+)
 
 DE_GAAP_CI_NAMESPACE = (
     "http://www.xbrl.de/taxonomies/"
@@ -158,7 +164,7 @@ def test_xbrl_writer_serializes_euro_unit() -> None:
 def test_xbrl_writer_serializes_fact() -> None:
     """Ein TaxonomyFact wird als XBRL-Fact serialisiert."""
 
-    
+
     concept = TaxonomyConcept(
         name="bs.ass.fixAss",
         concept_id="de-gaap-ci_bs.ass.fixAss",
@@ -231,7 +237,7 @@ def test_xbrl_writer_builds_instance_document() -> None:
     )
 
     unit = TaxonomyUnit.eur()
-    
+
     entry_point = TaxonomyEntryPoint(
         path=Path(
             "de-gaap-ci-2024-04-01-shell-fiscal.xsd"
@@ -263,9 +269,9 @@ def test_xbrl_writer_builds_instance_document() -> None:
         taxonomy_namespace=DE_GAAP_CI_NAMESPACE,
         entry_points=(entry_point,),
     )
-    
+
     assert root.tag == f"{{{XBRLI_NAMESPACE}}}xbrl"
-    
+
     schema_ref = root.find(
         "{http://www.xbrl.org/2003/linkbase}schemaRef"
     )
@@ -336,7 +342,7 @@ def test_xbrl_writer_serializes_schema_ref() -> None:
         "de-gaap-ci-2024-04-01/"
         "de-gaap-ci-2024-04-01-shell-fiscal.xsd"
     )
-   
+
 def test_xbrl_writer_serializes_instance_to_xml_string() -> None:
     """Eine XBRL-Instanz kann als XML-String serialisiert werden."""
 
@@ -353,7 +359,7 @@ def test_xbrl_writer_serializes_instance_to_xml_string() -> None:
     assert xml.startswith("<?xml version=")
     assert "encoding='utf-8'" in xml
     assert "xbrl" in xml
-    
+
 def test_xbrl_writer_serializes_required_namespaces() -> None:
     """Die XBRL-Instanz deklariert die benötigten Standard-Namespaces."""
 
@@ -640,7 +646,7 @@ def test_xbrl_writer_builds_instance_with_multiple_contexts() -> None:
     )
 
     unit = TaxonomyUnit.eur()
-    
+
     fact = TaxonomyFact(
         concept=concept,
         amount=Decimal("125000.00"),
@@ -695,7 +701,7 @@ def test_xbrl_writer_builds_instance_with_multiple_contexts() -> None:
 
     assert fact_element is not None
     assert fact_element.attrib["contextRef"] == "ctx-2025"
-    
+
 def test_xbrl_writer_resolves_unit_id() -> None:
     """Ein Fact erhält die ID seiner zugehörigen XBRL-Einheit."""
 
@@ -716,7 +722,7 @@ def test_xbrl_writer_resolves_unit_id() -> None:
     )
 
     assert unit_id == "pure"
-    
+
 def test_xbrl_writer_builds_instance_with_multiple_units() -> None:
     """Mehrere Units werden serialisiert und Facts korrekt zugeordnet."""
 
@@ -824,7 +830,7 @@ def test_xbrl_writer_rejects_unregistered_unit() -> None:
                 "EUR": registered_unit,
             },
         )
-  
+
 def test_xbrl_writer_assigns_contexts_and_units_to_multiple_facts() -> None:
     """Mehrere Facts erhalten ihre jeweiligen Context- und Unit-Referenzen."""
 
@@ -939,7 +945,7 @@ def test_xbrl_writer_assigns_contexts_and_units_to_multiple_facts() -> None:
     assert pure_element.attrib["contextRef"] == "ctx-duration-2025"
     assert pure_element.attrib["unitRef"] == "pure"
     assert pure_element.text == "0.75"
-    
+
 def test_xbrl_writer_resolves_equivalent_unit() -> None:
     """Fachlich gleiche Units werden derselben XBRL-ID zugeordnet."""
 
@@ -956,7 +962,7 @@ def test_xbrl_writer_resolves_equivalent_unit() -> None:
     )
 
     assert unit_id == "EUR"
-    
+
 def test_xbrl_writer_distinguishes_equivalent_contexts() -> None:
     """Inhaltlich gleiche Contexts bleiben getrennte XBRL-Contexts."""
 
@@ -1145,7 +1151,7 @@ def test_xbrl_writer_builds_instance_with_numeric_and_text_facts() -> None:
     assert text_element.text == "Landwirtschaftlicher Betrieb"
     assert "unitRef" not in text_element.attrib
     assert "decimals" not in text_element.attrib
-    
+
 def test_xbrl_writer_builds_instance_with_multiple_taxonomy_namespaces() -> None:
     """GCD- und GAAP-CI-Facts erhalten ihre jeweiligen Namespaces."""
 
@@ -1844,7 +1850,7 @@ def test_xbrl_writer_includes_gcd_company_id_no_in_instance() -> None:
         f"{{{namespace}}}"
         "genInfo.company.id.idNo.type.companyId.ST13"
     ) in tags
-    
+
 def test_xbrl_writer_serializes_gcd_shareholder_tuple() -> None:
     """Der Writer serialisiert ein verschachteltes Gesellschafter-Tuple."""
 
@@ -2194,7 +2200,7 @@ def test_xbrl_writer_serializes_shareholder_current_number() -> None:
     assert element.get("contextRef") == "ctx-2025"
     assert element.get("unitRef") == "PURE"
     assert element.get("decimals") == "INF"
-    
+
 
 def test_xbrl_writer_serializes_gcd_company_classification_tuples() -> None:
     """Der Writer serialisiert beide GCD-Unternehmensklassifikationen."""
@@ -2301,8 +2307,8 @@ def test_xbrl_writer_serializes_gcd_company_classification_tuples() -> None:
     )
     assert business_element[0].attrib["contextRef"] == "ctx-2025"
     assert business_element[0].text == "normal"
-    
-    
+
+
 def test_xbrl_writer_serializes_optional_shareholder_identifiers() -> None:
     """Der Writer serialisiert beWiNr und idNotAssigned."""
 
@@ -2420,3 +2426,52 @@ def test_xbrl_writer_serializes_optional_shareholder_identifiers() -> None:
     assert id_not_assigned.text == "NO-ID"
     assert id_not_assigned.get("contextRef") == "ctx-2026"
 
+def test_context_element_writes_explicit_dimensions() -> None:
+    """Dimensionale Kontexte werden als XBRL-Szenario geschrieben."""
+
+    context = TaxonomyContext(
+        entity_identifier="123456789",
+        entity_scheme="http://example.com",
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2026, 1, 1),
+        end_date=date(2026, 12, 31),
+        dimensions=(
+            TaxonomyContextDimension(
+                dimension=(
+                    "de-gaap-ci:"
+                    "dim_changes.nt.ass.gross_short"
+                ),
+                member=(
+                    "de-gaap-ci:"
+                    "bs.ass.fixAss.tan.machinery"
+                ),
+            ),
+        ),
+    )
+
+    writer = TaxonomyXbrlWriter()
+
+    element = writer.context_element(
+        context,
+        "ctx-fixed-assets",
+    )
+
+    scenario = element.find(
+        f"{{{XBRLI_NAMESPACE}}}scenario"
+    )
+
+    assert scenario is not None
+
+    explicit_member = scenario.find(
+        f"{{{XBRLDI_NAMESPACE}}}explicitMember"
+    )
+
+    assert explicit_member is not None
+    assert (
+        explicit_member.attrib["dimension"]
+        == "de-gaap-ci:dim_changes.nt.ass.gross_short"
+    )
+    assert (
+        explicit_member.text
+        == "de-gaap-ci:bs.ass.fixAss.tan.machinery"
+    )

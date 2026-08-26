@@ -6,6 +6,15 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from openbilanz.ui_qt.account_activity_report_page import (
+    AccountActivityReportPage,
+)
+from openbilanz.ui_qt.fixed_asset_report_page import (
+    FixedAssetReportPage,
+)
+from openbilanz.ui_qt.journal_report_page import (
+    JournalReportPage,
+)
 from openbilanz.ui_qt.trial_balance_report_page import (
     TrialBalanceReportPage,
 )
@@ -18,6 +27,9 @@ class ReportsPage(QWidget):
         self,
         *,
         trial_balance_page: TrialBalanceReportPage,
+        account_activity_page: AccountActivityReportPage,
+        journal_report_page: JournalReportPage,
+        fixed_asset_report_page: FixedAssetReportPage,
     ) -> None:
         super().__init__()
 
@@ -31,13 +43,18 @@ class ReportsPage(QWidget):
         )
 
         self._tabs.addTab(
-            QWidget(),
+            account_activity_page,
             "Kontenauswertung",
         )
 
         self._tabs.addTab(
-            QWidget(),
+            journal_report_page,
             "Journal",
+        )
+
+        self._tabs.addTab(
+            fixed_asset_report_page,
+            "Anlagen",
         )
 
         layout.addWidget(self._tabs)

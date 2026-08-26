@@ -5,6 +5,7 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QLabel,
     QTableView,
+    QTableWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -42,6 +43,9 @@ class JournalPage(QWidget):
         self._table = QTableView()
         self._table.setModel(self._model)
         self._table.setAlternatingRowColors(True)
+        self._table.setHorizontalScrollMode(
+            QTableWidget.ScrollMode.ScrollPerPixel
+        )
         self._table.setSelectionBehavior(
             QTableView.SelectionBehavior.SelectRows
         )
@@ -62,11 +66,11 @@ class JournalPage(QWidget):
         )
         header.setSectionResizeMode(
             2,
-            QHeaderView.ResizeMode.Stretch,
+            QHeaderView.ResizeMode.Interactive,
         )
         header.setSectionResizeMode(
             3,
-            QHeaderView.ResizeMode.Stretch,
+            QHeaderView.ResizeMode.Interactive,
         )
         header.setSectionResizeMode(
             4,
@@ -79,6 +83,9 @@ class JournalPage(QWidget):
 
         self._table.setTextElideMode(
             Qt.TextElideMode.ElideRight
+        )
+        self._table.setHorizontalScrollMode(
+            QTableView.ScrollMode.ScrollPerPixel
         )
 
         layout.addWidget(self._table)

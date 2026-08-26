@@ -18,6 +18,10 @@ from openbilanz.hgb.balance_sheet_structure import (
 from openbilanz.hgb.income_statement_structure import (
     create_hgb_income_statement_structure,
 )
+from openbilanz.reporting.fixed_asset_schedule import (
+    FixedAssetSchedule,
+    FixedAssetScheduleRow,
+)
 from openbilanz.taxonomy.arelle_adapter import ArelleAdapter
 from openbilanz.taxonomy.e_bilanz_builder import EBilanzBuilder
 from openbilanz.taxonomy.entry_point import TaxonomyEntryPoint
@@ -40,8 +44,10 @@ from openbilanz.taxonomy.gcd_shareholder import (
 from openbilanz.taxonomy.resolver import TaxonomyResolver
 from openbilanz.taxonomy.taxonomy import TaxonomyVersion
 
-TAXONOMY_ROOT = Path(
-    "/tmp/openbilanz-taxonomy"
+TAXONOMY_ROOT = (
+    Path(__file__).resolve().parents[2]
+    / "data"
+    / "taxonomy"
 )
 
 TEST_ENTITY_SCHEME = (
@@ -224,6 +230,20 @@ def test_builds_complete_e_bilanz_and_validates_with_arelle(
             income_statement=income_statement,
         )
 
+        fixed_asset_schedule = FixedAssetSchedule(
+            rows=(
+                FixedAssetScheduleRow(
+                    position_code="HGB.266.AKTIVA.A.II.3",
+                    opening_cost=Decimal("12000.00"),
+                    additions=Decimal("0.00"),
+                    disposals=Decimal("0.00"),
+                    current_depreciation=Decimal("2400.00"),
+                    accumulated_depreciation=Decimal("4800.00"),
+                    closing_book_value=Decimal("7200.00"),
+                ),
+            )
+        )
+
         document = builder.build(
             company_data=company_data,
             fiscal_year=fiscal_year,
@@ -248,6 +268,7 @@ def test_builds_complete_e_bilanz_and_validates_with_arelle(
             account_details=(
                 account_detail,
             ),
+            fixed_asset_schedule=fixed_asset_schedule,
             identifiers=identifiers,
             shareholders=(
                 shareholder,
@@ -271,6 +292,10 @@ def test_builds_complete_e_bilanz_and_validates_with_arelle(
         )
         assert (
             "genInfo.report.id.reportElement.reportElements.GuV"
+            in xml
+        )
+        assert (
+            "genInfo.report.id.reportElement.reportElements.BAL"
             in xml
         )
 
@@ -320,6 +345,29 @@ def test_builds_complete_e_bilanz_and_validates_with_arelle(
 
         assert (
             "is.netIncome.regular.operatingTC.otherCost"
+            in xml
+        )
+
+        assert "grossCost.beginning_short" in xml
+        assert ">12000.00<" in xml
+
+        assert "accDepr.DeprPeriod_short" in xml
+        assert ">2400.00<" in xml
+
+        assert (
+            'dimension="de-gaap-ci:dim_taxTrans"'
+            in xml
+        )
+        assert ">de-gaap-ci:dim_comBal<" in xml
+
+        assert (
+            'dimension="de-gaap-ci:'
+            'dim_changes.nt.ass.gross_short"'
+            in xml
+        )
+        assert (
+            ">de-gaap-ci:"
+            "bs.ass.fixAss.tan.otherEquipm<"
             in xml
         )
 

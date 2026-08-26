@@ -4,6 +4,7 @@ from collections.abc import Callable, Mapping, Sequence
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
+from xml.sax.saxutils import escape
 
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER
@@ -29,6 +30,9 @@ from openbilanz.domain.entry_side import EntrySide
 from openbilanz.domain.money import ZERO
 from openbilanz.reporting.account_activity_report import (
     AccountActivityReport,
+)
+from openbilanz.reporting.fixed_asset_report import (
+    FixedAssetReport,
 )
 from openbilanz.reporting.journal_report import JournalReport
 from openbilanz.reporting.trial_balance_report import TrialBalanceReport
@@ -247,6 +251,7 @@ class PdfReportingService:
                 25 * mm,
             ),
             landscape_page=True,
+            wrap_columns=(1,),
         )
 
     def export_account_activity(
@@ -328,6 +333,7 @@ class PdfReportingService:
                 30 * mm,
             ),
             landscape_page=True,
+            wrap_columns=(3,),
         )
 
     def _build_pdf(
@@ -340,6 +346,7 @@ class PdfReportingService:
         rows: list[list[str]],
         column_widths: tuple[float, ...],
         landscape_page: bool = False,
+        wrap_columns: tuple[int, ...] = (),
     ) -> Path:
         """Schreibt einen tabellarischen Bericht als PDF."""
 
@@ -392,6 +399,16 @@ class PdfReportingService:
             spaceAfter=6,
         )
 
+        table_text_style = ParagraphStyle(
+            "TableText",
+            parent=styles["Normal"],
+            fontName="Helvetica",
+            fontSize=8,
+            leading=10,
+            spaceBefore=0,
+            spaceAfter=0,
+        )
+
         story = [
             Paragraph(
                 company_name,
@@ -415,8 +432,26 @@ class PdfReportingService:
             ),
         ]
 
+        table_rows: list[list[object]] = []
+
+        for row in rows:
+            table_row: list[object] = []
+
+            for column, value in enumerate(row):
+                if column in wrap_columns:
+                    table_row.append(
+                        Paragraph(
+                            escape(str(value)),
+                            table_text_style,
+                        )
+                    )
+                else:
+                    table_row.append(value)
+
+            table_rows.append(table_row)
+
         table = Table(
-            rows,
+            table_rows,
             colWidths=column_widths,
             repeatRows=1,
             hAlign="LEFT",
@@ -614,7 +649,7 @@ class PdfReportingService:
             .replace(".", ",")
             .replace("X", ".")
         )
-    
+
     def export_journal(
         self,
         *,
@@ -679,4 +714,113 @@ class PdfReportingService:
                 30 * mm,
             ),
             landscape_page=True,
+            wrap_columns=(3, 5),
+        )
+
+    def export_fixed_asset_report(
+        self,
+        *,
+        report: FixedAssetReport,
+        company_name: str,
+        target: Path,
+    ) -> Path:
+        """Exportiert den Anlagenbericht."""
+
+        rows: list[list[str]] = [
+            [
+                "Anlage",
+                "Bezeichnung",
+                "Konto",
+                "Anschaffung",
+                "AK/HK",
+                "AfA Vorjahre",
+                "AfA laufend",
+                "AfA kumuliert",
+                "Buchwert",
+                "Abgang",
+            ],
+        ]
+
+        for row in report.rows:
+            rows.append(
+                [
+                    row.asset_code,
+                    row.description,
+                    row.asset_account_number,
+                    row.acquisition_date.strftime(
+                        "%d.%m.%Y"
+                    ),
+                    self._format_amount(
+                        row.acquisition_cost
+                    ),
+                    self._format_amount(
+                        row.opening_depreciation
+                    ),
+                    self._format_amount(
+                        row.current_depreciation
+                    ),
+                    self._format_amount(
+                        row.accumulated_depreciation
+                    ),
+                    self._format_amount(
+                        row.closing_book_value
+                    ),
+                    (
+                        row.disposal_date.strftime(
+                            "%d.%m.%Y"
+                        )
+                        if row.disposal_date is not None
+                        else ""
+                    ),
+                ]
+            )
+
+        rows.append(
+            [
+                "",
+                "Summe",
+                "",
+                "",
+                self._format_amount(
+                    report.acquisition_cost_total
+                ),
+                self._format_amount(
+                    report.opening_depreciation_total
+                ),
+                self._format_amount(
+                    report.current_depreciation_total
+                ),
+                self._format_amount(
+                    report.accumulated_depreciation_total
+                ),
+                self._format_amount(
+                    report.closing_book_value_total
+                ),
+                "",
+            ]
+        )
+
+        return self._build_pdf(
+            target=target,
+            title="Anlagenbericht",
+            company_name=company_name,
+            period_text=self._format_period(
+                report.start_date,
+                report.end_date,
+            ),
+            rows=rows,
+            column_widths=(
+                20 * mm,
+                48 * mm,
+                18 * mm,
+                24 * mm,
+                24 * mm,
+                25 * mm,
+                25 * mm,
+                25 * mm,
+                25 * mm,
+                24 * mm,
+            ),
+            landscape_page=True,
+            wrap_columns=(1,),
         )

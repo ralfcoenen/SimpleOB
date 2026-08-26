@@ -19,7 +19,13 @@ from openbilanz.database.database import Database
 from openbilanz.database.fixed_asset_depreciation_repository import (
     FixedAssetDepreciationRepository,
 )
+from openbilanz.database.fixed_asset_movement_repository import (
+    FixedAssetMovementRepository,
+)
 from openbilanz.database.fixed_asset_repository import FixedAssetRepository
+from openbilanz.database.migration_service import (
+    MigrationService,
+)
 from openbilanz.services.chart_of_accounts_initialization_service import (
     ChartOfAccountsInitializationService,
 )
@@ -31,8 +37,23 @@ from openbilanz.services.depreciation_booking_service import (
 )
 from openbilanz.services.depreciation_service import DepreciationService
 from openbilanz.services.e_bilanz_export_service import EBilanzExportService
+from openbilanz.services.fixed_asset_book_value_service import (
+    FixedAssetBookValueService,
+)
 from openbilanz.services.fixed_asset_depreciation_workflow import (
     FixedAssetDepreciationWorkflow,
+)
+from openbilanz.services.fixed_asset_disposal_booking_service import (
+    FixedAssetDisposalBookingService,
+)
+from openbilanz.services.fixed_asset_disposal_workflow import (
+    FixedAssetDisposalWorkflow,
+)
+from openbilanz.services.fixed_asset_loss_booking_service import (
+    FixedAssetLossBookingService,
+)
+from openbilanz.services.fixed_asset_loss_workflow import (
+    FixedAssetLossWorkflow,
 )
 from openbilanz.services.pdf_reporting_service import PdfReportingService
 from openbilanz.services.posting_service import PostingService
@@ -57,6 +78,8 @@ class ApplicationBootstrap:
     arelle_adapter: ArelleAdapter
     session: object
     company_repository: CompanyRepository
+    booking_repository: BookingRepository
+    posting_service: PostingService
     workspace_factory: WorkspaceFactory
     pdf_reporting_service: PdfReportingService
 
@@ -66,8 +89,11 @@ class ApplicationBootstrap:
 
         config = load_config()
 
+        MigrationService(
+            config=config
+        ).upgrade_to_head()
+
         database = Database(config)
-        database.create_database()
 
         standard_financial_statement_context = (
             create_standard_financial_statement_context()
@@ -146,6 +172,12 @@ class ApplicationBootstrap:
             )
         )
 
+        fixed_asset_movement_repository = (
+            FixedAssetMovementRepository(
+                session
+            )
+        )
+
         depreciation_service = DepreciationService()
 
         depreciation_booking_service = (
@@ -161,6 +193,64 @@ class ApplicationBootstrap:
                 ),
                 booking_service=(
                     depreciation_booking_service
+                ),
+            )
+        )
+
+        fixed_asset_book_value_service = (
+            FixedAssetBookValueService(
+                depreciation_repository=(
+                    fixed_asset_depreciation_repository
+                ),
+            )
+        )
+
+        fixed_asset_loss_booking_service = (
+            FixedAssetLossBookingService()
+        )
+
+        fixed_asset_loss_workflow = FixedAssetLossWorkflow(
+            session=session,
+            fixed_asset_repository=fixed_asset_repository,
+            depreciation_repository=(
+                fixed_asset_depreciation_repository
+            ),
+            movement_repository=(
+                fixed_asset_movement_repository
+            ),
+            booking_repository=booking_repository,
+            depreciation_service=depreciation_service,
+            book_value_service=(
+                fixed_asset_book_value_service
+            ),
+            booking_service=(
+                fixed_asset_loss_booking_service
+            ),
+        )
+
+        fixed_asset_disposal_booking_service = (
+            FixedAssetDisposalBookingService()
+        )
+
+        fixed_asset_disposal_workflow = (
+            FixedAssetDisposalWorkflow(
+                session=session,
+                fixed_asset_repository=(
+                    fixed_asset_repository
+                ),
+                depreciation_repository=(
+                    fixed_asset_depreciation_repository
+                ),
+                movement_repository=(
+                    fixed_asset_movement_repository
+                ),
+                booking_repository=booking_repository,
+                depreciation_service=depreciation_service,
+                book_value_service=(
+                    fixed_asset_book_value_service
+                ),
+                booking_service=(
+                    fixed_asset_disposal_booking_service
                 ),
             )
         )
@@ -206,11 +296,20 @@ class ApplicationBootstrap:
             fixed_asset_depreciation_repository=(
                 fixed_asset_depreciation_repository
             ),
+            fixed_asset_movement_repository=(
+                fixed_asset_movement_repository
+            ),
             depreciation_service=(
                 depreciation_service
             ),
             fixed_asset_depreciation_workflow=(
                 fixed_asset_depreciation_workflow
+            ),
+            fixed_asset_loss_workflow=(
+                fixed_asset_loss_workflow
+            ),
+            fixed_asset_disposal_workflow=(
+                fixed_asset_disposal_workflow
             ),
             resolver=resolver,
             arelle_adapter=arelle_adapter,
@@ -225,6 +324,8 @@ class ApplicationBootstrap:
             arelle_adapter=arelle_adapter,
             session=session,
             company_repository=company_repository,
+            booking_repository=booking_repository,
+            posting_service=posting_service,
             workspace_factory=workspace_factory,
             pdf_reporting_service=pdf_reporting_service,
         )
