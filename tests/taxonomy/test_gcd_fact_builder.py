@@ -231,7 +231,7 @@ def test_gcd_fact_builder_defines_fiscal_year_values() -> None:
         31,
     ),
 }
-   
+
 def test_gcd_fact_builder_builds_company_facts() -> None:
     """Unternehmensstammdaten werden zu GCD-Text-Facts."""
 
@@ -688,7 +688,7 @@ def test_gcd_fact_builder_builds_report_profile_facts() -> None:
         abstract=False,
         nillable=True,
     )
-    
+
     special_accounting_standard_concept = TaxonomyConcept(
         name=profile.special_accounting_standard,
         concept_id=(
@@ -716,7 +716,7 @@ def test_gcd_fact_builder_builds_report_profile_facts() -> None:
         abstract=False,
         nillable=True,
     )
-    
+
     consolidation_range_concept = TaxonomyConcept(
         name=profile.consolidation_range,
         concept_id=(
@@ -744,7 +744,7 @@ def test_gcd_fact_builder_builds_report_profile_facts() -> None:
         abstract=False,
         nillable=True,
     )
-    
+
     taxonomy_model = _taxonomy_model(
         report_status_concept,
         revision_status_concept,
@@ -814,7 +814,7 @@ def test_gcd_fact_builder_builds_report_profile_facts() -> None:
             context=context,
         ),
     )
-    
+
 def test_gcd_fact_builder_builds_standard_report_element() -> None:
     """Das Standardprofil erzeugt die regulären Berichtselemente."""
 
@@ -823,6 +823,7 @@ def test_gcd_fact_builder_builds_standard_report_element() -> None:
     concept_names = (
         "genInfo.report.id.reportElement.reportElements.B",
         "genInfo.report.id.reportElement.reportElements.GuV",
+        "genInfo.report.id.reportElement.reportElements.BAL",
     )
 
     concepts = tuple(
@@ -880,15 +881,19 @@ def test_gcd_fact_builder_builds_standard_report_element() -> None:
         "genInfo.report.id.reportElement.reportElements.GuV": (
             "GuV"
         ),
+        "genInfo.report.id.reportElement.reportElements.BAL": (
+            "Anlagenspiegel"
+        ),
     }
 
-def test_gcd_fact_builder_adds_account_statements_from_69() -> None:
-    """Taxonomie 6.9 verwendet im Standardprofil nur Bilanz und GuV."""
+def test_gcd_fact_builder_adds_report_elements_from_69() -> None:
+    """Das Standardprofil enthält Bilanz, GuV und Anlagenspiegel."""
     profile = GcdReportProfile.standard()
 
     concept_names = (
         "genInfo.report.id.reportElement.reportElements.B",
         "genInfo.report.id.reportElement.reportElements.GuV",
+        "genInfo.report.id.reportElement.reportElements.BAL",
     )
 
     concepts = tuple(
@@ -941,16 +946,20 @@ def test_gcd_fact_builder_adds_account_statements_from_69() -> None:
         "genInfo.report.id.reportElement.reportElements.GuV": (
             "GuV"
         ),
+        "genInfo.report.id.reportElement.reportElements.BAL": (
+            "Anlagenspiegel"
+        ),
     }
-        
-def test_gcd_fact_builder_keeps_account_statements_in_610() -> None:
-    """Taxonomie 6.10 verwendet im Standardprofil nur Bilanz und GuV."""
+
+def test_gcd_fact_builder_keeps_report_elements_in_610() -> None:
+    """Das Standardprofil enthält Bilanz, GuV und Anlagenspiegel."""
 
     profile = GcdReportProfile.standard()
 
     concept_names = (
         "genInfo.report.id.reportElement.reportElements.B",
         "genInfo.report.id.reportElement.reportElements.GuV",
+        "genInfo.report.id.reportElement.reportElements.BAL",
     )
 
     concepts = tuple(
@@ -1002,6 +1011,9 @@ def test_gcd_fact_builder_keeps_account_statements_in_610() -> None:
         ),
         "genInfo.report.id.reportElement.reportElements.GuV": (
             "GuV"
+        ),
+        "genInfo.report.id.reportElement.reportElements.BAL": (
+            "Anlagenspiegel"
         ),
     }
 
@@ -1090,7 +1102,7 @@ def test_gcd_fact_builder_includes_previous_fiscal_year_values() -> None:
             31,
         ),
     }
-    
+
 def test_gcd_fact_builder_builds_previous_fiscal_year_facts() -> None:
         """Vorjahresdaten werden zu GCD-Text-Facts."""
 
@@ -1234,7 +1246,7 @@ def test_gcd_fact_builder_builds_variable_report_data_facts(
             context=context,
         ),
     )
-    
+
 def test_gcd_fact_builder_builds_company_id_no_tuple() -> None:
     """Unternehmenskennungen werden zu einem GCD-idNo-Tuple."""
 
@@ -1585,7 +1597,7 @@ def test_gcd_fact_builder_builds_shareholder_legal_status() -> None:
     assert result.fact.concept.name == concept_name
     assert result.fact.value == "NPP"
     assert result.fact.context == context
-    
+
 def test_gcd_fact_builder_builds_shareholder_share_divide_key() -> None:
     """Der Builder erzeugt das Beteiligungsquoten-Tuple."""
 
@@ -1741,7 +1753,7 @@ def test_gcd_fact_builder_builds_shareholder_current_number() -> None:
     assert result.context == context
     assert result.unit == TaxonomyUnit.pure()
     assert result.decimals == "INF"
-    
+
 def test_gcd_fact_builder_builds_shareholder_tuple() -> None:
     """Der Builder setzt die Gesellschafter-Bausteine zum Tuple zusammen."""
 
@@ -1851,7 +1863,7 @@ def test_gcd_fact_builder_builds_shareholder_tuple() -> None:
     assert result.current_number.amount == Decimal("1")
     assert result.current_number.unit == TaxonomyUnit.pure()
     assert result.current_number.decimals == "INF"
-    
+
 def test_gcd_fact_builder_builds_domestic_branch_of_foreign_company() -> None:
     """Der Builder erzeugt das Tuple für eine inländische Zweigniederlassung."""
 
@@ -1952,7 +1964,7 @@ def test_gcd_fact_builder_builds_entity_with_taxable_purpose_business() -> None:
     assert result.fact.concept is concept
     assert result.fact.value == "normal"
     assert result.fact.context is context
-    
+
 def test_gcd_fact_builder_builds_optional_shareholder_identifier_facts() -> None:
     """Der Builder erzeugt optionale Shareholder-Facts taxonomieabhängig."""
 
@@ -2044,5 +2056,3 @@ def test_gcd_fact_builder_builds_optional_shareholder_identifier_facts() -> None
 
     assert result.id_not_assigned is not None
     assert result.id_not_assigned.value == "NO-ID"
-    
-    

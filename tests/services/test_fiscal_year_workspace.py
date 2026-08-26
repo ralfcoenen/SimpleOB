@@ -119,6 +119,7 @@ def test_reconstructs_empty_workspace(
         e_bilanz_account_detail_service=Mock(),
         taxonomy_management_service=Mock(),
         e_bilanz_export_service=Mock(),
+        fixed_asset_schedule_service=Mock(),
     )
 
     assert isinstance(workspace.journal, Journal)
@@ -165,6 +166,7 @@ def test_reports_open_fiscal_year(
         e_bilanz_account_detail_service=Mock(),
         taxonomy_management_service=Mock(),
         e_bilanz_export_service=Mock(),
+        fixed_asset_schedule_service=Mock(),
     )
 
     assert workspace.is_open is True
@@ -201,6 +203,7 @@ def test_reports_closed_fiscal_year(
         e_bilanz_account_detail_service=Mock(),
         taxonomy_management_service=Mock(),
         e_bilanz_export_service=Mock(),
+        fixed_asset_schedule_service=Mock(),
     )
 
     assert workspace.is_open is False
@@ -241,6 +244,7 @@ def test_reports_taxonomy_status_for_opened_fiscal_year(
             taxonomy_management_service
         ),
         e_bilanz_export_service=Mock(),
+        fixed_asset_schedule_service=Mock(),
     )
 
     status = workspace.taxonomy_status
@@ -274,6 +278,7 @@ def test_raises_when_managed_fiscal_year_is_missing(
         e_bilanz_account_detail_service=Mock(),
         taxonomy_management_service=Mock(),
         e_bilanz_export_service=Mock(),
+        fixed_asset_schedule_service=Mock(),
     )
 
     with pytest.raises(
@@ -327,6 +332,7 @@ def test_post_booking_persists_and_reloads_workspace(
         e_bilanz_account_detail_service=Mock(),
         taxonomy_management_service=Mock(),
         e_bilanz_export_service=Mock(),
+        fixed_asset_schedule_service=Mock(),
     )
 
     assert len(workspace.journal) == 0
@@ -392,6 +398,7 @@ def test_post_booking_does_not_change_workspace_when_persistence_fails(
         e_bilanz_account_detail_service=Mock(),
         taxonomy_management_service=Mock(),
         e_bilanz_export_service=Mock(),
+        fixed_asset_schedule_service=Mock(),
     )
 
     with pytest.raises(
@@ -472,6 +479,7 @@ def test_builds_open_depreciation_proposal(
         e_bilanz_service=Mock(),
         e_bilanz_account_detail_service=Mock(),
         e_bilanz_export_service=Mock(),
+        fixed_asset_schedule_service=Mock(),
         taxonomy_management_service=Mock(),
         fixed_asset_repository=(
             fixed_asset_repository
@@ -582,6 +590,7 @@ def test_confirmed_depreciation_is_not_proposed_again(
         e_bilanz_service=Mock(),
         e_bilanz_account_detail_service=Mock(),
         e_bilanz_export_service=Mock(),
+        fixed_asset_schedule_service=Mock(),
         taxonomy_management_service=Mock(),
         fixed_asset_repository=(
             fixed_asset_repository
@@ -701,6 +710,7 @@ def test_close_fiscal_year_uses_workflow_and_reloads_closed_bookings(
         e_bilanz_account_detail_service=Mock(),
         taxonomy_management_service=Mock(),
         e_bilanz_export_service=Mock(),
+        fixed_asset_schedule_service=Mock(),
     )
 
     income_statement = Mock(
@@ -800,6 +810,7 @@ def test_validate_closing_delegates_to_consistency_service(
         e_bilanz_account_detail_service=Mock(),
         taxonomy_management_service=Mock(),
         e_bilanz_export_service=Mock(),
+        fixed_asset_schedule_service=Mock(),
     )
 
     balance_sheet = Mock(
@@ -890,6 +901,7 @@ def test_loads_company_master_data(
         e_bilanz_account_detail_service=Mock(),
         taxonomy_management_service=Mock(),
         e_bilanz_export_service=Mock(),
+        fixed_asset_schedule_service=Mock(),
     )
 
     result = workspace.load_company_master_data()
@@ -941,6 +953,7 @@ def test_saves_company_master_data(
         e_bilanz_account_detail_service=Mock(),
         taxonomy_management_service=Mock(),
         e_bilanz_export_service=Mock(),
+        fixed_asset_schedule_service=Mock(),
     )
 
     workspace.save_company_master_data(
@@ -994,6 +1007,7 @@ def test_prepares_e_bilanz_for_closed_fiscal_year(
         e_bilanz_account_detail_service=Mock(),
         taxonomy_management_service=Mock(),
         e_bilanz_export_service=Mock(),
+        fixed_asset_schedule_service=Mock(),
     )
 
     income_statement = Mock(
@@ -1039,6 +1053,7 @@ def test_rejects_e_bilanz_preparation_for_open_fiscal_year(
         e_bilanz_account_detail_service=Mock(),
         taxonomy_management_service=Mock(),
         e_bilanz_export_service=Mock(),
+        fixed_asset_schedule_service=Mock(),
     )
 
     with pytest.raises(
@@ -1105,6 +1120,12 @@ def test_builds_e_bilanz_from_prepared_data(
         expected_document
     )
 
+    fixed_asset_schedule = Mock()
+    fixed_asset_schedule_service = Mock()
+    fixed_asset_schedule_service.schedule_for_company.return_value = (
+        fixed_asset_schedule
+    )
+
     workspace = FiscalYearWorkspace(
         context=context,
         booking_repository=booking_repository,
@@ -1121,6 +1142,9 @@ def test_builds_e_bilanz_from_prepared_data(
         ),
         taxonomy_management_service=Mock(),
         e_bilanz_export_service=Mock(),
+        fixed_asset_schedule_service=(
+            fixed_asset_schedule_service
+        ),
     )
 
     result = workspace.build_e_bilanz(
@@ -1144,6 +1168,13 @@ def test_builds_e_bilanz_from_prepared_data(
         entity_scheme="urn:openbilanz:company-id",
         previous_fiscal_year=previous_fiscal_year,
         account_details=account_details,
+        fixed_asset_schedule=fixed_asset_schedule,
+    )
+
+    fixed_asset_schedule_service.schedule_for_company.assert_called_once_with(
+        company_id=context.company.company_id,
+        start_date=context.fiscal_year.start_date,
+        end_date=context.fiscal_year.end_date,
     )
 
 
@@ -1175,6 +1206,7 @@ def test_rejects_e_bilanz_build_for_open_fiscal_year(
         e_bilanz_account_detail_service=Mock(),
         taxonomy_management_service=Mock(),
         e_bilanz_export_service=Mock(),
+        fixed_asset_schedule_service=Mock(),
     )
 
     with pytest.raises(
@@ -1234,6 +1266,7 @@ def test_validates_e_bilanz_for_closed_fiscal_year(
         e_bilanz_account_detail_service=Mock(),
         taxonomy_management_service=Mock(),
         e_bilanz_export_service=Mock(),
+        fixed_asset_schedule_service=Mock(),
     )
 
     document = Mock(
@@ -1279,6 +1312,7 @@ def test_rejects_e_bilanz_validation_for_open_fiscal_year(
         e_bilanz_account_detail_service=Mock(),
         taxonomy_management_service=Mock(),
         e_bilanz_export_service=Mock(),
+        fixed_asset_schedule_service=Mock(),
     )
 
     document = Mock(
@@ -1321,6 +1355,7 @@ def test_installs_required_taxonomy_for_opened_fiscal_year(
             taxonomy_management_service
         ),
         e_bilanz_export_service=Mock(),
+        fixed_asset_schedule_service=Mock(),
     )
 
     workspace.install_required_taxonomy()
@@ -1375,6 +1410,7 @@ def test_exports_successfully_validated_e_bilanz(
         e_bilanz_account_detail_service=Mock(),
         e_bilanz_export_service=export_service,
         taxonomy_management_service=Mock(),
+        fixed_asset_schedule_service=Mock(),
     )
 
     workspace.validate_e_bilanz(
@@ -1427,6 +1463,7 @@ def test_rejects_export_of_unvalidated_e_bilanz(
         e_bilanz_account_detail_service=Mock(),
         e_bilanz_export_service=export_service,
         taxonomy_management_service=Mock(),
+        fixed_asset_schedule_service=Mock(),
     )
 
     document = Mock(
@@ -1473,6 +1510,7 @@ def test_updates_account_via_chart_of_accounts_repository(
         e_bilanz_account_detail_service=Mock(),
         taxonomy_management_service=Mock(),
         e_bilanz_export_service=Mock(),
+        fixed_asset_schedule_service=Mock(),
     )
 
     account = Mock()
@@ -1551,6 +1589,7 @@ def test_updates_unlinked_fixed_asset(
         e_bilanz_account_detail_service=Mock(),
         taxonomy_management_service=Mock(),
         e_bilanz_export_service=Mock(),
+        fixed_asset_schedule_service=Mock(),
         fixed_asset_repository=fixed_asset_repository,
         fixed_asset_depreciation_repository=(
             depreciation_repository
@@ -1639,6 +1678,7 @@ def test_rejects_acquisition_data_change_after_link(
         e_bilanz_account_detail_service=Mock(),
         taxonomy_management_service=Mock(),
         e_bilanz_export_service=Mock(),
+        fixed_asset_schedule_service=Mock(),
         fixed_asset_repository=fixed_asset_repository,
         fixed_asset_depreciation_repository=(
             depreciation_repository
@@ -1706,6 +1746,7 @@ def test_rejects_fixed_asset_update_after_depreciation(
         e_bilanz_account_detail_service=Mock(),
         taxonomy_management_service=Mock(),
         e_bilanz_export_service=Mock(),
+        fixed_asset_schedule_service=Mock(),
         fixed_asset_repository=fixed_asset_repository,
         fixed_asset_depreciation_repository=(
             depreciation_repository
@@ -1771,6 +1812,7 @@ def test_deletes_unlinked_fixed_asset(
         e_bilanz_account_detail_service=Mock(),
         taxonomy_management_service=Mock(),
         e_bilanz_export_service=Mock(),
+        fixed_asset_schedule_service=Mock(),
         fixed_asset_repository=fixed_asset_repository,
         fixed_asset_depreciation_repository=(
             depreciation_repository
@@ -1861,6 +1903,7 @@ def test_links_fixed_asset_acquisition(
         e_bilanz_account_detail_service=Mock(),
         taxonomy_management_service=Mock(),
         e_bilanz_export_service=Mock(),
+        fixed_asset_schedule_service=Mock(),
         fixed_asset_repository=(
             fixed_asset_repository
         ),
@@ -1967,6 +2010,7 @@ def test_rejects_fixed_asset_acquisition_for_wrong_account(
         e_bilanz_account_detail_service=Mock(),
         taxonomy_management_service=Mock(),
         e_bilanz_export_service=Mock(),
+        fixed_asset_schedule_service=Mock(),
         fixed_asset_repository=fixed_asset_repository,
         fixed_asset_movement_repository=(
             fixed_asset_movement_repository
@@ -2063,6 +2107,7 @@ def test_rejects_duplicate_fixed_asset_acquisition(
         e_bilanz_account_detail_service=Mock(),
         taxonomy_management_service=Mock(),
         e_bilanz_export_service=Mock(),
+        fixed_asset_schedule_service=Mock(),
         fixed_asset_repository=fixed_asset_repository,
         fixed_asset_movement_repository=(
             fixed_asset_movement_repository
@@ -2111,6 +2156,7 @@ def test_reports_pending_fixed_asset_loss_depreciation(
         e_bilanz_account_detail_service=Mock(),
         taxonomy_management_service=Mock(),
         e_bilanz_export_service=Mock(),
+        fixed_asset_schedule_service=Mock(),
         fixed_asset_loss_workflow=loss_workflow,
     )
 
@@ -2168,6 +2214,7 @@ def test_confirms_fixed_asset_loss_and_reloads_workspace(
         e_bilanz_account_detail_service=Mock(),
         taxonomy_management_service=Mock(),
         e_bilanz_export_service=Mock(),
+        fixed_asset_schedule_service=Mock(),
         fixed_asset_loss_workflow=loss_workflow,
     )
 
@@ -2232,6 +2279,7 @@ def test_confirms_fixed_asset_disposal_and_reloads_workspace(
         e_bilanz_account_detail_service=Mock(),
         taxonomy_management_service=Mock(),
         e_bilanz_export_service=Mock(),
+        fixed_asset_schedule_service=Mock(),
         fixed_asset_disposal_workflow=(
             disposal_workflow
         ),

@@ -59,6 +59,11 @@ def _standard_chart_of_accounts() -> ChartOfAccountsTemplate:
                 account_type=AccountType.EQUITY,
             ),
             TemplateAccount(
+                account_number="2970",
+                name="Gewinnvortrag / Verlustvortrag",
+                account_type=AccountType.EQUITY,
+            ),
+            TemplateAccount(
                 account_number="1571",
                 name="Abziehbare Vorsteuer 7 %",
                 account_type=AccountType.ASSET,
@@ -158,6 +163,7 @@ def test_initializes_chart_of_accounts_for_company() -> None:
     assert loaded.income_summary_account == "8990"
     assert loaded.profit_account == "8020"
     assert loaded.loss_account == "8021"
+    assert loaded.retained_earnings_account == "2970"
     assert loaded_vat_accounts is not None
     assert loaded_vat_accounts.input_tax_7 == "1571"
     assert loaded_vat_accounts.input_tax_19 == "1576"
@@ -238,6 +244,7 @@ def test_does_not_replace_existing_chart_of_accounts() -> None:
         "1776",
         "8020",
         "8021",
+        "2970",
         "8990",
         "9000",
     }

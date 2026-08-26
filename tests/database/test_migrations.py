@@ -7,7 +7,7 @@ from alembic.config import Config
 from sqlalchemy import create_engine, inspect
 
 BASELINE_REVISION = "7392d6cc6892"
-HEAD_REVISION = "43399f7117af"
+HEAD_REVISION = "329033b53fb2"
 
 def _alembic_config(
     database_path: Path,
