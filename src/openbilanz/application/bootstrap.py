@@ -26,6 +26,9 @@ from openbilanz.database.fixed_asset_repository import FixedAssetRepository
 from openbilanz.database.migration_service import (
     MigrationService,
 )
+from openbilanz.database.vat_configuration_repository import (
+    VatConfigurationRepository,
+)
 from openbilanz.services.chart_of_accounts_initialization_service import (
     ChartOfAccountsInitializationService,
 )
@@ -143,6 +146,12 @@ class ApplicationBootstrap:
 
         chart_of_accounts_repository = (
             ChartOfAccountsRepository(
+                session
+            )
+        )
+
+        vat_configuration_repository = (
+            VatConfigurationRepository(
                 session
             )
         )
@@ -274,6 +283,9 @@ class ApplicationBootstrap:
             company_repository=company_repository,
             chart_of_accounts_repository=(
                 chart_of_accounts_repository
+            ),
+            vat_configuration_repository=(
+                vat_configuration_repository
             ),
             chart_of_accounts_initialization_service=(
                 chart_of_accounts_initialization_service

@@ -51,6 +51,12 @@ from openbilanz.domain.fixed_asset_movement_type import (
 )
 from openbilanz.domain.journal import Journal
 from openbilanz.domain.managed_fiscal_year import ManagedFiscalYear
+from openbilanz.domain.vat_configuration import (
+    VatConfiguration,
+)
+from openbilanz.domain.vat_taxation_type import (
+    VatTaxationType,
+)
 from openbilanz.services.closing_result import ClosingResult
 from openbilanz.services.e_bilanz_export_service import (
     EBilanzExportService,
@@ -69,6 +75,10 @@ from openbilanz.taxonomy.e_bilanz_builder import (
 )
 from openbilanz.taxonomy.taxonomy import TaxonomyVersion
 
+TEST_VAT_CONFIGURATION = VatConfiguration(
+    taxation_type=VatTaxationType.STANDARD,
+    effective_from=date(2026, 1, 1),
+)
 
 @pytest.fixture
 def company() -> Company:
@@ -109,6 +119,7 @@ def test_reconstructs_empty_workspace(
 
     workspace = FiscalYearWorkspace(
         context=context,
+        vat_configuration=TEST_VAT_CONFIGURATION,
         booking_repository=booking_repository,
         company_repository=company_repository,
         posting_service=posting_service,
@@ -156,6 +167,7 @@ def test_reports_open_fiscal_year(
 
     workspace = FiscalYearWorkspace(
         context=context,
+        vat_configuration=TEST_VAT_CONFIGURATION,
         booking_repository=booking_repository,
         company_repository=company_repository,
         posting_service=posting_service,
@@ -193,6 +205,7 @@ def test_reports_closed_fiscal_year(
 
     workspace = FiscalYearWorkspace(
         context=context,
+        vat_configuration=TEST_VAT_CONFIGURATION,
         booking_repository=booking_repository,
         company_repository=company_repository,
         posting_service=posting_service,
@@ -232,6 +245,7 @@ def test_reports_taxonomy_status_for_opened_fiscal_year(
 
     workspace = FiscalYearWorkspace(
         context=context,
+        vat_configuration=TEST_VAT_CONFIGURATION,
         booking_repository=booking_repository,
         company_repository=company_repository,
         posting_service=Mock(),
@@ -268,6 +282,7 @@ def test_raises_when_managed_fiscal_year_is_missing(
 
     workspace = FiscalYearWorkspace(
         context=context,
+        vat_configuration=TEST_VAT_CONFIGURATION,
         booking_repository=booking_repository,
         company_repository=company_repository,
         posting_service=posting_service,
@@ -322,6 +337,7 @@ def test_post_booking_persists_and_reloads_workspace(
 
     workspace = FiscalYearWorkspace(
         context=context,
+        vat_configuration=TEST_VAT_CONFIGURATION,
         booking_repository=booking_repository,
         company_repository=company_repository,
         posting_service=posting_service,
@@ -388,6 +404,7 @@ def test_post_booking_does_not_change_workspace_when_persistence_fails(
 
     workspace = FiscalYearWorkspace(
         context=context,
+        vat_configuration=TEST_VAT_CONFIGURATION,
         booking_repository=booking_repository,
         company_repository=company_repository,
         posting_service=posting_service,
@@ -470,6 +487,7 @@ def test_builds_open_depreciation_proposal(
 
     workspace = FiscalYearWorkspace(
         context=context,
+        vat_configuration=TEST_VAT_CONFIGURATION,
         booking_repository=booking_repository,
         company_repository=company_repository,
         posting_service=Mock(),
@@ -581,6 +599,7 @@ def test_confirmed_depreciation_is_not_proposed_again(
 
     workspace = FiscalYearWorkspace(
         context=context,
+        vat_configuration=TEST_VAT_CONFIGURATION,
         booking_repository=booking_repository,
         company_repository=company_repository,
         posting_service=Mock(),
@@ -700,6 +719,7 @@ def test_close_fiscal_year_uses_workflow_and_reloads_closed_bookings(
 
     workspace = FiscalYearWorkspace(
         context=context,
+        vat_configuration=TEST_VAT_CONFIGURATION,
         booking_repository=booking_repository,
         company_repository=company_repository,
         posting_service=posting_service,
@@ -798,6 +818,7 @@ def test_validate_closing_delegates_to_consistency_service(
 
     workspace = FiscalYearWorkspace(
         context=context,
+        vat_configuration=TEST_VAT_CONFIGURATION,
         booking_repository=booking_repository,
         company_repository=company_repository,
         posting_service=posting_service,
@@ -891,6 +912,7 @@ def test_loads_company_master_data(
 
     workspace = FiscalYearWorkspace(
         context=context,
+        vat_configuration=TEST_VAT_CONFIGURATION,
         booking_repository=booking_repository,
         company_repository=company_repository,
         posting_service=posting_service,
@@ -943,6 +965,7 @@ def test_saves_company_master_data(
 
     workspace = FiscalYearWorkspace(
         context=context,
+        vat_configuration=TEST_VAT_CONFIGURATION,
         booking_repository=booking_repository,
         company_repository=company_repository,
         posting_service=posting_service,
@@ -993,6 +1016,7 @@ def test_prepares_e_bilanz_for_closed_fiscal_year(
 
     workspace = FiscalYearWorkspace(
         context=context,
+        vat_configuration=TEST_VAT_CONFIGURATION,
         booking_repository=booking_repository,
         company_repository=company_repository,
         posting_service=posting_service,
@@ -1043,6 +1067,7 @@ def test_rejects_e_bilanz_preparation_for_open_fiscal_year(
 
     workspace = FiscalYearWorkspace(
         context=context,
+        vat_configuration=TEST_VAT_CONFIGURATION,
         booking_repository=booking_repository,
         company_repository=company_repository,
         posting_service=PostingService(),
@@ -1128,6 +1153,7 @@ def test_builds_e_bilanz_from_prepared_data(
 
     workspace = FiscalYearWorkspace(
         context=context,
+        vat_configuration=TEST_VAT_CONFIGURATION,
         booking_repository=booking_repository,
         company_repository=company_repository,
         posting_service=PostingService(),
@@ -1196,6 +1222,7 @@ def test_rejects_e_bilanz_build_for_open_fiscal_year(
 
     workspace = FiscalYearWorkspace(
         context=context,
+        vat_configuration=TEST_VAT_CONFIGURATION,
         booking_repository=booking_repository,
         company_repository=company_repository,
         posting_service=PostingService(),
@@ -1252,6 +1279,7 @@ def test_validates_e_bilanz_for_closed_fiscal_year(
 
     workspace = FiscalYearWorkspace(
         context=context,
+        vat_configuration=TEST_VAT_CONFIGURATION,
         booking_repository=booking_repository,
         company_repository=company_repository,
         posting_service=posting_service,
@@ -1302,6 +1330,7 @@ def test_rejects_e_bilanz_validation_for_open_fiscal_year(
 
     workspace = FiscalYearWorkspace(
         context=context,
+        vat_configuration=TEST_VAT_CONFIGURATION,
         booking_repository=booking_repository,
         company_repository=company_repository,
         posting_service=PostingService(),
@@ -1343,6 +1372,7 @@ def test_installs_required_taxonomy_for_opened_fiscal_year(
 
     workspace = FiscalYearWorkspace(
         context=context,
+        vat_configuration=TEST_VAT_CONFIGURATION,
         booking_repository=booking_repository,
         company_repository=company_repository,
         posting_service=Mock(),
@@ -1400,6 +1430,7 @@ def test_exports_successfully_validated_e_bilanz(
 
     workspace = FiscalYearWorkspace(
         context=context,
+        vat_configuration=TEST_VAT_CONFIGURATION,
         booking_repository=booking_repository,
         company_repository=company_repository,
         posting_service=PostingService(),
@@ -1453,6 +1484,7 @@ def test_rejects_export_of_unvalidated_e_bilanz(
 
     workspace = FiscalYearWorkspace(
         context=context,
+        vat_configuration=TEST_VAT_CONFIGURATION,
         booking_repository=booking_repository,
         company_repository=company_repository,
         posting_service=PostingService(),
@@ -1497,6 +1529,7 @@ def test_updates_account_via_chart_of_accounts_repository(
 
     workspace = FiscalYearWorkspace(
         context=context,
+        vat_configuration=TEST_VAT_CONFIGURATION,
         booking_repository=booking_repository,
         company_repository=company_repository,
         chart_of_accounts_repository=(
@@ -1579,6 +1612,7 @@ def test_updates_unlinked_fixed_asset(
 
     workspace = FiscalYearWorkspace(
         context=context,
+        vat_configuration=TEST_VAT_CONFIGURATION,
         booking_repository=booking_repository,
         company_repository=company_repository,
         posting_service=Mock(),
@@ -1668,6 +1702,7 @@ def test_rejects_acquisition_data_change_after_link(
 
     workspace = FiscalYearWorkspace(
         context=context,
+        vat_configuration=TEST_VAT_CONFIGURATION,
         booking_repository=booking_repository,
         company_repository=company_repository,
         posting_service=Mock(),
@@ -1736,6 +1771,7 @@ def test_rejects_fixed_asset_update_after_depreciation(
 
     workspace = FiscalYearWorkspace(
         context=context,
+        vat_configuration=TEST_VAT_CONFIGURATION,
         booking_repository=booking_repository,
         company_repository=company_repository,
         posting_service=Mock(),
@@ -1802,6 +1838,7 @@ def test_deletes_unlinked_fixed_asset(
 
     workspace = FiscalYearWorkspace(
         context=context,
+        vat_configuration=TEST_VAT_CONFIGURATION,
         booking_repository=booking_repository,
         company_repository=company_repository,
         posting_service=Mock(),
@@ -1893,6 +1930,7 @@ def test_links_fixed_asset_acquisition(
 
     workspace = FiscalYearWorkspace(
         context=context,
+        vat_configuration=TEST_VAT_CONFIGURATION,
         booking_repository=booking_repository,
         company_repository=company_repository,
         posting_service=Mock(),
@@ -2000,6 +2038,7 @@ def test_rejects_fixed_asset_acquisition_for_wrong_account(
 
     workspace = FiscalYearWorkspace(
         context=context,
+        vat_configuration=TEST_VAT_CONFIGURATION,
         booking_repository=booking_repository,
         company_repository=company_repository,
         posting_service=Mock(),
@@ -2097,6 +2136,7 @@ def test_rejects_duplicate_fixed_asset_acquisition(
 
     workspace = FiscalYearWorkspace(
         context=context,
+        vat_configuration=TEST_VAT_CONFIGURATION,
         booking_repository=booking_repository,
         company_repository=company_repository,
         posting_service=Mock(),
@@ -2146,6 +2186,7 @@ def test_reports_pending_fixed_asset_loss_depreciation(
 
     workspace = FiscalYearWorkspace(
         context=context,
+        vat_configuration=TEST_VAT_CONFIGURATION,
         booking_repository=booking_repository,
         company_repository=company_repository,
         posting_service=Mock(),
@@ -2204,6 +2245,7 @@ def test_confirms_fixed_asset_loss_and_reloads_workspace(
 
     workspace = FiscalYearWorkspace(
         context=context,
+        vat_configuration=TEST_VAT_CONFIGURATION,
         booking_repository=booking_repository,
         company_repository=company_repository,
         posting_service=posting_service,
@@ -2269,6 +2311,7 @@ def test_confirms_fixed_asset_disposal_and_reloads_workspace(
 
     workspace = FiscalYearWorkspace(
         context=context,
+        vat_configuration=TEST_VAT_CONFIGURATION,
         booking_repository=booking_repository,
         company_repository=company_repository,
         posting_service=posting_service,

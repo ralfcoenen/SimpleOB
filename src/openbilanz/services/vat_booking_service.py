@@ -11,6 +11,9 @@ from openbilanz.domain.vat_accounts import VatAccounts
 from openbilanz.domain.vat_booking_item import (
     VatBookingItem,
 )
+from openbilanz.domain.vat_configuration import (
+    VatConfiguration,
+)
 
 CENT = Decimal("0.01")
 HUNDRED = Decimal("100")
@@ -26,18 +29,31 @@ class VatBookingService:
         counter_account_number: str,
         items: tuple[VatBookingItem, ...],
         vat_accounts: VatAccounts,
+        vat_configuration: VatConfiguration,
         voucher_no: str | None = None,
         description: str | None = None,
     ) -> Booking:
         """Erzeugt eine Ausgangsbuchung."""
 
+        if not isinstance(
+            vat_configuration,
+            VatConfiguration,
+        ):
+            raise TypeError(
+                "vat_configuration must be a VatConfiguration"
+            )
+
         lines: list[BookingLine] = []
         gross_total = ZERO
 
         for item in self._validate_items(items):
-            net_amount, tax_amount = (
-                self._split_gross_amount(item)
-            )
+            if vat_configuration.is_small_business:
+                net_amount = item.gross_amount
+                tax_amount = ZERO
+            else:
+                net_amount, tax_amount = (
+                    self._split_gross_amount(item)
+                )
 
             gross_total += item.gross_amount
 
@@ -86,18 +102,29 @@ class VatBookingService:
         counter_account_number: str,
         items: tuple[VatBookingItem, ...],
         vat_accounts: VatAccounts,
+        vat_configuration: VatConfiguration,
         voucher_no: str | None = None,
         description: str | None = None,
     ) -> Booking:
         """Erzeugt eine Eingangsbuchung."""
-
+        if not isinstance(
+            vat_configuration,
+            VatConfiguration,
+        ):
+            raise TypeError(
+                "vat_configuration must be a VatConfiguration"
+            )
         lines: list[BookingLine] = []
         gross_total = ZERO
 
         for item in self._validate_items(items):
-            net_amount, tax_amount = (
-                self._split_gross_amount(item)
-            )
+            if vat_configuration.is_small_business:
+                net_amount = item.gross_amount
+                tax_amount = ZERO
+            else:
+                net_amount, tax_amount = (
+                    self._split_gross_amount(item)
+                )
 
             gross_total += item.gross_amount
 
@@ -145,6 +172,7 @@ class VatBookingService:
         counter_account_number: str,
         items: tuple[VatBookingItem, ...],
         vat_accounts: VatAccounts,
+        vat_configuration: VatConfiguration,
         voucher_no: str | None = None,
         description: str | None = None,
     ) -> Booking:
@@ -154,9 +182,13 @@ class VatBookingService:
         gross_total = ZERO
 
         for item in self._validate_items(items):
-            net_amount, tax_amount = (
-                self._split_gross_amount(item)
-            )
+            if vat_configuration.is_small_business:
+                net_amount = item.gross_amount
+                tax_amount = ZERO
+            else:
+                net_amount, tax_amount = (
+                    self._split_gross_amount(item)
+                )
 
             gross_total += item.gross_amount
 
@@ -204,6 +236,7 @@ class VatBookingService:
         counter_account_number: str,
         items: tuple[VatBookingItem, ...],
         vat_accounts: VatAccounts,
+        vat_configuration: VatConfiguration,
         voucher_no: str | None = None,
         description: str | None = None,
     ) -> Booking:
@@ -213,9 +246,13 @@ class VatBookingService:
         gross_total = ZERO
 
         for item in self._validate_items(items):
-            net_amount, tax_amount = (
-                self._split_gross_amount(item)
-            )
+            if vat_configuration.is_small_business:
+                net_amount = item.gross_amount
+                tax_amount = ZERO
+            else:
+                net_amount, tax_amount = (
+                    self._split_gross_amount(item)
+                )
 
             gross_total += item.gross_amount
 

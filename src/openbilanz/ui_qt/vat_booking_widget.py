@@ -23,6 +23,9 @@ from openbilanz.domain.account_type import AccountType
 from openbilanz.domain.booking import Booking
 from openbilanz.domain.vat_accounts import VatAccounts
 from openbilanz.domain.vat_booking_item import VatBookingItem
+from openbilanz.domain.vat_configuration import (
+    VatConfiguration,
+)
 from openbilanz.services.vat_booking_service import VatBookingService
 from openbilanz.ui.date_input import (
     normalize_german_date,
@@ -45,10 +48,12 @@ class VatPositionRow(QWidget):
         *,
         account_display_names: tuple[str, ...],
         on_changed: Callable[[], None],
+        small_business: bool,
     ) -> None:
         super().__init__()
 
         self._on_changed = on_changed
+        self._small_business = small_business
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -78,7 +83,9 @@ class VatPositionRow(QWidget):
 
         self.tax_rate_box = QComboBox()
         self.tax_rate_box.addItems(_TAX_RATES)
-        self.tax_rate_box.setCurrentText("19 %")
+        self.tax_rate_box.setCurrentText(
+            "0 %" if self._small_business else "19 %"
+        )
         self.tax_rate_box.setMaximumWidth(90)
 
         layout.addWidget(self.account_box, 1)
@@ -98,13 +105,16 @@ class VatPositionRow(QWidget):
     def set_enabled(self, enabled: bool) -> None:
         self.account_box.setEnabled(enabled)
         self.amount_entry.setEnabled(enabled)
-        self.tax_rate_box.setEnabled(enabled)
+        self.tax_rate_box.setEnabled(
+            enabled and not self._small_business
+        )
 
     def clear(self) -> None:
         self.account_box.setCurrentIndex(-1)
         self.amount_entry.clear()
-        self.tax_rate_box.setCurrentText("19 %")
-
+        self.tax_rate_box.setCurrentText(
+            "0 %" if self._small_business else "19 %"
+        )
 
 class VatBookingWidget(QWidget):
     """Erfasst Rechnungen und Gutschriften mit Umsatzsteuer."""
@@ -114,12 +124,14 @@ class VatBookingWidget(QWidget):
         *,
         accounts: tuple[Account, ...],
         vat_accounts: VatAccounts,
+        vat_configuration: VatConfiguration,
         on_booking_created: Callable[[Booking], None],
     ) -> None:
         super().__init__()
 
         self._accounts = accounts
         self._vat_accounts = vat_accounts
+        self._vat_configuration = vat_configuration
         self._on_booking_created = on_booking_created
         self._vat_booking_service = VatBookingService()
         self._enabled = True
@@ -144,6 +156,14 @@ class VatBookingWidget(QWidget):
 
     def _create_ui(self) -> None:
         layout = QVBoxLayout(self)
+
+        if self._vat_configuration.is_small_business:
+            small_business_label = QLabel(
+                "Kleinunternehmer gemäß § 19 UStG – "
+                "keine Umsatzsteuerberechnung"
+            )
+            small_business_label.setWordWrap(True)
+            layout.addWidget(small_business_label)
 
         form = QFormLayout()
         layout.addLayout(form)
@@ -298,6 +318,9 @@ class VatBookingWidget(QWidget):
         row = VatPositionRow(
             account_display_names=self._account_display_names,
             on_changed=self._update_state,
+            small_business=(
+                self._vat_configuration.is_small_business
+            ),
         )
 
         self._position_rows.append(row)

@@ -64,6 +64,9 @@ from openbilanz.domain.fixed_asset_status import (
 from openbilanz.domain.journal import Journal
 from openbilanz.domain.managed_fiscal_year import ManagedFiscalYear
 from openbilanz.domain.vat_accounts import VatAccounts
+from openbilanz.domain.vat_configuration import (
+    VatConfiguration,
+)
 from openbilanz.reporting.account_activity_report import (
     AccountActivityReport,
 )
@@ -135,6 +138,7 @@ class FiscalYearWorkspace:
         self,
         *,
         context: ApplicationContext,
+        vat_configuration: VatConfiguration,
         booking_repository: BookingRepository,
         company_repository: CompanyRepository,
         chart_of_accounts_repository: ChartOfAccountsRepository | None = None,
@@ -170,6 +174,7 @@ class FiscalYearWorkspace:
         ) = None,
     ) -> None:
         self._context = context
+        self._vat_configuration = vat_configuration
         self._booking_repository = booking_repository
         self._company_repository = company_repository
         self._chart_of_accounts_repository = (
@@ -220,6 +225,14 @@ class FiscalYearWorkspace:
         """Liefert den aktuellen Anwendungskontext."""
 
         return self._context
+
+    @property
+    def vat_configuration(
+        self,
+    ) -> VatConfiguration:
+        """Liefert die umsatzsteuerliche Mandantenkonfiguration."""
+
+        return self._vat_configuration
 
     def add_account(
         self,

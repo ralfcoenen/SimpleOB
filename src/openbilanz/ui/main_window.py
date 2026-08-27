@@ -813,6 +813,7 @@ class MainWindow(tk.Tk):
             self._booking_frame_container,
             accounts=bookable_accounts,
             vat_accounts=self._vat_accounts,
+            vat_configuration=self._workspace.vat_configuration,
             on_booking_created=self._post_booking,
         )
 

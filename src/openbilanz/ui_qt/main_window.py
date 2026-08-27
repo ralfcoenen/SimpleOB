@@ -168,6 +168,9 @@ class MainWindow(QMainWindow):
         self._booking_page = BookingPage(
             accounts=self._bookable_accounts(),
             vat_accounts=self._workspace_context.vat_accounts,
+            vat_configuration=(
+                self._workspace_context.workspace.vat_configuration
+            ),
             on_booking_created=self._post_booking,
             enabled=self._workspace_context.workspace.is_open,
         )

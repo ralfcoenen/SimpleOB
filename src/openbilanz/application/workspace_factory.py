@@ -24,6 +24,9 @@ from openbilanz.database.fixed_asset_movement_repository import (
     FixedAssetMovementRepository,
 )
 from openbilanz.database.fixed_asset_repository import FixedAssetRepository
+from openbilanz.database.vat_configuration_repository import (
+    VatConfigurationRepository,
+)
 from openbilanz.domain.accounting_control_accounts import (
     AccountingControlAccounts,
 )
@@ -99,6 +102,7 @@ class WorkspaceFactory:
         session: Session,
         company_repository: CompanyRepository,
         chart_of_accounts_repository: ChartOfAccountsRepository,
+        vat_configuration_repository: VatConfigurationRepository,
         chart_of_accounts_initialization_service: (
             ChartOfAccountsInitializationService
         ),
@@ -131,6 +135,9 @@ class WorkspaceFactory:
         self._session = session
         self._company_repository = company_repository
         self._chart_of_accounts_repository = chart_of_accounts_repository
+        self._vat_configuration_repository = (
+            vat_configuration_repository
+        )
         self._chart_of_accounts_initialization_service = (
             chart_of_accounts_initialization_service
         )
@@ -213,10 +220,22 @@ class WorkspaceFactory:
             )
         )
 
+        vat_configuration = (
+            self._vat_configuration_repository.load(
+                context.company.company_id
+            )
+        )
+
         if vat_accounts is None:
             raise RuntimeError(
                 "Die Umsatzsteuerkonten des Unternehmens "
                 "konnten nicht geladen werden."
+            )
+
+        if vat_configuration is None:
+            raise RuntimeError(
+                "Die Umsatzsteuerkonfiguration des "
+                "Unternehmens konnte nicht geladen werden."
             )
 
         if control_accounts is None:
@@ -318,6 +337,7 @@ class WorkspaceFactory:
 
         workspace = FiscalYearWorkspace(
             context=context,
+            vat_configuration=vat_configuration,
             booking_repository=self._booking_repository,
             company_repository=self._company_repository,
             chart_of_accounts_repository=(

@@ -11,6 +11,9 @@ from openbilanz.domain.account_type import AccountType
 from openbilanz.domain.booking import Booking
 from openbilanz.domain.vat_accounts import VatAccounts
 from openbilanz.domain.vat_booking_item import VatBookingItem
+from openbilanz.domain.vat_configuration import (
+    VatConfiguration,
+)
 from openbilanz.services.vat_booking_service import (
     VatBookingService,
 )
@@ -36,12 +39,14 @@ class VatBookingFrame(ttk.Frame):
         *,
         accounts: tuple[Account, ...],
         vat_accounts: VatAccounts,
+        vat_configuration: VatConfiguration,
         on_booking_created: Callable[[Booking], None],
     ) -> None:
         super().__init__(parent)
 
         self._accounts = accounts
         self._vat_accounts = vat_accounts
+        self._vat_configuration = vat_configuration
         self._on_booking_created = on_booking_created
         self._vat_booking_service = VatBookingService()
         self._enabled = True
@@ -700,6 +705,7 @@ class VatBookingFrame(ttk.Frame):
                     ),
                     items=items,
                     vat_accounts=self._vat_accounts,
+                    vat_configuration=self._vat_configuration,
                     voucher_no=voucher_no,
                     description=description,
                 )
@@ -715,6 +721,7 @@ class VatBookingFrame(ttk.Frame):
                     ),
                     items=items,
                     vat_accounts=self._vat_accounts,
+                    vat_configuration=self._vat_configuration,
                     voucher_no=voucher_no,
                     description=description,
                 )
@@ -730,6 +737,7 @@ class VatBookingFrame(ttk.Frame):
                     ),
                     items=items,
                     vat_accounts=self._vat_accounts,
+                    vat_configuration=self._vat_configuration,
                     voucher_no=voucher_no,
                     description=description,
                 )
@@ -745,6 +753,7 @@ class VatBookingFrame(ttk.Frame):
                     ),
                     items=items,
                     vat_accounts=self._vat_accounts,
+                    vat_configuration=self._vat_configuration,
                     voucher_no=voucher_no,
                     description=description,
                 )

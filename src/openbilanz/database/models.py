@@ -123,6 +123,14 @@ class Mandant(Base):
         uselist=False,
     )
 
+    umsatzsteuer_konfiguration: Mapped[
+        "UmsatzsteuerKonfiguration | None"
+    ] = relationship(
+        back_populates="mandant",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+
 class Konto(Base):
     """Persistiertes Konto eines Mandanten."""
 
@@ -245,6 +253,36 @@ class KontenrahmenKonfiguration(Base):
 
     mandant: Mapped[Mandant] = relationship(
         back_populates="kontenrahmen_konfiguration",
+    )
+
+class UmsatzsteuerKonfiguration(Base):
+    """Umsatzsteuerliche Konfiguration eines Mandanten."""
+
+    __tablename__ = "umsatzsteuer_konfiguration"
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+    )
+
+    mandant_id: Mapped[int] = mapped_column(
+        ForeignKey("mandanten.id"),
+        nullable=False,
+        unique=True,
+    )
+
+    taxation_type: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    effective_from: Mapped[date] = mapped_column(
+        Date,
+        nullable=False,
+    )
+
+    mandant: Mapped[Mandant] = relationship(
+        back_populates="umsatzsteuer_konfiguration",
     )
 
 class Wirtschaftsjahr(Base):

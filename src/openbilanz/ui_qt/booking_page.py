@@ -13,6 +13,9 @@ from PySide6.QtWidgets import (
 from openbilanz.domain.account import Account
 from openbilanz.domain.booking import Booking
 from openbilanz.domain.vat_accounts import VatAccounts
+from openbilanz.domain.vat_configuration import (
+    VatConfiguration,
+)
 from openbilanz.ui_qt.simple_booking_widget import (
     SimpleBookingWidget,
 )
@@ -29,6 +32,7 @@ class BookingPage(QWidget):
         *,
         accounts: tuple[Account, ...],
         vat_accounts: VatAccounts,
+        vat_configuration: VatConfiguration,
         on_booking_created: Callable[[Booking], None],
         enabled: bool,
     ) -> None:
@@ -64,6 +68,7 @@ class BookingPage(QWidget):
         self._vat_booking = VatBookingWidget(
             accounts=accounts,
             vat_accounts=vat_accounts,
+            vat_configuration=vat_configuration,
             on_booking_created=on_booking_created,
         )
 
