@@ -32,6 +32,9 @@ from openbilanz.database.vat_booking_detail_repository import (
 from openbilanz.database.vat_configuration_repository import (
     VatConfigurationRepository,
 )
+from openbilanz.database.vat_input_timing_repository import (
+    VatInputTimingRepository,
+)
 from openbilanz.database.vat_revenue_repository import (
     VatRevenueRepository,
 )
@@ -74,13 +77,12 @@ from openbilanz.domain.journal import Journal
 from openbilanz.domain.managed_fiscal_year import ManagedFiscalYear
 from openbilanz.domain.vat_accounts import VatAccounts
 from openbilanz.domain.vat_booking_detail import VatBookingDetail
-from openbilanz.domain.vat_booking_direction import VatBookingDirection
 from openbilanz.domain.vat_configuration import (
     VatConfiguration,
 )
+from openbilanz.domain.vat_input_timing import VatInputTiming
 from openbilanz.domain.vat_payment_kind import VatPaymentKind
 from openbilanz.domain.vat_revenue_kind import VatRevenueKind
-from openbilanz.domain.vat_taxation_method import VatTaxationMethod
 from openbilanz.reporting.account_activity_report import (
     AccountActivityReport,
 )
@@ -136,6 +138,9 @@ from openbilanz.services.reporting_service import ReportingService
 from openbilanz.services.taxonomy_management_service import (
     TaxonomyManagementService,
     TaxonomyStatus,
+)
+from openbilanz.services.vat_advance_return_timing_service import (
+    VatAdvanceReturnTimingService,
 )
 from openbilanz.services.vat_revenue_posting_workflow import (
     VatRevenuePostingWorkflow,
@@ -200,6 +205,7 @@ class FiscalYearWorkspace:
         vat_configuration_repository: (
             VatConfigurationRepository | None
         ) = None,
+        vat_input_timing_repository: VatInputTimingRepository | None = None,
     ) -> None:
         self._context = context
         self._vat_configuration = vat_configuration
@@ -256,6 +262,9 @@ class FiscalYearWorkspace:
         )
         self._vat_configuration_repository = (
             vat_configuration_repository
+        )
+        self._vat_input_timing_repository = (
+            vat_input_timing_repository
         )
 
         self.reload()
@@ -408,6 +417,38 @@ class FiscalYearWorkspace:
 
         self.reload()
 
+    def post_vat_input_booking(
+        self,
+        *,
+        booking: Booking,
+        booking_details: tuple[VatBookingDetail, ...],
+        service_date: date,
+        invoice_received_date: date,
+    ) -> None:
+        """Verbucht eine Eingangsrechnung mit Vorsteuer-Zeitzuordnung."""
+
+        if self._vat_revenue_posting_workflow is None:
+            raise RuntimeError(
+                "Der Umsatzsteuer-Buchungsworkflow "
+                "ist nicht konfiguriert."
+            )
+
+        timing = VatInputTiming(
+            booking_id=booking.booking_id,
+            service_date=service_date,
+            invoice_received_date=invoice_received_date,
+        )
+
+        self._vat_revenue_posting_workflow.post_booking(
+            company=self._context.company,
+            fiscal_year=self._context.fiscal_year,
+            booking=booking,
+            booking_details=booking_details,
+            input_timing=timing,
+        )
+
+        self.reload()
+
     def post_vat_revenue_booking(
         self,
         *,
@@ -515,49 +556,38 @@ class FiscalYearWorkspace:
                 "Das USt-Detail-Repository ist nicht konfiguriert."
             )
 
-        if self._vat_configuration.taxation_method is VatTaxationMethod.RECEIVED:
-            raise RuntimeError(
-                "Die USt-VA nach Istversteuerung ist noch nicht implementiert."
-            )
-
         if self._vat_revenue_repository is None:
             raise RuntimeError(
                 "Das USt-Umsatz-Repository ist nicht konfiguriert."
             )
 
-        revenues = (
-            self._vat_revenue_repository
-            .list_revenues_for_company_in_date_range(
-                company_id=self._context.company.company_id,
-                start_date=start_date,
-                end_date=end_date,
+        if self._vat_input_timing_repository is None:
+            raise RuntimeError(
+                "Das Vorsteuer-Zeit-Repository ist nicht konfiguriert."
             )
-        )
 
-        output_details = tuple(
-            detail
-            for revenue in revenues
-            for detail in (
+        timing_service = VatAdvanceReturnTimingService(
+            booking_repository=self._booking_repository,
+            vat_booking_detail_repository=(
                 self._vat_booking_detail_repository
-                .list_for_booking(revenue.booking_id)
-            )
-            if detail.direction is VatBookingDirection.OUTPUT
+            ),
+            vat_revenue_repository=(
+                self._vat_revenue_repository
+            ),
+            vat_input_timing_repository=(
+                self._vat_input_timing_repository
+            ),
         )
 
-        input_details = tuple(
-            detail
-            for detail in (
-                self._vat_booking_detail_repository
-                .list_for_company_in_date_range(
-                    company_id=self._context.company.company_id,
-                    start_date=start_date,
-                    end_date=end_date,
-                )
-            )
-            if detail.direction is VatBookingDirection.INPUT
+        details = timing_service.details_for_period(
+            company_id=self._context.company.company_id,
+            taxation_method=(
+                self._vat_configuration.taxation_method
+            ),
+            start_date=start_date,
+            end_date=end_date,
         )
 
-        details = output_details + input_details
         return self._reporting_service.vat_advance_return(
             details=details,
             start_date=start_date,

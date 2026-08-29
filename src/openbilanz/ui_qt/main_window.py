@@ -192,6 +192,9 @@ class MainWindow(QMainWindow):
             ),
             on_booking_created=self._post_booking,
             on_vat_booking_created=self._post_vat_booking,
+            on_vat_input_booking_created=(
+                self._post_vat_input_booking
+            ),
             on_vat_revenue_created=(
                 self._post_vat_revenue_booking
             ),
@@ -1123,6 +1126,29 @@ class MainWindow(QMainWindow):
         workspace.post_vat_booking(
             booking=booking,
             booking_details=booking_details,
+        )
+
+        self._refresh_after_booking()
+
+    def _post_vat_input_booking(
+        self,
+        booking: Booking,
+        booking_details: tuple[VatBookingDetail, ...],
+        service_date: date,
+        invoice_received_date: date,
+    ) -> None:
+        """Verbucht eine Eingangsrechnung mit Vorsteuer-Zeitdaten."""
+
+        workspace = self._workspace_context.workspace
+
+        if workspace.is_closed:
+            return
+
+        workspace.post_vat_input_booking(
+            booking=booking,
+            booking_details=booking_details,
+            service_date=service_date,
+            invoice_received_date=invoice_received_date,
         )
 
         self._refresh_after_booking()

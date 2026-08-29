@@ -9,6 +9,9 @@ from openbilanz.database.booking_repository import BookingRepository
 from openbilanz.database.vat_booking_detail_repository import (
     VatBookingDetailRepository,
 )
+from openbilanz.database.vat_input_timing_repository import (
+    VatInputTimingRepository,
+)
 from openbilanz.database.vat_revenue_repository import (
     VatRevenueRepository,
 )
@@ -16,6 +19,7 @@ from openbilanz.domain.booking import Booking
 from openbilanz.domain.company import Company
 from openbilanz.domain.fiscal_year import FiscalYear
 from openbilanz.domain.vat_booking_detail import VatBookingDetail
+from openbilanz.domain.vat_input_timing import VatInputTiming
 from openbilanz.domain.vat_payment_kind import VatPaymentKind
 from openbilanz.domain.vat_revenue import VatRevenue
 from openbilanz.domain.vat_revenue_kind import VatRevenueKind
@@ -31,6 +35,7 @@ class VatRevenuePostingWorkflow:
         booking_repository: BookingRepository,
         vat_booking_detail_repository: VatBookingDetailRepository,
         vat_revenue_repository: VatRevenueRepository,
+        vat_input_timing_repository: VatInputTimingRepository,
     ) -> None:
         self._session = session
         self._booking_repository = booking_repository
@@ -40,6 +45,9 @@ class VatRevenuePostingWorkflow:
         self._vat_revenue_repository = (
             vat_revenue_repository
         )
+        self._vat_input_timing_repository = (
+            vat_input_timing_repository
+        )
 
     def post_booking(
         self,
@@ -48,8 +56,18 @@ class VatRevenuePostingWorkflow:
         fiscal_year: FiscalYear,
         booking: Booking,
         booking_details: tuple[VatBookingDetail, ...],
+        input_timing: VatInputTiming | None = None,
     ) -> None:
-        """Persistiert USt-Buchung und USt-Details gemeinsam."""
+        """Persistiert USt-Buchung und USt-Zusatzdaten gemeinsam."""
+
+        if (
+            input_timing is not None
+            and input_timing.booking_id != booking.booking_id
+        ):
+            raise ValueError(
+                "Die Vorsteuer-Zeitzuordnung gehört "
+                "nicht zur Buchung."
+            )
 
         try:
             self._booking_repository.add(
@@ -63,6 +81,12 @@ class VatRevenuePostingWorkflow:
                 booking_details,
                 commit=False,
             )
+
+            if input_timing is not None:
+                self._vat_input_timing_repository.add(
+                    input_timing,
+                    commit=False,
+                )
 
             self._session.commit()
 

@@ -30,6 +30,9 @@ from openbilanz.database.vat_booking_detail_repository import (
 from openbilanz.database.vat_configuration_repository import (
     VatConfigurationRepository,
 )
+from openbilanz.database.vat_input_timing_repository import (
+    VatInputTimingRepository,
+)
 from openbilanz.database.vat_revenue_repository import (
     VatRevenueRepository,
 )
@@ -128,6 +131,7 @@ class WorkspaceFactory:
         ),
         vat_booking_detail_repository: VatBookingDetailRepository,
         vat_revenue_repository: VatRevenueRepository,
+        vat_input_timing_repository: VatInputTimingRepository,
         depreciation_service: DepreciationService,
         fixed_asset_depreciation_workflow: (
             FixedAssetDepreciationWorkflow
@@ -194,6 +198,9 @@ class WorkspaceFactory:
         self._position_provider = position_provider
         self._vat_revenue_posting_workflow = (
             vat_revenue_posting_workflow
+        )
+        self._vat_input_timing_repository = (
+            vat_input_timing_repository
         )
 
     def create(
@@ -354,8 +361,6 @@ class WorkspaceFactory:
                 ),
             )
         )
-
-
 
         workspace = FiscalYearWorkspace(
             context=context,

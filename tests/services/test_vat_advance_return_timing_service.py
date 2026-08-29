@@ -12,6 +12,7 @@ from openbilanz.domain.vat_booking_detail import VatBookingDetail
 from openbilanz.domain.vat_booking_direction import (
     VatBookingDirection,
 )
+from openbilanz.domain.vat_input_timing import VatInputTiming
 from openbilanz.domain.vat_payment_allocation import (
     VatPaymentAllocation,
 )
@@ -54,6 +55,7 @@ def test_uses_service_date_for_agreed_taxation() -> None:
     booking_repository = Mock()
     detail_repository = Mock()
     revenue_repository = Mock()
+    input_timing_repository = Mock()
 
     company_id = uuid4()
     booking_id = uuid4()
@@ -75,29 +77,19 @@ def test_uses_service_date_for_agreed_taxation() -> None:
         direction=VatBookingDirection.OUTPUT,
     )
 
-    input_detail = VatBookingDetail(
-        booking_id=uuid4(),
-        account_number="3400",
-        net_amount=Decimal("50.00"),
-        tax_amount=Decimal("9.50"),
-        tax_rate=19,
-        direction=VatBookingDirection.INPUT,
-    )
-
     revenue_repository.list_revenues_for_company_in_date_range.return_value = (
         revenue,
     )
     detail_repository.list_for_booking.return_value = (
         output_detail,
     )
-    detail_repository.list_for_company_in_date_range.return_value = (
-        input_detail,
-    )
+    input_timing_repository.list_for_company_in_date_range.return_value = ()
 
     service = VatAdvanceReturnTimingService(
         booking_repository=booking_repository,
         vat_booking_detail_repository=detail_repository,
         vat_revenue_repository=revenue_repository,
+        vat_input_timing_repository=input_timing_repository,
     )
 
     result = service.details_for_period(
@@ -109,10 +101,15 @@ def test_uses_service_date_for_agreed_taxation() -> None:
 
     assert result == (
         output_detail,
-        input_detail,
     )
 
     revenue_repository.list_revenues_for_company_in_date_range.assert_called_once_with(
+        company_id=company_id,
+        start_date=date(2026, 1, 1),
+        end_date=date(2026, 1, 31),
+    )
+
+    input_timing_repository.list_for_company_in_date_range.assert_called_once_with(
         company_id=company_id,
         start_date=date(2026, 1, 1),
         end_date=date(2026, 1, 31),
@@ -123,6 +120,7 @@ def test_uses_booking_date_for_immediate_received_taxation() -> None:
     booking_repository = Mock()
     detail_repository = Mock()
     revenue_repository = Mock()
+    input_timing_repository = Mock()
 
     company_id = uuid4()
     booking_id = uuid4()
@@ -151,7 +149,7 @@ def test_uses_booking_date_for_immediate_received_taxation() -> None:
     detail_repository.list_for_booking.return_value = (
         output_detail,
     )
-    detail_repository.list_for_company_in_date_range.return_value = ()
+    input_timing_repository.list_for_company_in_date_range.return_value = ()
 
     booking_repository.get.return_value = _booking(
         booking_id=booking_id,
@@ -162,6 +160,7 @@ def test_uses_booking_date_for_immediate_received_taxation() -> None:
         booking_repository=booking_repository,
         vat_booking_detail_repository=detail_repository,
         vat_revenue_repository=revenue_repository,
+        vat_input_timing_repository=input_timing_repository,
     )
 
     result = service.details_for_period(
@@ -180,6 +179,7 @@ def test_allocates_partial_payment_for_received_taxation() -> None:
     booking_repository = Mock()
     detail_repository = Mock()
     revenue_repository = Mock()
+    input_timing_repository = Mock()
 
     company_id = uuid4()
     invoice_booking_id = uuid4()
@@ -218,7 +218,7 @@ def test_allocates_partial_payment_for_received_taxation() -> None:
     detail_repository.list_for_booking.return_value = (
         output_detail,
     )
-    detail_repository.list_for_company_in_date_range.return_value = ()
+    input_timing_repository.list_for_company_in_date_range.return_value = ()
 
     booking_repository.get.return_value = _booking(
         booking_id=payment_booking_id,
@@ -229,6 +229,7 @@ def test_allocates_partial_payment_for_received_taxation() -> None:
         booking_repository=booking_repository,
         vat_booking_detail_repository=detail_repository,
         vat_revenue_repository=revenue_repository,
+        vat_input_timing_repository=input_timing_repository,
     )
 
     result = service.details_for_period(
@@ -254,6 +255,7 @@ def test_allocates_mixed_rates_proportionally() -> None:
     booking_repository = Mock()
     detail_repository = Mock()
     revenue_repository = Mock()
+    input_timing_repository = Mock()
 
     company_id = uuid4()
     invoice_booking_id = uuid4()
@@ -302,7 +304,7 @@ def test_allocates_mixed_rates_proportionally() -> None:
         detail_19,
         detail_7,
     )
-    detail_repository.list_for_company_in_date_range.return_value = ()
+    input_timing_repository.list_for_company_in_date_range.return_value = ()
 
     booking_repository.get.return_value = _booking(
         booking_id=payment_booking_id,
@@ -313,6 +315,7 @@ def test_allocates_mixed_rates_proportionally() -> None:
         booking_repository=booking_repository,
         vat_booking_detail_repository=detail_repository,
         vat_revenue_repository=revenue_repository,
+        vat_input_timing_repository=input_timing_repository,
     )
 
     result = service.details_for_period(
@@ -346,6 +349,7 @@ def test_cumulative_rounding_reaches_exact_invoice_amount() -> None:
     booking_repository = Mock()
     detail_repository = Mock()
     revenue_repository = Mock()
+    input_timing_repository = Mock()
 
     company_id = uuid4()
     invoice_booking_id = uuid4()
@@ -398,7 +402,7 @@ def test_cumulative_rounding_reaches_exact_invoice_amount() -> None:
     detail_repository.list_for_booking.return_value = (
         output_detail,
     )
-    detail_repository.list_for_company_in_date_range.return_value = ()
+    input_timing_repository.list_for_company_in_date_range.return_value = ()
 
     bookings = {
         payment_1_id: _booking(
@@ -421,6 +425,7 @@ def test_cumulative_rounding_reaches_exact_invoice_amount() -> None:
         booking_repository=booking_repository,
         vat_booking_detail_repository=detail_repository,
         vat_revenue_repository=revenue_repository,
+        vat_input_timing_repository=input_timing_repository,
     )
 
     result = service.details_for_period(
@@ -447,15 +452,17 @@ def test_cumulative_rounding_reaches_exact_invoice_amount() -> None:
     ) == Decimal("19.00")
 
 
-def test_keeps_input_tax_on_existing_booking_date_path() -> None:
+def test_uses_input_deductible_date_for_input_tax() -> None:
     booking_repository = Mock()
     detail_repository = Mock()
     revenue_repository = Mock()
+    input_timing_repository = Mock()
 
     company_id = uuid4()
+    input_booking_id = uuid4()
 
     input_detail = VatBookingDetail(
-        booking_id=uuid4(),
+        booking_id=input_booking_id,
         account_number="3400",
         net_amount=Decimal("100.00"),
         tax_amount=Decimal("19.00"),
@@ -463,7 +470,16 @@ def test_keeps_input_tax_on_existing_booking_date_path() -> None:
         direction=VatBookingDirection.INPUT,
     )
 
-    detail_repository.list_for_company_in_date_range.return_value = (
+    input_timing = VatInputTiming(
+        booking_id=input_booking_id,
+        service_date=date(2026, 3, 28),
+        invoice_received_date=date(2026, 4, 4),
+    )
+
+    input_timing_repository.list_for_company_in_date_range.return_value = (
+        input_timing,
+    )
+    detail_repository.list_for_booking.return_value = (
         input_detail,
     )
     revenue_repository.list_revenues_for_company.return_value = ()
@@ -472,15 +488,26 @@ def test_keeps_input_tax_on_existing_booking_date_path() -> None:
         booking_repository=booking_repository,
         vat_booking_detail_repository=detail_repository,
         vat_revenue_repository=revenue_repository,
+        vat_input_timing_repository=input_timing_repository,
     )
 
     result = service.details_for_period(
         company_id=company_id,
         taxation_method=VatTaxationMethod.RECEIVED,
-        start_date=date(2026, 1, 1),
-        end_date=date(2026, 1, 31),
+        start_date=date(2026, 4, 1),
+        end_date=date(2026, 4, 30),
     )
 
     assert result == (
         input_detail,
+    )
+
+    input_timing_repository.list_for_company_in_date_range.assert_called_once_with(
+        company_id=company_id,
+        start_date=date(2026, 4, 1),
+        end_date=date(2026, 4, 30),
+    )
+
+    detail_repository.list_for_booking.assert_called_once_with(
+        input_booking_id
     )

@@ -32,6 +32,9 @@ from openbilanz.database.vat_booking_detail_repository import (
 from openbilanz.database.vat_configuration_repository import (
     VatConfigurationRepository,
 )
+from openbilanz.database.vat_input_timing_repository import (
+    VatInputTimingRepository,
+)
 from openbilanz.database.vat_revenue_repository import (
     VatRevenueRepository,
 )
@@ -186,6 +189,12 @@ class ApplicationBootstrap:
             )
         )
 
+        vat_input_timing_repository = (
+            VatInputTimingRepository(
+                session
+            )
+        )
+
         vat_revenue_posting_workflow = (
             VatRevenuePostingWorkflow(
                 session=session,
@@ -194,8 +203,12 @@ class ApplicationBootstrap:
                     vat_booking_detail_repository
                 ),
                 vat_revenue_repository=vat_revenue_repository,
+                vat_input_timing_repository=(
+                    vat_input_timing_repository
+                ),
             )
         )
+
         posting_service = PostingService()
 
         fixed_asset_repository = (
@@ -325,6 +338,9 @@ class ApplicationBootstrap:
             ),
             vat_revenue_repository=(
                 vat_revenue_repository
+            ),
+            vat_input_timing_repository=(
+                vat_input_timing_repository
             ),
             posting_service=posting_service,
             reporting_service=reporting_service,

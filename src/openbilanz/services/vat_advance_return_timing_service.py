@@ -7,6 +7,9 @@ from openbilanz.database.booking_repository import BookingRepository
 from openbilanz.database.vat_booking_detail_repository import (
     VatBookingDetailRepository,
 )
+from openbilanz.database.vat_input_timing_repository import (
+    VatInputTimingRepository,
+)
 from openbilanz.database.vat_revenue_repository import VatRevenueRepository
 from openbilanz.domain.money import ZERO
 from openbilanz.domain.vat_booking_detail import VatBookingDetail
@@ -27,6 +30,7 @@ class VatAdvanceReturnTimingService:
         booking_repository: BookingRepository,
         vat_booking_detail_repository: VatBookingDetailRepository,
         vat_revenue_repository: VatRevenueRepository,
+        vat_input_timing_repository: VatInputTimingRepository,
     ) -> None:
         self._booking_repository = booking_repository
         self._vat_booking_detail_repository = (
@@ -34,6 +38,9 @@ class VatAdvanceReturnTimingService:
         )
         self._vat_revenue_repository = (
             vat_revenue_repository
+        )
+        self._vat_input_timing_repository = (
+            vat_input_timing_repository
         )
 
     def details_for_period(
@@ -101,10 +108,10 @@ class VatAdvanceReturnTimingService:
         start_date: date,
         end_date: date,
     ) -> tuple[VatBookingDetail, ...]:
-        """Lädt Vorsteuerdetails nach dem bisherigen Buchungsdatum."""
+        """Ordnet Vorsteuer nach Leistungs- und Rechnungseingangsdatum zu."""
 
-        details = (
-            self._vat_booking_detail_repository
+        timings = (
+            self._vat_input_timing_repository
             .list_for_company_in_date_range(
                 company_id=company_id,
                 start_date=start_date,
@@ -114,9 +121,16 @@ class VatAdvanceReturnTimingService:
 
         return tuple(
             detail
-            for detail in details
+            for timing in timings
+            for detail in (
+                self._vat_booking_detail_repository
+                .list_for_booking(
+                    timing.booking_id
+                )
+            )
             if detail.direction is VatBookingDirection.INPUT
         )
+
 
     def _agreed_output_details_for_period(
         self,

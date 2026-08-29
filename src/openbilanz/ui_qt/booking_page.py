@@ -45,6 +45,15 @@ class BookingPage(QWidget):
             [Booking, tuple[VatBookingDetail, ...]],
             None,
         ],
+        on_vat_input_booking_created: Callable[
+            [
+                Booking,
+                tuple[VatBookingDetail, ...],
+                date,
+                date,
+            ],
+            None,
+        ],
         on_vat_revenue_created: Callable[
             [
                 Booking,
@@ -93,6 +102,9 @@ class BookingPage(QWidget):
             vat_configuration=vat_configuration,
             on_vat_booking_created=(
                 on_vat_booking_created
+            ),
+            on_vat_input_booking_created=(
+                on_vat_input_booking_created
             ),
             on_vat_revenue_created=(
                 on_vat_revenue_created

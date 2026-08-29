@@ -72,6 +72,7 @@ def test_standard_vat_configuration_keeps_tax_rate_enabled() -> None:
         vat_accounts=VAT_ACCOUNTS,
         vat_configuration=STANDARD_VAT_CONFIGURATION,
         on_vat_booking_created=lambda *_args: None,
+        on_vat_input_booking_created=lambda *_args: None,
         on_vat_revenue_created=lambda *_args: None,
     )
 
@@ -104,6 +105,7 @@ def test_small_business_configuration_disables_tax_rate() -> None:
         vat_accounts=VAT_ACCOUNTS,
         vat_configuration=SMALL_BUSINESS_VAT_CONFIGURATION,
         on_vat_booking_created=lambda *_args: None,
+        on_vat_input_booking_created=lambda *_args: None,
         on_vat_revenue_created=lambda *_args: None,
     )
 
@@ -126,6 +128,94 @@ def test_small_business_configuration_disables_tax_rate() -> None:
     widget.deleteLater()
 
 
+def test_input_invoice_reports_vat_input_timing() -> None:
+    """Eine Eingangsrechnung meldet Leistungs- und Rechnungseingangsdatum."""
+
+    _application()
+
+    payable_account = _account(
+        number="1600",
+        name="Verbindlichkeiten",
+        account_type=AccountType.LIABILITY,
+        account_role=AccountRole.PAYABLE,
+    )
+    expense_account = _account(
+        number="4900",
+        name="Sonstige betriebliche Aufwendungen",
+        account_type=AccountType.EXPENSE,
+    )
+
+    on_vat_booking_created = Mock()
+    on_vat_input_booking_created = Mock()
+    on_vat_revenue_created = Mock()
+
+    widget = VatBookingWidget(
+        accounts=(
+            payable_account,
+            expense_account,
+        ),
+        vat_accounts=VAT_ACCOUNTS,
+        vat_configuration=STANDARD_VAT_CONFIGURATION,
+        on_vat_booking_created=on_vat_booking_created,
+        on_vat_input_booking_created=(
+            on_vat_input_booking_created
+        ),
+        on_vat_revenue_created=on_vat_revenue_created,
+    )
+
+    widget._invoice_type_box.setCurrentText(
+        "Eingangsrechnung"
+    )
+    widget._counter_account.setCurrentText(
+        str(payable_account)
+    )
+
+    widget._service_date.setText(
+        "28.03.2026"
+    )
+    widget._invoice_received_date.setText(
+        "04.04.2026"
+    )
+
+    row = widget._position_rows[0]
+    row.account_box.setCurrentText(
+        str(expense_account)
+    )
+    row.amount_entry.setText("119,00")
+    row.tax_rate_box.setCurrentText("19 %")
+
+    widget._create_booking()
+
+    on_vat_booking_created.assert_not_called()
+    on_vat_revenue_created.assert_not_called()
+    on_vat_input_booking_created.assert_called_once()
+
+    (
+        booking,
+        booking_details,
+        service_date,
+        invoice_received_date,
+    ) = on_vat_input_booking_created.call_args.args
+
+    assert len(booking_details) == 1
+
+    detail = booking_details[0]
+
+    assert detail.booking_id == booking.booking_id
+    assert detail.account_number == "4900"
+    assert detail.net_amount == Decimal("100.00")
+    assert detail.tax_amount == Decimal("19.00")
+    assert detail.tax_rate == 19
+
+    assert booking.debit_total == Decimal("119.00")
+    assert booking.credit_total == Decimal("119.00")
+
+    assert service_date == date(2026, 3, 28)
+    assert invoice_received_date == date(2026, 4, 4)
+
+    widget.deleteLater()
+
+
 def test_output_invoice_reports_immediate_vat_revenue() -> None:
     """Eine sofort vereinnahmte Ausgangsrechnung meldet den Umsatz."""
 
@@ -144,6 +234,7 @@ def test_output_invoice_reports_immediate_vat_revenue() -> None:
     )
 
     on_vat_booking_created = Mock()
+    on_vat_input_booking_created = Mock()
     on_vat_revenue_created = Mock()
 
     widget = VatBookingWidget(
@@ -154,6 +245,9 @@ def test_output_invoice_reports_immediate_vat_revenue() -> None:
         vat_accounts=VAT_ACCOUNTS,
         vat_configuration=STANDARD_VAT_CONFIGURATION,
         on_vat_booking_created=on_vat_booking_created,
+        on_vat_input_booking_created=(
+            on_vat_input_booking_created
+        ),
         on_vat_revenue_created=on_vat_revenue_created,
     )
 
@@ -178,6 +272,7 @@ def test_output_invoice_reports_immediate_vat_revenue() -> None:
     widget._create_booking()
 
     on_vat_booking_created.assert_not_called()
+    on_vat_input_booking_created.assert_not_called()
     on_vat_revenue_created.assert_called_once()
 
     (
@@ -227,6 +322,7 @@ def test_output_invoice_reports_receivable_vat_revenue() -> None:
     )
 
     on_vat_booking_created = Mock()
+    on_vat_input_booking_created = Mock()
     on_vat_revenue_created = Mock()
 
     widget = VatBookingWidget(
@@ -237,6 +333,9 @@ def test_output_invoice_reports_receivable_vat_revenue() -> None:
         vat_accounts=VAT_ACCOUNTS,
         vat_configuration=STANDARD_VAT_CONFIGURATION,
         on_vat_booking_created=on_vat_booking_created,
+        on_vat_input_booking_created=(
+            on_vat_input_booking_created
+        ),
         on_vat_revenue_created=on_vat_revenue_created,
     )
 
@@ -261,6 +360,7 @@ def test_output_invoice_reports_receivable_vat_revenue() -> None:
     widget._create_booking()
 
     on_vat_booking_created.assert_not_called()
+    on_vat_input_booking_created.assert_not_called()
     on_vat_revenue_created.assert_called_once()
 
     (

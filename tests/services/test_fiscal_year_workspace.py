@@ -58,6 +58,7 @@ from openbilanz.domain.vat_booking_direction import (
 from openbilanz.domain.vat_configuration import (
     VatConfiguration,
 )
+from openbilanz.domain.vat_input_timing import VatInputTiming
 from openbilanz.domain.vat_payment_kind import VatPaymentKind
 from openbilanz.domain.vat_revenue import VatRevenue
 from openbilanz.domain.vat_revenue_kind import VatRevenueKind
@@ -2376,15 +2377,17 @@ def test_builds_vat_advance_return_from_repository(
     booking_repository = Mock()
     vat_booking_detail_repository = Mock()
     vat_revenue_repository = Mock()
+    vat_input_timing_repository = Mock()
     reporting_service = Mock()
 
     booking_repository.list_for_fiscal_year.return_value = ()
 
-    booking_id = uuid4()
+    output_booking_id = uuid4()
+    input_booking_id = uuid4()
 
     output_details = (
         VatBookingDetail(
-            booking_id=booking_id,
+            booking_id=output_booking_id,
             account_number="8400",
             net_amount=Decimal("100.00"),
             tax_amount=Decimal("19.00"),
@@ -2395,7 +2398,7 @@ def test_builds_vat_advance_return_from_repository(
 
     input_details = (
         VatBookingDetail(
-            booking_id=uuid4(),
+            booking_id=input_booking_id,
             account_number="3400",
             net_amount=Decimal("50.00"),
             tax_amount=Decimal("9.50"),
@@ -2406,9 +2409,15 @@ def test_builds_vat_advance_return_from_repository(
 
     details = output_details + input_details
 
+    input_timing = VatInputTiming(
+        booking_id=input_booking_id,
+        service_date=date(2026, 1, 10),
+        invoice_received_date=date(2026, 1, 12),
+    )
+
     revenues = (
         VatRevenue(
-            booking_id=booking_id,
+            booking_id=output_booking_id,
             gross_amount=Decimal("119.00"),
             revenue_kind=VatRevenueKind.NORMAL,
             payment_kind=VatPaymentKind.IMMEDIATE,
@@ -2430,12 +2439,22 @@ def test_builds_vat_advance_return_from_repository(
     vat_revenue_repository.list_revenues_for_company_in_date_range.return_value = (
         revenues
     )
-    vat_booking_detail_repository.list_for_booking.return_value = (
-        output_details
+
+    def details_for_booking(current_booking_id):
+        if current_booking_id == output_booking_id:
+            return output_details
+        if current_booking_id == input_booking_id:
+            return input_details
+        return ()
+
+    vat_booking_detail_repository.list_for_booking.side_effect = (
+        details_for_booking
     )
-    vat_booking_detail_repository.list_for_company_in_date_range.return_value = (
-        input_details
+
+    vat_input_timing_repository.list_for_company_in_date_range.return_value = (
+        input_timing,
     )
+
     reporting_service.vat_advance_return.return_value = report
 
     workspace = FiscalYearWorkspace(
@@ -2446,6 +2465,9 @@ def test_builds_vat_advance_return_from_repository(
             vat_booking_detail_repository
         ),
         vat_revenue_repository=vat_revenue_repository,
+        vat_input_timing_repository=(
+            vat_input_timing_repository
+        ),
         company_repository=Mock(),
         posting_service=Mock(),
         closing_workflow=Mock(),
@@ -2472,14 +2494,19 @@ def test_builds_vat_advance_return_from_repository(
         end_date=date(2026, 1, 31),
     )
 
-    vat_booking_detail_repository.list_for_booking.assert_called_once_with(
-        booking_id
-    )
-
-    vat_booking_detail_repository.list_for_company_in_date_range.assert_called_once_with(
+    vat_input_timing_repository.list_for_company_in_date_range.assert_called_once_with(
         company_id=context.company.company_id,
         start_date=date(2026, 1, 1),
         end_date=date(2026, 1, 31),
+    )
+
+    assert vat_booking_detail_repository.list_for_booking.call_count == 2
+
+    vat_booking_detail_repository.list_for_booking.assert_any_call(
+        output_booking_id
+    )
+    vat_booking_detail_repository.list_for_booking.assert_any_call(
+        input_booking_id
     )
 
     reporting_service.vat_advance_return.assert_called_once_with(
