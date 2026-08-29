@@ -2,12 +2,19 @@
 
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
+from uuid import UUID
 
 from openbilanz.domain.booking import Booking
 from openbilanz.domain.booking_line import BookingLine
 from openbilanz.domain.entry_side import EntrySide
 from openbilanz.domain.money import ZERO
 from openbilanz.domain.vat_accounts import VatAccounts
+from openbilanz.domain.vat_booking_detail import (
+    VatBookingDetail,
+)
+from openbilanz.domain.vat_booking_direction import (
+    VatBookingDirection,
+)
 from openbilanz.domain.vat_booking_item import (
     VatBookingItem,
 )
@@ -293,6 +300,66 @@ class VatBookingService:
             description=description,
             lines=tuple(lines),
         )
+
+    def build_booking_details(
+        self,
+        *,
+        booking_id: UUID,
+        items: tuple[VatBookingItem, ...],
+        vat_configuration: VatConfiguration,
+        direction: VatBookingDirection,
+        is_credit_note: bool = False,
+    ) -> tuple[VatBookingDetail, ...]:
+        """Erzeugt USt-relevante Detaildaten einer Buchung."""
+
+        if not isinstance(booking_id, UUID):
+            raise TypeError(
+                "booking_id must be a UUID"
+            )
+
+        if not isinstance(
+            vat_configuration,
+            VatConfiguration,
+        ):
+            raise TypeError(
+                "vat_configuration must be a VatConfiguration"
+            )
+
+        if not isinstance(
+            direction,
+            VatBookingDirection,
+        ):
+            raise TypeError(
+                "direction must be a VatBookingDirection"
+            )
+
+        validated_items = self._validate_items(items)
+
+        sign = Decimal("-1") if is_credit_note else Decimal("1")
+
+        details: list[VatBookingDetail] = []
+
+        for item in validated_items:
+            if vat_configuration.is_small_business:
+                net_amount = item.gross_amount
+                tax_amount = ZERO
+            else:
+                net_amount, tax_amount = (
+                    self._split_gross_amount(item)
+                )
+
+            details.append(
+                VatBookingDetail(
+                    booking_id=booking_id,
+                    account_number=item.account_number,
+                    net_amount=net_amount * sign,
+                    tax_amount=tax_amount * sign,
+                    tax_rate=item.tax_rate,
+                    direction=direction,
+                )
+            )
+
+        return tuple(details)
 
     @staticmethod
     def _validate_items(

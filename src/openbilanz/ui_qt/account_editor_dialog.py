@@ -20,6 +20,7 @@ from openbilanz.accounting.financial_statement_position import (
 from openbilanz.accounting.statement_category import StatementCategory
 from openbilanz.domain.account import Account
 from openbilanz.domain.account_mapping_rule import AccountMappingRule
+from openbilanz.domain.account_role import AccountRole
 from openbilanz.domain.account_type import AccountType
 from openbilanz.domain.template_account import TemplateAccount
 
@@ -41,6 +42,14 @@ class AccountEditorDialog(QDialog):
         "Eigenkapital": AccountType.EQUITY,
         "Ertragskonto": AccountType.REVENUE,
         "Aufwandskonto": AccountType.EXPENSE,
+    }
+
+    _ACCOUNT_ROLE_LABELS = {
+        "Keine": None,
+        "Forderungskonto": AccountRole.RECEIVABLE,
+        "Verbindlichkeitskonto": AccountRole.PAYABLE,
+        "Bankkonto": AccountRole.BANK,
+        "Kassenkonto": AccountRole.CASH,
     }
 
     def __init__(
@@ -132,6 +141,16 @@ class AccountEditorDialog(QDialog):
             self._account_type_box,
         )
 
+        self._account_role_box = QComboBox()
+        self._account_role_box.addItems(
+            tuple(self._ACCOUNT_ROLE_LABELS)
+        )
+
+        form.addRow(
+            "Technische Rolle",
+            self._account_role_box,
+        )
+
         self._debit_position_box = QComboBox()
         form.addRow(
             "HGB-Zuordnung Soll",
@@ -189,6 +208,18 @@ class AccountEditorDialog(QDialog):
         except KeyError as exc:
             raise ValueError(
                 "Bitte wählen Sie einen Kontotyp."
+            ) from exc
+
+    def _selected_account_role(
+        self,
+    ) -> AccountRole | None:
+        try:
+            return self._ACCOUNT_ROLE_LABELS[
+                self._account_role_box.currentText()
+            ]
+        except KeyError as exc:
+            raise ValueError(
+                "Bitte wählen Sie eine technische Rolle."
             ) from exc
 
     def _update_mapping_choices(self) -> None:
@@ -299,6 +330,30 @@ class AccountEditorDialog(QDialog):
             name = self._name_entry.text().strip()
 
             account_type = self._selected_account_type()
+            account_role = self._selected_account_role()
+
+            if (
+                account_role
+                in (
+                    AccountRole.RECEIVABLE,
+                    AccountRole.BANK,
+                    AccountRole.CASH,
+                )
+                and account_type is not AccountType.ASSET
+            ):
+                raise ValueError(
+                    "Forderungs-, Bank- und Kassenrollen "
+                    "können nur Aktivkonten zugeordnet werden."
+                )
+
+            if (
+                account_role is AccountRole.PAYABLE
+                and account_type is not AccountType.LIABILITY
+            ):
+                raise ValueError(
+                    "Die Rolle Verbindlichkeitskonto kann "
+                    "nur einem Passivkonto zugeordnet werden."
+                )
 
             template = TemplateAccount(
                 account_number=account_number,
@@ -309,6 +364,7 @@ class AccountEditorDialog(QDialog):
             account = Account(
                 template=template,
                 is_active=self._is_active_box.isChecked(),
+                account_role=account_role,
             )
 
             debit_position = self._debit_positions.get(
@@ -362,6 +418,19 @@ class AccountEditorDialog(QDialog):
         )
         self._is_active_box.setChecked(
             self._account.is_active
+        )
+        account_role_label = next(
+            (
+                label
+                for label, account_role
+                in self._ACCOUNT_ROLE_LABELS.items()
+                if account_role is self._account.account_role
+            ),
+            "Keine",
+        )
+
+        self._account_role_box.setCurrentText(
+            account_role_label
         )
 
         account_type_label = next(

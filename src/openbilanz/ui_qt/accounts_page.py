@@ -113,7 +113,7 @@ class AccountsPage(QWidget):
             QHeaderView.ResizeMode.Stretch,
         )
 
-        for column in (2, 3, 4):
+        for column in (2, 3, 4, 5, 6):
             header.setSectionResizeMode(
                 column,
                 QHeaderView.ResizeMode.ResizeToContents,

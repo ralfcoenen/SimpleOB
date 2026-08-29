@@ -26,6 +26,15 @@ from openbilanz.database.fixed_asset_movement_repository import (
 from openbilanz.database.fixed_asset_repository import (
     FixedAssetRepository,
 )
+from openbilanz.database.vat_booking_detail_repository import (
+    VatBookingDetailRepository,
+)
+from openbilanz.database.vat_configuration_repository import (
+    VatConfigurationRepository,
+)
+from openbilanz.database.vat_revenue_repository import (
+    VatRevenueRepository,
+)
 from openbilanz.domain.account import Account
 from openbilanz.domain.account_mapping_rule import (
     AccountMappingRule,
@@ -64,9 +73,14 @@ from openbilanz.domain.fixed_asset_status import (
 from openbilanz.domain.journal import Journal
 from openbilanz.domain.managed_fiscal_year import ManagedFiscalYear
 from openbilanz.domain.vat_accounts import VatAccounts
+from openbilanz.domain.vat_booking_detail import VatBookingDetail
+from openbilanz.domain.vat_booking_direction import VatBookingDirection
 from openbilanz.domain.vat_configuration import (
     VatConfiguration,
 )
+from openbilanz.domain.vat_payment_kind import VatPaymentKind
+from openbilanz.domain.vat_revenue_kind import VatRevenueKind
+from openbilanz.domain.vat_taxation_method import VatTaxationMethod
 from openbilanz.reporting.account_activity_report import (
     AccountActivityReport,
 )
@@ -76,6 +90,9 @@ from openbilanz.reporting.fixed_asset_report import (
 from openbilanz.reporting.journal_report import JournalReport
 from openbilanz.reporting.trial_balance_report import (
     TrialBalanceReport,
+)
+from openbilanz.reporting.vat_advance_return import (
+    VatAdvanceReturn,
 )
 from openbilanz.reporting.vat_report import VatReport
 from openbilanz.services.closing_consistency_service import (
@@ -120,6 +137,9 @@ from openbilanz.services.taxonomy_management_service import (
     TaxonomyManagementService,
     TaxonomyStatus,
 )
+from openbilanz.services.vat_revenue_posting_workflow import (
+    VatRevenuePostingWorkflow,
+)
 from openbilanz.taxonomy.arelle_adapter import (
     ArelleValidationResult,
 )
@@ -140,6 +160,8 @@ class FiscalYearWorkspace:
         context: ApplicationContext,
         vat_configuration: VatConfiguration,
         booking_repository: BookingRepository,
+        vat_booking_detail_repository: VatBookingDetailRepository | None = None,
+        vat_revenue_repository: VatRevenueRepository | None = None,
         company_repository: CompanyRepository,
         chart_of_accounts_repository: ChartOfAccountsRepository | None = None,
         posting_service: PostingService,
@@ -172,10 +194,22 @@ class FiscalYearWorkspace:
         fixed_asset_disposal_workflow: (
             FixedAssetDisposalWorkflow | None
         ) = None,
+        vat_revenue_posting_workflow: (
+            VatRevenuePostingWorkflow | None
+        ) = None,
+        vat_configuration_repository: (
+            VatConfigurationRepository | None
+        ) = None,
     ) -> None:
         self._context = context
         self._vat_configuration = vat_configuration
         self._booking_repository = booking_repository
+        self._vat_booking_detail_repository = (
+            vat_booking_detail_repository
+        )
+        self._vat_revenue_repository = (
+            vat_revenue_repository
+        )
         self._company_repository = company_repository
         self._chart_of_accounts_repository = (
             chart_of_accounts_repository
@@ -216,6 +250,12 @@ class FiscalYearWorkspace:
         )
         self._fixed_asset_schedule_service = (
             fixed_asset_schedule_service
+        )
+        self._vat_revenue_posting_workflow = (
+            vat_revenue_posting_workflow
+        )
+        self._vat_configuration_repository = (
+            vat_configuration_repository
         )
 
         self.reload()
@@ -345,6 +385,60 @@ class FiscalYearWorkspace:
 
         return self.managed_fiscal_year.status is FiscalYearStatus.CLOSED
 
+    def post_vat_booking(
+        self,
+        *,
+        booking: Booking,
+        booking_details: tuple[VatBookingDetail, ...],
+    ) -> None:
+        """Verbucht USt-Buchung und USt-Details atomar."""
+
+        if self._vat_revenue_posting_workflow is None:
+            raise RuntimeError(
+                "Der Umsatzsteuer-Buchungsworkflow "
+                "ist nicht konfiguriert."
+            )
+
+        self._vat_revenue_posting_workflow.post_booking(
+            company=self._context.company,
+            fiscal_year=self._context.fiscal_year,
+            booking=booking,
+            booking_details=booking_details,
+        )
+
+        self.reload()
+
+    def post_vat_revenue_booking(
+        self,
+        *,
+        booking: Booking,
+        booking_details: tuple[VatBookingDetail, ...],
+        gross_amount: Decimal,
+        revenue_kind: VatRevenueKind,
+        payment_kind: VatPaymentKind,
+        service_date: date,
+    ) -> None:
+        """Verbucht Ausgangsbuchung und USt-Umsatz atomar."""
+
+        if self._vat_revenue_posting_workflow is None:
+            raise RuntimeError(
+                "Der Umsatzsteuer-Ausgangsworkflow "
+                "ist nicht konfiguriert."
+            )
+
+        self._vat_revenue_posting_workflow.post(
+            company=self._context.company,
+            fiscal_year=self._context.fiscal_year,
+            booking=booking,
+            booking_details=booking_details,
+            gross_amount=gross_amount,
+            revenue_kind=revenue_kind,
+            payment_kind=payment_kind,
+            service_date=service_date,
+        )
+
+        self.reload()
+
     def post_booking(
         self,
         booking: Booking,
@@ -404,6 +498,68 @@ class FiscalYearWorkspace:
 
         return self._reporting_service.journal_report(
             journal=self._journal,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+    def build_vat_advance_return(
+        self,
+        *,
+        start_date: date,
+        end_date: date,
+    ) -> VatAdvanceReturn:
+        """Erzeugt die Umsatzsteuer-Voranmeldung."""
+
+        if self._vat_booking_detail_repository is None:
+            raise RuntimeError(
+                "Das USt-Detail-Repository ist nicht konfiguriert."
+            )
+
+        if self._vat_configuration.taxation_method is VatTaxationMethod.RECEIVED:
+            raise RuntimeError(
+                "Die USt-VA nach Istversteuerung ist noch nicht implementiert."
+            )
+
+        if self._vat_revenue_repository is None:
+            raise RuntimeError(
+                "Das USt-Umsatz-Repository ist nicht konfiguriert."
+            )
+
+        revenues = (
+            self._vat_revenue_repository
+            .list_revenues_for_company_in_date_range(
+                company_id=self._context.company.company_id,
+                start_date=start_date,
+                end_date=end_date,
+            )
+        )
+
+        output_details = tuple(
+            detail
+            for revenue in revenues
+            for detail in (
+                self._vat_booking_detail_repository
+                .list_for_booking(revenue.booking_id)
+            )
+            if detail.direction is VatBookingDirection.OUTPUT
+        )
+
+        input_details = tuple(
+            detail
+            for detail in (
+                self._vat_booking_detail_repository
+                .list_for_company_in_date_range(
+                    company_id=self._context.company.company_id,
+                    start_date=start_date,
+                    end_date=end_date,
+                )
+            )
+            if detail.direction is VatBookingDirection.INPUT
+        )
+
+        details = output_details + input_details
+        return self._reporting_service.vat_advance_return(
+            details=details,
             start_date=start_date,
             end_date=end_date,
         )
@@ -1286,3 +1442,21 @@ class FiscalYearWorkspace:
             document=document,
             target=target,
         )
+
+    def save_vat_configuration(
+        self,
+        configuration: VatConfiguration,
+    ) -> None:
+        """Speichert die umsatzsteuerliche Mandantenkonfiguration."""
+
+        if self._vat_configuration_repository is None:
+            raise RuntimeError(
+                "Die Umsatzsteuerkonfiguration ist nicht konfiguriert."
+            )
+
+        self._vat_configuration_repository.save(
+            company_id=self._context.company.company_id,
+            configuration=configuration,
+        )
+
+        self._vat_configuration = configuration

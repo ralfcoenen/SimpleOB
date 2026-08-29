@@ -6,6 +6,8 @@ from decimal import Decimal
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt
 
 from openbilanz.domain.account import Account
+from openbilanz.domain.account_role import AccountRole
+from openbilanz.domain.account_type import AccountType
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,9 +23,26 @@ class AccountTableRow:
 class AccountsTableModel(QAbstractTableModel):
     """Model für die Kontenübersicht."""
 
+    _ACCOUNT_TYPE_LABELS = {
+        AccountType.ASSET: "Aktivkonto",
+        AccountType.LIABILITY: "Passivkonto",
+        AccountType.EQUITY: "Eigenkapital",
+        AccountType.REVENUE: "Ertragskonto",
+        AccountType.EXPENSE: "Aufwandskonto",
+    }
+
+    _ACCOUNT_ROLE_LABELS = {
+        AccountRole.RECEIVABLE: "Forderungskonto",
+        AccountRole.PAYABLE: "Verbindlichkeitskonto",
+        AccountRole.BANK: "Bankkonto",
+        AccountRole.CASH: "Kassenkonto",
+    }
+
     HEADERS = (
         "Konto",
         "Bezeichnung",
+        "Kontotyp",
+        "Kontenrolle",
         "Soll",
         "Haben",
         "Saldo",
@@ -68,6 +87,16 @@ class AccountsTableModel(QAbstractTableModel):
         values = (
             row.account.number,
             row.account.name,
+            self._ACCOUNT_TYPE_LABELS[
+                row.account.account_type
+            ],
+            (
+                self._ACCOUNT_ROLE_LABELS[
+                    row.account.account_role
+                ]
+                if row.account.account_role is not None
+                else "–"
+            ),
             self._format_amount(row.debit),
             self._format_amount(row.credit),
             row.balance,

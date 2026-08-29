@@ -51,11 +51,21 @@ from openbilanz.domain.fixed_asset_movement_type import (
 )
 from openbilanz.domain.journal import Journal
 from openbilanz.domain.managed_fiscal_year import ManagedFiscalYear
+from openbilanz.domain.vat_booking_detail import VatBookingDetail
+from openbilanz.domain.vat_booking_direction import (
+    VatBookingDirection,
+)
 from openbilanz.domain.vat_configuration import (
     VatConfiguration,
 )
+from openbilanz.domain.vat_payment_kind import VatPaymentKind
+from openbilanz.domain.vat_revenue import VatRevenue
+from openbilanz.domain.vat_revenue_kind import VatRevenueKind
 from openbilanz.domain.vat_taxation_type import (
     VatTaxationType,
+)
+from openbilanz.reporting.vat_advance_return import (
+    VatAdvanceReturn,
 )
 from openbilanz.services.closing_result import ClosingResult
 from openbilanz.services.e_bilanz_export_service import (
@@ -2358,4 +2368,122 @@ def test_confirms_fixed_asset_disposal_and_reloads_workspace(
         booking_repository
         .list_for_fiscal_year.call_count
         == 2
+    )
+
+def test_builds_vat_advance_return_from_repository(
+    context: ApplicationContext,
+) -> None:
+    booking_repository = Mock()
+    vat_booking_detail_repository = Mock()
+    vat_revenue_repository = Mock()
+    reporting_service = Mock()
+
+    booking_repository.list_for_fiscal_year.return_value = ()
+
+    booking_id = uuid4()
+
+    output_details = (
+        VatBookingDetail(
+            booking_id=booking_id,
+            account_number="8400",
+            net_amount=Decimal("100.00"),
+            tax_amount=Decimal("19.00"),
+            tax_rate=19,
+            direction=VatBookingDirection.OUTPUT,
+        ),
+    )
+
+    input_details = (
+        VatBookingDetail(
+            booking_id=uuid4(),
+            account_number="3400",
+            net_amount=Decimal("50.00"),
+            tax_amount=Decimal("9.50"),
+            tax_rate=19,
+            direction=VatBookingDirection.INPUT,
+        ),
+    )
+
+    details = output_details + input_details
+
+    revenues = (
+        VatRevenue(
+            booking_id=booking_id,
+            gross_amount=Decimal("119.00"),
+            revenue_kind=VatRevenueKind.NORMAL,
+            payment_kind=VatPaymentKind.IMMEDIATE,
+            service_date=date(2026, 1, 15),
+        ),
+    )
+
+    report = VatAdvanceReturn(
+        start_date=date(2026, 1, 1),
+        end_date=date(2026, 1, 31),
+        taxable_turnover_7=Decimal("0.00"),
+        taxable_turnover_19=Decimal("100.00"),
+        output_tax_7=Decimal("0.00"),
+        output_tax_19=Decimal("19.00"),
+        input_tax_7=Decimal("0.00"),
+        input_tax_19=Decimal("9.50"),
+    )
+
+    vat_revenue_repository.list_revenues_for_company_in_date_range.return_value = (
+        revenues
+    )
+    vat_booking_detail_repository.list_for_booking.return_value = (
+        output_details
+    )
+    vat_booking_detail_repository.list_for_company_in_date_range.return_value = (
+        input_details
+    )
+    reporting_service.vat_advance_return.return_value = report
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        vat_configuration=TEST_VAT_CONFIGURATION,
+        booking_repository=booking_repository,
+        vat_booking_detail_repository=(
+            vat_booking_detail_repository
+        ),
+        vat_revenue_repository=vat_revenue_repository,
+        company_repository=Mock(),
+        posting_service=Mock(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
+        taxonomy_management_service=Mock(),
+        e_bilanz_export_service=Mock(),
+        fixed_asset_schedule_service=Mock(),
+        reporting_service=reporting_service,
+    )
+
+    result = workspace.build_vat_advance_return(
+        start_date=date(2026, 1, 1),
+        end_date=date(2026, 1, 31),
+    )
+
+    assert result is report
+
+    vat_revenue_repository.list_revenues_for_company_in_date_range.assert_called_once_with(
+        company_id=context.company.company_id,
+        start_date=date(2026, 1, 1),
+        end_date=date(2026, 1, 31),
+    )
+
+    vat_booking_detail_repository.list_for_booking.assert_called_once_with(
+        booking_id
+    )
+
+    vat_booking_detail_repository.list_for_company_in_date_range.assert_called_once_with(
+        company_id=context.company.company_id,
+        start_date=date(2026, 1, 1),
+        end_date=date(2026, 1, 31),
+    )
+
+    reporting_service.vat_advance_return.assert_called_once_with(
+        details=details,
+        start_date=date(2026, 1, 1),
+        end_date=date(2026, 1, 31),
     )

@@ -14,6 +14,10 @@ from openbilanz.domain.booking_type import BookingType
 from openbilanz.domain.entry_side import EntrySide
 from openbilanz.domain.journal import Journal
 from openbilanz.domain.vat_accounts import VatAccounts
+from openbilanz.domain.vat_booking_detail import VatBookingDetail
+from openbilanz.domain.vat_booking_direction import (
+    VatBookingDirection,
+)
 from openbilanz.reporting.account_statement import AccountStatement
 from openbilanz.services.reporting_service import ReportingService
 
@@ -663,6 +667,75 @@ def test_journal_report_filters_and_groups_bookings() -> None:
         line.booking_id != closing_booking.booking_id
         for line in report.lines
     )
+
+def test_vat_advance_return_calculates_taxable_turnover_and_tax() -> None:
+    """Die USt-VA wertet Bemessungsgrundlagen und Steuerbeträge aus."""
+
+    booking_id = uuid4()
+
+    details = (
+        VatBookingDetail(
+            booking_id=booking_id,
+            account_number="8400",
+            net_amount=Decimal("1000.00"),
+            tax_amount=Decimal("190.00"),
+            tax_rate=19,
+            direction=VatBookingDirection.OUTPUT,
+        ),
+        VatBookingDetail(
+            booking_id=booking_id,
+            account_number="8300",
+            net_amount=Decimal("500.00"),
+            tax_amount=Decimal("35.00"),
+            tax_rate=7,
+            direction=VatBookingDirection.OUTPUT,
+        ),
+        VatBookingDetail(
+            booking_id=booking_id,
+            account_number="8400",
+            net_amount=Decimal("-100.00"),
+            tax_amount=Decimal("-19.00"),
+            tax_rate=19,
+            direction=VatBookingDirection.OUTPUT,
+        ),
+        VatBookingDetail(
+            booking_id=booking_id,
+            account_number="4930",
+            net_amount=Decimal("200.00"),
+            tax_amount=Decimal("38.00"),
+            tax_rate=19,
+            direction=VatBookingDirection.INPUT,
+        ),
+        VatBookingDetail(
+            booking_id=booking_id,
+            account_number="4930",
+            net_amount=Decimal("100.00"),
+            tax_amount=Decimal("7.00"),
+            tax_rate=7,
+            direction=VatBookingDirection.INPUT,
+        ),
+    )
+
+    report = ReportingService().vat_advance_return(
+        details=details,
+        start_date=date(2026, 3, 1),
+        end_date=date(2026, 3, 31),
+    )
+
+    assert report.taxable_turnover_19 == Decimal("900.00")
+    assert report.taxable_turnover_7 == Decimal("500.00")
+    assert report.taxable_turnover_total == Decimal("1400.00")
+
+    assert report.output_tax_19 == Decimal("171.00")
+    assert report.output_tax_7 == Decimal("35.00")
+    assert report.output_tax_total == Decimal("206.00")
+
+    assert report.input_tax_19 == Decimal("38.00")
+    assert report.input_tax_7 == Decimal("7.00")
+    assert report.input_tax_total == Decimal("45.00")
+
+    assert report.vat_payable == Decimal("161.00")
+    assert report.input_tax_surplus == Decimal("0.00")
 
 def test_vat_report_calculates_tax_amounts_and_payable() -> None:
     """Die USt-Auswertung saldiert Vor- und Umsatzsteuer."""

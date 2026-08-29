@@ -26,8 +26,14 @@ from openbilanz.database.fixed_asset_repository import FixedAssetRepository
 from openbilanz.database.migration_service import (
     MigrationService,
 )
+from openbilanz.database.vat_booking_detail_repository import (
+    VatBookingDetailRepository,
+)
 from openbilanz.database.vat_configuration_repository import (
     VatConfigurationRepository,
+)
+from openbilanz.database.vat_revenue_repository import (
+    VatRevenueRepository,
 )
 from openbilanz.services.chart_of_accounts_initialization_service import (
     ChartOfAccountsInitializationService,
@@ -63,6 +69,9 @@ from openbilanz.services.posting_service import PostingService
 from openbilanz.services.reporting_service import ReportingService
 from openbilanz.services.taxonomy_management_service import (
     TaxonomyManagementService,
+)
+from openbilanz.services.vat_revenue_posting_workflow import (
+    VatRevenuePostingWorkflow,
 )
 from openbilanz.taxonomy.arelle_adapter import ArelleAdapter
 from openbilanz.taxonomy.resolver import TaxonomyResolver
@@ -167,6 +176,26 @@ class ApplicationBootstrap:
             session
         )
 
+        vat_revenue_repository = VatRevenueRepository(
+            session
+        )
+
+        vat_booking_detail_repository = (
+            VatBookingDetailRepository(
+                session
+            )
+        )
+
+        vat_revenue_posting_workflow = (
+            VatRevenuePostingWorkflow(
+                session=session,
+                booking_repository=booking_repository,
+                vat_booking_detail_repository=(
+                    vat_booking_detail_repository
+                ),
+                vat_revenue_repository=vat_revenue_repository,
+            )
+        )
         posting_service = PostingService()
 
         fixed_asset_repository = (
@@ -291,6 +320,12 @@ class ApplicationBootstrap:
                 chart_of_accounts_initialization_service
             ),
             booking_repository=booking_repository,
+            vat_booking_detail_repository=(
+                vat_booking_detail_repository
+            ),
+            vat_revenue_repository=(
+                vat_revenue_repository
+            ),
             posting_service=posting_service,
             reporting_service=reporting_service,
             closing_consistency_service=(
@@ -329,6 +364,9 @@ class ApplicationBootstrap:
                 standard_financial_statement_context
             ),
             position_provider=position_provider,
+            vat_revenue_posting_workflow=(
+                vat_revenue_posting_workflow
+            ),
         )
 
         return cls(

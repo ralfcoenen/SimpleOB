@@ -9,6 +9,10 @@ from openbilanz.domain.entry_side import EntrySide
 from openbilanz.domain.journal import Journal
 from openbilanz.domain.money import ZERO
 from openbilanz.domain.vat_accounts import VatAccounts
+from openbilanz.domain.vat_booking_detail import VatBookingDetail
+from openbilanz.domain.vat_booking_direction import (
+    VatBookingDirection,
+)
 from openbilanz.reporting.account_activity_report import (
     AccountActivityReport,
     AccountActivityReportLine,
@@ -24,6 +28,9 @@ from openbilanz.reporting.journal_report import (
 from openbilanz.reporting.trial_balance_report import (
     TrialBalanceReport,
     TrialBalanceReportRow,
+)
+from openbilanz.reporting.vat_advance_return import (
+    VatAdvanceReturn,
 )
 from openbilanz.reporting.vat_report import VatReport
 
@@ -392,6 +399,74 @@ class ReportingService:
             start_date=start_date,
             end_date=end_date,
             lines=tuple(lines),
+        )
+
+    def vat_advance_return(
+        self,
+        *,
+        details: tuple[VatBookingDetail, ...],
+        start_date: date,
+        end_date: date,
+    ) -> VatAdvanceReturn:
+        """Erzeugt eine USt-VA-Auswertung aus USt-Buchungsdetails."""
+
+        if not isinstance(start_date, date):
+            raise TypeError(
+                "start_date muss ein Datum sein."
+            )
+
+        if not isinstance(end_date, date):
+            raise TypeError(
+                "end_date muss ein Datum sein."
+            )
+
+        if end_date < start_date:
+            raise ValueError(
+                "Das Enddatum darf nicht vor dem Startdatum liegen."
+            )
+
+        taxable_turnover_7 = ZERO
+        taxable_turnover_19 = ZERO
+        output_tax_7 = ZERO
+        output_tax_19 = ZERO
+        input_tax_7 = ZERO
+        input_tax_19 = ZERO
+
+        for detail in details:
+            if not isinstance(
+                detail,
+                VatBookingDetail,
+            ):
+                raise TypeError(
+                    "details muss ausschließlich "
+                    "VatBookingDetail-Objekte enthalten."
+                )
+
+            if detail.direction is VatBookingDirection.OUTPUT:
+                if detail.tax_rate == 7:
+                    taxable_turnover_7 += detail.net_amount
+                    output_tax_7 += detail.tax_amount
+
+                elif detail.tax_rate == 19:
+                    taxable_turnover_19 += detail.net_amount
+                    output_tax_19 += detail.tax_amount
+
+            elif detail.direction is VatBookingDirection.INPUT:
+                if detail.tax_rate == 7:
+                    input_tax_7 += detail.tax_amount
+
+                elif detail.tax_rate == 19:
+                    input_tax_19 += detail.tax_amount
+
+        return VatAdvanceReturn(
+            start_date=start_date,
+            end_date=end_date,
+            taxable_turnover_7=taxable_turnover_7,
+            taxable_turnover_19=taxable_turnover_19,
+            output_tax_7=output_tax_7,
+            output_tax_19=output_tax_19,
+            input_tax_7=input_tax_7,
+            input_tax_19=input_tax_19,
         )
 
     def vat_report(

@@ -24,8 +24,14 @@ from openbilanz.database.fixed_asset_movement_repository import (
     FixedAssetMovementRepository,
 )
 from openbilanz.database.fixed_asset_repository import FixedAssetRepository
+from openbilanz.database.vat_booking_detail_repository import (
+    VatBookingDetailRepository,
+)
 from openbilanz.database.vat_configuration_repository import (
     VatConfigurationRepository,
+)
+from openbilanz.database.vat_revenue_repository import (
+    VatRevenueRepository,
 )
 from openbilanz.domain.accounting_control_accounts import (
     AccountingControlAccounts,
@@ -75,6 +81,9 @@ from openbilanz.services.reporting_service import ReportingService
 from openbilanz.services.taxonomy_management_service import (
     TaxonomyManagementService,
 )
+from openbilanz.services.vat_revenue_posting_workflow import (
+    VatRevenuePostingWorkflow,
+)
 from openbilanz.taxonomy.arelle_adapter import ArelleAdapter
 from openbilanz.taxonomy.gcd_company_data_mapper import GcdCompanyDataMapper
 from openbilanz.taxonomy.resolver import TaxonomyResolver
@@ -91,6 +100,7 @@ class WorkspaceContext:
     opening_balance_account_number: str
     control_accounts: AccountingControlAccounts
     vat_accounts: VatAccounts
+
 
 
 class WorkspaceFactory:
@@ -116,6 +126,8 @@ class WorkspaceFactory:
         fixed_asset_depreciation_repository: (
             FixedAssetDepreciationRepository
         ),
+        vat_booking_detail_repository: VatBookingDetailRepository,
+        vat_revenue_repository: VatRevenueRepository,
         depreciation_service: DepreciationService,
         fixed_asset_depreciation_workflow: (
             FixedAssetDepreciationWorkflow
@@ -131,6 +143,7 @@ class WorkspaceFactory:
         arelle_adapter: ArelleAdapter,
         standard_financial_statement_context: FinancialStatementContext,
         position_provider: FinancialStatementPositionProvider,
+        vat_revenue_posting_workflow: VatRevenuePostingWorkflow,
     ) -> None:
         self._session = session
         self._company_repository = company_repository
@@ -142,6 +155,12 @@ class WorkspaceFactory:
             chart_of_accounts_initialization_service
         )
         self._booking_repository = booking_repository
+        self._vat_booking_detail_repository = (
+            vat_booking_detail_repository
+        )
+        self._vat_revenue_repository = (
+            vat_revenue_repository
+        )
         self._posting_service = posting_service
         self._reporting_service = reporting_service
         self._closing_consistency_service = closing_consistency_service
@@ -173,6 +192,9 @@ class WorkspaceFactory:
             standard_financial_statement_context
         )
         self._position_provider = position_provider
+        self._vat_revenue_posting_workflow = (
+            vat_revenue_posting_workflow
+        )
 
     def create(
         self,
@@ -339,6 +361,12 @@ class WorkspaceFactory:
             context=context,
             vat_configuration=vat_configuration,
             booking_repository=self._booking_repository,
+            vat_booking_detail_repository=(
+                self._vat_booking_detail_repository
+            ),
+            vat_revenue_repository=(
+                self._vat_revenue_repository
+            ),
             company_repository=self._company_repository,
             chart_of_accounts_repository=(
                 self._chart_of_accounts_repository
@@ -388,6 +416,12 @@ class WorkspaceFactory:
             ),
             fixed_asset_disposal_workflow=(
                 self._fixed_asset_disposal_workflow
+            ),
+            vat_revenue_posting_workflow=(
+                self._vat_revenue_posting_workflow
+            ),
+            vat_configuration_repository=(
+                self._vat_configuration_repository
             ),
         )
 

@@ -11,6 +11,9 @@ from openbilanz.database.models import (
 from openbilanz.domain.vat_configuration import (
     VatConfiguration,
 )
+from openbilanz.domain.vat_taxation_method import (
+    VatTaxationMethod,
+)
 from openbilanz.domain.vat_taxation_type import (
     VatTaxationType,
 )
@@ -80,6 +83,9 @@ class VatConfigurationRepository:
                 effective_from=(
                     configuration.effective_from
                 ),
+                taxation_method=(
+                    configuration.taxation_method.value
+                ),
             )
 
             self._session.add(model)
@@ -89,6 +95,9 @@ class VatConfigurationRepository:
             )
             model.effective_from = (
                 configuration.effective_from
+            )
+            model.taxation_method = (
+                configuration.taxation_method.value
             )
 
         if commit:
@@ -135,4 +144,7 @@ class VatConfigurationRepository:
                 model.taxation_type
             ),
             effective_from=model.effective_from,
+            taxation_method=VatTaxationMethod(
+                model.taxation_method
+            ),
         )

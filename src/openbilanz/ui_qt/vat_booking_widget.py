@@ -19,13 +19,22 @@ from PySide6.QtWidgets import (
 )
 
 from openbilanz.domain.account import Account
+from openbilanz.domain.account_role import AccountRole
 from openbilanz.domain.account_type import AccountType
 from openbilanz.domain.booking import Booking
 from openbilanz.domain.vat_accounts import VatAccounts
+from openbilanz.domain.vat_booking_detail import (
+    VatBookingDetail,
+)
+from openbilanz.domain.vat_booking_direction import (
+    VatBookingDirection,
+)
 from openbilanz.domain.vat_booking_item import VatBookingItem
 from openbilanz.domain.vat_configuration import (
     VatConfiguration,
 )
+from openbilanz.domain.vat_payment_kind import VatPaymentKind
+from openbilanz.domain.vat_revenue_kind import VatRevenueKind
 from openbilanz.services.vat_booking_service import VatBookingService
 from openbilanz.ui.date_input import (
     normalize_german_date,
@@ -36,6 +45,9 @@ _INPUT_INVOICE = "Eingangsrechnung"
 _OUTPUT_INVOICE = "Ausgangsrechnung"
 _CUSTOMER_CREDIT_NOTE = "Kundengutschrift"
 _SUPPLIER_CREDIT_NOTE = "Lieferantengutschrift"
+_IMMEDIATE_PAYMENT = "Sofort bezahlt"
+_RECEIVABLE_PAYMENT = "Auf Rechnung / Forderung"
+_PAYABLE_PAYMENT = "Auf Rechnung / Verbindlichkeit"
 
 _TAX_RATES = ("0 %", "7 %", "19 %")
 
@@ -102,12 +114,31 @@ class VatPositionRow(QWidget):
             self._on_changed
         )
 
+
+    def set_small_business(
+        self,
+        small_business: bool,
+    ) -> None:
+        """Aktualisiert die Kleinunternehmerdarstellung."""
+
+        self._small_business = small_business
+
+        self.tax_rate_box.setCurrentText(
+            "0 %" if small_business else "19 %"
+        )
+
+        self.tax_rate_box.setEnabled(
+            self.isEnabled()
+            and not small_business
+        )
+
     def set_enabled(self, enabled: bool) -> None:
         self.account_box.setEnabled(enabled)
         self.amount_entry.setEnabled(enabled)
         self.tax_rate_box.setEnabled(
             enabled and not self._small_business
         )
+
 
     def clear(self) -> None:
         self.account_box.setCurrentIndex(-1)
@@ -125,14 +156,33 @@ class VatBookingWidget(QWidget):
         accounts: tuple[Account, ...],
         vat_accounts: VatAccounts,
         vat_configuration: VatConfiguration,
-        on_booking_created: Callable[[Booking], None],
+        on_vat_booking_created: Callable[
+            [Booking, tuple[VatBookingDetail, ...]],
+            None,
+        ],
+        on_vat_revenue_created: Callable[
+            [
+                Booking,
+                tuple[VatBookingDetail, ...],
+                Decimal,
+                VatRevenueKind,
+                VatPaymentKind,
+                date,
+            ],
+            None,
+        ],
     ) -> None:
         super().__init__()
 
         self._accounts = accounts
         self._vat_accounts = vat_accounts
         self._vat_configuration = vat_configuration
-        self._on_booking_created = on_booking_created
+        self._on_vat_booking_created = (
+            on_vat_booking_created
+        )
+        self._on_vat_revenue_created = (
+            on_vat_revenue_created
+        )
         self._vat_booking_service = VatBookingService()
         self._enabled = True
 
@@ -151,7 +201,15 @@ class VatBookingWidget(QWidget):
         self._position_rows: list[VatPositionRow] = []
 
         self._create_ui()
+
+        self._service_date.setEnabled(
+            self._invoice_type_box.currentText()
+            == _OUTPUT_INVOICE
+        )
+
         self._add_position_row()
+        self._update_payment_kind_choices()
+        self._update_counter_accounts()
         self._update_state()
 
     def _create_ui(self) -> None:
@@ -186,10 +244,26 @@ class VatBookingWidget(QWidget):
             self._normalize_booking_date
         )
 
+        self._service_date = QLineEdit(
+            date.today().strftime("%d.%m.%Y")
+        )
+        self._service_date.setMaximumWidth(160)
+        self._service_date.editingFinished.connect(
+            self._normalize_service_date
+        )
+
         self._voucher_no = QLineEdit()
         self._voucher_no.setMaximumWidth(240)
 
         self._description = QLineEdit()
+
+        self._payment_kind_box = QComboBox()
+        self._payment_kind_box.addItems(
+            (
+                _RECEIVABLE_PAYMENT,
+                _IMMEDIATE_PAYMENT,
+            )
+        )
 
         self._counter_account = self._create_account_box()
 
@@ -202,6 +276,10 @@ class VatBookingWidget(QWidget):
             self._booking_date,
         )
         form.addRow(
+            "Leistungsdatum",
+            self._service_date,
+        )
+        form.addRow(
             "Belegnummer",
             self._voucher_no,
         )
@@ -210,10 +288,13 @@ class VatBookingWidget(QWidget):
             self._description,
         )
         form.addRow(
+            "Zahlungsweise",
+            self._payment_kind_box,
+        )
+        form.addRow(
             "Gegenkonto",
             self._counter_account,
         )
-
         layout.addSpacing(12)
 
         title = QLabel("Rechnungspositionen")
@@ -281,9 +362,12 @@ class VatBookingWidget(QWidget):
         layout.addWidget(self._status)
 
         self._invoice_type_box.currentTextChanged.connect(
-            self._update_state
+            self._invoice_type_changed
         )
         self._booking_date.textChanged.connect(
+            self._update_state
+        )
+        self._service_date.textChanged.connect(
             self._update_state
         )
         self._description.textChanged.connect(
@@ -292,6 +376,62 @@ class VatBookingWidget(QWidget):
         self._counter_account.currentTextChanged.connect(
             self._update_state
         )
+        self._payment_kind_box.currentTextChanged.connect(
+            self._counter_account_filter_changed
+        )
+
+    def _update_payment_kind_choices(self) -> None:
+        invoice_type = self._invoice_type_box.currentText()
+
+        current_text = self._payment_kind_box.currentText()
+
+        if invoice_type in (
+            _INPUT_INVOICE,
+            _CUSTOMER_CREDIT_NOTE,
+        ):
+            invoice_payment_text = _PAYABLE_PAYMENT
+        else:
+            invoice_payment_text = _RECEIVABLE_PAYMENT
+
+        self._payment_kind_box.blockSignals(True)
+
+        self._payment_kind_box.clear()
+        self._payment_kind_box.addItems(
+            (
+                invoice_payment_text,
+                _IMMEDIATE_PAYMENT,
+            )
+        )
+
+        if current_text == _IMMEDIATE_PAYMENT:
+            self._payment_kind_box.setCurrentText(
+                _IMMEDIATE_PAYMENT
+            )
+
+        self._payment_kind_box.blockSignals(False)
+
+    def _counter_account_filter_changed(
+        self,
+    ) -> None:
+        self._update_counter_accounts()
+        self._update_state()
+
+
+    def set_vat_configuration(
+        self,
+        configuration: VatConfiguration,
+    ) -> None:
+        """Aktualisiert die umsatzsteuerliche Mandantenkonfiguration."""
+
+        self._vat_configuration = configuration
+
+        for row in self._position_rows:
+            row.set_small_business(
+                configuration.is_small_business
+            )
+
+        self._update_state()
+
 
     def _create_account_box(self) -> QComboBox:
         box = QComboBox()
@@ -359,6 +499,7 @@ class VatBookingWidget(QWidget):
             self._description,
             self._counter_account,
             self._add_position_button,
+            self._payment_kind_box,
         ):
             widget.setEnabled(enabled)
 
@@ -376,6 +517,83 @@ class VatBookingWidget(QWidget):
             )
 
         self._update_state()
+
+    def _allowed_counter_account_roles(
+        self,
+    ) -> tuple[AccountRole, ...]:
+        invoice_type = self._invoice_type_box.currentText()
+
+        if (
+            self._payment_kind_box.currentText()
+            == _IMMEDIATE_PAYMENT
+        ):
+            return (
+                AccountRole.BANK,
+                AccountRole.CASH,
+            )
+
+        if invoice_type in (
+            _INPUT_INVOICE,
+            _CUSTOMER_CREDIT_NOTE,
+        ):
+            return (AccountRole.PAYABLE,)
+
+        return (AccountRole.RECEIVABLE,)
+
+    def _invoice_type_changed(self) -> None:
+        is_output_invoice = (
+            self._invoice_type_box.currentText()
+            == _OUTPUT_INVOICE
+        )
+
+        self._service_date.setEnabled(
+            is_output_invoice
+        )
+
+        self._update_payment_kind_choices()
+        self._update_counter_accounts()
+        self._update_state()
+    def _update_counter_accounts(self) -> None:
+        current_account = self._resolve_account(
+            self._counter_account.currentText()
+        )
+
+        allowed_roles = (
+            self._allowed_counter_account_roles()
+        )
+
+        if allowed_roles is None:
+            accounts = self._accounts
+        else:
+            accounts = tuple(
+                account
+                for account in self._accounts
+                if account.account_role in allowed_roles
+            )
+
+        self._counter_account.blockSignals(True)
+
+        self._counter_account.clear()
+        self._counter_account.addItems(
+            tuple(
+                self._account_display_name(account)
+                for account in accounts
+            )
+        )
+
+        if (
+            current_account is not None
+            and current_account in accounts
+        ):
+            self._counter_account.setCurrentText(
+                self._account_display_name(
+                    current_account
+                )
+            )
+        else:
+            self._counter_account.setCurrentIndex(-1)
+
+        self._counter_account.blockSignals(False)
 
     def _update_state(self) -> None:
         valid = self._enabled
@@ -398,6 +616,17 @@ class VatBookingWidget(QWidget):
             valid = False
 
         invoice_type = self._invoice_type_box.currentText()
+
+        allowed_roles = (
+            self._allowed_counter_account_roles()
+        )
+
+        if (
+            counter_account is not None
+            and counter_account.account_role
+            not in allowed_roles
+        ):
+            valid = False
 
         for row in self._position_rows:
             account = self._resolve_account(
@@ -457,11 +686,24 @@ class VatBookingWidget(QWidget):
         if counter_account is None:
             return
 
+        allowed_roles = (
+            self._allowed_counter_account_roles()
+        )
+
+        if (
+            allowed_roles is not None
+            and counter_account.account_role
+            not in allowed_roles
+        ):
+            return
+
         try:
             booking_date = self._parse_booking_date(
                 self._booking_date.text()
             )
-
+            service_date = self._parse_booking_date(
+                self._service_date.text()
+            )
             items = tuple(
                 VatBookingItem(
                     account_number=account.number,
@@ -490,6 +732,9 @@ class VatBookingWidget(QWidget):
         self._booking_date.setText(
             booking_date.strftime("%d.%m.%Y")
         )
+        self._service_date.setText(
+            service_date.strftime("%d.%m.%Y")
+        )
 
         voucher_no = (
             self._voucher_no.text().strip()
@@ -515,11 +760,13 @@ class VatBookingWidget(QWidget):
                     ),
                     items=items,
                     vat_accounts=self._vat_accounts,
+                    vat_configuration=(
+                        self._vat_configuration
+                    ),
                     voucher_no=voucher_no,
                     description=description,
                 )
             )
-
         elif invoice_type == _OUTPUT_INVOICE:
             booking = (
                 self._vat_booking_service
@@ -530,6 +777,9 @@ class VatBookingWidget(QWidget):
                     ),
                     items=items,
                     vat_accounts=self._vat_accounts,
+                    vat_configuration=(
+                        self._vat_configuration
+                    ),
                     voucher_no=voucher_no,
                     description=description,
                 )
@@ -545,6 +795,9 @@ class VatBookingWidget(QWidget):
                     ),
                     items=items,
                     vat_accounts=self._vat_accounts,
+                    vat_configuration=(
+                        self._vat_configuration
+                    ),
                     voucher_no=voucher_no,
                     description=description,
                 )
@@ -560,6 +813,9 @@ class VatBookingWidget(QWidget):
                     ),
                     items=items,
                     vat_accounts=self._vat_accounts,
+                    vat_configuration=(
+                        self._vat_configuration
+                    ),
                     voucher_no=voucher_no,
                     description=description,
                 )
@@ -568,7 +824,60 @@ class VatBookingWidget(QWidget):
         else:
             return
 
-        self._on_booking_created(booking)
+        if invoice_type in (
+            _OUTPUT_INVOICE,
+            _CUSTOMER_CREDIT_NOTE,
+        ):
+            direction = VatBookingDirection.OUTPUT
+        else:
+            direction = VatBookingDirection.INPUT
+
+        booking_details = (
+            self._vat_booking_service.build_booking_details(
+                booking_id=booking.booking_id,
+                items=items,
+                vat_configuration=self._vat_configuration,
+                direction=direction,
+                is_credit_note=invoice_type
+                in (
+                    _CUSTOMER_CREDIT_NOTE,
+                    _SUPPLIER_CREDIT_NOTE,
+                ),
+            )
+        )
+
+
+        if invoice_type == _OUTPUT_INVOICE:
+            gross_amount = sum(
+                (
+                    item.gross_amount
+                    for item in items
+                ),
+                Decimal("0.00"),
+            )
+
+            payment_kind = (
+                VatPaymentKind.IMMEDIATE
+                if (
+                    self._payment_kind_box.currentText()
+                    == _IMMEDIATE_PAYMENT
+                )
+                else VatPaymentKind.RECEIVABLE
+            )
+
+            self._on_vat_revenue_created(
+                booking,
+                booking_details,
+                gross_amount,
+                VatRevenueKind.NORMAL,
+                payment_kind,
+                service_date,
+            )
+        else:
+            self._on_vat_booking_created(
+                booking,
+                booking_details,
+            )
 
         self._clear()
 
@@ -686,10 +995,20 @@ class VatBookingWidget(QWidget):
 
         self._booking_date.setText(normalized)
 
-    def set_vat_accounts(
-    self,
-    vat_accounts: VatAccounts,
-) -> None:
-        """Aktualisiert die verwendeten Umsatzsteuerkonten."""
+    def _normalize_service_date(self) -> None:
+        try:
+            normalized = normalize_german_date(
+                self._service_date.text()
+            )
+        except ValueError:
+            return
 
-        self._vat_accounts = vat_accounts
+        self._service_date.setText(normalized)
+
+    def set_vat_accounts(
+        self,
+        vat_accounts: VatAccounts,
+    ) -> None:
+            """Aktualisiert die verwendeten Umsatzsteuerkonten."""
+
+            self._vat_accounts = vat_accounts

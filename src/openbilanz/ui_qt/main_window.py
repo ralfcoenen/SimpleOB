@@ -1,9 +1,11 @@
 """Hauptfenster der experimentellen PySide6-Oberfläche."""
 
 from collections.abc import Callable
+from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
+from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QDialog,
     QFileDialog,
@@ -25,6 +27,15 @@ from openbilanz.domain.fixed_asset_status import (
     FixedAssetStatus,
 )
 from openbilanz.domain.money import ZERO
+from openbilanz.domain.vat_booking_detail import (
+    VatBookingDetail,
+)
+from openbilanz.domain.vat_configuration import VatConfiguration
+from openbilanz.domain.vat_payment_kind import VatPaymentKind
+from openbilanz.domain.vat_revenue_kind import VatRevenueKind
+from openbilanz.reporting.vat_advance_return import (
+    VatAdvanceReturn,
+)
 from openbilanz.services.pdf_reporting_service import (
     PdfReportingService,
 )
@@ -45,6 +56,9 @@ from openbilanz.ui_qt.balance_sheet_page import BalanceSheetPage
 from openbilanz.ui_qt.booking_page import BookingPage
 from openbilanz.ui_qt.closing_page import (
     ClosingPage,
+)
+from openbilanz.ui_qt.company_master_data_dialog import (
+    CompanyMasterDataDialog,
 )
 from openbilanz.ui_qt.fixed_asset_acquisition_link_dialog import (
     AcquisitionBookingCandidate,
@@ -77,6 +91,9 @@ from openbilanz.ui_qt.new_fixed_asset_dialog import (
 from openbilanz.ui_qt.reports_page import ReportsPage
 from openbilanz.ui_qt.trial_balance_report_page import (
     TrialBalanceReportPage,
+)
+from openbilanz.ui_qt.vat_advance_return_page import (
+    VatAdvanceReturnPage,
 )
 
 
@@ -129,6 +146,8 @@ class MainWindow(QMainWindow):
 
         self._create_tabs()
 
+        self._create_menu()
+
     def _create_tabs(self) -> None:
         """Erzeugt die Hauptarbeitsbereiche."""
 
@@ -172,6 +191,10 @@ class MainWindow(QMainWindow):
                 self._workspace_context.workspace.vat_configuration
             ),
             on_booking_created=self._post_booking,
+            on_vat_booking_created=self._post_vat_booking,
+            on_vat_revenue_created=(
+                self._post_vat_revenue_booking
+            ),
             enabled=self._workspace_context.workspace.is_open,
         )
 
@@ -318,6 +341,28 @@ class MainWindow(QMainWindow):
             )
         )
 
+        self._vat_advance_return_page = (
+            VatAdvanceReturnPage(
+                fiscal_year_start=(
+                    self._workspace_context
+                    .workspace
+                    .context
+                    .fiscal_year
+                    .start_date
+                ),
+                fiscal_year_end=(
+                    self._workspace_context
+                    .workspace
+                    .context
+                    .fiscal_year
+                    .end_date
+                ),
+                build_report=(
+                    self._build_vat_advance_return
+                ),
+            )
+        )
+
         self._reports_page = ReportsPage(
             trial_balance_page=(
                 self._trial_balance_report_page
@@ -330,6 +375,9 @@ class MainWindow(QMainWindow):
             ),
             fixed_asset_report_page=(
                 self._fixed_asset_report_page
+            ),
+            vat_advance_return_page=(
+                self._vat_advance_return_page
             ),
         )
 
@@ -362,6 +410,77 @@ class MainWindow(QMainWindow):
             QWidget(),
             "E-Bilanz",
         )
+
+    def _create_menu(self) -> None:
+        """Erzeugt das Anwendungsmenü."""
+
+        company_menu = self.menuBar().addMenu(
+            "Unternehmen"
+        )
+
+        master_data_action = QAction(
+            "Unternehmensstammdaten…",
+            self,
+        )
+        master_data_action.triggered.connect(
+            self._open_company_master_data
+        )
+
+        company_menu.addAction(
+            master_data_action
+        )
+
+    def _open_company_master_data(self) -> None:
+        """Öffnet die Unternehmensstammdaten."""
+
+        workspace = self._workspace_context.workspace
+
+        try:
+            master_data = (
+                workspace.load_company_master_data()
+            )
+
+        except (TypeError, ValueError) as exc:
+            QMessageBox.critical(
+                self,
+                "Unternehmensstammdaten",
+                str(exc),
+            )
+            return
+
+        dialog = CompanyMasterDataDialog(
+            master_data=master_data,
+            vat_configuration=(
+                workspace.vat_configuration
+            ),
+            parent=self,
+        )
+
+        if not dialog.exec():
+            return
+
+        if dialog.result is None:
+            return
+
+        try:
+            workspace.save_company_master_data(
+                dialog.result.master_data
+            )
+
+            workspace.save_vat_configuration(
+                dialog.result.vat_configuration
+            )
+
+            self._booking_page.set_vat_configuration(
+                dialog.result.vat_configuration
+            )
+
+        except (TypeError, ValueError) as exc:
+            QMessageBox.critical(
+                self,
+                "Unternehmensstammdaten",
+                str(exc),
+            )
 
     def _open_new_account(self) -> None:
         workspace = self._workspace_context.workspace
@@ -526,6 +645,16 @@ class MainWindow(QMainWindow):
             self,
             "Konto geändert",
             "Das Konto wurde gespeichert.",
+        )
+
+    def set_vat_configuration(
+        self,
+        configuration: VatConfiguration,
+    ) -> None:
+        """Aktualisiert die umsatzsteuerliche Behandlung."""
+
+        self._vat_booking.set_vat_configuration(
+            configuration
         )
 
     def _export_fixed_asset_report_pdf(
@@ -949,6 +1078,11 @@ class MainWindow(QMainWindow):
 
         workspace.post_booking(booking)
 
+        self._refresh_after_booking()
+
+    def _refresh_after_booking(self) -> None:
+        """Aktualisiert die von Buchungen abhängigen Qt-Anzeigen."""
+
         self._journal_page.model.replace_rows(
             self._build_journal_rows()
         )
@@ -973,6 +1107,52 @@ class MainWindow(QMainWindow):
         )
 
         self._journal_report_page.refresh_report()
+
+    def _post_vat_booking(
+        self,
+        booking: Booking,
+        booking_details: tuple[VatBookingDetail, ...],
+    ) -> None:
+        """Verbucht eine USt-Buchung mit ihren Detaildaten."""
+
+        workspace = self._workspace_context.workspace
+
+        if workspace.is_closed:
+            return
+
+        workspace.post_vat_booking(
+            booking=booking,
+            booking_details=booking_details,
+        )
+
+        self._refresh_after_booking()
+
+    def _post_vat_revenue_booking(
+        self,
+        booking: Booking,
+        booking_details: tuple[VatBookingDetail, ...],
+        gross_amount: Decimal,
+        revenue_kind: VatRevenueKind,
+        payment_kind: VatPaymentKind,
+        service_date: date,
+    ) -> None:
+        """Verbucht eine Ausgangsrechnung mit USt-Umsatzdaten."""
+
+        workspace = self._workspace_context.workspace
+
+        if workspace.is_closed:
+            return
+
+        workspace.post_vat_revenue_booking(
+            booking=booking,
+            booking_details=booking_details,
+            gross_amount=gross_amount,
+            revenue_kind=revenue_kind,
+            payment_kind=payment_kind,
+            service_date=service_date,
+        )
+
+        self._refresh_after_booking()
 
     def _return_to_start(self) -> None:
         """Schließt das Hauptfenster und kehrt zur Auswahl zurück."""
@@ -1921,6 +2101,22 @@ class MainWindow(QMainWindow):
         return workspace.build_journal_report(
             start_date=start_date,
             end_date=end_date,
+        )
+
+    def _build_vat_advance_return(
+        self,
+        start_date: date,
+        end_date: date,
+    ) -> VatAdvanceReturn:
+        """Erzeugt die USt-VA-Auswertung für den gewählten Zeitraum."""
+
+        return (
+            self._workspace_context
+            .workspace
+            .build_vat_advance_return(
+                start_date=start_date,
+                end_date=end_date,
+            )
         )
 
     def _account_names(

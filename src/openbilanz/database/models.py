@@ -175,6 +175,11 @@ class Konto(Base):
         default=True,
     )
 
+    account_role: Mapped[str | None] = mapped_column(
+        String,
+        nullable=True,
+    )
+
     debit_position_code: Mapped[str | None] = mapped_column(
         String,
         nullable=True,
@@ -272,6 +277,11 @@ class UmsatzsteuerKonfiguration(Base):
     )
 
     taxation_type: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    taxation_method: Mapped[str] = mapped_column(
         String,
         nullable=False,
     )
@@ -439,6 +449,138 @@ class Buchungszeile(Base):
     buchung: Mapped[Buchung] = relationship(
         back_populates="zeilen",
     )
+
+class UmsatzsteuerBuchungsdetail(Base):
+    """Persistiertes USt-Detail einer Buchungsposition."""
+
+    __tablename__ = "umsatzsteuer_buchungsdetail"
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+    )
+
+    buchung_id: Mapped[int] = mapped_column(
+        ForeignKey("buchungen.id"),
+        nullable=False,
+    )
+
+    account_number: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    net_amount: Mapped[Decimal] = mapped_column(
+        Numeric(18, 2),
+        nullable=False,
+    )
+
+    tax_amount: Mapped[Decimal] = mapped_column(
+        Numeric(18, 2),
+        nullable=False,
+    )
+
+    tax_rate: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+    )
+
+    direction: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    buchung: Mapped[Buchung] = relationship()
+
+class UmsatzsteuerAusgangsumsatz(Base):
+    """Persistierter Ausgangsumsatz für die USt-Auswertung."""
+
+    __tablename__ = "umsatzsteuer_ausgangsumsatz"
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+    )
+
+    revenue_id: Mapped[str] = mapped_column(
+        String(36),
+        unique=True,
+        nullable=False,
+    )
+
+    buchung_id: Mapped[int] = mapped_column(
+        ForeignKey("buchungen.id"),
+        unique=True,
+        nullable=False,
+    )
+
+    gross_amount: Mapped[Decimal] = mapped_column(
+        Numeric(18, 2),
+        nullable=False,
+    )
+
+    revenue_kind: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    payment_kind: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    service_date: Mapped[date] = mapped_column(
+        Date,
+        nullable=False,
+    )
+
+    buchung: Mapped[Buchung] = relationship()
+
+    zahlungszuordnungen: Mapped[
+        list["UmsatzsteuerZahlungszuordnung"]
+    ] = relationship(
+        back_populates="ausgangsumsatz",
+        cascade="all, delete-orphan",
+    )
+
+class UmsatzsteuerZahlungszuordnung(Base):
+    """Zuordnung einer Zahlung zu einem Ausgangsumsatz."""
+
+    __tablename__ = "umsatzsteuer_zahlungszuordnung"
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+    )
+
+    allocation_id: Mapped[str] = mapped_column(
+        String(36),
+        unique=True,
+        nullable=False,
+    )
+
+    ausgangsumsatz_id: Mapped[int] = mapped_column(
+        ForeignKey("umsatzsteuer_ausgangsumsatz.id"),
+        nullable=False,
+    )
+
+    zahlungsbuchung_id: Mapped[int] = mapped_column(
+        ForeignKey("buchungen.id"),
+        nullable=False,
+    )
+
+    amount: Mapped[Decimal] = mapped_column(
+        Numeric(18, 2),
+        nullable=False,
+    )
+
+    ausgangsumsatz: Mapped[
+        UmsatzsteuerAusgangsumsatz
+    ] = relationship(
+        back_populates="zahlungszuordnungen",
+    )
+
+    zahlungsbuchung: Mapped[Buchung] = relationship()
 
 class Anlagegut(Base):
     """Persistiertes Anlagegut."""

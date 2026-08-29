@@ -17,6 +17,9 @@ from openbilanz.domain.company import Company
 from openbilanz.domain.vat_configuration import (
     VatConfiguration,
 )
+from openbilanz.domain.vat_taxation_method import (
+    VatTaxationMethod,
+)
 from openbilanz.domain.vat_taxation_type import (
     VatTaxationType,
 )
@@ -40,8 +43,9 @@ def test_saves_and_loads_vat_configuration() -> None:
     )
 
     configuration = VatConfiguration(
-        taxation_type=VatTaxationType.SMALL_BUSINESS,
+        taxation_type=VatTaxationType.STANDARD,
         effective_from=date(2027, 1, 1),
+        taxation_method=VatTaxationMethod.RECEIVED,
     )
 
     with Session() as session:

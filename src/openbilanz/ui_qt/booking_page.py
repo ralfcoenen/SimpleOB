@@ -1,6 +1,8 @@
 """Buchungserfassung der PySide6-Oberfläche."""
 
 from collections.abc import Callable
+from datetime import date
+from decimal import Decimal
 
 from PySide6.QtWidgets import (
     QComboBox,
@@ -13,9 +15,14 @@ from PySide6.QtWidgets import (
 from openbilanz.domain.account import Account
 from openbilanz.domain.booking import Booking
 from openbilanz.domain.vat_accounts import VatAccounts
+from openbilanz.domain.vat_booking_detail import (
+    VatBookingDetail,
+)
 from openbilanz.domain.vat_configuration import (
     VatConfiguration,
 )
+from openbilanz.domain.vat_payment_kind import VatPaymentKind
+from openbilanz.domain.vat_revenue_kind import VatRevenueKind
 from openbilanz.ui_qt.simple_booking_widget import (
     SimpleBookingWidget,
 )
@@ -34,6 +41,21 @@ class BookingPage(QWidget):
         vat_accounts: VatAccounts,
         vat_configuration: VatConfiguration,
         on_booking_created: Callable[[Booking], None],
+        on_vat_booking_created: Callable[
+            [Booking, tuple[VatBookingDetail, ...]],
+            None,
+        ],
+        on_vat_revenue_created: Callable[
+            [
+                Booking,
+                tuple[VatBookingDetail, ...],
+                Decimal,
+                VatRevenueKind,
+                VatPaymentKind,
+                date,
+            ],
+            None,
+        ],
         enabled: bool,
     ) -> None:
         super().__init__()
@@ -69,7 +91,12 @@ class BookingPage(QWidget):
             accounts=accounts,
             vat_accounts=vat_accounts,
             vat_configuration=vat_configuration,
-            on_booking_created=on_booking_created,
+            on_vat_booking_created=(
+                on_vat_booking_created
+            ),
+            on_vat_revenue_created=(
+                on_vat_revenue_created
+            ),
         )
 
         self._stack.addWidget(
@@ -87,6 +114,16 @@ class BookingPage(QWidget):
         )
 
         self.set_enabled(enabled)
+
+    def set_vat_configuration(
+        self,
+        configuration: VatConfiguration,
+    ) -> None:
+        """Aktualisiert die umsatzsteuerliche Behandlung."""
+
+        self._vat_booking.set_vat_configuration(
+            configuration
+        )
 
     def set_enabled(
         self,

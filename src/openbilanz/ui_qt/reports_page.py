@@ -18,6 +18,9 @@ from openbilanz.ui_qt.journal_report_page import (
 from openbilanz.ui_qt.trial_balance_report_page import (
     TrialBalanceReportPage,
 )
+from openbilanz.ui_qt.vat_advance_return_page import (
+    VatAdvanceReturnPage,
+)
 
 
 class ReportsPage(QWidget):
@@ -30,6 +33,7 @@ class ReportsPage(QWidget):
         account_activity_page: AccountActivityReportPage,
         journal_report_page: JournalReportPage,
         fixed_asset_report_page: FixedAssetReportPage,
+        vat_advance_return_page: VatAdvanceReturnPage,
     ) -> None:
         super().__init__()
 
@@ -55,6 +59,11 @@ class ReportsPage(QWidget):
         self._tabs.addTab(
             fixed_asset_report_page,
             "Anlagen",
+        )
+
+        self._tabs.addTab(
+            vat_advance_return_page,
+            "USt-VA",
         )
 
         layout.addWidget(self._tabs)

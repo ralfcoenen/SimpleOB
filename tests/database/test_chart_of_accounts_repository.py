@@ -23,6 +23,7 @@ from openbilanz.domain.account import Account
 from openbilanz.domain.account_mapping_rule import (
     AccountMappingRule,
 )
+from openbilanz.domain.account_role import AccountRole
 from openbilanz.domain.account_type import AccountType
 from openbilanz.domain.accounting_control_accounts import (
     AccountingControlAccounts,
@@ -111,13 +112,13 @@ def test_saves_and_loads_chart_of_accounts() -> None:
     accounts = (
         Account(
             template=bank_template,
+            account_role=AccountRole.BANK,
         ),
         Account(
             template=revenue_template,
             is_active=False,
         ),
     )
-
     company = Company(
         company_id=uuid4(),
         name="Muster UG",
@@ -172,6 +173,14 @@ def test_saves_and_loads_chart_of_accounts() -> None:
     ) == (
         True,
         False,
+    )
+
+    assert tuple(
+        account.account_role
+        for account in loaded_accounts
+    ) == (
+        AccountRole.BANK,
+        None,
     )
 
     mapping_by_number = {

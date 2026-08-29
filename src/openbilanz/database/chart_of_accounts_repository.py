@@ -16,6 +16,7 @@ from openbilanz.domain.account import Account
 from openbilanz.domain.account_mapping_rule import (
     AccountMappingRule,
 )
+from openbilanz.domain.account_role import AccountRole
 from openbilanz.domain.account_type import AccountType
 from openbilanz.domain.accounting_control_accounts import (
     AccountingControlAccounts,
@@ -148,6 +149,11 @@ class ChartOfAccountsRepository:
                     template_account.account_type.name
                 ),
                 is_active=account.is_active,
+                account_role=(
+                    account.account_role.value
+                    if account.account_role is not None
+                    else None
+                ),
                 debit_position_code=(
                     rule.debit_position.code
                     if (
@@ -244,6 +250,11 @@ class ChartOfAccountsRepository:
             name=account.name,
             account_type=account.account_type.name,
             is_active=account.is_active,
+            account_role=(
+                account.account_role.value
+                if account.account_role is not None
+                else None
+            ),
             debit_position_code=(
                 mapping_rule.debit_position.code
                 if (
@@ -339,7 +350,11 @@ class ChartOfAccountsRepository:
         model.name = account.name
         model.account_type = account.account_type.name
         model.is_active = account.is_active
-
+        model.account_role = (
+            account.account_role.value
+            if account.account_role is not None
+            else None
+        )
         model.debit_position_code = (
             mapping_rule.debit_position.code
             if (
@@ -424,6 +439,18 @@ class ChartOfAccountsRepository:
                     f"Kontotyp: {model.account_type!r}"
                 ) from exc
 
+            try:
+                account_role = (
+                    AccountRole(model.account_role)
+                    if model.account_role is not None
+                    else None
+                )
+            except ValueError as exc:
+                raise ValueError(
+                    "Unbekannte gespeicherte "
+                    f"Kontenrolle: {model.account_role!r}"
+                ) from exc
+
             template_account = TemplateAccount(
                 account_number=model.account_number,
                 name=model.name,
@@ -438,6 +465,7 @@ class ChartOfAccountsRepository:
                 Account(
                     template=template_account,
                     is_active=model.is_active,
+                    account_role=account_role,
                 )
             )
 
