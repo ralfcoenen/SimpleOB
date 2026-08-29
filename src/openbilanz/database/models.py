@@ -410,6 +410,43 @@ class Buchung(Base):
         order_by="Buchungszeile.position",
     )
 
+class UmsatzsteuerEingangsrechnung(Base):
+    """Zeitliche Zuordnung einer Eingangsrechnung für den Vorsteuerabzug."""
+
+    __tablename__ = "umsatzsteuer_eingangsrechnungen"
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+    )
+
+    timing_id: Mapped[str] = mapped_column(
+        String(36),
+        unique=True,
+        nullable=False,
+    )
+
+    buchung_id: Mapped[int] = mapped_column(
+        ForeignKey(
+            "buchungen.id",
+            ondelete="CASCADE",
+        ),
+        unique=True,
+        nullable=False,
+    )
+
+    service_date: Mapped[date] = mapped_column(
+        Date,
+        nullable=False,
+    )
+
+    invoice_received_date: Mapped[date] = mapped_column(
+        Date,
+        nullable=False,
+    )
+
+    buchung: Mapped[Buchung] = relationship()
+
 
 class Buchungszeile(Base):
     """Persistierte Zeile einer Buchung."""
