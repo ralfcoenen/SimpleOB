@@ -1,4 +1,6 @@
 """Anwendungsservice zur Erzeugung einer E-Bilanz."""
+
+import os
 from collections.abc import Mapping
 from decimal import Decimal
 from pathlib import Path
@@ -115,7 +117,7 @@ class EBilanzService:
             gaap_ci_entry_point.namespace
             .removesuffix("/shell-fiscal")
         )
-        
+
         builder = EBilanzBuilder(
             gcd_model=gcd_model,
             gaap_ci_model=gaap_ci_model,
@@ -138,7 +140,6 @@ class EBilanzService:
             identifiers=mapping.identifiers,
             account_details=account_details,
         )
-
 
     def validate(
         self,
@@ -186,23 +187,51 @@ class EBilanzService:
             gaap_ci_path
         )
 
-        validation_xml = document.xml
-
-        validation_xml = validation_xml.replace(
-            gcd_entry_point.schema_ref_uri,
-            gcd_path.resolve().as_uri(),
-        )
-
-        validation_xml = validation_xml.replace(
-            gaap_ci_entry_point.schema_ref_uri,
-            gaap_ci_path.resolve().as_uri(),
+        taxonomy_root = Path(
+            os.path.commonpath(
+                (
+                    gcd_path.parent,
+                    gaap_ci_path.parent,
+                )
+            )
         )
 
         with TemporaryDirectory(
-            prefix="openbilanz-e-bilanz-"
+            prefix="openbilanz-e-bilanz-",
+            dir=taxonomy_root,
         ) as temporary_directory:
+            temporary_directory_path = Path(
+                temporary_directory
+            )
+
+            gcd_relative_path = Path(
+                os.path.relpath(
+                    gcd_path,
+                    temporary_directory_path,
+                )
+            ).as_posix()
+
+            gaap_ci_relative_path = Path(
+                os.path.relpath(
+                    gaap_ci_path,
+                    temporary_directory_path,
+                )
+            ).as_posix()
+
+            validation_xml = document.xml
+
+            validation_xml = validation_xml.replace(
+                gcd_entry_point.schema_ref_uri,
+                gcd_relative_path,
+            )
+
+            validation_xml = validation_xml.replace(
+                gaap_ci_entry_point.schema_ref_uri,
+                gaap_ci_relative_path,
+            )
+
             instance_path = (
-                Path(temporary_directory)
+                temporary_directory_path
                 / "openbilanz-e-bilanz.xbrl"
             )
 

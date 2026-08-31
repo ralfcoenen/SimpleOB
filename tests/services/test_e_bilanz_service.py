@@ -290,17 +290,40 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
         == "5123045678901"
     )
     
-def test_e_bilanz_service_validates_document_with_local_schema_refs(
+def test_e_bilanz_service_validates_document_with_relative_schema_refs(
     tmp_path: Path,
-) -> None:
-    """Für die Offline-Validierung werden lokale schemaRefs verwendet."""
+    ) -> None:
+    """Für die Offline-Validierung werden relative schemaRefs verwendet."""
+
+    taxonomy_root = (
+        tmp_path
+        / "taxonomy root with spaces"
+        / "6.9"
+    )
+
+    gcd_directory = (
+        taxonomy_root
+        / "de-gcd-2025-04-01"
+    )
+    gaap_ci_directory = (
+        taxonomy_root
+        / "de-gaap-ci-2025-04-01"
+    )
+
+    gcd_directory.mkdir(
+        parents=True
+    )
+    gaap_ci_directory.mkdir(
+        parents=True
+    )
 
     gcd_path = (
-        tmp_path
+        gcd_directory
         / "de-gcd-2025-04-01-shell.xsd"
     )
+
     gaap_ci_path = (
-        tmp_path
+        gaap_ci_directory
         / "de-gaap-ci-2025-04-01-shell-fiscal.xsd"
     )
 
@@ -358,22 +381,28 @@ def test_e_bilanz_service_validates_document_with_local_schema_refs(
         end_date=date(2026, 12, 31),
     )
 
+    gcd_schema_ref_uri = (
+        "http://www.xbrl.de/taxonomies/"
+        "de-gcd-2025-04-01/"
+        "de-gcd-2025-04-01-shell.xsd"
+    )
+
+    gaap_ci_schema_ref_uri = (
+        "http://www.xbrl.de/taxonomies/"
+        "de-gaap-ci-2025-04-01/"
+        "de-gaap-ci-2025-04-01-shell-fiscal.xsd"
+    )
+
     original_xml = (
         '<?xml version="1.0" encoding="UTF-8"?>'
         '<xbrl xmlns:link="http://www.xbrl.org/2003/linkbase" '
         'xmlns:xlink="http://www.w3.org/1999/xlink">'
         '<link:schemaRef '
         'xlink:type="simple" '
-        'xlink:href="'
-        'http://www.xbrl.de/taxonomies/'
-        'de-gcd-2025-04-01/'
-        'de-gcd-2025-04-01-shell.xsd"/>'
+        f'xlink:href="{gcd_schema_ref_uri}"/>'
         '<link:schemaRef '
         'xlink:type="simple" '
-        'xlink:href="'
-        'http://www.xbrl.de/taxonomies/'
-        'de-gaap-ci-2025-04-01/'
-        'de-gaap-ci-2025-04-01-shell-fiscal.xsd"/>'
+        f'xlink:href="{gaap_ci_schema_ref_uri}"/>'
         "</xbrl>"
     )
 
@@ -393,28 +422,45 @@ def test_e_bilanz_service_validates_document_with_local_schema_refs(
     assert adapter.validated_path is not None
     assert adapter.validated_content is not None
 
-    assert gcd_path.as_uri() in (
-        adapter.validated_content
-    )
-
-    assert gaap_ci_path.as_uri() in (
-        adapter.validated_content
-    )
-
     assert (
-        "http://www.xbrl.de/taxonomies/"
-        "de-gcd-2025-04-01/"
+        adapter.validated_path.parent.parent
+        == taxonomy_root
+    )
+
+    gcd_relative_path = (
+        "../de-gcd-2025-04-01/"
         "de-gcd-2025-04-01-shell.xsd"
+    )
+
+    gaap_ci_relative_path = (
+        "../de-gaap-ci-2025-04-01/"
+        "de-gaap-ci-2025-04-01-shell-fiscal.xsd"
+    )
+
+    assert (
+        gcd_relative_path
+        in adapter.validated_content
+    )
+
+    assert (
+        gaap_ci_relative_path
+        in adapter.validated_content
+    )
+
+    assert (
+        gcd_schema_ref_uri
         not in adapter.validated_content
     )
 
     assert (
-        "http://www.xbrl.de/taxonomies/"
-        "de-gaap-ci-2025-04-01/"
-        "de-gaap-ci-2025-04-01-shell-fiscal.xsd"
+        gaap_ci_schema_ref_uri
         not in adapter.validated_content
     )
+
+    assert "file://" not in adapter.validated_content
+
+    assert str(tmp_path) not in adapter.validated_content
 
     # Das eigentliche Exportdokument bleibt unverändert.
     assert document.xml == original_xml
-    
+
