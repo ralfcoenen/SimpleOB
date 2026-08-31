@@ -72,8 +72,8 @@ from openbilanz.taxonomy.taxonomy import TaxonomyVersion
 from openbilanz.taxonomy.unit import TaxonomyUnit
 
 TAXONOMY_ROOT = Path(
-    "/tmp/openbilanz-taxonomy"
-)
+    "data/taxonomy"
+).resolve()
 
 DE_GAAP_CI_NAMESPACE = (
     "http://www.xbrl.de/taxonomies/"
@@ -142,7 +142,7 @@ def test_exported_xbrl_instance_is_validated_by_arelle(
     )
 
     unit = TaxonomyUnit.eur()
-    
+
 
     fact = TaxonomyFact(
         concept=concept,
@@ -167,7 +167,7 @@ def test_exported_xbrl_instance_is_validated_by_arelle(
         ),
     )
 
-    
+
     instance_path = (
         tmp_path
         / "openbilanz-test-instance.xbrl"
@@ -293,7 +293,7 @@ def test_exported_xbrl_instance_with_balance_sheet_and_income_statement(
                 entry_point,
             ),
         )
-        
+
         instance_path = (
             tmp_path
             / "openbilanz-balance-and-income.xbrl"
@@ -652,7 +652,7 @@ def test_combined_gcd_and_gaap_ci_instance_is_validated_by_arelle(
 
     assert result.is_valid
     assert result.errors == ()
-    
+
 def test_combined_69_instance_with_report_element_is_validated_by_arelle(
     tmp_path: Path,
 ) -> None:
@@ -761,7 +761,7 @@ def test_combined_69_instance_with_report_element_is_validated_by_arelle(
         )
 
         gcd_builder = GcdFactBuilder()
-        
+
         branch = gcd_builder.domestic_branch_of_foreign_company(
             branch_type=GcdDomesticBranchOfForeignCompanyType.HGB,
             taxonomy_model=gcd_model,
@@ -839,14 +839,14 @@ def test_combined_69_instance_with_report_element_is_validated_by_arelle(
         )
 
         profile = GcdReportProfile.standard()
-        
+
 
         profile_facts = gcd_builder.report_profile_facts(
             profile=profile,
             taxonomy_model=gcd_model,
             context=duration_context,
         )
-        
+
         report_element = gcd_builder.report_element(
             profile=profile,
             taxonomy_model=gcd_model,
@@ -889,8 +889,8 @@ def test_combined_69_instance_with_report_element_is_validated_by_arelle(
         )
 
         exporter = XbrlExporter()
-        
-        
+
+
 
         xml = exporter.export(
             contexts={
@@ -967,7 +967,7 @@ def test_combined_69_instance_with_report_element_is_validated_by_arelle(
             "genInfo.company.id.entityWithTaxablePurposeBusiness.normal"
             in xml
         )
-        
+
         instance_path = (
             tmp_path
             / "openbilanz-gcd-gaap-ci-69.xbrl"
@@ -1096,7 +1096,7 @@ def test_combined_610_instance_with_report_element_is_validated_by_arelle(
         )
 
         gcd_builder = GcdFactBuilder()
-        
+
         branch = gcd_builder.domestic_branch_of_foreign_company(
             branch_type=GcdDomesticBranchOfForeignCompanyType.HGB,
             taxonomy_model=gcd_model,
@@ -1112,7 +1112,7 @@ def test_combined_610_instance_with_report_element_is_validated_by_arelle(
                 context=duration_context,
             )
         )
-        
+
         shareholder_data = GcdShareholder(
             name="Mustermann",
             first_name="Max",
@@ -1168,7 +1168,7 @@ def test_combined_610_instance_with_report_element_is_validated_by_arelle(
         )
 
         profile = GcdReportProfile.standard()
-        
+
 
         profile_facts = gcd_builder.report_profile_facts(
             profile=profile,
@@ -1294,7 +1294,7 @@ def test_combined_610_instance_with_report_element_is_validated_by_arelle(
             "genInfo.company.id.entityWithTaxablePurposeBusiness.normal"
             in xml
         )
-        
+
         instance_path = (
             tmp_path
             / "openbilanz-gcd-gaap-ci-610.xbrl"
@@ -1314,7 +1314,7 @@ def test_combined_610_instance_with_report_element_is_validated_by_arelle(
 
     assert result.is_valid
     assert result.errors == ()
-    
+
 def test_gaap_ci_69_builds_facts_from_real_hgb_statement_pipeline(
     tmp_path: Path,
 ) -> None:

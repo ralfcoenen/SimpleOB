@@ -30,7 +30,7 @@ class StartDialog(tk.Toplevel):
         self.result: ApplicationContext | None = None
 
         self.title("OpenBilanz – Buchhaltung öffnen")
-        self.geometry("600x320")
+        self.geometry("800x320")
         self.resizable(False, False)
 
         self.transient(parent)
