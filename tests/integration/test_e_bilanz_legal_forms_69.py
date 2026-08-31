@@ -14,6 +14,9 @@ from openbilanz.domain.company import Company
 from openbilanz.domain.company_master_data import (
     CompanyMasterData,
 )
+from openbilanz.domain.e_bilanz_account_detail import (
+    EBilanzAccountDetail,
+)
 from openbilanz.domain.fiscal_year import FiscalYear
 from openbilanz.hgb.balance_sheet_structure import (
     create_hgb_balance_sheet_structure,
@@ -123,17 +126,36 @@ def test_e_bilanz_69_validates_supported_legal_forms(
         end_date=date(2026, 12, 31),
     )
 
+    cash_position = positions[
+        "HGB.266.AKTIVA.B.IV"
+    ]
+
+    capital_position = positions[
+        "HGB.266.PASSIVA.A.I"
+    ]
+
     amounts: dict[
         FinancialStatementPosition,
         Decimal,
     ] = {
-        positions[
-            "HGB.266.AKTIVA.B.IV"
-        ]: Decimal("10000.00"),
-        positions[
-            "HGB.266.PASSIVA.A.I"
-        ]: Decimal("10000.00"),
+        cash_position: Decimal("10000.00"),
+        capital_position: Decimal("10000.00"),
     }
+
+    account_details = (
+        EBilanzAccountDetail(
+            position=cash_position,
+            account_number="1200",
+            account_description="Bank",
+            balance=Decimal("10000.00"),
+        ),
+        EBilanzAccountDetail(
+            position=capital_position,
+            account_number="0800",
+            account_description="Gezeichnetes Kapital",
+            balance=Decimal("10000.00"),
+        ),
+    )
 
     resolver = TaxonomyResolver(
         root=TAXONOMY_ROOT
@@ -157,6 +179,7 @@ def test_e_bilanz_69_validates_supported_legal_forms(
             amounts=amounts,
             entity_identifier="DE123456789",
             entity_scheme=TEST_ENTITY_SCHEME,
+            account_details=account_details,
         )
 
         result = service.validate(
@@ -169,6 +192,11 @@ def test_e_bilanz_69_validates_supported_legal_forms(
 
     assert result.is_valid
     assert result.errors == ()
+
+    assert "1200" in document.xml
+    assert "Bank" in document.xml
+    assert "0800" in document.xml
+    assert "Gezeichnetes Kapital" in document.xml
 
     if legal_form == "UG (haftungsbeschränkt)":
         assert (

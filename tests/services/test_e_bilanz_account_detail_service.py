@@ -34,12 +34,13 @@ class StubAccountMapper:
 def _account(
     number: str,
     name: str,
+    account_type: AccountType = AccountType.ASSET,
 ) -> Account:
     return Account(
         template=TemplateAccount(
             account_number=number,
             name=name,
-            account_type=AccountType.ASSET,
+            account_type=account_type,
         )
     )
 
@@ -115,3 +116,99 @@ def test_rejects_missing_account_description() -> None:
         match="Keine Kontenbezeichnung für Konto 1800",
     ):
         service.build(ledger=ledger)
+
+
+def test_builds_e_bilanz_details_from_pre_and_post_closing_ledgers() -> None:
+    pre_closing_ledger = Ledger()
+    pre_closing_ledger.post(
+        "1200",
+        "8400",
+        Decimal("1000.00"),
+    )
+    pre_closing_ledger.post(
+        "4930",
+        "1200",
+        Decimal("200.00"),
+    )
+
+    closed_ledger = Ledger()
+    closed_ledger.post(
+        "1200",
+        "0800",
+        Decimal("800.00"),
+    )
+
+    mapper = StubAccountMapper(_position())
+
+    service = EBilanzAccountDetailService(
+        account_mapper=mapper,
+        accounts=(
+            _account(
+                "1200",
+                "Bank",
+                AccountType.ASSET,
+            ),
+            _account(
+                "0800",
+                "Gezeichnetes Kapital",
+                AccountType.EQUITY,
+            ),
+            _account(
+                "8400",
+                "Erlöse",
+                AccountType.REVENUE,
+            ),
+            _account(
+                "4930",
+                "Bürobedarf",
+                AccountType.EXPENSE,
+            ),
+        ),
+    )
+
+    details = service.build_for_e_bilanz(
+        pre_closing_ledger=pre_closing_ledger,
+        closed_ledger=closed_ledger,
+    )
+
+    details_by_account = {
+        detail.account_number: detail
+        for detail in details
+    }
+
+    assert set(details_by_account) == {
+        "0800",
+        "1200",
+        "4930",
+        "8400",
+    }
+
+    assert details_by_account["8400"].balance == Decimal(
+        "-1000.00"
+    )
+    assert details_by_account["4930"].balance == Decimal(
+        "200.00"
+    )
+    assert details_by_account["1200"].balance == Decimal(
+        "800.00"
+    )
+    assert details_by_account["0800"].balance == Decimal(
+        "-800.00"
+    )
+
+    assert (
+        details_by_account["8400"].account_description
+        == "Erlöse"
+    )
+    assert (
+        details_by_account["4930"].account_description
+        == "Bürobedarf"
+    )
+    assert (
+        details_by_account["1200"].account_description
+        == "Bank"
+    )
+    assert (
+        details_by_account["0800"].account_description
+        == "Gezeichnetes Kapital"
+    )
