@@ -61,6 +61,9 @@ from openbilanz.domain.fixed_asset_movement import (
 from openbilanz.domain.fixed_asset_movement_type import (
     FixedAssetMovementType,
 )
+from openbilanz.services.fixed_asset_schedule_service import (
+    FixedAssetScheduleService,
+)
 from openbilanz.domain.entry_side import EntrySide
 from openbilanz.reporting.account_activity_report import (
     AccountActivityReport,
@@ -140,6 +143,9 @@ class FiscalYearWorkspace:
         fixed_asset_movement_repository: (
             FixedAssetMovementRepository | None
         ) = None,
+        fixed_asset_schedule_service: (
+            FixedAssetScheduleService | None
+        ) = None,
     ) -> None:
         self._context = context
         self._booking_repository = booking_repository
@@ -171,6 +177,9 @@ class FiscalYearWorkspace:
         self._fixed_asset_depreciation_workflow = fixed_asset_depreciation_workflow
         self._fixed_asset_movement_repository = (
             fixed_asset_movement_repository
+        )
+        self._fixed_asset_schedule_service = (
+            fixed_asset_schedule_service
         )
 
         self.reload()
@@ -1123,6 +1132,23 @@ class FiscalYearWorkspace:
             closed_ledger=self._ledger,
         )
 
+        fixed_asset_schedule = ()
+
+        if self._fixed_asset_schedule_service is not None:
+            fixed_asset_schedule = (
+                self._fixed_asset_schedule_service.build(
+                    company_id=(
+                        self._context.company.company_id
+                    ),
+                    fiscal_year_start=(
+                        self._context.fiscal_year.start_date
+                    ),
+                    fiscal_year_end=(
+                        self._context.fiscal_year.end_date
+                    ),
+                )
+            )
+
         document = self._e_bilanz_service.build(
             master_data=master_data,
             fiscal_year=self._context.fiscal_year,
@@ -1131,6 +1157,7 @@ class FiscalYearWorkspace:
             entity_scheme=entity.scheme,
             previous_fiscal_year=(self.managed_fiscal_year.opening_source),
             account_details=account_details,
+            fixed_asset_schedule=fixed_asset_schedule,
         )
 
         self._validated_e_bilanz_document = None

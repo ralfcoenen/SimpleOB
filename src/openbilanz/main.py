@@ -26,6 +26,9 @@ from openbilanz.database.database import Database
 from openbilanz.database.fixed_asset_depreciation_repository import (
     FixedAssetDepreciationRepository,
 )
+from openbilanz.services.fixed_asset_schedule_service import (
+    FixedAssetScheduleService,
+)
 from openbilanz.database.fixed_asset_repository import (
     FixedAssetRepository,
 )
@@ -174,6 +177,20 @@ def main() -> None:
         fixed_asset_movement_repository = (
             FixedAssetMovementRepository(
                 session
+            )
+        )
+
+        fixed_asset_schedule_service = (
+            FixedAssetScheduleService(
+                fixed_asset_repository=(
+                    fixed_asset_repository
+                ),
+                fixed_asset_movement_repository=(
+                    fixed_asset_movement_repository
+                ),
+                fixed_asset_depreciation_repository=(
+                    fixed_asset_depreciation_repository
+                ),
             )
         )
 
@@ -452,6 +469,9 @@ def main() -> None:
                 ),
                 fixed_asset_movement_repository=(
                     fixed_asset_movement_repository
+                ),
+                fixed_asset_schedule_service=(
+                    fixed_asset_schedule_service
                 ),
                 depreciation_service=(
                     depreciation_service
