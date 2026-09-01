@@ -589,17 +589,13 @@ class VatBookingFrame(ttk.Frame):
 
             if account is not None:
                 if invoice_type in (
-                    _OUTPUT_INVOICE,
-                    _CUSTOMER_CREDIT_NOTE,
-                ):
-                    if account.account_type is not AccountType.REVENUE:
-                        valid = False
-
-                if invoice_type in (
                     _INPUT_INVOICE,
                     _SUPPLIER_CREDIT_NOTE,
                 ):
-                    if account.account_type is not AccountType.EXPENSE:
+                    if account.account_type not in (
+                        AccountType.EXPENSE,
+                        AccountType.ASSET,
+                    ):
                         valid = False
             try:
                 self._parse_amount(
