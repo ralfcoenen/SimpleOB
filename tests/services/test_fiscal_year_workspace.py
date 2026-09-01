@@ -45,6 +45,12 @@ from openbilanz.domain.fixed_asset_depreciation import (
 )
 from openbilanz.domain.journal import Journal
 from openbilanz.domain.managed_fiscal_year import ManagedFiscalYear
+from openbilanz.domain.fixed_asset_movement_type import (
+    FixedAssetMovementType,
+)
+from openbilanz.domain.fixed_asset_status import (
+    FixedAssetStatus,
+)
 from openbilanz.services.closing_result import ClosingResult
 from openbilanz.services.e_bilanz_export_service import (
     EBilanzExportService,
@@ -1478,3 +1484,269 @@ def test_updates_account_via_chart_of_accounts_repository(
         account=account,
         mapping_rule=mapping_rule,
     )
+
+def test_links_fixed_asset_disposal_to_existing_booking(
+    context: ApplicationContext,
+) -> None:
+    booking_repository = Mock()
+    company_repository = Mock()
+    fixed_asset_repository = Mock()
+    movement_repository = Mock()
+
+    booking_repository.list_for_fiscal_year.return_value = ()
+
+    company_repository.get_managed_fiscal_years.return_value = (
+        ManagedFiscalYear(
+            fiscal_year=context.fiscal_year,
+            status=FiscalYearStatus.OPEN,
+            opening_source=None,
+        ),
+    )
+
+    fixed_asset = FixedAsset(
+        company_id=context.company.company_id,
+        asset_code="A-0001",
+        description="Maschine",
+        position_code="HGB.266.AKTIVA.A.II.3",
+        asset_account_number="0400",
+        depreciation_expense_account_number="4830",
+        acquisition_date=date(2026, 1, 1),
+        acquisition_cost=Decimal("12000.00"),
+        depreciation_start_date=date(2026, 1, 1),
+        useful_life_months=120,
+    )
+
+    disposal_booking = Booking(
+        booking_date=date(2026, 8, 15),
+        description="Abgang Maschine",
+        lines=(
+            BookingLine(
+                account_number="4840",
+                side=EntrySide.DEBIT,
+                amount=Decimal("11200.00"),
+            ),
+            BookingLine(
+                account_number="0400",
+                side=EntrySide.CREDIT,
+                amount=Decimal("11200.00"),
+            ),
+        ),
+    )
+
+    acquisition_movement = Mock()
+    acquisition_movement.movement_type = (
+        FixedAssetMovementType.ACQUISITION
+    )
+
+    fixed_asset_repository.get.return_value = fixed_asset
+    booking_repository.get.return_value = disposal_booking
+
+    movement_repository.list_for_fixed_asset.return_value = (
+        acquisition_movement,
+    )
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=company_repository,
+        posting_service=Mock(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
+        e_bilanz_export_service=Mock(),
+        taxonomy_management_service=Mock(),
+        fixed_asset_repository=fixed_asset_repository,
+        fixed_asset_movement_repository=movement_repository,
+    )
+
+    movement = workspace.link_fixed_asset_disposal(
+        fixed_asset_id=fixed_asset.fixed_asset_id,
+        booking_id=disposal_booking.booking_id,
+        booking_line_position=1,
+    )
+
+    assert (
+        movement.movement_type
+        is FixedAssetMovementType.DISPOSAL
+    )
+    assert movement.fixed_asset_id == fixed_asset.fixed_asset_id
+    assert movement.booking_id == disposal_booking.booking_id
+    assert movement.movement_date == date(2026, 8, 15)
+    assert movement.amount == Decimal("11200.00")
+
+    movement_repository.add.assert_called_once_with(
+        movement=movement,
+        booking_line_position=1,
+        commit=False,
+    )
+
+    fixed_asset_repository.update.assert_called_once()
+
+    updated_asset = (
+        fixed_asset_repository.update.call_args.kwargs[
+            "fixed_asset"
+        ]
+    )
+
+    assert updated_asset.fixed_asset_id == fixed_asset.fixed_asset_id
+    assert updated_asset.status is FixedAssetStatus.DISPOSED
+    assert updated_asset.disposal_date == date(2026, 8, 15)
+
+@pytest.mark.parametrize(
+    (
+        "booking_date",
+        "booking_account_number",
+        "booking_side",
+        "existing_movement_types",
+        "expected_message",
+    ),
+    (
+        (
+            date(2026, 8, 15),
+            "0400",
+            EntrySide.CREDIT,
+            (),
+            "Dem Anlagegut ist noch keine "
+            "Anschaffungsbuchung zugeordnet.",
+        ),
+        (
+            date(2026, 8, 15),
+            "0500",
+            EntrySide.CREDIT,
+            (FixedAssetMovementType.ACQUISITION,),
+            "Die Buchungszeile gehört nicht zum "
+            "Anlagenkonto des Anlageguts.",
+        ),
+        (
+            date(2026, 8, 15),
+            "0400",
+            EntrySide.DEBIT,
+            (FixedAssetMovementType.ACQUISITION,),
+            "Die Abgangsbuchung muss das Anlagenkonto "
+            "im Haben buchen.",
+        ),
+        (
+            date(2025, 12, 31),
+            "0400",
+            EntrySide.CREDIT,
+            (FixedAssetMovementType.ACQUISITION,),
+            "Die Buchung gehört nicht zum "
+            "geöffneten Geschäftsjahr.",
+        ),
+        (
+            date(2026, 8, 15),
+            "0400",
+            EntrySide.CREDIT,
+            (
+                FixedAssetMovementType.ACQUISITION,
+                FixedAssetMovementType.DISPOSAL,
+            ),
+            "Dem Anlagegut ist bereits eine "
+            "Abgangsbuchung zugeordnet.",
+        ),
+    ),
+)
+def test_rejects_invalid_fixed_asset_disposal_link(
+    context: ApplicationContext,
+    booking_date: date,
+    booking_account_number: str,
+    booking_side: EntrySide,
+    existing_movement_types: tuple[
+        FixedAssetMovementType,
+        ...,
+    ],
+    expected_message: str,
+) -> None:
+    booking_repository = Mock()
+    company_repository = Mock()
+    fixed_asset_repository = Mock()
+    movement_repository = Mock()
+
+    booking_repository.list_for_fiscal_year.return_value = ()
+
+    company_repository.get_managed_fiscal_years.return_value = (
+        ManagedFiscalYear(
+            fiscal_year=context.fiscal_year,
+            status=FiscalYearStatus.OPEN,
+            opening_source=None,
+        ),
+    )
+
+    fixed_asset = FixedAsset(
+        company_id=context.company.company_id,
+        asset_code="A-0001",
+        description="Maschine",
+        position_code="HGB.266.AKTIVA.A.II.3",
+        asset_account_number="0400",
+        depreciation_expense_account_number="4830",
+        acquisition_date=date(2026, 1, 1),
+        acquisition_cost=Decimal("12000.00"),
+        depreciation_start_date=date(2026, 1, 1),
+        useful_life_months=120,
+    )
+
+    booking = Booking(
+        booking_date=booking_date,
+        description="Abgang Maschine",
+        lines=(
+            BookingLine(
+                account_number="4840",
+                side=(
+                    EntrySide.DEBIT
+                    if booking_side is EntrySide.CREDIT
+                    else EntrySide.CREDIT
+                ),
+                amount=Decimal("11200.00"),
+            ),
+            BookingLine(
+                account_number=booking_account_number,
+                side=booking_side,
+                amount=Decimal("11200.00"),
+            ),
+        ),
+    )
+
+    movements = []
+
+    for movement_type in existing_movement_types:
+        movement = Mock()
+        movement.movement_type = movement_type
+        movements.append(movement)
+
+    fixed_asset_repository.get.return_value = fixed_asset
+    booking_repository.get.return_value = booking
+
+    movement_repository.list_for_fixed_asset.return_value = (
+        tuple(movements)
+    )
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=company_repository,
+        posting_service=Mock(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
+        e_bilanz_export_service=Mock(),
+        taxonomy_management_service=Mock(),
+        fixed_asset_repository=fixed_asset_repository,
+        fixed_asset_movement_repository=movement_repository,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=expected_message,
+    ):
+        workspace.link_fixed_asset_disposal(
+            fixed_asset_id=fixed_asset.fixed_asset_id,
+            booking_id=booking.booking_id,
+            booking_line_position=1,
+        )
+
+    movement_repository.add.assert_not_called()
+    fixed_asset_repository.update.assert_not_called()

@@ -4,6 +4,7 @@ from datetime import date
 from decimal import Decimal
 from pathlib import Path
 from uuid import UUID
+from dataclasses import replace
 
 from openbilanz.accounting.account_balance import AccountBalance
 from openbilanz.accounting.balance_sheet import BalanceSheet
@@ -60,6 +61,7 @@ from openbilanz.domain.fixed_asset_movement import (
 from openbilanz.domain.fixed_asset_movement_type import (
     FixedAssetMovementType,
 )
+from openbilanz.domain.entry_side import EntrySide
 from openbilanz.reporting.account_activity_report import (
     AccountActivityReport,
 )
@@ -750,6 +752,182 @@ class FiscalYearWorkspace:
         self._fixed_asset_movement_repository.add(
             movement=movement,
             booking_line_position=booking_line_position,
+        )
+
+        return movement
+
+    def link_fixed_asset_disposal(
+        self,
+        *,
+        fixed_asset_id: UUID,
+        booking_id: UUID,
+        booking_line_position: int,
+    ) -> FixedAssetMovement:
+        """Ordnet einem Anlagegut eine vorhandene Abgangsbuchung zu."""
+
+        if not self.is_open:
+            raise ValueError(
+                "Das Geschäftsjahr ist abgeschlossen."
+            )
+
+        if self._fixed_asset_repository is None:
+            raise RuntimeError(
+                "Die Anlagenbuchhaltung ist nicht konfiguriert."
+            )
+
+        if self._fixed_asset_movement_repository is None:
+            raise RuntimeError(
+                "Anlagenbewegungen sind nicht konfiguriert."
+            )
+
+        if not isinstance(fixed_asset_id, UUID):
+            raise TypeError(
+                "fixed_asset_id must be a UUID"
+            )
+
+        if not isinstance(booking_id, UUID):
+            raise TypeError(
+                "booking_id must be a UUID"
+            )
+
+        if not isinstance(booking_line_position, int):
+            raise TypeError(
+                "booking_line_position must be an int"
+            )
+
+        if booking_line_position < 0:
+            raise ValueError(
+                "booking_line_position must not be negative"
+            )
+
+        fixed_asset = self._fixed_asset_repository.get(
+            fixed_asset_id
+        )
+
+        if fixed_asset is None:
+            raise ValueError(
+                "Das Anlagegut ist nicht vorhanden."
+            )
+
+        if (
+            fixed_asset.company_id
+            != self._context.company.company_id
+        ):
+            raise ValueError(
+                "Das Anlagegut gehört nicht zum "
+                "geöffneten Unternehmen."
+            )
+
+        if fixed_asset.status is not FixedAssetStatus.ACTIVE:
+            raise ValueError(
+                "Das Anlagegut ist bereits abgegangen."
+            )
+
+        booking = self._booking_repository.get(
+            booking_id
+        )
+
+        if booking is None:
+            raise ValueError(
+                "Die Buchung ist nicht vorhanden."
+            )
+
+        if not (
+            self._context.fiscal_year.start_date
+            <= booking.booking_date
+            <= self._context.fiscal_year.end_date
+        ):
+            raise ValueError(
+                "Die Buchung gehört nicht zum "
+                "geöffneten Geschäftsjahr."
+            )
+
+        if booking.booking_date < fixed_asset.acquisition_date:
+            raise ValueError(
+                "Der Anlagenabgang kann nicht vor dem "
+                "Anschaffungsdatum liegen."
+            )
+
+        if booking_line_position >= len(booking.lines):
+            raise ValueError(
+                "Die Buchungszeile ist nicht vorhanden."
+            )
+
+        booking_line = booking.lines[
+            booking_line_position
+        ]
+
+        if (
+            booking_line.account_number
+            != fixed_asset.asset_account_number
+        ):
+            raise ValueError(
+                "Die Buchungszeile gehört nicht zum "
+                "Anlagenkonto des Anlageguts."
+            )
+
+        if booking_line.side is not EntrySide.CREDIT:
+            raise ValueError(
+                "Die Abgangsbuchung muss das Anlagenkonto "
+                "im Haben buchen."
+            )
+
+        existing_movements = (
+            self._fixed_asset_movement_repository
+            .list_for_fixed_asset(
+                fixed_asset.fixed_asset_id
+            )
+        )
+
+        if not any(
+            movement.movement_type
+            is FixedAssetMovementType.ACQUISITION
+            for movement in existing_movements
+        ):
+            raise ValueError(
+                "Dem Anlagegut ist noch keine "
+                "Anschaffungsbuchung zugeordnet."
+            )
+
+        if any(
+            movement.movement_type
+            is FixedAssetMovementType.DISPOSAL
+            for movement in existing_movements
+        ):
+            raise ValueError(
+                "Dem Anlagegut ist bereits eine "
+                "Abgangsbuchung zugeordnet."
+            )
+
+        movement = FixedAssetMovement(
+            fixed_asset_id=(
+                fixed_asset.fixed_asset_id
+            ),
+            fiscal_year_end=(
+                self._context.fiscal_year.end_date
+            ),
+            movement_date=booking.booking_date,
+            amount=booking_line.amount,
+            booking_id=booking.booking_id,
+            movement_type=(
+                FixedAssetMovementType.DISPOSAL
+            ),
+        )
+
+        self._fixed_asset_movement_repository.add(
+            movement=movement,
+            booking_line_position=booking_line_position,
+            commit=False,
+        )
+
+        disposed_fixed_asset = replace(
+            fixed_asset,
+            status=FixedAssetStatus.DISPOSED,
+            disposal_date=booking.booking_date,
+        )
+
+        self._fixed_asset_repository.update(
+            fixed_asset=disposed_fixed_asset,
         )
 
         return movement
