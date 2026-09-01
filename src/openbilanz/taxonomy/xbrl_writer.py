@@ -28,10 +28,10 @@ from openbilanz.taxonomy.text_fact import TaxonomyTextFact
 from openbilanz.taxonomy.unit import TaxonomyUnit
 
 XBRLI_NAMESPACE = "http://www.xbrl.org/2003/instance"
+XBRLDI_NAMESPACE = "http://xbrl.org/2006/xbrldi"
 ISO4217_NAMESPACE = "http://www.xbrl.org/2003/iso4217"
 LINK_NAMESPACE = "http://www.xbrl.org/2003/linkbase"
 XLINK_NAMESPACE = "http://www.w3.org/1999/xlink"
-
 
 class TaxonomyXbrlWriter:
     """Serialisiert Taxonomie-Objekte als XBRL-Elemente."""
@@ -114,6 +114,22 @@ class TaxonomyXbrlWriter:
                 f"{{{XBRLI_NAMESPACE}}}endDate",
             )
             end_date.text = context.end_date.isoformat()
+
+        if context.dimensions:
+            scenario = ET.SubElement(
+                element,
+                f"{{{XBRLI_NAMESPACE}}}scenario",
+            )
+
+            for dimension in context.dimensions:
+                explicit_member = ET.SubElement(
+                    scenario,
+                    f"{{{XBRLDI_NAMESPACE}}}explicitMember",
+                    {
+                        "dimension": dimension.dimension_name,
+                    },
+                )
+                explicit_member.text = dimension.member_name
 
         return element
 
@@ -774,6 +790,10 @@ class TaxonomyXbrlWriter:
         ET.register_namespace(
             "xbrli",
             XBRLI_NAMESPACE,
+        )
+        ET.register_namespace(
+            "xbrldi",
+            XBRLDI_NAMESPACE,
         )
         ET.register_namespace(
             "link",

@@ -5,7 +5,10 @@ from datetime import date
 import pytest
 
 from openbilanz.taxonomy.concept import TaxonomyPeriodType
-from openbilanz.taxonomy.context import TaxonomyContext
+from openbilanz.taxonomy.context import (
+    TaxonomyContext,
+    TaxonomyDimension,
+)
 
 TEST_ENTITY_SCHEME = "http://www.bundesfinanzministerium.de"
 
@@ -119,4 +122,166 @@ def test_taxonomy_context_rejects_blank_entity_scheme(
             period_type=TaxonomyPeriodType.INSTANT,
             start_date=None,
             end_date=date(2025, 12, 31),
+        )
+
+
+def test_taxonomy_context_has_no_dimensions_by_default() -> None:
+    """Ein normaler XBRL-Kontext besitzt standardmäßig keine Dimensionen."""
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    assert context.dimensions == ()
+
+
+def test_taxonomy_context_stores_dimensions() -> None:
+    """Ein XBRL-Kontext kann explizite Dimensionen speichern."""
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+        dimensions=(
+            TaxonomyDimension(
+                dimension_name="de-gaap-ci:dim_taxTrans",
+                member_name="de-gaap-ci:dim_comBal",
+            ),
+            TaxonomyDimension(
+                dimension_name=(
+                    "de-gaap-ci:dim_changes.nt.ass.gross"
+                ),
+                member_name=(
+                    "de-gaap-ci:bs.ass.fixAss.tan.machinery"
+                ),
+            ),
+        ),
+    )
+
+    assert context.dimensions == (
+        TaxonomyDimension(
+            dimension_name="de-gaap-ci:dim_taxTrans",
+            member_name="de-gaap-ci:dim_comBal",
+        ),
+        TaxonomyDimension(
+            dimension_name=(
+                "de-gaap-ci:dim_changes.nt.ass.gross"
+            ),
+            member_name=(
+                "de-gaap-ci:bs.ass.fixAss.tan.machinery"
+            ),
+        ),
+    )
+
+
+@pytest.mark.parametrize(
+    ("dimension_name", "member_name", "message"),
+    (
+        (
+            "",
+            "de-gaap-ci:dim_comBal",
+            "dimension_name must not be blank",
+        ),
+        (
+            "   ",
+            "de-gaap-ci:dim_comBal",
+            "dimension_name must not be blank",
+        ),
+        (
+            "de-gaap-ci:dim_taxTrans",
+            "",
+            "member_name must not be blank",
+        ),
+        (
+            "de-gaap-ci:dim_taxTrans",
+            "   ",
+            "member_name must not be blank",
+        ),
+    ),
+)
+def test_taxonomy_dimension_rejects_blank_names(
+    dimension_name: str,
+    member_name: str,
+    message: str,
+) -> None:
+    """Dimension und Mitglied müssen benannt sein."""
+
+    with pytest.raises(
+        ValueError,
+        match=message,
+    ):
+        TaxonomyDimension(
+            dimension_name=dimension_name,
+            member_name=member_name,
+        )
+
+
+def test_taxonomy_context_rejects_non_tuple_dimensions() -> None:
+    """Dimensionen müssen unveränderlich als Tuple gespeichert werden."""
+
+    with pytest.raises(
+        TypeError,
+        match="dimensions must be a tuple",
+    ):
+        TaxonomyContext(
+            entity_identifier="DE123456789",
+            entity_scheme=TEST_ENTITY_SCHEME,
+            period_type=TaxonomyPeriodType.DURATION,
+            start_date=date(2025, 1, 1),
+            end_date=date(2025, 12, 31),
+            dimensions=[],  # type: ignore[arg-type]
+        )
+
+
+def test_taxonomy_context_rejects_invalid_dimension_entries() -> None:
+    """Das Dimensions-Tuple darf nur TaxonomyDimension enthalten."""
+
+    with pytest.raises(
+        TypeError,
+        match=(
+            "dimensions must contain only "
+            "TaxonomyDimension"
+        ),
+    ):
+        TaxonomyContext(
+            entity_identifier="DE123456789",
+            entity_scheme=TEST_ENTITY_SCHEME,
+            period_type=TaxonomyPeriodType.DURATION,
+            start_date=date(2025, 1, 1),
+            end_date=date(2025, 12, 31),
+            dimensions=(
+                "de-gaap-ci:dim_taxTrans",
+            ),  # type: ignore[arg-type]
+        )
+
+
+def test_taxonomy_context_rejects_duplicate_dimensions() -> None:
+    """Eine Dimension darf in einem Kontext nur einmal vorkommen."""
+
+    with pytest.raises(
+        ValueError,
+        match="dimension names must be unique",
+    ):
+        TaxonomyContext(
+            entity_identifier="DE123456789",
+            entity_scheme=TEST_ENTITY_SCHEME,
+            period_type=TaxonomyPeriodType.DURATION,
+            start_date=date(2025, 1, 1),
+            end_date=date(2025, 12, 31),
+            dimensions=(
+                TaxonomyDimension(
+                    dimension_name="de-gaap-ci:dim_taxTrans",
+                    member_name="de-gaap-ci:dim_comBal",
+                ),
+                TaxonomyDimension(
+                    dimension_name="de-gaap-ci:dim_taxTrans",
+                    member_name="de-gaap-ci:dim_taxBal",
+                ),
+            ),
         )
