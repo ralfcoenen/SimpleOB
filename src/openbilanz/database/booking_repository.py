@@ -103,6 +103,52 @@ class BookingRepository:
         if commit:
             self._session.commit()
 
+    def get(
+        self,
+        booking_id: UUID,
+    ) -> Booking | None:
+        """Lädt eine Buchung über ihre fachliche ID."""
+
+        if not isinstance(
+            booking_id,
+            UUID,
+        ):
+            raise TypeError(
+                "booking_id must be a UUID"
+            )
+
+        model = (
+            self._session.query(Buchung)
+            .filter(
+                Buchung.booking_id
+                == str(booking_id)
+            )
+            .one_or_none()
+        )
+
+        if model is None:
+            return None
+
+        return Booking(
+            booking_id=UUID(model.booking_id),
+            booking_date=model.booking_date,
+            voucher_no=model.voucher_no,
+            description=model.description,
+            booking_type=BookingType(
+                model.booking_type
+            ),
+            lines=tuple(
+                BookingLine(
+                    account_number=line.account_number,
+                    side=EntrySide.from_value(
+                        line.side
+                    ),
+                    amount=line.amount,
+                )
+                for line in model.zeilen
+            ),
+        )
+
     def list_for_fiscal_year(
         self,
         *,
@@ -176,4 +222,3 @@ class BookingRepository:
             )
             .one_or_none()
         )
-    

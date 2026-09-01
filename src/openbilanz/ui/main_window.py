@@ -43,6 +43,10 @@ from openbilanz.ui.closing_frame import ClosingFrame
 from openbilanz.ui.company_master_data_dialog import (
     CompanyMasterDataDialog,
 )
+from openbilanz.ui.fixed_asset_acquisition_link_dialog import (
+    AcquisitionBookingCandidate,
+    FixedAssetAcquisitionLinkDialog,
+)
 from openbilanz.ui.date_input import (
     normalize_german_date,
     parse_german_date,
@@ -91,9 +95,9 @@ class MainWindow(tk.Tk):
         self._current_account_activity_end_date = None
         self._current_journal_report = None
 
-        self.title("OpenBilanz")
-        self.geometry("1100x700")
-        self.minsize(850, 550)
+        self.title("SimpleOB")
+        self.geometry("1300x800")
+        self.minsize(1100, 700)
 
         self._opening_balance_service = OpeningBalanceService(
             opening_balance_account_number=(
@@ -859,12 +863,42 @@ class MainWindow(tk.Tk):
             side="left",
         )
 
+        self._link_fixed_asset_acquisition_button = ttk.Button(
+            header,
+            text="Anschaffungsbuchung zuordnen",
+            command=self._open_link_fixed_asset_acquisition,
+        )
+        self._link_fixed_asset_acquisition_button.pack(
+            side="right",
+            padx=(0, 8),
+        )
+
         self._process_depreciations_button = ttk.Button(
             header,
             text="Abschreibungen prüfen/buchen",
             command=self._process_depreciations,
         )
         self._process_depreciations_button.pack(
+            side="right",
+            padx=(0, 8),
+        )
+
+        self._delete_fixed_asset_button = ttk.Button(
+            header,
+            text="Anlagegut löschen",
+            command=self._delete_fixed_asset,
+        )
+        self._delete_fixed_asset_button.pack(
+            side="right",
+            padx=(0, 8),
+        )
+
+        self._edit_fixed_asset_button = ttk.Button(
+            header,
+            text="Anlagegut bearbeiten",
+            command=self._open_edit_fixed_asset,
+        )
+        self._edit_fixed_asset_button.pack(
             side="right",
             padx=(0, 8),
         )
@@ -886,6 +920,7 @@ class MainWindow(tk.Tk):
             "useful_life",
             "asset_account",
             "depreciation_account",
+            "acquisition_booking",
             "status",
         )
 
@@ -904,6 +939,7 @@ class MainWindow(tk.Tk):
             "useful_life": "ND Monate",
             "asset_account": "Anlagekonto",
             "depreciation_account": "AfA-Konto",
+            "acquisition_booking": "Anschaffungsbuchung",
             "status": "Status",
         }
 
@@ -946,6 +982,11 @@ class MainWindow(tk.Tk):
         self._fixed_asset_table.column(
             "depreciation_account",
             width=90,
+            anchor="w",
+        )
+        self._fixed_asset_table.column(
+            "acquisition_booking",
+            width=150,
             anchor="w",
         )
         self._fixed_asset_table.column(
@@ -1943,11 +1984,37 @@ class MainWindow(tk.Tk):
         )
 
         if enabled:
-            self._add_fixed_asset_button.state(["!disabled"])
-            self._process_depreciations_button.state(["!disabled"])
+            self._add_fixed_asset_button.state(
+                ["!disabled"]
+            )
+            self._edit_fixed_asset_button.state(
+                ["!disabled"]
+            )
+            self._delete_fixed_asset_button.state(
+                ["!disabled"]
+            )
+            self._link_fixed_asset_acquisition_button.state(
+                ["!disabled"]
+            )
+            self._process_depreciations_button.state(
+                ["!disabled"]
+            )
         else:
-            self._add_fixed_asset_button.state(["disabled"])
-            self._process_depreciations_button.state(["disabled"])
+            self._add_fixed_asset_button.state(
+                ["disabled"]
+            )
+            self._edit_fixed_asset_button.state(
+                ["disabled"]
+            )
+            self._delete_fixed_asset_button.state(
+                ["disabled"]
+            )
+            self._link_fixed_asset_acquisition_button.state(
+                ["disabled"]
+            )
+            self._process_depreciations_button.state(
+                ["disabled"]
+            )
 
     def _open_company_master_data(
         self,
@@ -1990,6 +2057,8 @@ class MainWindow(tk.Tk):
             parent=self,
         )
 
+
+
     def _refresh_fixed_assets(self) -> None:
         """Aktualisiert die Liste der Anlagegüter."""
 
@@ -2001,23 +2070,190 @@ class MainWindow(tk.Tk):
         except RuntimeError:
             return
 
+        self._fixed_assets_by_id = {
+            str(asset.fixed_asset_id): asset
+            for asset in assets
+        }
+
         for asset in assets:
-            status = "Aktiv" if asset.status.value == "ACTIVE" else "Abgegangen"
+            status = (
+                "Aktiv"
+                if asset.status.value == "ACTIVE"
+                else "Abgegangen"
+            )
+
+            try:
+                acquisition_linked = (
+                    self._workspace.has_fixed_asset_acquisition(
+                        asset.fixed_asset_id
+                    )
+                )
+            except RuntimeError:
+                acquisition_linked = False
+
+            acquisition_booking = (
+                "zugeordnet"
+                if acquisition_linked
+                else "nicht zugeordnet"
+            )
 
             self._fixed_asset_table.insert(
                 "",
                 "end",
+                iid=str(asset.fixed_asset_id),
                 values=(
                     asset.asset_code,
                     asset.description,
-                    (f"{asset.acquisition_date:%d.%m.%Y}"),
-                    self._format_amount(asset.acquisition_cost),
+                    (
+                        f"{asset.acquisition_date:%d.%m.%Y}"
+                    ),
+                    self._format_amount(
+                        asset.acquisition_cost
+                    ),
                     asset.useful_life_months,
                     asset.asset_account_number,
-                    (asset.depreciation_expense_account_number),
+                    (
+                        asset.depreciation_expense_account_number
+                    ),
+                    acquisition_booking,
                     status,
                 ),
             )
+    def _selected_fixed_asset(self):
+        """Gibt das aktuell ausgewählte Anlagegut zurück."""
+
+        selection = self._fixed_asset_table.selection()
+
+        if not selection:
+            return None
+
+        fixed_asset_id = selection[0]
+
+        return self._fixed_assets_by_id.get(
+            fixed_asset_id
+        )
+
+    def _open_edit_fixed_asset(self) -> None:
+        """Öffnet ein Anlagegut zur Bearbeitung."""
+
+        if not self._workspace.is_open:
+            return
+
+        fixed_asset = self._selected_fixed_asset()
+
+        if fixed_asset is None:
+            messagebox.showinfo(
+                "Anlagegut bearbeiten",
+                "Bitte zuerst ein Anlagegut auswählen.",
+                parent=self,
+            )
+            return
+
+        try:
+            acquisition_linked = (
+                self._workspace.has_fixed_asset_acquisition(
+                    fixed_asset.fixed_asset_id
+                )
+            )
+        except RuntimeError as exc:
+            messagebox.showerror(
+                "Anlagegut kann nicht bearbeitet werden",
+                str(exc),
+                parent=self,
+            )
+            return
+
+        dialog = NewFixedAssetDialog(
+            self,
+            company_id=(
+                self._context.company.company_id
+            ),
+            fixed_asset=fixed_asset,
+            acquisition_linked=acquisition_linked,
+        )
+
+        self.wait_window(dialog)
+
+        if dialog.result is None:
+            return
+
+        try:
+            self._workspace.update_fixed_asset(
+                dialog.result
+            )
+        except (
+            ValueError,
+            RuntimeError,
+        ) as exc:
+            messagebox.showerror(
+                "Anlagegut kann nicht bearbeitet werden",
+                str(exc),
+                parent=self,
+            )
+            return
+
+        self._refresh_fixed_assets()
+
+        messagebox.showinfo(
+            "Anlagegut",
+            "Das Anlagegut wurde geändert.",
+            parent=self,
+        )
+
+    def _delete_fixed_asset(self) -> None:
+        """Löscht ein noch nicht buchungswirksames Anlagegut."""
+
+        if not self._workspace.is_open:
+            return
+
+        fixed_asset = self._selected_fixed_asset()
+
+        if fixed_asset is None:
+            messagebox.showinfo(
+                "Anlagegut löschen",
+                "Bitte zuerst ein Anlagegut auswählen.",
+                parent=self,
+            )
+            return
+
+        confirmed = messagebox.askyesno(
+            "Anlagegut löschen",
+            (
+                f"Soll das Anlagegut "
+                f"„{fixed_asset.asset_code} – "
+                f"{fixed_asset.description}“ "
+                "wirklich gelöscht werden?\n\n"
+                "Dieser Vorgang kann nicht rückgängig "
+                "gemacht werden."
+            ),
+            parent=self,
+        )
+
+        if not confirmed:
+            return
+
+        try:
+            self._workspace.delete_fixed_asset(
+                fixed_asset.fixed_asset_id
+            )
+        except (
+            ValueError,
+            RuntimeError,
+        ) as exc:
+            messagebox.showerror(
+                "Anlagegut kann nicht gelöscht werden",
+                str(exc),
+                parent=self,
+            )
+            return
+
+        self._refresh_fixed_assets()
+
+        messagebox.showinfo(
+            "Anlagegut",
+            "Das Anlagegut wurde gelöscht.",
+            parent=self,
+        )
 
     def _open_new_fixed_asset(self) -> None:
         """Öffnet den Dialog für ein neues Anlagegut."""
@@ -2055,6 +2291,150 @@ class MainWindow(tk.Tk):
             "Das Anlagegut wurde angelegt.",
             parent=self,
         )
+
+    def _open_link_fixed_asset_acquisition(
+        self,
+    ) -> None:
+        """Ordnet eine vorhandene Buchung einem Anlagegut zu."""
+
+        if not self._workspace.is_open:
+            return
+
+        fixed_asset = self._selected_fixed_asset()
+
+        if fixed_asset is None:
+            messagebox.showinfo(
+                "Anschaffungsbuchung zuordnen",
+                "Bitte zuerst ein Anlagegut auswählen.",
+                parent=self,
+            )
+            return
+
+        try:
+            if self._workspace.has_fixed_asset_acquisition(
+                fixed_asset.fixed_asset_id
+            ):
+                messagebox.showinfo(
+                    "Anschaffungsbuchung zuordnen",
+                    (
+                        "Dem ausgewählten Anlagegut ist bereits "
+                        "eine Anschaffungsbuchung zugeordnet."
+                    ),
+                    parent=self,
+                )
+                return
+        except RuntimeError as exc:
+            messagebox.showerror(
+                "Anschaffungsbuchung kann nicht zugeordnet werden",
+                str(exc),
+                parent=self,
+            )
+            return
+
+        candidates: list[
+            AcquisitionBookingCandidate
+        ] = []
+
+        for booking in self._workspace.journal.bookings:
+            for position, line in enumerate(
+                booking.lines
+            ):
+                if (
+                    line.account_number
+                    != fixed_asset.asset_account_number
+                ):
+                    continue
+
+                if line.side is not EntrySide.DEBIT:
+                    continue
+
+                if (
+                    line.amount
+                    != fixed_asset.acquisition_cost
+                ):
+                    continue
+
+                candidates.append(
+                    AcquisitionBookingCandidate(
+                        booking_id=booking.booking_id,
+                        booking_line_position=position,
+                        booking_date_text=(
+                            booking.booking_date.strftime(
+                                "%d.%m.%Y"
+                            )
+                        ),
+                        voucher_no=(
+                            booking.voucher_no or ""
+                        ),
+                        description=(
+                            booking.description or ""
+                        ),
+                        account_number=(
+                            line.account_number
+                        ),
+                        amount=line.amount,
+                    )
+                )
+
+        if not candidates:
+            messagebox.showinfo(
+                "Anschaffungsbuchung zuordnen",
+                (
+                    "Es wurde keine passende "
+                    "Anschaffungsbuchung gefunden."
+                ),
+                parent=self,
+            )
+            return
+
+        dialog = FixedAssetAcquisitionLinkDialog(
+            self,
+            candidates=tuple(candidates),
+        )
+
+        self.wait_window(dialog)
+
+        candidate = dialog.selected_candidate
+
+        if candidate is None:
+            return
+
+        try:
+            self._workspace.link_fixed_asset_acquisition(
+                fixed_asset_id=(
+                    fixed_asset.fixed_asset_id
+                ),
+                booking_id=(
+                    candidate.booking_id
+                ),
+                booking_line_position=(
+                    candidate.booking_line_position
+                ),
+            )
+        except (
+            ValueError,
+            RuntimeError,
+        ) as exc:
+            messagebox.showerror(
+                (
+                    "Anschaffungsbuchung konnte "
+                    "nicht zugeordnet werden"
+                ),
+                str(exc),
+                parent=self,
+            )
+            return
+
+        messagebox.showinfo(
+            "Anschaffungsbuchung",
+            (
+                "Die Anschaffungsbuchung wurde "
+                "dem Anlagegut zugeordnet."
+            ),
+            parent=self,
+        )
+
+        self._refresh_fixed_assets()
 
     def _return_to_start(self) -> None:
         """Schließt die aktuelle Buchhaltung und kehrt zur Auswahl zurück."""

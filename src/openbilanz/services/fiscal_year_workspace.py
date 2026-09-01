@@ -3,6 +3,7 @@
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
+from uuid import UUID
 
 from openbilanz.accounting.account_balance import AccountBalance
 from openbilanz.accounting.balance_sheet import BalanceSheet
@@ -21,6 +22,9 @@ from openbilanz.database.fixed_asset_depreciation_repository import (
 )
 from openbilanz.database.fixed_asset_repository import (
     FixedAssetRepository,
+)
+from openbilanz.database.fixed_asset_movement_repository import (
+    FixedAssetMovementRepository,
 )
 from openbilanz.domain.account import Account
 from openbilanz.domain.account_mapping_rule import (
@@ -50,6 +54,12 @@ from openbilanz.domain.fixed_asset_status import (
 )
 from openbilanz.domain.journal import Journal
 from openbilanz.domain.managed_fiscal_year import ManagedFiscalYear
+from openbilanz.domain.fixed_asset_movement import (
+    FixedAssetMovement,
+)
+from openbilanz.domain.fixed_asset_movement_type import (
+    FixedAssetMovementType,
+)
 from openbilanz.reporting.account_activity_report import (
     AccountActivityReport,
 )
@@ -125,6 +135,9 @@ class FiscalYearWorkspace:
         fixed_asset_depreciation_workflow: (
             FixedAssetDepreciationWorkflow | None
         ) = None,
+        fixed_asset_movement_repository: (
+            FixedAssetMovementRepository | None
+        ) = None,
     ) -> None:
         self._context = context
         self._booking_repository = booking_repository
@@ -154,6 +167,9 @@ class FiscalYearWorkspace:
         self._fixed_asset_depreciation_repository = fixed_asset_depreciation_repository
         self._depreciation_service = depreciation_service
         self._fixed_asset_depreciation_workflow = fixed_asset_depreciation_workflow
+        self._fixed_asset_movement_repository = (
+            fixed_asset_movement_repository
+        )
 
         self.reload()
 
@@ -372,6 +388,371 @@ class FiscalYearWorkspace:
             raise ValueError("Das Anlagegut gehört nicht zum geöffneten Unternehmen.")
 
         self._fixed_asset_repository.add(fixed_asset=fixed_asset)
+
+    def has_fixed_asset_acquisition(
+        self,
+        fixed_asset_id: UUID,
+    ) -> bool:
+        """Prüft, ob eine Anschaffungsbuchung zugeordnet ist."""
+
+        if self._fixed_asset_movement_repository is None:
+            raise RuntimeError(
+                "Anlagenbewegungen sind nicht konfiguriert."
+            )
+
+        movements = (
+            self._fixed_asset_movement_repository
+            .list_for_fixed_asset(
+                fixed_asset_id
+            )
+        )
+
+        return any(
+            movement.movement_type
+            is FixedAssetMovementType.ACQUISITION
+            for movement in movements
+        )
+
+    def update_fixed_asset(
+        self,
+        fixed_asset: FixedAsset,
+    ) -> None:
+        """Aktualisiert ein noch änderbares Anlagegut."""
+
+        if not self.is_open:
+            raise ValueError(
+                "Das Geschäftsjahr ist abgeschlossen."
+            )
+
+        if self._fixed_asset_repository is None:
+            raise RuntimeError(
+                "Die Anlagenbuchhaltung ist nicht konfiguriert."
+            )
+
+        if self._fixed_asset_depreciation_repository is None:
+            raise RuntimeError(
+                "Die Anlagenabschreibungen sind nicht konfiguriert."
+            )
+
+        if self._fixed_asset_movement_repository is None:
+            raise RuntimeError(
+                "Anlagenbewegungen sind nicht konfiguriert."
+            )
+
+        existing = self._fixed_asset_repository.get(
+            fixed_asset.fixed_asset_id
+        )
+
+        if existing is None:
+            raise ValueError(
+                "Das Anlagegut ist nicht vorhanden."
+            )
+
+        if (
+            existing.company_id
+            != self._context.company.company_id
+            or fixed_asset.company_id
+            != self._context.company.company_id
+        ):
+            raise ValueError(
+                "Das Anlagegut gehört nicht zum "
+                "geöffneten Unternehmen."
+            )
+
+        if existing.status is not FixedAssetStatus.ACTIVE:
+            raise ValueError(
+                "Ein abgegangenes Anlagegut kann nicht "
+                "mehr bearbeitet werden."
+            )
+
+        depreciations = (
+            self._fixed_asset_depreciation_repository
+            .list_for_fixed_asset(
+                fixed_asset.fixed_asset_id
+            )
+        )
+
+        if depreciations:
+            raise ValueError(
+                "Das Anlagegut kann nach der ersten "
+                "gebuchten Abschreibung nicht mehr "
+                "bearbeitet werden."
+            )
+
+        movements = (
+            self._fixed_asset_movement_repository
+            .list_for_fixed_asset(
+                fixed_asset.fixed_asset_id
+            )
+        )
+
+        acquisition_linked = any(
+            movement.movement_type
+            is FixedAssetMovementType.ACQUISITION
+            for movement in movements
+        )
+
+        if acquisition_linked:
+            if (
+                fixed_asset.asset_account_number
+                != existing.asset_account_number
+                or fixed_asset.acquisition_cost
+                != existing.acquisition_cost
+                or fixed_asset.acquisition_date
+                != existing.acquisition_date
+            ):
+                raise ValueError(
+                    "Anlagenkonto, Anschaffungsdatum und "
+                    "Anschaffungskosten können nach der "
+                    "Zuordnung der Anschaffungsbuchung "
+                    "nicht mehr geändert werden."
+                )
+
+        self._fixed_asset_repository.update(
+            fixed_asset=fixed_asset
+        )
+
+    def delete_fixed_asset(
+        self,
+        fixed_asset_id: UUID,
+    ) -> None:
+        """Löscht ein noch nicht buchungswirksames Anlagegut."""
+
+        if not self.is_open:
+            raise ValueError(
+                "Das Geschäftsjahr ist abgeschlossen."
+            )
+
+        if self._fixed_asset_repository is None:
+            raise RuntimeError(
+                "Die Anlagenbuchhaltung ist nicht konfiguriert."
+            )
+
+        if self._fixed_asset_depreciation_repository is None:
+            raise RuntimeError(
+                "Die Anlagenabschreibungen sind nicht konfiguriert."
+            )
+
+        if self._fixed_asset_movement_repository is None:
+            raise RuntimeError(
+                "Anlagenbewegungen sind nicht konfiguriert."
+            )
+
+        fixed_asset = self._fixed_asset_repository.get(
+            fixed_asset_id
+        )
+
+        if fixed_asset is None:
+            raise ValueError(
+                "Das Anlagegut ist nicht vorhanden."
+            )
+
+        if (
+            fixed_asset.company_id
+            != self._context.company.company_id
+        ):
+            raise ValueError(
+                "Das Anlagegut gehört nicht zum "
+                "geöffneten Unternehmen."
+            )
+
+        if fixed_asset.status is not FixedAssetStatus.ACTIVE:
+            raise ValueError(
+                "Ein abgegangenes Anlagegut kann nicht "
+                "gelöscht werden."
+            )
+
+        depreciations = (
+            self._fixed_asset_depreciation_repository
+            .list_for_fixed_asset(
+                fixed_asset_id
+            )
+        )
+
+        if depreciations:
+            raise ValueError(
+                "Das Anlagegut kann nach der ersten "
+                "gebuchten Abschreibung nicht mehr "
+                "gelöscht werden."
+            )
+
+        movements = (
+            self._fixed_asset_movement_repository
+            .list_for_fixed_asset(
+                fixed_asset_id
+            )
+        )
+
+        if movements:
+            raise ValueError(
+                "Das Anlagegut kann nach einer "
+                "buchungswirksamen Anlagenbewegung "
+                "nicht mehr gelöscht werden."
+            )
+
+        self._fixed_asset_repository.delete(
+            fixed_asset_id=fixed_asset_id
+        )
+
+    def link_fixed_asset_acquisition(
+        self,
+        *,
+        fixed_asset_id: UUID,
+        booking_id: UUID,
+        booking_line_position: int,
+    ) -> FixedAssetMovement:
+        """Ordnet eine Anschaffungsbuchung einem Anlagegut zu."""
+
+        if not self.is_open:
+            raise ValueError(
+                "Das Geschäftsjahr ist abgeschlossen."
+            )
+
+        if self._fixed_asset_repository is None:
+            raise RuntimeError(
+                "Die Anlagenbuchhaltung ist nicht konfiguriert."
+            )
+
+        if self._fixed_asset_movement_repository is None:
+            raise RuntimeError(
+                "Anlagenbewegungen sind nicht konfiguriert."
+            )
+
+        if not isinstance(
+            fixed_asset_id,
+            UUID,
+        ):
+            raise TypeError(
+                "fixed_asset_id must be a UUID"
+            )
+
+        if not isinstance(
+            booking_id,
+            UUID,
+        ):
+            raise TypeError(
+                "booking_id must be a UUID"
+            )
+
+        if not isinstance(
+            booking_line_position,
+            int,
+        ):
+            raise TypeError(
+                "booking_line_position must be an int"
+            )
+
+        if booking_line_position < 0:
+            raise ValueError(
+                "booking_line_position must not be negative"
+            )
+
+        fixed_asset = (
+            self._fixed_asset_repository.get(
+                fixed_asset_id
+            )
+        )
+
+        if fixed_asset is None:
+            raise ValueError(
+                "Das Anlagegut ist nicht vorhanden."
+            )
+
+        if (
+            fixed_asset.company_id
+            != self._context.company.company_id
+        ):
+            raise ValueError(
+                "Das Anlagegut gehört nicht zum "
+                "geöffneten Unternehmen."
+            )
+
+        booking = self._booking_repository.get(
+            booking_id
+        )
+
+        if booking is None:
+            raise ValueError(
+                "Die Buchung ist nicht vorhanden."
+            )
+
+        if not self._context.fiscal_year.contains(
+            booking.booking_date
+        ):
+            raise ValueError(
+                "Die Buchung gehört nicht zum "
+                "geöffneten Geschäftsjahr."
+            )
+
+        if (
+            booking_line_position
+            >= len(booking.lines)
+        ):
+            raise ValueError(
+                "Die Buchungszeile ist nicht vorhanden."
+            )
+
+        booking_line = booking.lines[
+            booking_line_position
+        ]
+
+        if (
+            booking_line.account_number
+            != fixed_asset.asset_account_number
+        ):
+            raise ValueError(
+                "Die Buchungszeile gehört nicht zum "
+                "Anlagenkonto des Anlageguts."
+            )
+
+        if (
+            booking_line.amount
+            != fixed_asset.acquisition_cost
+        ):
+            raise ValueError(
+                "Der Betrag der Buchungszeile stimmt "
+                "nicht mit den Anschaffungskosten "
+                "des Anlageguts überein."
+            )
+
+        existing_movements = (
+            self._fixed_asset_movement_repository
+            .list_for_fixed_asset(
+                fixed_asset.fixed_asset_id
+            )
+        )
+
+        if any(
+            movement.movement_type
+            is FixedAssetMovementType.ACQUISITION
+            for movement in existing_movements
+        ):
+            raise ValueError(
+                "Dem Anlagegut ist bereits eine "
+                "Anschaffungsbuchung zugeordnet."
+            )
+
+        movement = FixedAssetMovement(
+            fixed_asset_id=(
+                fixed_asset.fixed_asset_id
+            ),
+            fiscal_year_end=(
+                self._context.fiscal_year.end_date
+            ),
+            movement_date=booking.booking_date,
+            amount=booking_line.amount,
+            booking_id=booking.booking_id,
+            movement_type=(
+                FixedAssetMovementType.ACQUISITION
+            ),
+        )
+
+        self._fixed_asset_movement_repository.add(
+            movement=movement,
+            booking_line_position=booking_line_position,
+        )
+
+        return movement
 
     def build_depreciation_proposals(
         self,

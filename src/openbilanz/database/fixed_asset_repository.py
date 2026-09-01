@@ -116,6 +116,132 @@ class FixedAssetRepository:
         if commit:
             self._session.commit()
 
+    def update(
+        self,
+        *,
+        fixed_asset: FixedAsset,
+        commit: bool = True,
+    ) -> None:
+        """Aktualisiert ein vorhandenes Anlagegut."""
+
+        if not isinstance(
+            fixed_asset,
+            FixedAsset,
+        ):
+            raise TypeError(
+                "fixed_asset must be a FixedAsset"
+            )
+
+        company_model = (
+            self._session.query(Mandant)
+            .filter(
+                Mandant.company_id
+                == str(fixed_asset.company_id)
+            )
+            .one_or_none()
+        )
+
+        if company_model is None:
+            raise ValueError(
+                "Das Unternehmen ist nicht vorhanden."
+            )
+
+        model = (
+            self._session.query(Anlagegut)
+            .filter(
+                Anlagegut.fixed_asset_id
+                == str(fixed_asset.fixed_asset_id),
+                Anlagegut.mandant_id
+                == company_model.id,
+            )
+            .one_or_none()
+        )
+
+        if model is None:
+            raise ValueError(
+                "Das Anlagegut ist nicht vorhanden."
+            )
+
+        duplicate_code = (
+            self._session.query(Anlagegut)
+            .filter(
+                Anlagegut.mandant_id
+                == company_model.id,
+                Anlagegut.asset_code
+                == fixed_asset.asset_code,
+                Anlagegut.id != model.id,
+            )
+            .one_or_none()
+        )
+
+        if duplicate_code is not None:
+            raise ValueError(
+                "Die Anlagen-ID ist für dieses "
+                "Unternehmen bereits vorhanden."
+            )
+
+        model.asset_code = fixed_asset.asset_code
+        model.description = fixed_asset.description
+        model.position_code = fixed_asset.position_code
+        model.asset_account_number = (
+            fixed_asset.asset_account_number
+        )
+        model.depreciation_expense_account_number = (
+            fixed_asset.depreciation_expense_account_number
+        )
+        model.acquisition_date = (
+            fixed_asset.acquisition_date
+        )
+        model.acquisition_cost = (
+            fixed_asset.acquisition_cost
+        )
+        model.depreciation_start_date = (
+            fixed_asset.depreciation_start_date
+        )
+        model.useful_life_months = (
+            fixed_asset.useful_life_months
+        )
+        model.status = fixed_asset.status.value
+        model.disposal_date = fixed_asset.disposal_date
+
+        if commit:
+            self._session.commit()
+
+    def delete(
+        self,
+        *,
+        fixed_asset_id: UUID,
+        commit: bool = True,
+    ) -> None:
+        """Löscht ein vorhandenes Anlagegut."""
+
+        if not isinstance(
+            fixed_asset_id,
+            UUID,
+        ):
+            raise TypeError(
+                "fixed_asset_id must be a UUID"
+            )
+
+        model = (
+            self._session.query(Anlagegut)
+            .filter(
+                Anlagegut.fixed_asset_id
+                == str(fixed_asset_id)
+            )
+            .one_or_none()
+        )
+
+        if model is None:
+            raise ValueError(
+                "Das Anlagegut ist nicht vorhanden."
+            )
+
+        self._session.delete(model)
+
+        if commit:
+            self._session.commit()
+
     def get(
         self,
         fixed_asset_id: UUID,

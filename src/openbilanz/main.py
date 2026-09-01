@@ -19,6 +19,9 @@ from openbilanz.database.chart_of_accounts_repository import (
 from openbilanz.database.company_repository import (
     CompanyRepository,
 )
+from openbilanz.database.fixed_asset_movement_repository import (
+    FixedAssetMovementRepository,
+)
 from openbilanz.database.database import Database
 from openbilanz.database.fixed_asset_depreciation_repository import (
     FixedAssetDepreciationRepository,
@@ -164,6 +167,12 @@ def main() -> None:
 
         fixed_asset_depreciation_repository = (
             FixedAssetDepreciationRepository(
+                session
+            )
+        )
+
+        fixed_asset_movement_repository = (
+            FixedAssetMovementRepository(
                 session
             )
         )
@@ -440,6 +449,9 @@ def main() -> None:
                 ),
                 fixed_asset_depreciation_repository=(
                     fixed_asset_depreciation_repository
+                ),
+                fixed_asset_movement_repository=(
+                    fixed_asset_movement_repository
                 ),
                 depreciation_service=(
                     depreciation_service
