@@ -89,6 +89,13 @@ class CompanyMasterDataDialog(tk.Toplevel):
             anchor="w",
             pady=(4, 18),
         )
+        ttk.Label(
+            container,
+            text="* Pflichtfeld für die E-Bilanz",
+        ).pack(
+            anchor="w",
+            pady=(0, 8),
+        )
 
         form = ttk.Frame(
             container
@@ -119,11 +126,11 @@ class CompanyMasterDataDialog(tk.Toplevel):
 
         fields = (
             (
-                "Rechtsform",
+                "Rechtsform *",
                 self._legal_form_var,
             ),
             (
-                "Steuernummer",
+                "Steuernummer *",
                 self._tax_number_var,
             ),
             (
@@ -143,27 +150,27 @@ class CompanyMasterDataDialog(tk.Toplevel):
                 self._bf4_var,
             ),
             (
-                "Straße",
+                "Straße *",
                 self._street_var,
             ),
             (
-                "Hausnummer",
+                "Hausnummer *",
                 self._house_number_var,
             ),
             (
-                "PLZ",
+                "PLZ *",
                 self._postal_code_var,
             ),
             (
-                "Ort",
+                "Ort *",
                 self._city_var,
             ),
             (
-                "Land",
+                "Land *",
                 self._country_var,
             ),
             (
-                "Geschäftstätigkeit",
+                "Geschäftstätigkeit *",
                 self._business_var,
             ),
         )
@@ -191,12 +198,12 @@ class CompanyMasterDataDialog(tk.Toplevel):
                 sticky="ew",
                 pady=6,
             )
-        
+
         federal_state_row = len(fields)
 
         ttk.Label(
             form,
-            text="Bundesland",
+            text="Bundesland *",
         ).grid(
             row=federal_state_row,
             column=0,
@@ -343,6 +350,9 @@ class CompanyMasterDataDialog(tk.Toplevel):
                 ),
             )
 
+            master_data.validate_e_bilanz_ready()
+
+
         except (TypeError, ValueError) as exc:
             messagebox.showerror(
                 "Ungültige Stammdaten",
@@ -361,4 +371,3 @@ class CompanyMasterDataDialog(tk.Toplevel):
         """Liefert einen bereinigten Eingabewert."""
 
         return variable.get().strip()
-    

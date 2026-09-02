@@ -66,7 +66,7 @@ def _positions_by_code(
 def test_e_bilanz_69_builds_and_validates_fixed_asset_schedule(
     tmp_path: Path,
 ) -> None:
-    """Anlagenspiegel wird dimensional erzeugt und mit Arelle validiert."""
+    """Anlagenspiegel und GCD-Mussfeld werden mit Arelle validiert."""
 
     version_root = TAXONOMY_ROOT / "6.9"
 
@@ -269,6 +269,18 @@ def test_e_bilanz_69_builds_and_validates_fixed_asset_schedule(
             in xml
         )
         assert "accDepr.release" in xml
+
+        assert (
+            "<de-gcd:"
+            "genInfo.report.id."
+            "incomeStatementendswithBalProfit"
+            ' contextRef="ctx-duration-2026">'
+            "false"
+            "</de-gcd:"
+            "genInfo.report.id."
+            "incomeStatementendswithBalProfit>"
+            in xml
+        )
 
         instance_path = (
             tmp_path

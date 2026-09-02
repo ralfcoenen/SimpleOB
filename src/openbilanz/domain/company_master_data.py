@@ -3,6 +3,9 @@
 from dataclasses import dataclass
 
 from openbilanz.domain.company import Company
+from openbilanz.domain.tax_number_normalizer import (
+    TaxNumberNormalizer,
+)
 
 GERMAN_FEDERAL_STATE_CODES = frozenset(
     {
@@ -24,6 +27,7 @@ GERMAN_FEDERAL_STATE_CODES = frozenset(
         "TH",
     }
 )
+
 
 @dataclass(frozen=True, slots=True)
 class CompanyMasterData:
@@ -105,7 +109,7 @@ class CompanyMasterData:
             "business",
             self.business,
         )
-        
+
         if (
             self.bf4
             and (
@@ -116,6 +120,7 @@ class CompanyMasterData:
             raise ValueError(
                 "bf4 must contain exactly 4 digits"
             )
+
         if (
             self.federal_state
             and self.federal_state
@@ -147,10 +152,50 @@ class CompanyMasterData:
 
     @property
     def is_e_bilanz_ready(self) -> bool:
-        """Prüft die derzeit zwingenden E-Bilanz-Stammdaten."""
+        """Prüft die zwingenden E-Bilanz-Stammdaten."""
 
         return bool(
             self.legal_form
             and self.tax_number
             and self.federal_state
+            and self.street
+            and self.house_number
+            and self.postal_code
+            and self.city
+            and self.country
+            and self.business
+        )
+
+    def validate_e_bilanz_ready(self) -> None:
+        """Validiert die für die E-Bilanz erforderlichen Stammdaten."""
+
+        required_fields = (
+            ("Rechtsform", self.legal_form),
+            ("Steuernummer", self.tax_number),
+            ("Bundesland", self.federal_state),
+            ("Straße", self.street),
+            ("Hausnummer", self.house_number),
+            ("PLZ", self.postal_code),
+            ("Ort", self.city),
+            ("Land", self.country),
+            ("Geschäftstätigkeit", self.business),
+        )
+
+        missing_fields = tuple(
+            label
+            for label, value in required_fields
+            if not value
+        )
+
+        if missing_fields:
+            raise ValueError(
+                "Für die E-Bilanz fehlen folgende "
+                "Unternehmensstammdaten: "
+                + ", ".join(missing_fields)
+                + "."
+            )
+
+        TaxNumberNormalizer().normalize(
+            federal_state=self.federal_state,
+            tax_number=self.tax_number,
         )

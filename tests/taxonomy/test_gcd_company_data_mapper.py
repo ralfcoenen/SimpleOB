@@ -75,21 +75,6 @@ def test_maps_complete_company_master_data() -> None:
     assert result.identifiers.bf4 == "1234"
 
 
-def test_maps_empty_optional_identifiers_to_none() -> None:
-    master_data = CompanyMasterData(
-        company=_company(),
-        legal_form="UG (haftungsbeschränkt)",
-        tax_number="123/4567/8901",
-        federal_state="NW",
-    )
-
-    result = GcdCompanyDataMapper().map(
-        master_data
-    )
-
-    assert result.identifiers.tax_id is None
-    assert result.identifiers.tax_economic_id is None
-    assert result.identifiers.bf4 is None
 
 
 def test_rejects_incomplete_master_data() -> None:
@@ -120,12 +105,41 @@ def test_rejects_wrong_type() -> None:
             object()  # type: ignore[arg-type]
         )
 
+def test_maps_empty_optional_identifiers_to_none() -> None:
+    master_data = CompanyMasterData(
+        company=_company(),
+        legal_form="UG (haftungsbeschränkt)",
+        tax_number="123/4567/8901",
+        federal_state="NW",
+        street="Musterstraße",
+        house_number="12a",
+        postal_code="12345",
+        city="Musterstadt",
+        country="DE",
+        business="Softwareentwicklung",
+    )
+
+    result = GcdCompanyDataMapper().map(
+        master_data
+    )
+
+    assert result.identifiers.tax_id is None
+    assert result.identifiers.tax_economic_id is None
+    assert result.identifiers.bf4 is None
+
+
 def test_rejects_invalid_state_specific_tax_number() -> None:
     master_data = CompanyMasterData(
         company=_company(),
         legal_form="UG (haftungsbeschränkt)",
         tax_number="1234/5678/9012",
         federal_state="NW",
+        street="Musterstraße",
+        house_number="12a",
+        postal_code="12345",
+        city="Musterstadt",
+        country="DE",
+        business="Softwareentwicklung",
     )
 
     with pytest.raises(

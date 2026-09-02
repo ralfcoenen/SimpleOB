@@ -43,6 +43,7 @@ from openbilanz.taxonomy.gcd_entity_with_taxable_purpose_business import (
     GcdEntityWithTaxablePurposeBusinessType,
 )
 from openbilanz.taxonomy.gcd_fact_builder import GcdFactBuilder
+from openbilanz.taxonomy.gcd_report_data import GcdReportData
 from openbilanz.taxonomy.gcd_report_profile import GcdReportProfile
 from openbilanz.taxonomy.gcd_shareholder import GcdShareholder
 from openbilanz.taxonomy.hgb_gaap_ci_mapping import (
@@ -223,6 +224,14 @@ class EBilanzBuilder:
             context=duration_context,
         )
 
+        report_data_facts = gcd_builder.report_data_facts(
+            data=GcdReportData(
+                income_statement_ends_with_balance_profit=False,
+            ),
+            taxonomy_model=self._gcd_model,
+            context=duration_context,
+        )
+
         report_element = gcd_builder.report_element(
             profile=profile,
             taxonomy_model=self._gcd_model,
@@ -271,6 +280,7 @@ class EBilanzBuilder:
         facts = (
             gcd_facts
             + profile_facts
+            + report_data_facts
             + gaap_statement.facts
             + fixed_asset_schedule_xbrl.facts
         )
