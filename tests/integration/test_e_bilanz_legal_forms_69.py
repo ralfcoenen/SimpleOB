@@ -31,7 +31,6 @@ from openbilanz.taxonomy.gcd_company_data_mapper import (
 )
 from openbilanz.taxonomy.resolver import TaxonomyResolver
 
-
 TAXONOMY_ROOT = Path(
     "data/taxonomy"
 ).resolve()
@@ -119,6 +118,12 @@ def test_e_bilanz_69_validates_supported_legal_forms(
         tax_id="12345678901",
         tax_economic_id="DE123456789",
         bf4="1234",
+        street="Musterstraße",
+        house_number="1",
+        postal_code="50667",
+        city="Köln",
+        country="DE",
+        business="Softwareentwicklung",
     )
 
     fiscal_year = FiscalYear(

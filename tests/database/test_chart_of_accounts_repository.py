@@ -232,6 +232,11 @@ def test_saves_and_validates_control_accounts() -> None:
             account_type=AccountType.EQUITY,
         ),
         TemplateAccount(
+            account_number="2970",
+            name="Gewinnvortrag / Verlustvortrag",
+            account_type=AccountType.EQUITY,
+        ),
+        TemplateAccount(
             account_number="1571",
             name="Abziehbare Vorsteuer 7 %",
             account_type=AccountType.ASSET,
@@ -275,6 +280,7 @@ def test_saves_and_validates_control_accounts() -> None:
         income_summary_account="8990",
         profit_account="8020",
         loss_account="8021",
+        profit_loss_carryforward_account="2970",
     )
 
     vat_accounts = VatAccounts(
@@ -328,6 +334,7 @@ def test_saves_and_validates_control_accounts() -> None:
                 income_summary_account="8990",
                 profit_account="8020",
                 loss_account="8021",
+                profit_loss_carryforward_account="2970",
             )
         )
 
@@ -341,7 +348,12 @@ def test_saves_and_validates_control_accounts() -> None:
             )
 
     assert loaded == control_accounts
+    assert (
+        loaded.profit_loss_carryforward_account
+        == "2970"
+    )
     assert loaded_vat_accounts == vat_accounts
+
 
 def test_adds_account_to_existing_chart_of_accounts() -> None:
     """Ein neues Konto wird dem Mandantenkontenrahmen hinzugefügt."""

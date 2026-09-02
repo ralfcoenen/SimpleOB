@@ -1,7 +1,7 @@
 """Dialog zum Anlegen eines neuen Geschäftsjahres."""
 
 import tkinter as tk
-from datetime import datetime
+from datetime import datetime, timedelta
 from tkinter import messagebox, ttk
 
 from openbilanz.database.company_repository import CompanyRepository
@@ -29,6 +29,7 @@ class NewFiscalYearDialog(tk.Toplevel):
         self._company = company
 
         self.result: FiscalYear | None = None
+        self.requested_opening_source: FiscalYear | None = None
 
         self.title("OpenBilanz – Neues Geschäftsjahr")
         self.geometry("520x280")
@@ -206,6 +207,103 @@ class NewFiscalYearDialog(tk.Toplevel):
         return parse_german_date(
             value
         )
+
+    def _find_immediate_predecessor(
+        self,
+        fiscal_year: FiscalYear,
+    ):
+        """Liefert das unmittelbar vorhergehende Geschäftsjahr."""
+
+        managed_fiscal_years = (
+            self._repository.get_managed_fiscal_years(
+                self._company.company_id
+            )
+        )
+
+        expected_end_date = (
+            fiscal_year.start_date - timedelta(days=1)
+        )
+
+        return next(
+            (
+                managed
+                for managed in managed_fiscal_years
+                if (
+                    managed.fiscal_year.end_date
+                    == expected_end_date
+                )
+            ),
+            None,
+        )
+
+    def _confirm_opening_transfer(
+        self,
+        fiscal_year: FiscalYear,
+    ) -> bool:
+        """Fragt nach einer möglichen Saldenübernahme."""
+
+        predecessor = self._find_immediate_predecessor(
+            fiscal_year
+        )
+
+        if predecessor is None:
+            self.requested_opening_source = None
+            return True
+
+        source_fiscal_year = predecessor.fiscal_year
+
+        if not predecessor.is_closed:
+            create_without_transfer = (
+                messagebox.askokcancel(
+                    "Vorjahr noch nicht abgeschlossen",
+                    (
+                        "Das unmittelbar vorhergehende "
+                        "Geschäftsjahr "
+                        f"{source_fiscal_year.display_name} "
+                        "ist noch nicht abgeschlossen.\n\n"
+                        "Eine Übernahme der Vorjahressalden "
+                        "ist deshalb derzeit nicht möglich.\n\n"
+                        "Soll das neue Geschäftsjahr trotzdem "
+                        "ohne Saldenübernahme angelegt werden?"
+                    ),
+                    parent=self,
+                )
+            )
+
+            if not create_without_transfer:
+                return False
+
+            self.requested_opening_source = None
+            return True
+
+        decision = messagebox.askyesnocancel(
+            "Vorjahressalden übernehmen",
+            (
+                "Das abgeschlossene Geschäftsjahr "
+                f"{source_fiscal_year.display_name} "
+                "ist das unmittelbare Vorjahr.\n\n"
+                "Sollen dessen Schlussbestände als "
+                "Eröffnungswerte in das neue Geschäftsjahr "
+                "übernommen werden?\n\n"
+                "Ja = Vorjahressalden übernehmen\n"
+                "Nein = ohne Saldenübernahme anlegen\n"
+                "Abbrechen = Geschäftsjahr nicht anlegen"
+            ),
+            parent=self,
+        )
+
+        if decision is None:
+            return False
+
+        if decision:
+            self.requested_opening_source = (
+                source_fiscal_year
+            )
+        else:
+            self.requested_opening_source = None
+
+        return True
+
     def _create_fiscal_year(self) -> None:
         """Erzeugt und speichert das Geschäftsjahr."""
 
@@ -228,6 +326,11 @@ class NewFiscalYearDialog(tk.Toplevel):
                 start_date=start_date,
                 end_date=end_date,
             )
+
+            if not self._confirm_opening_transfer(
+                fiscal_year
+            ):
+                return
 
             self._repository.add_fiscal_year(
                 self._company.company_id,

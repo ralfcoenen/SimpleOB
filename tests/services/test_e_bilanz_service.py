@@ -88,7 +88,7 @@ class FakeAdapter:
             return self._gcd_model
 
         return self._gaap_ci_model
-    
+
     def validate(
         self,
         entry_point: Path,
@@ -111,7 +111,7 @@ def _company() -> Company:
         company_id=uuid4(),
         name="Muster UG",
     )
-    
+
 
 
 
@@ -129,8 +129,14 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
         tax_id="12345678901",
         tax_economic_id="DE123456789",
         bf4="1234",
+        street="Musterstraße",
+        house_number="1",
+        postal_code="50667",
+        city="Köln",
+        country="DE",
+        business="Softwareentwicklung",
     )
-    
+
     gcd_path = Path("/tmp/gcd.xsd")
     gaap_ci_path = Path("/tmp/gaap-ci.xsd")
 
@@ -256,7 +262,7 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
         liabilities=liabilities,
         income_statement=income_statement,
     )
-    
+
     builder.build.assert_called_once()
 
     call_kwargs = (
@@ -289,7 +295,7 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
         call_kwargs["identifiers"].tax_number_13
         == "5123045678901"
     )
-    
+
 def test_e_bilanz_service_validates_document_with_relative_schema_refs(
     tmp_path: Path,
     ) -> None:
@@ -463,4 +469,3 @@ def test_e_bilanz_service_validates_document_with_relative_schema_refs(
 
     # Das eigentliche Exportdokument bleibt unverändert.
     assert document.xml == original_xml
-

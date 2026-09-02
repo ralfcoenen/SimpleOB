@@ -4,8 +4,8 @@ from unittest.mock import Mock
 
 from openbilanz.domain.account_type import AccountType
 from openbilanz.ui.vat_booking_frame import (
-    VatBookingFrame,
     _INPUT_INVOICE,
+    VatBookingFrame,
 )
 
 

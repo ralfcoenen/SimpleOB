@@ -9,11 +9,11 @@ from openbilanz.taxonomy.unit import TaxonomyUnit
 
 @dataclass(frozen=True, slots=True)
 class TaxonomyNilFact:
-    """Repräsentiert einen numerischen XBRL-Fact ohne ableitbaren Wert."""
+    """Repräsentiert einen XBRL-Fact ohne ableitbaren Wert."""
 
     concept: TaxonomyConcept
     context: TaxonomyContext
-    unit: TaxonomyUnit
+    unit: TaxonomyUnit | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(
@@ -32,17 +32,15 @@ class TaxonomyNilFact:
                 "context must be a TaxonomyContext"
             )
 
-        if not isinstance(
-            self.unit,
-            TaxonomyUnit,
+        if (
+            self.unit is not None
+            and not isinstance(
+                self.unit,
+                TaxonomyUnit,
+            )
         ):
             raise TypeError(
-                "unit must be a TaxonomyUnit"
-            )
-
-        if not self.concept.is_numeric:
-            raise ValueError(
-                "concept is not numeric"
+                "unit must be a TaxonomyUnit or None"
             )
 
         if not self.concept.nillable:
@@ -58,18 +56,32 @@ class TaxonomyNilFact:
                 "context period type does not match concept"
             )
 
-        if (
-            self.concept.type_name == "xbrli:monetaryItemType"
-            and not self.unit.measure.startswith("iso4217:")
-        ):
-            raise ValueError(
-                "monetary concept requires ISO 4217 unit"
-            )
+        if self.concept.is_numeric:
+            if self.unit is None:
+                raise ValueError(
+                    "numeric concept requires unit"
+                )
 
-        if (
-            self.concept.type_name == "xbrli:pureItemType"
-            and self.unit.measure != "xbrli:pure"
-        ):
+            if (
+                self.concept.type_name
+                == "xbrli:monetaryItemType"
+                and not self.unit.measure.startswith(
+                    "iso4217:"
+                )
+            ):
+                raise ValueError(
+                    "monetary concept requires ISO 4217 unit"
+                )
+
+            if (
+                self.concept.type_name
+                == "xbrli:pureItemType"
+                and self.unit.measure != "xbrli:pure"
+            ):
+                raise ValueError(
+                    "pure concept requires xbrli:pure unit"
+                )
+        elif self.unit is not None:
             raise ValueError(
-                "pure concept requires xbrli:pure unit"
+                "non-numeric concept must not have unit"
             )

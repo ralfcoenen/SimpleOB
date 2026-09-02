@@ -36,7 +36,7 @@ from openbilanz.services.posting_service import PostingService
 
 
 def test_closes_profit_and_transfers_it_to_next_fiscal_year() -> None:
-    """Ein Jahresüberschuss wird abgeschlossen und vorgetragen."""
+    """Ein Jahresüberschuss wird als Gewinnvortrag übernommen."""
 
     ledger_2026 = Ledger()
     journal_2026 = Journal()
@@ -103,6 +103,7 @@ def test_closes_profit_and_transfers_it_to_next_fiscal_year() -> None:
     assets, liabilities = (
         create_hgb_balance_sheet_structure()
     )
+
     income_statement_root = (
         create_hgb_income_statement_structure()
     )
@@ -200,6 +201,9 @@ def test_closes_profit_and_transfers_it_to_next_fiscal_year() -> None:
 
     transfer_service = FiscalYearTransferService(
         opening_balance_account_number="9000",
+        profit_account_number="8020",
+        loss_account_number="8021",
+        profit_loss_carryforward_account_number="2970",
     )
 
     transfer_bookings = transfer_service.create_opening_bookings(
@@ -215,8 +219,10 @@ def test_closes_profit_and_transfers_it_to_next_fiscal_year() -> None:
     }
 
     assert "1200" in transferred_accounts
-    assert "8020" in transferred_accounts
+    assert "2970" in transferred_accounts
 
+    assert "8020" not in transferred_accounts
+    assert "8021" not in transferred_accounts
     assert "8400" not in transferred_accounts
     assert "4980" not in transferred_accounts
     assert "8990" not in transferred_accounts
@@ -236,15 +242,24 @@ def test_closes_profit_and_transfers_it_to_next_fiscal_year() -> None:
         for balance in ledger_2027.balances()
     }
 
-    assert balances_2027["1200"].debit_balance == Decimal("26500.00")
-    assert balances_2027["8020"].credit_balance == Decimal("1500.00")
+    assert (
+        balances_2027["1200"].debit_balance
+        == Decimal("26500.00")
+    )
+    assert (
+        balances_2027["2970"].credit_balance
+        == Decimal("1500.00")
+    )
 
+    assert "8020" not in balances_2027
+    assert "8021" not in balances_2027
     assert "8400" not in balances_2027
     assert "4980" not in balances_2027
     assert "8990" not in balances_2027
 
+
 def test_closes_loss_and_transfers_it_to_next_fiscal_year() -> None:
-    """Ein Jahresfehlbetrag wird abgeschlossen und vorgetragen."""
+    """Ein Jahresfehlbetrag wird als Verlustvortrag übernommen."""
 
     ledger_2026 = Ledger()
     journal_2026 = Journal()
@@ -311,6 +326,7 @@ def test_closes_loss_and_transfers_it_to_next_fiscal_year() -> None:
     assets, liabilities = (
         create_hgb_balance_sheet_structure()
     )
+
     income_statement_root = (
         create_hgb_income_statement_structure()
     )
@@ -408,6 +424,9 @@ def test_closes_loss_and_transfers_it_to_next_fiscal_year() -> None:
 
     transfer_service = FiscalYearTransferService(
         opening_balance_account_number="9000",
+        profit_account_number="8020",
+        loss_account_number="8021",
+        profit_loss_carryforward_account_number="2970",
     )
 
     transfer_bookings = transfer_service.create_opening_bookings(
@@ -423,8 +442,10 @@ def test_closes_loss_and_transfers_it_to_next_fiscal_year() -> None:
     }
 
     assert "1200" in transferred_accounts
-    assert "8021" in transferred_accounts
+    assert "2970" in transferred_accounts
 
+    assert "8020" not in transferred_accounts
+    assert "8021" not in transferred_accounts
     assert "8400" not in transferred_accounts
     assert "4980" not in transferred_accounts
     assert "8990" not in transferred_accounts
@@ -444,9 +465,17 @@ def test_closes_loss_and_transfers_it_to_next_fiscal_year() -> None:
         for balance in ledger_2027.balances()
     }
 
-    assert balances_2027["1200"].debit_balance == Decimal("23500.00")
-    assert balances_2027["8021"].debit_balance == Decimal("1500.00")
+    assert (
+        balances_2027["1200"].debit_balance
+        == Decimal("23500.00")
+    )
+    assert (
+        balances_2027["2970"].debit_balance
+        == Decimal("1500.00")
+    )
 
+    assert "8020" not in balances_2027
+    assert "8021" not in balances_2027
     assert "8400" not in balances_2027
     assert "4980" not in balances_2027
     assert "8990" not in balances_2027

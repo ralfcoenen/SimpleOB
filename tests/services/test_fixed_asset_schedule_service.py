@@ -15,14 +15,14 @@ from openbilanz.domain.fixed_asset import FixedAsset
 from openbilanz.domain.fixed_asset_depreciation import (
     FixedAssetDepreciation,
 )
-from openbilanz.domain.fixed_asset_status import (
-    FixedAssetStatus,
-)
 from openbilanz.domain.fixed_asset_movement import (
     FixedAssetMovement,
 )
 from openbilanz.domain.fixed_asset_movement_type import (
     FixedAssetMovementType,
+)
+from openbilanz.domain.fixed_asset_status import (
+    FixedAssetStatus,
 )
 from openbilanz.services.fixed_asset_schedule_service import (
     FixedAssetScheduleService,

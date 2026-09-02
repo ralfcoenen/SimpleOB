@@ -59,6 +59,11 @@ def _standard_chart_of_accounts() -> ChartOfAccountsTemplate:
                 account_type=AccountType.EQUITY,
             ),
             TemplateAccount(
+                account_number="2970",
+                name="Gewinnvortrag / Verlustvortrag",
+                account_type=AccountType.EQUITY,
+            ),
+            TemplateAccount(
                 account_number="1571",
                 name="Abziehbare Vorsteuer 7 %",
                 account_type=AccountType.ASSET,
@@ -236,6 +241,7 @@ def test_does_not_replace_existing_chart_of_accounts() -> None:
         "1576",
         "1771",
         "1776",
+        "2970",
         "8020",
         "8021",
         "8990",

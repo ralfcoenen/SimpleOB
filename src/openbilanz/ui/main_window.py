@@ -15,10 +15,10 @@ from openbilanz.accounting.ledger import Ledger
 from openbilanz.domain.account_type import AccountType
 from openbilanz.domain.booking import Booking
 from openbilanz.domain.entry_side import EntrySide
+from openbilanz.domain.fixed_asset_status import FixedAssetStatus
 from openbilanz.domain.journal import Journal
 from openbilanz.domain.money import ZERO
 from openbilanz.domain.vat_accounts import VatAccounts
-from openbilanz.domain.fixed_asset_status import FixedAssetStatus
 from openbilanz.services.closing_accounts import ClosingAccounts
 from openbilanz.services.closing_result import ClosingResult
 from openbilanz.services.closing_service import ClosingService
@@ -44,6 +44,10 @@ from openbilanz.ui.closing_frame import ClosingFrame
 from openbilanz.ui.company_master_data_dialog import (
     CompanyMasterDataDialog,
 )
+from openbilanz.ui.date_input import (
+    normalize_german_date,
+    parse_german_date,
+)
 from openbilanz.ui.fixed_asset_acquisition_link_dialog import (
     AcquisitionBookingCandidate,
     FixedAssetAcquisitionLinkDialog,
@@ -51,10 +55,6 @@ from openbilanz.ui.fixed_asset_acquisition_link_dialog import (
 from openbilanz.ui.fixed_asset_disposal_link_dialog import (
     DisposalBookingCandidate,
     FixedAssetDisposalLinkDialog,
-)
-from openbilanz.ui.date_input import (
-    normalize_german_date,
-    parse_german_date,
 )
 from openbilanz.ui.income_statement_frame import (
     IncomeStatementFrame,

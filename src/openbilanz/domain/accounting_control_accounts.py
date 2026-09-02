@@ -11,6 +11,7 @@ class AccountingControlAccounts:
     income_summary_account: str
     profit_account: str
     loss_account: str
+    profit_loss_carryforward_account: str = "2970"
 
     def __post_init__(self) -> None:
         for field_name, account_number in (
@@ -29,6 +30,10 @@ class AccountingControlAccounts:
             (
                 "loss_account",
                 self.loss_account,
+            ),
+            (
+                "profit_loss_carryforward_account",
+                self.profit_loss_carryforward_account,
             ),
         ):
             if not isinstance(account_number, str):
@@ -64,5 +69,6 @@ class AccountingControlAccounts:
                 self.income_summary_account,
                 self.profit_account,
                 self.loss_account,
+                self.profit_loss_carryforward_account,
             )
         )

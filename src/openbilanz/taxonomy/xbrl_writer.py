@@ -24,9 +24,9 @@ from openbilanz.taxonomy.gcd_report_element import (
 from openbilanz.taxonomy.gcd_shareholder_tuple import (
     GcdShareholderTuple,
 )
+from openbilanz.taxonomy.nil_fact import TaxonomyNilFact
 from openbilanz.taxonomy.text_fact import TaxonomyTextFact
 from openbilanz.taxonomy.unit import TaxonomyUnit
-from openbilanz.taxonomy.nil_fact import TaxonomyNilFact
 
 XBRLI_NAMESPACE = "http://www.xbrl.org/2003/instance"
 XBRLDI_NAMESPACE = "http://xbrl.org/2006/xbrldi"
@@ -159,12 +159,21 @@ class TaxonomyXbrlWriter:
 
     def fact_element(
         self,
+        *,
         fact: TaxonomyFact,
         context_id: str,
         unit_id: str,
         namespace: str,
     ) -> ET.Element:
         """Erzeugt ein numerisches XBRL-Fact-Element."""
+
+        if not isinstance(
+            fact,
+            TaxonomyFact,
+        ):
+            raise TypeError(
+                "fact must be a TaxonomyFact"
+            )
 
         element = ET.Element(
             f"{{{namespace}}}{fact.concept.name}",
@@ -175,9 +184,7 @@ class TaxonomyXbrlWriter:
             },
         )
 
-        element.text = str(
-            fact.amount
-        )
+        element.text = str(fact.amount)
 
         return element
 
@@ -186,10 +193,10 @@ class TaxonomyXbrlWriter:
         *,
         fact: TaxonomyNilFact,
         context_id: str,
-        unit_id: str,
+        unit_id: str | None,
         namespace: str,
     ) -> ET.Element:
-        """Erzeugt ein numerisches XBRL-NIL-Fact-Element."""
+        """Erzeugt ein XBRL-NIL-Fact-Element."""
 
         if not isinstance(
             fact,
@@ -199,13 +206,17 @@ class TaxonomyXbrlWriter:
                 "fact must be a TaxonomyNilFact"
             )
 
+        attributes = {
+            "contextRef": context_id,
+            f"{{{XSI_NAMESPACE}}}nil": "true",
+        }
+
+        if unit_id is not None:
+            attributes["unitRef"] = unit_id
+
         return ET.Element(
             f"{{{namespace}}}{fact.concept.name}",
-            {
-                "contextRef": context_id,
-                "unitRef": unit_id,
-                f"{{{XSI_NAMESPACE}}}nil": "true",
-            },
+            attributes,
         )
 
     def gcd_report_element_element(
@@ -664,18 +675,22 @@ class TaxonomyXbrlWriter:
                 taxonomy_namespaces=taxonomy_namespaces,
             )
 
+            unit_id = None
+
+            if fact.unit is not None:
+                unit_id = self.unit_id_for(
+                    unit=fact.unit,
+                    units=units,
+                )
+
             root.append(
                 self.nil_fact_element(
                     fact=fact,
                     context_id=context_id,
-                    unit_id=self.unit_id_for(
-                        unit=fact.unit,
-                        units=units,
-                    ),
+                    unit_id=unit_id,
                     namespace=namespace,
                 )
             )
-
 
 
         for company_id_no in company_id_nos:

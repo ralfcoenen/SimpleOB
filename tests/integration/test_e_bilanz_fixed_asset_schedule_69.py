@@ -28,7 +28,6 @@ from openbilanz.taxonomy.gcd_company_data import GcdCompanyData
 from openbilanz.taxonomy.resolver import TaxonomyResolver
 from openbilanz.taxonomy.taxonomy import TaxonomyVersion
 
-
 TAXONOMY_ROOT = Path(
     "data/taxonomy"
 ).resolve()

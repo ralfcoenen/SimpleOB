@@ -17,9 +17,21 @@ class FiscalYearTransferService:
         self,
         *,
         opening_balance_account_number: str,
+        profit_account_number: str,
+        loss_account_number: str,
+        profit_loss_carryforward_account_number: str,
     ) -> None:
         self._opening_balance_account_number = (
             opening_balance_account_number
+        )
+        self._profit_account_number = (
+            profit_account_number
+        )
+        self._loss_account_number = (
+            loss_account_number
+        )
+        self._profit_loss_carryforward_account_number = (
+            profit_loss_carryforward_account_number
         )
 
     def create_opening_bookings(
@@ -40,16 +52,16 @@ class FiscalYearTransferService:
         }
 
         for balance in ledger.balances():
-            account_number = balance.account_number
+            source_account_number = balance.account_number
 
             if (
-                account_number
+                source_account_number
                 == self._opening_balance_account_number
             ):
                 continue
 
             account_type = account_types.get(
-                account_number
+                source_account_number
             )
 
             if (
@@ -58,8 +70,15 @@ class FiscalYearTransferService:
             ):
                 continue
 
+            target_account_number = (
+                self._opening_account_number(
+                    source_account_number
+                )
+            )
+
             booking = self._create_opening_booking(
-                account_number=account_number,
+                source_account_number=source_account_number,
+                target_account_number=target_account_number,
                 debit_balance=balance.debit_balance,
                 credit_balance=balance.credit_balance,
                 opening_date=opening_date,
@@ -72,10 +91,27 @@ class FiscalYearTransferService:
 
         return tuple(bookings)
 
+    def _opening_account_number(
+        self,
+        source_account_number: str,
+    ) -> str:
+        """Bestimmt das Konto des Saldovortrags im neuen Geschäftsjahr."""
+
+        if source_account_number in (
+            self._profit_account_number,
+            self._loss_account_number,
+        ):
+            return (
+                self._profit_loss_carryforward_account_number
+            )
+
+        return source_account_number
+
     def _create_opening_booking(
         self,
         *,
-        account_number: str,
+        source_account_number: str,
+        target_account_number: str,
         debit_balance: Decimal,
         credit_balance: Decimal,
         opening_date: date,
@@ -87,11 +123,12 @@ class FiscalYearTransferService:
                 booking_date=opening_date,
                 voucher_no=None,
                 description=(
-                    f"Saldovortrag Konto {account_number}"
+                    "Saldovortrag Konto "
+                    f"{source_account_number}"
                 ),
                 lines=(
                     BookingLine(
-                        account_number=account_number,
+                        account_number=target_account_number,
                         side=EntrySide.DEBIT,
                         amount=debit_balance,
                     ),
@@ -110,7 +147,8 @@ class FiscalYearTransferService:
                 booking_date=opening_date,
                 voucher_no=None,
                 description=(
-                    f"Saldovortrag Konto {account_number}"
+                    "Saldovortrag Konto "
+                    f"{source_account_number}"
                 ),
                 lines=(
                     BookingLine(
@@ -121,7 +159,7 @@ class FiscalYearTransferService:
                         amount=credit_balance,
                     ),
                     BookingLine(
-                        account_number=account_number,
+                        account_number=target_account_number,
                         side=EntrySide.CREDIT,
                         amount=credit_balance,
                     ),

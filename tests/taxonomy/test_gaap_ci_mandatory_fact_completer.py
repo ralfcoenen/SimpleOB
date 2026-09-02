@@ -8,6 +8,7 @@ from openbilanz.taxonomy.concept import (
     TaxonomyConcept,
     TaxonomyPeriodType,
 )
+from openbilanz.taxonomy.concept_set import TaxonomyConceptSet
 from openbilanz.taxonomy.context import TaxonomyContext
 from openbilanz.taxonomy.fact import TaxonomyFact
 from openbilanz.taxonomy.fiscal_requirement_reader import (
@@ -17,9 +18,8 @@ from openbilanz.taxonomy.fiscal_requirement_reader import (
 from openbilanz.taxonomy.gaap_ci_mandatory_fact_completer import (
     GaapCiMandatoryFactCompleter,
 )
-from openbilanz.taxonomy.model import TaxonomyModel
-from openbilanz.taxonomy.concept_set import TaxonomyConceptSet
 from openbilanz.taxonomy.label_set import TaxonomyLabelSet
+from openbilanz.taxonomy.model import TaxonomyModel
 from openbilanz.taxonomy.presentation_set import (
     TaxonomyPresentationSet,
 )

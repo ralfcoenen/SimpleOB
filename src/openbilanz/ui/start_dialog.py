@@ -27,7 +27,11 @@ class StartDialog(tk.Toplevel):
         super().__init__(parent)
 
         self._repository = repository
+
         self.result: ApplicationContext | None = None
+        self.opening_transfer_request: (
+            tuple[FiscalYear, FiscalYear] | None
+        ) = None
 
         self.title("OpenBilanz – Buchhaltung öffnen")
         self.geometry("800x320")
@@ -162,7 +166,7 @@ class StartDialog(tk.Toplevel):
         ).pack(
             side="left",
         )
-        
+
         self._new_fiscal_year_button = ttk.Button(
             buttons,
             text="Neues Geschäftsjahr",
@@ -175,7 +179,7 @@ class StartDialog(tk.Toplevel):
         self._new_fiscal_year_button.state(
             ["disabled"]
         )
-        
+
         ttk.Button(
             buttons,
             text="Abbrechen",
@@ -222,7 +226,7 @@ class StartDialog(tk.Toplevel):
                 "Es ist noch keine Buchhaltung vorhanden."
             )
             return
-        
+
         self._new_fiscal_year_button.state(
             ["!disabled"]
         )
@@ -335,7 +339,7 @@ class StartDialog(tk.Toplevel):
         )
 
         self.destroy()
-        
+
     def _create_new_company(self) -> None:
         """Öffnet den Dialog zum Anlegen einer Buchhaltung."""
 
@@ -351,7 +355,7 @@ class StartDialog(tk.Toplevel):
 
         self.result = dialog.result
         self.destroy()
-  
+
     def _create_new_fiscal_year(self) -> None:
         """Legt für das ausgewählte Unternehmen ein Geschäftsjahr an."""
 
@@ -371,13 +375,17 @@ class StartDialog(tk.Toplevel):
         if dialog.result is None:
             return
 
-        self._load_fiscal_years(
-            company
+        fiscal_year = dialog.result
+
+        if dialog.requested_opening_source is not None:
+            self.opening_transfer_request = (
+                fiscal_year,
+                dialog.requested_opening_source,
+            )
+
+        self.result = ApplicationContext(
+            company=company,
+            fiscal_year=fiscal_year,
         )
 
-        display_name = dialog.result.display_name
-
-        self._fiscal_year_var.set(
-            display_name
-        )
-    
+        self.destroy()

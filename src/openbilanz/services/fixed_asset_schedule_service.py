@@ -18,7 +18,6 @@ from openbilanz.domain.fixed_asset_movement_type import (
     FixedAssetMovementType,
 )
 
-
 ZERO = Decimal("0.00")
 
 

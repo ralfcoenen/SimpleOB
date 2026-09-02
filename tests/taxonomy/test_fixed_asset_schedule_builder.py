@@ -30,7 +30,6 @@ from openbilanz.taxonomy.presentation_set import (
     TaxonomyPresentationSet,
 )
 
-
 TEST_ENTITY_IDENTIFIER = "DE123456789"
 
 TEST_ENTITY_SCHEME = (

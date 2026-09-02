@@ -43,14 +43,14 @@ from openbilanz.domain.fixed_asset import FixedAsset
 from openbilanz.domain.fixed_asset_depreciation import (
     FixedAssetDepreciation,
 )
-from openbilanz.domain.journal import Journal
-from openbilanz.domain.managed_fiscal_year import ManagedFiscalYear
 from openbilanz.domain.fixed_asset_movement_type import (
     FixedAssetMovementType,
 )
 from openbilanz.domain.fixed_asset_status import (
     FixedAssetStatus,
 )
+from openbilanz.domain.journal import Journal
+from openbilanz.domain.managed_fiscal_year import ManagedFiscalYear
 from openbilanz.services.closing_result import ClosingResult
 from openbilanz.services.e_bilanz_export_service import (
     EBilanzExportService,
@@ -1068,9 +1068,14 @@ def test_builds_e_bilanz_from_prepared_data(
 
     company_repository.get_managed_fiscal_years.return_value = (
         ManagedFiscalYear(
+            fiscal_year=previous_fiscal_year,
+            status=FiscalYearStatus.CLOSED,
+            opening_source=None,
+        ),
+        ManagedFiscalYear(
             fiscal_year=context.fiscal_year,
             status=FiscalYearStatus.CLOSED,
-            opening_source=previous_fiscal_year,
+            opening_source=None,
         ),
     )
 
@@ -1140,8 +1145,8 @@ def test_builds_e_bilanz_from_prepared_data(
         entity_scheme="urn:openbilanz:company-id",
         previous_fiscal_year=previous_fiscal_year,
         account_details=account_details,
+        fixed_asset_schedule=(),
     )
-
 
 def test_rejects_e_bilanz_build_for_open_fiscal_year(
     context: ApplicationContext,

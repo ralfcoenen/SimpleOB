@@ -22,7 +22,6 @@ from openbilanz.taxonomy.resolver import TaxonomyResolver
 from openbilanz.taxonomy.taxonomy import TaxonomyVersion
 from openbilanz.taxonomy.unit import TaxonomyUnit
 
-
 TAXONOMY_ROOT = Path(
     "data/taxonomy"
 ).resolve()

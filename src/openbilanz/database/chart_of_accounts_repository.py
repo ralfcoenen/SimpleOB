@@ -586,6 +586,10 @@ class ChartOfAccountsRepository:
                 loss_account=(
                     control_accounts.loss_account
                 ),
+                profit_loss_carryforward_account=(
+                    control_accounts
+                    .profit_loss_carryforward_account
+                ),
                 input_tax_7="1571",
                 input_tax_19="1576",
                 output_tax_7="1771",
@@ -607,6 +611,10 @@ class ChartOfAccountsRepository:
             )
             model.loss_account = (
                 control_accounts.loss_account
+            )
+            model.profit_loss_carryforward_account = (
+                control_accounts
+                .profit_loss_carryforward_account
             )
 
         if commit:
@@ -744,6 +752,9 @@ class ChartOfAccountsRepository:
             ),
             profit_account=model.profit_account,
             loss_account=model.loss_account,
+            profit_loss_carryforward_account=(
+                model.profit_loss_carryforward_account
+            ),
         )
 
     def load_vat_accounts(

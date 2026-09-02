@@ -218,6 +218,14 @@ class KontenrahmenKonfiguration(Base):
         nullable=False,
     )
 
+    profit_loss_carryforward_account: Mapped[str] = (
+        mapped_column(
+            String,
+            nullable=False,
+            default="2970",
+        )
+    )
+
     input_tax_7: Mapped[str] = mapped_column(
         String,
         nullable=False,

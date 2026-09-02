@@ -53,6 +53,7 @@ from openbilanz.taxonomy.gcd_shareholder_tuple import (
 )
 from openbilanz.taxonomy.label_set import TaxonomyLabelSet
 from openbilanz.taxonomy.model import TaxonomyModel
+from openbilanz.taxonomy.nil_fact import TaxonomyNilFact
 from openbilanz.taxonomy.presentation_set import (
     TaxonomyPresentationSet,
 )
@@ -231,7 +232,7 @@ def test_gcd_fact_builder_defines_fiscal_year_values() -> None:
         31,
     ),
 }
-   
+
 def test_gcd_fact_builder_builds_company_facts() -> None:
     """Unternehmensstammdaten werden zu GCD-Text-Facts."""
 
@@ -535,50 +536,34 @@ def test_gcd_fact_builder_builds_gmbh_company_facts() -> None:
     }
 
 def test_gcd_fact_builder_builds_fiscal_year_facts() -> None:
-    """Wirtschaftsjahresdaten werden zu GCD-Text-Facts."""
+    """Wirtschaftsjahresdaten werden zu GCD-Facts."""
 
     fiscal_year = FiscalYear(
         start_date=date(2025, 1, 1),
         end_date=date(2025, 12, 31),
     )
 
-    concepts = (
+    concept_names = (
+        "genInfo.report.period.fiscalYearBegin",
+        "genInfo.report.period.fiscalYearEnd",
+        "genInfo.report.period.balSheetClosingDate",
+        "genInfo.report.period.fiscalPreviousYearBegin",
+        "genInfo.report.period.fiscalPreviousYearEnd",
+        "genInfo.report.period.balSheetClosingDatePreviousYear",
+    )
+
+    concepts = tuple(
         TaxonomyConcept(
-            name="genInfo.report.period.fiscalYearBegin",
-            concept_id=(
-                "de-gcd_genInfo.report.period.fiscalYearBegin"
-            ),
+            name=name,
+            concept_id="de-gcd_" + name,
             type_name="xbrli:dateItemType",
             substitution_group="xbrli:item",
             period_type=TaxonomyPeriodType.DURATION,
             balance=TaxonomyBalance.NONE,
             abstract=False,
             nillable=True,
-        ),
-        TaxonomyConcept(
-            name="genInfo.report.period.fiscalYearEnd",
-            concept_id=(
-                "de-gcd_genInfo.report.period.fiscalYearEnd"
-            ),
-            type_name="xbrli:dateItemType",
-            substitution_group="xbrli:item",
-            period_type=TaxonomyPeriodType.DURATION,
-            balance=TaxonomyBalance.NONE,
-            abstract=False,
-            nillable=True,
-        ),
-        TaxonomyConcept(
-            name="genInfo.report.period.balSheetClosingDate",
-            concept_id=(
-                "de-gcd_genInfo.report.period.balSheetClosingDate"
-            ),
-            type_name="xbrli:dateItemType",
-            substitution_group="xbrli:item",
-            period_type=TaxonomyPeriodType.DURATION,
-            balance=TaxonomyBalance.NONE,
-            abstract=False,
-            nillable=True,
-        ),
+        )
+        for name in concept_names
     )
 
     taxonomy_model = _taxonomy_model(
@@ -601,22 +586,27 @@ def test_gcd_fact_builder_builds_fiscal_year_facts() -> None:
         context=context,
     )
 
-    assert len(facts) == 3
+    assert len(facts) == 6
 
-    assert all(
-        isinstance(
+    text_facts = {
+        fact.concept.name: fact.value
+        for fact in facts
+        if isinstance(
             fact,
             TaxonomyTextFact,
         )
-        for fact in facts
-    )
-
-    values = {
-        fact.concept.name: fact.value
-        for fact in facts
     }
 
-    assert values == {
+    nil_fact_names = {
+        fact.concept.name
+        for fact in facts
+        if isinstance(
+            fact,
+            TaxonomyNilFact,
+        )
+    }
+
+    assert text_facts == {
         "genInfo.report.period.fiscalYearBegin": (
             "2025-01-01"
         ),
@@ -627,6 +617,21 @@ def test_gcd_fact_builder_builds_fiscal_year_facts() -> None:
             "2025-12-31"
         ),
     }
+
+    assert nil_fact_names == {
+        "genInfo.report.period.fiscalPreviousYearBegin",
+        "genInfo.report.period.fiscalPreviousYearEnd",
+        "genInfo.report.period.balSheetClosingDatePreviousYear",
+    }
+
+    assert all(
+        fact.unit is None
+        for fact in facts
+        if isinstance(
+            fact,
+            TaxonomyNilFact,
+        )
+    )
 
 def test_gcd_fact_builder_builds_report_profile_facts() -> None:
     """Das GCD-Berichtsprofil erzeugt grundlegende Berichtsfacts."""
@@ -688,7 +693,7 @@ def test_gcd_fact_builder_builds_report_profile_facts() -> None:
         abstract=False,
         nillable=True,
     )
-    
+
     special_accounting_standard_concept = TaxonomyConcept(
         name=profile.special_accounting_standard,
         concept_id=(
@@ -716,7 +721,7 @@ def test_gcd_fact_builder_builds_report_profile_facts() -> None:
         abstract=False,
         nillable=True,
     )
-    
+
     consolidation_range_concept = TaxonomyConcept(
         name=profile.consolidation_range,
         concept_id=(
@@ -744,7 +749,7 @@ def test_gcd_fact_builder_builds_report_profile_facts() -> None:
         abstract=False,
         nillable=True,
     )
-    
+
     taxonomy_model = _taxonomy_model(
         report_status_concept,
         revision_status_concept,
@@ -814,7 +819,7 @@ def test_gcd_fact_builder_builds_report_profile_facts() -> None:
             context=context,
         ),
     )
-    
+
 def test_gcd_fact_builder_builds_standard_report_element() -> None:
     """Das Standardprofil erzeugt die regulären Berichtselemente."""
 
@@ -942,7 +947,7 @@ def test_gcd_fact_builder_adds_account_statements_from_69() -> None:
             "GuV"
         ),
     }
-        
+
 def test_gcd_fact_builder_keeps_account_statements_in_610() -> None:
     """Taxonomie 6.10 verwendet im Standardprofil nur Bilanz und GuV."""
 
@@ -1090,7 +1095,7 @@ def test_gcd_fact_builder_includes_previous_fiscal_year_values() -> None:
             31,
         ),
     }
-    
+
 def test_gcd_fact_builder_builds_previous_fiscal_year_facts() -> None:
         """Vorjahresdaten werden zu GCD-Text-Facts."""
 
@@ -1166,6 +1171,98 @@ def test_gcd_fact_builder_builds_previous_fiscal_year_facts() -> None:
             ),
         }
 
+def test_gcd_fact_builder_builds_nil_previous_year_facts_for_first_fiscal_year() -> None:
+    """Im ersten Wirtschaftsjahr werden Vorjahres-Mussfelder als NIL erzeugt."""
+
+    fiscal_year = FiscalYear(
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    concept_names = (
+        "genInfo.report.period.fiscalYearBegin",
+        "genInfo.report.period.fiscalYearEnd",
+        "genInfo.report.period.balSheetClosingDate",
+        "genInfo.report.period.fiscalPreviousYearBegin",
+        "genInfo.report.period.fiscalPreviousYearEnd",
+        "genInfo.report.period.balSheetClosingDatePreviousYear",
+    )
+
+    concepts = tuple(
+        TaxonomyConcept(
+            name=name,
+            concept_id="de-gcd_" + name,
+            type_name="xbrli:dateItemType",
+            substitution_group="xbrli:item",
+            period_type=TaxonomyPeriodType.DURATION,
+            balance=TaxonomyBalance.NONE,
+            abstract=False,
+            nillable=True,
+        )
+        for name in concept_names
+    )
+
+    taxonomy_model = _taxonomy_model(
+        *concepts
+    )
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    builder = GcdFactBuilder()
+
+    facts = builder.fiscal_year_facts(
+        fiscal_year=fiscal_year,
+        previous_fiscal_year=None,
+        taxonomy_model=taxonomy_model,
+        context=context,
+    )
+
+    assert len(facts) == 6
+
+    text_facts = {
+        fact.concept.name: fact.value
+        for fact in facts
+        if isinstance(
+            fact,
+            TaxonomyTextFact,
+        )
+    }
+
+    nil_fact_names = {
+        fact.concept.name
+        for fact in facts
+        if isinstance(
+            fact,
+            TaxonomyNilFact,
+        )
+    }
+
+    assert text_facts == {
+        "genInfo.report.period.fiscalYearBegin": "2025-01-01",
+        "genInfo.report.period.fiscalYearEnd": "2025-12-31",
+        "genInfo.report.period.balSheetClosingDate": "2025-12-31",
+    }
+
+    assert nil_fact_names == {
+        "genInfo.report.period.fiscalPreviousYearBegin",
+        "genInfo.report.period.fiscalPreviousYearEnd",
+        "genInfo.report.period.balSheetClosingDatePreviousYear",
+    }
+
+    assert all(
+        fact.unit is None
+        for fact in facts
+        if isinstance(
+            fact,
+            TaxonomyNilFact,
+        )
+    )
 
 @pytest.mark.parametrize(
     ("value", "expected"),
@@ -1234,7 +1331,7 @@ def test_gcd_fact_builder_builds_variable_report_data_facts(
             context=context,
         ),
     )
-    
+
 def test_gcd_fact_builder_builds_company_id_no_tuple() -> None:
     """Unternehmenskennungen werden zu einem GCD-idNo-Tuple."""
 
@@ -1585,7 +1682,7 @@ def test_gcd_fact_builder_builds_shareholder_legal_status() -> None:
     assert result.fact.concept.name == concept_name
     assert result.fact.value == "NPP"
     assert result.fact.context == context
-    
+
 def test_gcd_fact_builder_builds_shareholder_share_divide_key() -> None:
     """Der Builder erzeugt das Beteiligungsquoten-Tuple."""
 
@@ -1741,7 +1838,7 @@ def test_gcd_fact_builder_builds_shareholder_current_number() -> None:
     assert result.context == context
     assert result.unit == TaxonomyUnit.pure()
     assert result.decimals == "INF"
-    
+
 def test_gcd_fact_builder_builds_shareholder_tuple() -> None:
     """Der Builder setzt die Gesellschafter-Bausteine zum Tuple zusammen."""
 
@@ -1851,7 +1948,7 @@ def test_gcd_fact_builder_builds_shareholder_tuple() -> None:
     assert result.current_number.amount == Decimal("1")
     assert result.current_number.unit == TaxonomyUnit.pure()
     assert result.current_number.decimals == "INF"
-    
+
 def test_gcd_fact_builder_builds_domestic_branch_of_foreign_company() -> None:
     """Der Builder erzeugt das Tuple für eine inländische Zweigniederlassung."""
 
@@ -1952,7 +2049,7 @@ def test_gcd_fact_builder_builds_entity_with_taxable_purpose_business() -> None:
     assert result.fact.concept is concept
     assert result.fact.value == "normal"
     assert result.fact.context is context
-    
+
 def test_gcd_fact_builder_builds_optional_shareholder_identifier_facts() -> None:
     """Der Builder erzeugt optionale Shareholder-Facts taxonomieabhängig."""
 
@@ -2044,5 +2141,3 @@ def test_gcd_fact_builder_builds_optional_shareholder_identifier_facts() -> None
 
     assert result.id_not_assigned is not None
     assert result.id_not_assigned.value == "NO-ID"
-    
-    

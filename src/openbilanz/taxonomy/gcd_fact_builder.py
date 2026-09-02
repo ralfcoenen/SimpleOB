@@ -39,6 +39,7 @@ from openbilanz.taxonomy.gcd_shareholder_tuple import (
     GcdShareholderTuple,
 )
 from openbilanz.taxonomy.model import TaxonomyModel
+from openbilanz.taxonomy.nil_fact import TaxonomyNilFact
 from openbilanz.taxonomy.text_fact import TaxonomyTextFact
 from openbilanz.taxonomy.unit import TaxonomyUnit
 
@@ -65,7 +66,7 @@ class GcdFactBuilder:
         legal_status_concept = profile.legal_status_for(
             data.legal_form
         )
-        
+
         values = {
             "genInfo.company.id.name": (
                 data.company.name
@@ -108,7 +109,7 @@ class GcdFactBuilder:
         )
 
         return values
-    
+
     def fiscal_year_values(
         self,
         fiscal_year: FiscalYear,
@@ -124,7 +125,7 @@ class GcdFactBuilder:
             raise TypeError(
                 "fiscal_year must be a FiscalYear"
             )
-            
+
         if (
             previous_fiscal_year is not None
             and not isinstance(
@@ -164,7 +165,7 @@ class GcdFactBuilder:
             )
 
         return values
-        
+
     def company_facts(
         self,
         *,
@@ -237,8 +238,11 @@ class GcdFactBuilder:
         taxonomy_model: TaxonomyModel,
         context: TaxonomyContext,
         previous_fiscal_year: FiscalYear | None = None,
-    ) -> tuple[TaxonomyTextFact, ...]:
-        """Erzeugt GCD-Text-Facts für das Wirtschaftsjahr."""
+    ) -> tuple[
+        TaxonomyTextFact | TaxonomyNilFact,
+        ...,
+    ]:
+        """Erzeugt GCD-Facts für das Wirtschaftsjahr."""
 
         if not isinstance(
             fiscal_year,
@@ -274,7 +278,9 @@ class GcdFactBuilder:
             for concept in taxonomy_model.concepts.concepts
         }
 
-        facts: list[TaxonomyTextFact] = []
+        facts: list[
+            TaxonomyTextFact | TaxonomyNilFact
+        ] = []
 
         for concept_name, value in values.items():
             concept = concepts_by_name.get(
@@ -295,8 +301,34 @@ class GcdFactBuilder:
                 )
             )
 
+        if previous_fiscal_year is None:
+            previous_year_concept_names = (
+                "genInfo.report.period.fiscalPreviousYearBegin",
+                "genInfo.report.period.fiscalPreviousYearEnd",
+                "genInfo.report.period.balSheetClosingDatePreviousYear",
+            )
+
+            for concept_name in previous_year_concept_names:
+                concept = concepts_by_name.get(
+                    concept_name
+                )
+
+                if concept is None:
+                    raise ValueError(
+                        "GCD taxonomy concept not found: "
+                        f"{concept_name}"
+                    )
+
+                facts.append(
+                    TaxonomyNilFact(
+                        concept=concept,
+                        context=context,
+                        unit=None,
+                    )
+                )
+
         return tuple(facts)
-    
+
     def report_profile_facts(
         self,
         *,
@@ -369,7 +401,7 @@ class GcdFactBuilder:
                 "Einkünfte aus Gewerbebetrieb",
             ),
         )
-        
+
         facts: list[TaxonomyTextFact] = []
 
         for concept_name, value in values:
@@ -392,7 +424,7 @@ class GcdFactBuilder:
             )
 
         return tuple(facts)
-    
+
     def report_element(
         self,
         *,
@@ -479,8 +511,8 @@ class GcdFactBuilder:
 
         return GcdReportElement(
             facts=tuple(facts)
-        )    
-        
+        )
+
     def report_data_facts(
         self,
         *,
@@ -547,7 +579,7 @@ class GcdFactBuilder:
                 context=context,
             ),
         )
-    
+
     def company_id_no(
         self,
         *,
@@ -771,7 +803,7 @@ class GcdFactBuilder:
         return GcdEntityWithTaxablePurposeBusiness(
             fact=fact,
         )
-        
+
     def shareholder_facts(
         self,
         *,
@@ -904,8 +936,8 @@ class GcdFactBuilder:
                 )
             )
 
-        return tuple(facts)    
-    
+        return tuple(facts)
+
     def shareholder_legal_status(
         self,
         *,
@@ -968,8 +1000,8 @@ class GcdFactBuilder:
 
         return GcdShareholderLegalStatusTuple(
             fact=fact,
-        )    
-    
+        )
+
     def shareholder_share_divide_key(
         self,
         *,
@@ -1054,7 +1086,7 @@ class GcdFactBuilder:
             numerator=numerator_fact,
             denominator=denominator_fact,
         )
-        
+
     def shareholder_current_number(
         self,
         *,
@@ -1121,7 +1153,7 @@ class GcdFactBuilder:
             unit=TaxonomyUnit.pure(),
             decimals="INF",
         )
-        
+
     def shareholder(
         self,
         *,
@@ -1232,5 +1264,3 @@ class GcdFactBuilder:
                 "genInfo.company.id.shareholder.idNotAssigned"
             ),
         )
-        
-   

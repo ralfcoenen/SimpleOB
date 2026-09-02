@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-import xml.etree.ElementTree as ET
 
 from openbilanz.taxonomy.entry_point import TaxonomyEntryPoint
-
 
 _XS_NAMESPACE = "http://www.w3.org/2001/XMLSchema"
 _LINK_NAMESPACE = "http://www.xbrl.org/2003/linkbase"

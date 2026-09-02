@@ -51,6 +51,8 @@ from openbilanz.taxonomy.hgb_gaap_ci_mapping import (
 )
 from openbilanz.taxonomy.mapper import TaxonomyMapper
 from openbilanz.taxonomy.model import TaxonomyModel
+from openbilanz.taxonomy.nil_fact import TaxonomyNilFact
+from openbilanz.taxonomy.text_fact import TaxonomyTextFact
 from openbilanz.taxonomy.unit import TaxonomyUnit
 
 
@@ -198,18 +200,40 @@ class EBilanzBuilder:
 
         gcd_builder = GcdFactBuilder()
 
+        gcd_fiscal_year_facts = (
+            gcd_builder.fiscal_year_facts(
+                fiscal_year=fiscal_year,
+                previous_fiscal_year=previous_fiscal_year,
+                taxonomy_model=self._gcd_model,
+                context=duration_context,
+            )
+        )
+
+        gcd_fiscal_year_text_facts = tuple(
+            fact
+            for fact in gcd_fiscal_year_facts
+            if isinstance(
+                fact,
+                TaxonomyTextFact,
+            )
+        )
+
+        gcd_fiscal_year_nil_facts = tuple(
+            fact
+            for fact in gcd_fiscal_year_facts
+            if isinstance(
+                fact,
+                TaxonomyNilFact,
+            )
+        )
+
         gcd_facts = (
             gcd_builder.company_facts(
                 data=company_data,
                 taxonomy_model=self._gcd_model,
                 context=duration_context,
             )
-            + gcd_builder.fiscal_year_facts(
-                fiscal_year=fiscal_year,
-                previous_fiscal_year=previous_fiscal_year,
-                taxonomy_model=self._gcd_model,
-                context=duration_context,
-            )
+            + gcd_fiscal_year_text_facts
         )
 
         profile = (
@@ -309,7 +333,10 @@ class EBilanzBuilder:
                 "PURE": pure_unit,
             },
             facts=facts,
-            nil_facts=nil_facts,
+            nil_facts=(
+                nil_facts
+                + gcd_fiscal_year_nil_facts
+            ),
             account_balances=account_balances,
             report_elements=(
                 report_element,

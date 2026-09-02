@@ -84,13 +84,19 @@ def test_creates_opening_bookings_for_balance_sheet_accounts() -> None:
         "1200": AccountType.ASSET,
         "1600": AccountType.LIABILITY,
         "1800": AccountType.EQUITY,
+        "2970": AccountType.EQUITY,
         "4980": AccountType.EXPENSE,
+        "8020": AccountType.EQUITY,
+        "8021": AccountType.EQUITY,
         "8400": AccountType.REVENUE,
         "9000": AccountType.EQUITY,
     }
 
     service = FiscalYearTransferService(
         opening_balance_account_number="9000",
+        profit_account_number="8020",
+        loss_account_number="8021",
+        profit_loss_carryforward_account_number="2970",
     )
 
     transfer_bookings = service.create_opening_bookings(
@@ -181,11 +187,17 @@ def test_creates_opening_bookings_for_credit_balances() -> None:
     account_types = {
         "1600": AccountType.LIABILITY,
         "1800": AccountType.EQUITY,
+        "2970": AccountType.EQUITY,
+        "8020": AccountType.EQUITY,
+        "8021": AccountType.EQUITY,
         "9000": AccountType.EQUITY,
     }
 
     service = FiscalYearTransferService(
         opening_balance_account_number="9000",
+        profit_account_number="8020",
+        loss_account_number="8021",
+        profit_loss_carryforward_account_number="2970",
     )
 
     transfer_bookings = service.create_opening_bookings(

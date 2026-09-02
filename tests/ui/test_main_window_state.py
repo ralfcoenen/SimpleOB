@@ -25,8 +25,14 @@ def _create_window_double(
     window._opening_balance_button = Mock()
     window._new_account_button = Mock()
     window._edit_account_button = Mock()
+
     window._add_fixed_asset_button = Mock()
+    window._edit_fixed_asset_button = Mock()
+    window._delete_fixed_asset_button = Mock()
+    window._link_fixed_asset_acquisition_button = Mock()
+    window._link_fixed_asset_disposal_button = Mock()
     window._process_depreciations_button = Mock()
+
     window._booking_frame = Mock()
     window._vat_booking_frame = Mock()
     window._booking_mode_box = Mock()

@@ -21,10 +21,10 @@ from openbilanz.taxonomy.gcd_report_element import (
 from openbilanz.taxonomy.gcd_shareholder_tuple import (
     GcdShareholderTuple,
 )
+from openbilanz.taxonomy.nil_fact import TaxonomyNilFact
 from openbilanz.taxonomy.text_fact import TaxonomyTextFact
 from openbilanz.taxonomy.unit import TaxonomyUnit
 from openbilanz.taxonomy.xbrl_writer import TaxonomyXbrlWriter
-from openbilanz.taxonomy.nil_fact import TaxonomyNilFact
 
 
 class XbrlExporter:

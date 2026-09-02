@@ -2,6 +2,7 @@
 
 from datetime import date
 
+from openbilanz.exporter.xbrl_export import XbrlExporter
 from openbilanz.taxonomy.concept import (
     TaxonomyBalance,
     TaxonomyConcept,
@@ -14,8 +15,6 @@ from openbilanz.taxonomy.xbrl_writer import (
     XSI_NAMESPACE,
     TaxonomyXbrlWriter,
 )
-from openbilanz.exporter.xbrl_export import XbrlExporter
-
 
 
 def create_numeric_nil_fact() -> TaxonomyNilFact:
@@ -160,3 +159,163 @@ def test_xbrl_exporter_passes_numeric_nil_fact_to_writer() -> None:
     assert 'unitRef="EUR"' in xml
     assert 'nil="true"' in xml
     assert "decimals=" not in xml
+
+def test_non_numeric_nil_fact_does_not_require_unit() -> None:
+    """Ein nichtnumerisches NIL-Fact benötigt keine XBRL-Unit."""
+
+    concept = TaxonomyConcept(
+        name="genInfo.report.period.fiscalPreviousYearBegin",
+        concept_id=(
+            "de-gcd_"
+            "genInfo.report.period.fiscalPreviousYearBegin"
+        ),
+        type_name="xbrli:dateItemType",
+        substitution_group="xbrli:item",
+        period_type=TaxonomyPeriodType.DURATION,
+        balance=TaxonomyBalance.NONE,
+        abstract=False,
+        nillable=True,
+    )
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme="http://www.rzf-nrw.de/Steuernummer",
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    fact = TaxonomyNilFact(
+        concept=concept,
+        context=context,
+        unit=None,
+    )
+
+    assert fact.concept is concept
+    assert fact.context is context
+    assert fact.unit is None
+
+def test_xbrl_writer_serializes_non_numeric_nil_fact_without_unit_ref() -> None:
+    """Ein nichtnumerisches NIL-Fact wird ohne unitRef geschrieben."""
+
+    namespace = (
+        "http://www.xbrl.de/taxonomies/"
+        "de-gcd-2025-04-01"
+    )
+
+    concept = TaxonomyConcept(
+        name="genInfo.report.period.fiscalPreviousYearBegin",
+        concept_id=(
+            "de-gcd_"
+            "genInfo.report.period.fiscalPreviousYearBegin"
+        ),
+        type_name="xbrli:dateItemType",
+        substitution_group="xbrli:item",
+        period_type=TaxonomyPeriodType.DURATION,
+        balance=TaxonomyBalance.NONE,
+        abstract=False,
+        nillable=True,
+    )
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme="http://www.rzf-nrw.de/Steuernummer",
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    fact = TaxonomyNilFact(
+        concept=concept,
+        context=context,
+        unit=None,
+    )
+
+    writer = TaxonomyXbrlWriter()
+
+    element = writer.nil_fact_element(
+        fact=fact,
+        context_id="ctx-duration-2025",
+        unit_id=None,
+        namespace=namespace,
+    )
+
+    assert element.tag == (
+        f"{{{namespace}}}"
+        "genInfo.report.period.fiscalPreviousYearBegin"
+    )
+
+    assert element.get("contextRef") == "ctx-duration-2025"
+    assert element.get("unitRef") is None
+    assert element.get(f"{{{XSI_NAMESPACE}}}nil") == "true"
+    assert element.text is None
+
+def test_xbrl_instance_contains_non_numeric_nil_fact_without_unit_ref() -> None:
+    """Eine XBRL-Instanz schreibt ein nichtnumerisches NIL-Fact ohne unitRef."""
+
+    namespace = (
+        "http://www.xbrl.de/taxonomies/"
+        "de-gcd-2025-04-01"
+    )
+
+    concept = TaxonomyConcept(
+        name="genInfo.report.period.fiscalPreviousYearBegin",
+        concept_id=(
+            "de-gcd_"
+            "genInfo.report.period.fiscalPreviousYearBegin"
+        ),
+        type_name="xbrli:dateItemType",
+        substitution_group="xbrli:item",
+        period_type=TaxonomyPeriodType.DURATION,
+        balance=TaxonomyBalance.NONE,
+        abstract=False,
+        nillable=True,
+    )
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme="http://www.rzf-nrw.de/Steuernummer",
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    fact = TaxonomyNilFact(
+        concept=concept,
+        context=context,
+        unit=None,
+    )
+
+    writer = TaxonomyXbrlWriter()
+
+    root = writer.instance_element(
+        contexts={
+            "ctx-duration-2025": context,
+        },
+        units={},
+        facts=(),
+        nil_facts=(
+            fact,
+        ),
+        taxonomy_namespace=namespace,
+        entry_points=(),
+    )
+
+    nil_elements = [
+        element
+        for element in root
+        if element.tag
+        == (
+            f"{{{namespace}}}"
+            "genInfo.report.period.fiscalPreviousYearBegin"
+        )
+    ]
+
+    assert len(nil_elements) == 1
+
+    element = nil_elements[0]
+
+    assert element.get("contextRef") == "ctx-duration-2025"
+    assert element.get("unitRef") is None
+    assert element.get(f"{{{XSI_NAMESPACE}}}nil") == "true"
+    assert element.text is None

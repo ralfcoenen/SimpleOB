@@ -1,10 +1,10 @@
 """Anwendungszustand eines geöffneten Geschäftsjahres."""
 
+from dataclasses import replace
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
 from uuid import UUID
-from dataclasses import replace
 
 from openbilanz.accounting.account_balance import AccountBalance
 from openbilanz.accounting.balance_sheet import BalanceSheet
@@ -21,11 +21,11 @@ from openbilanz.database.company_repository import CompanyRepository
 from openbilanz.database.fixed_asset_depreciation_repository import (
     FixedAssetDepreciationRepository,
 )
-from openbilanz.database.fixed_asset_repository import (
-    FixedAssetRepository,
-)
 from openbilanz.database.fixed_asset_movement_repository import (
     FixedAssetMovementRepository,
+)
+from openbilanz.database.fixed_asset_repository import (
+    FixedAssetRepository,
 )
 from openbilanz.domain.account import Account
 from openbilanz.domain.account_mapping_rule import (
@@ -45,26 +45,24 @@ from openbilanz.domain.company_master_data import (
 from openbilanz.domain.depreciation_proposal import (
     DepreciationProposal,
 )
+from openbilanz.domain.entry_side import EntrySide
+from openbilanz.domain.fiscal_year import FiscalYear
 from openbilanz.domain.fiscal_year_status import FiscalYearStatus
 from openbilanz.domain.fixed_asset import FixedAsset
 from openbilanz.domain.fixed_asset_depreciation import (
     FixedAssetDepreciation,
 )
-from openbilanz.domain.fixed_asset_status import (
-    FixedAssetStatus,
-)
-from openbilanz.domain.journal import Journal
-from openbilanz.domain.managed_fiscal_year import ManagedFiscalYear
 from openbilanz.domain.fixed_asset_movement import (
     FixedAssetMovement,
 )
 from openbilanz.domain.fixed_asset_movement_type import (
     FixedAssetMovementType,
 )
-from openbilanz.services.fixed_asset_schedule_service import (
-    FixedAssetScheduleService,
+from openbilanz.domain.fixed_asset_status import (
+    FixedAssetStatus,
 )
-from openbilanz.domain.entry_side import EntrySide
+from openbilanz.domain.journal import Journal
+from openbilanz.domain.managed_fiscal_year import ManagedFiscalYear
 from openbilanz.reporting.account_activity_report import (
     AccountActivityReport,
 )
@@ -95,6 +93,9 @@ from openbilanz.services.fiscal_year_closing_workflow import (
 )
 from openbilanz.services.fixed_asset_depreciation_workflow import (
     FixedAssetDepreciationWorkflow,
+)
+from openbilanz.services.fixed_asset_schedule_service import (
+    FixedAssetScheduleService,
 )
 from openbilanz.services.posting_service import PostingService
 from openbilanz.services.reporting_service import ReportingService
@@ -266,6 +267,31 @@ class FiscalYearWorkspace:
                 return managed_fiscal_year
 
         raise ValueError("Das geöffnete Geschäftsjahr wurde nicht gefunden.")
+
+    @property
+    def previous_fiscal_year(self) -> FiscalYear | None:
+        """Liefert das chronologisch vorherige Geschäftsjahr."""
+
+        fiscal_years = self._company_repository.get_managed_fiscal_years(
+            self._context.company.company_id
+        )
+
+        previous_fiscal_year: FiscalYear | None = None
+
+        for managed_fiscal_year in fiscal_years:
+            if (
+                managed_fiscal_year.fiscal_year
+                == self._context.fiscal_year
+            ):
+                return previous_fiscal_year
+
+            previous_fiscal_year = (
+                managed_fiscal_year.fiscal_year
+            )
+
+        raise ValueError(
+            "Das geöffnete Geschäftsjahr wurde nicht gefunden."
+        )
 
     @property
     def is_open(self) -> bool:
@@ -1155,7 +1181,7 @@ class FiscalYearWorkspace:
             amounts=preparation.amounts,
             entity_identifier=entity.value,
             entity_scheme=entity.scheme,
-            previous_fiscal_year=(self.managed_fiscal_year.opening_source),
+            previous_fiscal_year=self.previous_fiscal_year,
             account_details=account_details,
             fixed_asset_schedule=fixed_asset_schedule,
         )
