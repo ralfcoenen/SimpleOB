@@ -26,12 +26,14 @@ from openbilanz.taxonomy.gcd_shareholder_tuple import (
 )
 from openbilanz.taxonomy.text_fact import TaxonomyTextFact
 from openbilanz.taxonomy.unit import TaxonomyUnit
+from openbilanz.taxonomy.nil_fact import TaxonomyNilFact
 
 XBRLI_NAMESPACE = "http://www.xbrl.org/2003/instance"
 XBRLDI_NAMESPACE = "http://xbrl.org/2006/xbrldi"
 ISO4217_NAMESPACE = "http://www.xbrl.org/2003/iso4217"
 LINK_NAMESPACE = "http://www.xbrl.org/2003/linkbase"
 XLINK_NAMESPACE = "http://www.w3.org/1999/xlink"
+XSI_NAMESPACE = "http://www.w3.org/2001/XMLSchema-instance"
 
 class TaxonomyXbrlWriter:
     """Serialisiert Taxonomie-Objekte als XBRL-Elemente."""
@@ -178,6 +180,33 @@ class TaxonomyXbrlWriter:
         )
 
         return element
+
+    def nil_fact_element(
+        self,
+        *,
+        fact: TaxonomyNilFact,
+        context_id: str,
+        unit_id: str,
+        namespace: str,
+    ) -> ET.Element:
+        """Erzeugt ein numerisches XBRL-NIL-Fact-Element."""
+
+        if not isinstance(
+            fact,
+            TaxonomyNilFact,
+        ):
+            raise TypeError(
+                "fact must be a TaxonomyNilFact"
+            )
+
+        return ET.Element(
+            f"{{{namespace}}}{fact.concept.name}",
+            {
+                "contextRef": context_id,
+                "unitRef": unit_id,
+                f"{{{XSI_NAMESPACE}}}nil": "true",
+            },
+        )
 
     def gcd_report_element_element(
         self,
@@ -520,6 +549,7 @@ class TaxonomyXbrlWriter:
 
     def instance_element(
         self,
+        *,
         contexts: dict[str, TaxonomyContext],
         units: dict[str, TaxonomyUnit],
         facts: tuple[
@@ -529,6 +559,10 @@ class TaxonomyXbrlWriter:
         taxonomy_namespace: str,
         entry_points: tuple[TaxonomyEntryPoint, ...],
         taxonomy_namespaces: dict[str, str] | None = None,
+        nil_facts: tuple[
+            TaxonomyNilFact,
+            ...,
+        ] = (),
         report_elements: tuple[GcdReportElement, ...] = (),
         company_id_nos: tuple[GcdCompanyIdNo, ...] = (),
         domestic_branches: tuple[
@@ -617,6 +651,32 @@ class TaxonomyXbrlWriter:
                     namespace=namespace,
                 )
             )
+
+        for fact in nil_facts:
+            context_id = self.context_id_for(
+                context=fact.context,
+                contexts=contexts,
+            )
+
+            namespace = self.namespace_for(
+                concept_id=fact.concept.concept_id,
+                taxonomy_namespace=taxonomy_namespace,
+                taxonomy_namespaces=taxonomy_namespaces,
+            )
+
+            root.append(
+                self.nil_fact_element(
+                    fact=fact,
+                    context_id=context_id,
+                    unit_id=self.unit_id_for(
+                        unit=fact.unit,
+                        units=units,
+                    ),
+                    namespace=namespace,
+                )
+            )
+
+
 
         for company_id_no in company_id_nos:
             if not company_id_no.facts:

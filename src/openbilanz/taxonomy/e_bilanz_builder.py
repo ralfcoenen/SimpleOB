@@ -19,8 +19,14 @@ from openbilanz.taxonomy.account_balance_builder import (
     AccountBalanceBuilder,
 )
 from openbilanz.taxonomy.entry_point import TaxonomyEntryPoint
+from openbilanz.taxonomy.fiscal_requirement_reader import (
+    FiscalRequirementReader,
+)
 from openbilanz.taxonomy.fixed_asset_schedule_builder import (
     FixedAssetScheduleBuilder,
+)
+from openbilanz.taxonomy.gaap_ci_mandatory_fact_completer import (
+    GaapCiMandatoryFactCompleter,
 )
 from openbilanz.taxonomy.gaap_ci_statement_builder import (
     GaapCiStatement,
@@ -131,6 +137,28 @@ class EBilanzBuilder:
         )
 
         duration_context = gaap_statement.duration_context
+
+        fiscal_requirements = (
+            FiscalRequirementReader(
+                self._gaap_ci_entry_point
+            ).corporation_requirements()
+        )
+
+        nil_facts = (
+            GaapCiMandatoryFactCompleter(
+                taxonomy_model=self._gaap_ci_model
+            ).build_missing_nil_facts(
+                requirements=fiscal_requirements,
+                existing_facts=gaap_statement.facts,
+                instant_context=(
+                    gaap_statement.instant_context
+                ),
+                duration_context=(
+                    gaap_statement.duration_context
+                ),
+                unit=gaap_statement.unit,
+            )
+        )
 
         taxonomy_mappings = create_hgb_gaap_ci_mapping(
             assets=self._assets,
@@ -271,6 +299,7 @@ class EBilanzBuilder:
                 "PURE": pure_unit,
             },
             facts=facts,
+            nil_facts=nil_facts,
             account_balances=account_balances,
             report_elements=(
                 report_element,

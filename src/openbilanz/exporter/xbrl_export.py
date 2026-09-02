@@ -24,6 +24,7 @@ from openbilanz.taxonomy.gcd_shareholder_tuple import (
 from openbilanz.taxonomy.text_fact import TaxonomyTextFact
 from openbilanz.taxonomy.unit import TaxonomyUnit
 from openbilanz.taxonomy.xbrl_writer import TaxonomyXbrlWriter
+from openbilanz.taxonomy.nil_fact import TaxonomyNilFact
 
 
 class XbrlExporter:
@@ -42,6 +43,10 @@ class XbrlExporter:
             ...,
         ],
         taxonomy_namespace: str,
+        nil_facts: tuple[
+            TaxonomyNilFact,
+            ...,
+        ] = (),
         entry_points: tuple[TaxonomyEntryPoint, ...],
         taxonomy_namespaces: dict[str, str] | None = None,
         report_elements: tuple[GcdReportElement, ...] = (),
@@ -66,6 +71,7 @@ class XbrlExporter:
             contexts=contexts,
             units=units,
             facts=facts,
+            nil_facts=nil_facts,
             taxonomy_namespace=taxonomy_namespace,
             taxonomy_namespaces=taxonomy_namespaces,
             entry_points=entry_points,
