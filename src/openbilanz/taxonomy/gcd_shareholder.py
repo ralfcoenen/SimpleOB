@@ -71,9 +71,9 @@ class GcdShareholder:
 
     name: str
     shareholder_id: str
-    tax_number: str
-    tax_id: str
-    wid: str
+    tax_number: str | None
+    tax_id: str | None
+    wid: str | None
     legal_status: GcdShareholderLegalStatus
     share_divide_key: GcdShareDivideKey
     first_name: str | None = None
@@ -112,47 +112,50 @@ class GcdShareholder:
                 "shareholder_id must not be blank"
             )
 
-        if not isinstance(
-            self.tax_number,
-            str,
-        ):
-            raise TypeError(
-                "tax_number must be a string"
-            )
+        if self.tax_number is not None:
+            if not isinstance(
+                self.tax_number,
+                str,
+            ):
+                raise TypeError(
+                    "tax_number must be a string or None"
+                )
 
-        if (
-            len(self.tax_number) != 13
-            or not self.tax_number.isdigit()
-        ):
-            raise ValueError(
-                "tax_number must contain exactly 13 digits"
-            )
+            if (
+                len(self.tax_number) != 13
+                or not self.tax_number.isdigit()
+            ):
+                raise ValueError(
+                    "tax_number must contain exactly 13 digits"
+                )
 
-        if not isinstance(
-            self.tax_id,
-            str,
-        ):
-            raise TypeError(
-                "tax_id must be a string"
-            )
+        if self.tax_id is not None:
+            if not isinstance(
+                self.tax_id,
+                str,
+            ):
+                raise TypeError(
+                    "tax_id must be a string or None"
+                )
 
-        if not self.tax_id.strip():
-            raise ValueError(
-                "tax_id must not be blank"
-            )
+            if not self.tax_id.strip():
+                raise ValueError(
+                    "tax_id must not be blank"
+                )
 
-        if not isinstance(
-            self.wid,
-            str,
-        ):
-            raise TypeError(
-                "wid must be a string"
-            )
+        if self.wid is not None:
+            if not isinstance(
+                self.wid,
+                str,
+            ):
+                raise TypeError(
+                    "wid must be a string or None"
+                )
 
-        if not self.wid.strip():
-            raise ValueError(
-                "wid must not be blank"
-            )
+            if not self.wid.strip():
+                raise ValueError(
+                    "wid must not be blank"
+                )
 
         if not isinstance(
             self.legal_status,

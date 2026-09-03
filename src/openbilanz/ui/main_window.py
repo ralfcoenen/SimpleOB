@@ -65,6 +65,9 @@ from openbilanz.ui.new_fixed_asset_dialog import (
 from openbilanz.ui.opening_balance_dialog import (
     OpeningBalanceDialog,
 )
+from openbilanz.ui.shareholder_dialog import (
+    ShareholdersDialog,
+)
 from openbilanz.ui.vat_booking_frame import VatBookingFrame
 
 
@@ -222,6 +225,15 @@ class MainWindow(tk.Tk):
             command=self._open_company_master_data,
         ).pack(
             side="left",
+        )
+
+        ttk.Button(
+            context_buttons,
+            text="Gesellschafter",
+            command=self._open_shareholders,
+        ).pack(
+            side="left",
+            padx=(8, 0),
         )
 
         ttk.Button(
@@ -2076,7 +2088,17 @@ class MainWindow(tk.Tk):
             parent=self,
         )
 
+    def _open_shareholders(
+        self,
+    ) -> None:
+        """Öffnet die Gesellschafterverwaltung."""
 
+        dialog = ShareholdersDialog(
+            self,
+            workspace=self._workspace,
+        )
+
+        self.wait_window(dialog)
 
     def _refresh_fixed_assets(self) -> None:
         """Aktualisiert die Liste der Anlagegüter."""

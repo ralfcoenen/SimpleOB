@@ -782,9 +782,9 @@ def test_combined_69_instance_with_report_element_is_validated_by_arelle(
             name="Mustermann",
             first_name="Max",
             shareholder_id="1",
-            tax_number="1234567890123",
-            tax_id="12345678901",
-            wid="WID-1",
+            tax_number=None,
+            tax_id=None,
+            wid=None,
             group=GcdShareholderGroup.LIMITED,
             legal_status=(
                 GcdShareholderLegalStatus.NATURAL_PERSON
@@ -934,10 +934,25 @@ def test_combined_69_instance_with_report_element_is_validated_by_arelle(
         )
 
         assert (
-            "genInfo.company.id.shareholder.idNotAssigned"
-            not in xml
+            'genInfo.company.id.shareholder.taxnumber '
+            'contextRef="ctx-duration-2026" '
+            'xsi:nil="true"'
+            in xml
         )
 
+        assert (
+            'genInfo.company.id.shareholder.taxid '
+            'contextRef="ctx-duration-2026" '
+            'xsi:nil="true"'
+            in xml
+        )
+
+        assert (
+            'genInfo.company.id.shareholder.WID '
+            'contextRef="ctx-duration-2026" '
+            'xsi:nil="true"'
+            in xml
+        )
         assert (
             "genInfo.report.id.reportElement.reportElements.B"
             in xml

@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 
 from openbilanz.taxonomy.fact import TaxonomyFact
+from openbilanz.taxonomy.nil_fact import TaxonomyNilFact
 from openbilanz.taxonomy.text_fact import TaxonomyTextFact
 
 
@@ -27,9 +28,9 @@ class GcdShareholderTuple:
 
     name: TaxonomyTextFact
     shareholder_id: TaxonomyTextFact
-    tax_number: TaxonomyTextFact
-    tax_id: TaxonomyTextFact
-    wid: TaxonomyTextFact
+    tax_number: TaxonomyTextFact | TaxonomyNilFact
+    tax_id: TaxonomyTextFact | TaxonomyNilFact
+    wid: TaxonomyTextFact | TaxonomyNilFact
     legal_status: GcdShareholderLegalStatusTuple
     share_divide_key: GcdShareDivideKeyTuple
     first_name: TaxonomyTextFact | None = None
@@ -40,7 +41,3 @@ class GcdShareholderTuple:
     id_not_assigned: TaxonomyTextFact | None = None
     special_balance_required: TaxonomyTextFact | None = None
     extension_required: TaxonomyTextFact | None = None
-    
-    
-    
-    

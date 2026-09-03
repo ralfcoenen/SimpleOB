@@ -29,6 +29,9 @@ from openbilanz.database.fixed_asset_movement_repository import (
 from openbilanz.database.fixed_asset_repository import (
     FixedAssetRepository,
 )
+from openbilanz.database.shareholder_repository import (
+    ShareholderRepository,
+)
 from openbilanz.services.chart_of_accounts_initialization_service import (
     ChartOfAccountsInitializationService,
 )
@@ -146,6 +149,10 @@ def main() -> None:
 
     try:
         company_repository = CompanyRepository(
+            session
+        )
+
+        shareholder_repository = ShareholderRepository(
             session
         )
 
@@ -514,6 +521,9 @@ def main() -> None:
                 ),
                 company_repository=(
                     company_repository
+                ),
+                shareholder_repository=(
+                    shareholder_repository
                 ),
                 chart_of_accounts_repository=(
                     chart_of_accounts_repository

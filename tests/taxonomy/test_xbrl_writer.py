@@ -37,6 +37,7 @@ from openbilanz.taxonomy.gcd_shareholder_tuple import (
     GcdShareholderLegalStatusTuple,
     GcdShareholderTuple,
 )
+from openbilanz.taxonomy.nil_fact import TaxonomyNilFact
 from openbilanz.taxonomy.text_fact import TaxonomyTextFact
 from openbilanz.taxonomy.unit import TaxonomyUnit
 from openbilanz.taxonomy.xbrl_writer import TaxonomyXbrlWriter
@@ -2139,6 +2140,140 @@ def test_xbrl_writer_serializes_gcd_shareholder_tuple() -> None:
         if len(child) == 0:
             assert child.get("contextRef") == "ctx-2025"
 
+def test_xbrl_writer_serializes_nil_shareholder_identifiers() -> None:
+    """Der Writer serialisiert fehlende Gesellschafter-Kennungen als NIL."""
+
+    namespace = (
+        "http://www.xbrl.de/taxonomies/"
+        "de-gcd-2025-04-01"
+    )
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    def concept(
+        name: str,
+    ) -> TaxonomyConcept:
+        return TaxonomyConcept(
+            name=name,
+            concept_id="de-gcd_" + name,
+            type_name="xbrli:stringItemType",
+            substitution_group="xbrli:item",
+            period_type=TaxonomyPeriodType.DURATION,
+            balance=TaxonomyBalance.NONE,
+            abstract=False,
+            nillable=True,
+        )
+
+    def text_fact(
+        name: str,
+        value: str,
+    ) -> TaxonomyTextFact:
+        return TaxonomyTextFact(
+            concept=concept(name),
+            value=value,
+            context=context,
+        )
+
+    def nil_fact(
+        name: str,
+    ) -> TaxonomyNilFact:
+        return TaxonomyNilFact(
+            concept=concept(name),
+            context=context,
+            unit=None,
+        )
+
+    shareholder = GcdShareholderTuple(
+        name=text_fact(
+            "genInfo.company.id.shareholder.name",
+            "Mustermann",
+        ),
+        shareholder_id=text_fact(
+            "genInfo.company.id.shareholder.id",
+            "1",
+        ),
+        tax_number=nil_fact(
+            "genInfo.company.id.shareholder.taxnumber"
+        ),
+        tax_id=nil_fact(
+            "genInfo.company.id.shareholder.taxid"
+        ),
+        wid=nil_fact(
+            "genInfo.company.id.shareholder.WID"
+        ),
+        legal_status=GcdShareholderLegalStatusTuple(
+            fact=text_fact(
+                (
+                    "genInfo.company.id.shareholder."
+                    "legalStatus.legalStatus.NPP"
+                ),
+                "NPP",
+            ),
+        ),
+        share_divide_key=GcdShareDivideKeyTuple(
+            numerator=text_fact(
+                (
+                    "genInfo.company.id.shareholder."
+                    "ShareDivideKey.numerator"
+                ),
+                "25",
+            ),
+            denominator=text_fact(
+                (
+                    "genInfo.company.id.shareholder."
+                    "ShareDivideKey.denominator"
+                ),
+                "100",
+            ),
+        ),
+    )
+
+    writer = TaxonomyXbrlWriter()
+
+    element = writer.gcd_shareholder_element(
+        shareholder=shareholder,
+        context_id="ctx-2025",
+        namespace=namespace,
+    )
+
+    tax_number = element.find(
+        f"{{{namespace}}}"
+        "genInfo.company.id.shareholder.taxnumber"
+    )
+    tax_id = element.find(
+        f"{{{namespace}}}"
+        "genInfo.company.id.shareholder.taxid"
+    )
+    wid = element.find(
+        f"{{{namespace}}}"
+        "genInfo.company.id.shareholder.WID"
+    )
+
+    assert tax_number is not None
+    assert tax_id is not None
+    assert wid is not None
+
+    xsi_nil = (
+        "{http://www.w3.org/2001/XMLSchema-instance}nil"
+    )
+
+    assert tax_number.attrib[xsi_nil] == "true"
+    assert tax_id.attrib[xsi_nil] == "true"
+    assert wid.attrib[xsi_nil] == "true"
+
+    assert tax_number.attrib["contextRef"] == "ctx-2025"
+    assert tax_id.attrib["contextRef"] == "ctx-2025"
+    assert wid.attrib["contextRef"] == "ctx-2025"
+
+    assert "unitRef" not in tax_number.attrib
+    assert "unitRef" not in tax_id.attrib
+    assert "unitRef" not in wid.attrib
 
 def test_xbrl_writer_includes_gcd_shareholder_in_instance() -> None:
     """Ein Gesellschafter-Tuple wird in die XBRL-Instanz aufgenommen."""

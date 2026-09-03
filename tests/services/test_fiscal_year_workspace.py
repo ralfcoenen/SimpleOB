@@ -51,6 +51,7 @@ from openbilanz.domain.fixed_asset_status import (
 )
 from openbilanz.domain.journal import Journal
 from openbilanz.domain.managed_fiscal_year import ManagedFiscalYear
+from openbilanz.domain.shareholder import Shareholder
 from openbilanz.services.closing_result import ClosingResult
 from openbilanz.services.e_bilanz_export_service import (
     EBilanzExportService,
@@ -1050,11 +1051,13 @@ def test_rejects_e_bilanz_preparation_for_open_fiscal_year(
             ),
         )
 
+
 def test_builds_e_bilanz_from_prepared_data(
     context: ApplicationContext,
 ) -> None:
     booking_repository = Mock()
     company_repository = Mock()
+    shareholder_repository = Mock()
     preparation_service = Mock()
     e_bilanz_service = Mock()
     account_detail_service = Mock()
@@ -1089,6 +1092,15 @@ def test_builds_e_bilanz_from_prepared_data(
         master_data
     )
 
+    shareholders = (
+        Mock(),
+        Mock(),
+    )
+
+    shareholder_repository.list_for_company.return_value = (
+        shareholders
+    )
+
     preparation = Mock()
     preparation.amounts = {
         Mock(): Decimal("100.00"),
@@ -1110,6 +1122,7 @@ def test_builds_e_bilanz_from_prepared_data(
         context=context,
         booking_repository=booking_repository,
         company_repository=company_repository,
+        shareholder_repository=shareholder_repository,
         posting_service=PostingService(),
         closing_workflow=Mock(),
         closing_consistency_service=Mock(),
@@ -1135,6 +1148,10 @@ def test_builds_e_bilanz_from_prepared_data(
         closed_ledger=workspace.ledger,
     )
 
+    shareholder_repository.list_for_company.assert_called_once_with(
+        context.company.company_id
+    )
+
     e_bilanz_service.build.assert_called_once_with(
         master_data=master_data,
         fiscal_year=context.fiscal_year,
@@ -1146,6 +1163,7 @@ def test_builds_e_bilanz_from_prepared_data(
         previous_fiscal_year=previous_fiscal_year,
         account_details=account_details,
         fixed_asset_schedule=(),
+        shareholders=shareholders,
     )
 
 def test_rejects_e_bilanz_build_for_open_fiscal_year(
@@ -1755,3 +1773,108 @@ def test_rejects_invalid_fixed_asset_disposal_link(
 
     movement_repository.add.assert_not_called()
     fixed_asset_repository.update.assert_not_called()
+
+def test_manages_shareholders_independent_of_fiscal_year_status(
+    context: ApplicationContext,
+) -> None:
+    booking_repository = Mock()
+    company_repository = Mock()
+    shareholder_repository = Mock()
+
+    booking_repository.list_for_fiscal_year.return_value = ()
+
+    company_repository.get_managed_fiscal_years.return_value = (
+        ManagedFiscalYear(
+            fiscal_year=context.fiscal_year,
+            status=FiscalYearStatus.CLOSED,
+            opening_source=None,
+        ),
+    )
+
+    shareholder = Shareholder(
+        company_id=context.company.company_id,
+        shareholder_number="1",
+        name="Muster",
+        first_name="Max",
+        legal_status="NPP",
+        share_numerator="1",
+        share_denominator="2",
+        tax_number="",
+        tax_id="",
+        wid="",
+    )
+
+    updated_shareholder = Shareholder(
+        shareholder_id=shareholder.shareholder_id,
+        company_id=context.company.company_id,
+        shareholder_number="1",
+        name="Muster",
+        first_name="Maximilian",
+        legal_status="NPP",
+        share_numerator="1",
+        share_denominator="2",
+        tax_number="1234567890123",
+        tax_id="",
+        wid="",
+    )
+
+    shareholder_repository.list_for_company.return_value = (
+        shareholder,
+    )
+
+    shareholder_repository.get.return_value = (
+        updated_shareholder
+    )
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=company_repository,
+        shareholder_repository=shareholder_repository,
+        posting_service=PostingService(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
+        taxonomy_management_service=Mock(),
+        e_bilanz_export_service=Mock(),
+    )
+
+    assert workspace.list_shareholders() == (
+        shareholder,
+    )
+
+    shareholder_repository.list_for_company.assert_called_once_with(
+        context.company.company_id
+    )
+
+    workspace.add_shareholder(
+        shareholder
+    )
+
+    shareholder_repository.add.assert_called_once_with(
+        shareholder=shareholder
+    )
+
+    workspace.update_shareholder(
+        updated_shareholder
+    )
+
+    shareholder_repository.update.assert_called_once_with(
+        shareholder=updated_shareholder
+    )
+
+    workspace.delete_shareholder(
+        updated_shareholder.shareholder_id
+    )
+
+    shareholder_repository.get.assert_called_once_with(
+        updated_shareholder.shareholder_id
+    )
+
+    shareholder_repository.delete.assert_called_once_with(
+        shareholder_id=(
+            updated_shareholder.shareholder_id
+        )
+    )

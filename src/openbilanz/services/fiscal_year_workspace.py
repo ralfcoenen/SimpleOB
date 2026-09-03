@@ -27,6 +27,9 @@ from openbilanz.database.fixed_asset_movement_repository import (
 from openbilanz.database.fixed_asset_repository import (
     FixedAssetRepository,
 )
+from openbilanz.database.shareholder_repository import (
+    ShareholderRepository,
+)
 from openbilanz.domain.account import Account
 from openbilanz.domain.account_mapping_rule import (
     AccountMappingRule,
@@ -63,6 +66,7 @@ from openbilanz.domain.fixed_asset_status import (
 )
 from openbilanz.domain.journal import Journal
 from openbilanz.domain.managed_fiscal_year import ManagedFiscalYear
+from openbilanz.domain.shareholder import Shareholder
 from openbilanz.reporting.account_activity_report import (
     AccountActivityReport,
 )
@@ -123,6 +127,7 @@ class FiscalYearWorkspace:
         context: ApplicationContext,
         booking_repository: BookingRepository,
         company_repository: CompanyRepository,
+        shareholder_repository: ShareholderRepository | None = None,
         chart_of_accounts_repository: ChartOfAccountsRepository | None = None,
         posting_service: PostingService,
         reporting_service: ReportingService | None = None,
@@ -151,6 +156,9 @@ class FiscalYearWorkspace:
         self._context = context
         self._booking_repository = booking_repository
         self._company_repository = company_repository
+        self._shareholder_repository = (
+            shareholder_repository
+        )
         self._chart_of_accounts_repository = (
             chart_of_accounts_repository
         )
@@ -395,6 +403,102 @@ class FiscalYearWorkspace:
             closing_result=closing_result,
             balances=balances,
             mapper=mapper,
+        )
+
+    def list_shareholders(
+        self,
+    ) -> tuple[Shareholder, ...]:
+        """Lädt die Gesellschafter des geöffneten Unternehmens."""
+
+        if self._shareholder_repository is None:
+            raise RuntimeError(
+                "Die Gesellschafterverwaltung ist nicht konfiguriert."
+            )
+
+        return self._shareholder_repository.list_for_company(
+            self._context.company.company_id
+        )
+
+    def add_shareholder(
+        self,
+        shareholder: Shareholder,
+    ) -> None:
+        """Speichert einen Gesellschafter des geöffneten Unternehmens."""
+
+        if self._shareholder_repository is None:
+            raise RuntimeError(
+                "Die Gesellschafterverwaltung ist nicht konfiguriert."
+            )
+
+        if (
+            shareholder.company_id
+            != self._context.company.company_id
+        ):
+            raise ValueError(
+                "Der Gesellschafter gehört nicht zum "
+                "geöffneten Unternehmen."
+            )
+
+        self._shareholder_repository.add(
+            shareholder=shareholder
+        )
+
+    def update_shareholder(
+        self,
+        shareholder: Shareholder,
+    ) -> None:
+        """Aktualisiert einen Gesellschafter des geöffneten Unternehmens."""
+
+        if self._shareholder_repository is None:
+            raise RuntimeError(
+                "Die Gesellschafterverwaltung ist nicht konfiguriert."
+            )
+
+        if (
+            shareholder.company_id
+            != self._context.company.company_id
+        ):
+            raise ValueError(
+                "Der Gesellschafter gehört nicht zum "
+                "geöffneten Unternehmen."
+            )
+
+        self._shareholder_repository.update(
+            shareholder=shareholder
+        )
+
+    def delete_shareholder(
+        self,
+        shareholder_id: UUID,
+    ) -> None:
+        """Löscht einen Gesellschafter des geöffneten Unternehmens."""
+
+
+        if self._shareholder_repository is None:
+            raise RuntimeError(
+                "Die Gesellschafterverwaltung ist nicht konfiguriert."
+            )
+
+        shareholder = self._shareholder_repository.get(
+            shareholder_id
+        )
+
+        if shareholder is None:
+            raise ValueError(
+                "Der Gesellschafter ist nicht vorhanden."
+            )
+
+        if (
+            shareholder.company_id
+            != self._context.company.company_id
+        ):
+            raise ValueError(
+                "Der Gesellschafter gehört nicht zum "
+                "geöffneten Unternehmen."
+            )
+
+        self._shareholder_repository.delete(
+            shareholder_id=shareholder_id
         )
 
     def list_fixed_assets(
@@ -1175,6 +1279,15 @@ class FiscalYearWorkspace:
                 )
             )
 
+        shareholders = ()
+
+        if self._shareholder_repository is not None:
+            shareholders = (
+                self._shareholder_repository.list_for_company(
+                    self._context.company.company_id
+                )
+            )
+
         document = self._e_bilanz_service.build(
             master_data=master_data,
             fiscal_year=self._context.fiscal_year,
@@ -1184,6 +1297,7 @@ class FiscalYearWorkspace:
             previous_fiscal_year=self.previous_fiscal_year,
             account_details=account_details,
             fixed_asset_schedule=fixed_asset_schedule,
+            shareholders=shareholders,
         )
 
         self._validated_e_bilanz_document = None

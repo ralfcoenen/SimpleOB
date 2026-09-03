@@ -14,6 +14,7 @@ from openbilanz.domain.company_master_data import (
     CompanyMasterData,
 )
 from openbilanz.domain.fiscal_year import FiscalYear
+from openbilanz.domain.shareholder import Shareholder
 from openbilanz.services.e_bilanz_service import EBilanzService
 from openbilanz.taxonomy.arelle_adapter import (
     ArelleValidationResult,
@@ -26,6 +27,11 @@ from openbilanz.taxonomy.entry_point import (
 )
 from openbilanz.taxonomy.gcd_company_data_mapper import (
     GcdCompanyDataMapper,
+)
+from openbilanz.taxonomy.gcd_shareholder import (
+    GcdShareDivideKey,
+    GcdShareholder,
+    GcdShareholderLegalStatus,
 )
 from openbilanz.taxonomy.taxonomy import TaxonomyVersion
 
@@ -113,16 +119,16 @@ def _company() -> Company:
     )
 
 
-
-
 def test_e_bilanz_service_orchestrates_builder() -> None:
     fiscal_year = FiscalYear(
         start_date=date(2026, 1, 1),
         end_date=date(2026, 12, 31),
     )
 
+    company = _company()
+
     master_data = CompanyMasterData(
-        company=_company(),
+        company=company,
         legal_form="UG (haftungsbeschränkt)",
         tax_number="123/4567/8901",
         federal_state="NW",
@@ -135,6 +141,19 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
         city="Köln",
         country="DE",
         business="Softwareentwicklung",
+    )
+
+    shareholder = Shareholder(
+        company_id=company.company_id,
+        shareholder_number="1",
+        name="Muster",
+        first_name="Max",
+        legal_status="NPP",
+        share_numerator="1",
+        share_denominator="2",
+        tax_number="",
+        tax_id="12345678901",
+        wid="",
     )
 
     gcd_path = Path("/tmp/gcd.xsd")
@@ -227,6 +246,9 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
             entity_scheme=(
                 "http://www.bundesfinanzministerium.de"
             ),
+            shareholders=(
+                shareholder,
+            ),
         )
 
     assert result is expected_document
@@ -295,6 +317,25 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
         call_kwargs["identifiers"].tax_number_13
         == "5123045678901"
     )
+
+    assert call_kwargs["shareholders"] == (
+        GcdShareholder(
+            name="Muster",
+            first_name="Max",
+            shareholder_id="1",
+            tax_number=None,
+            tax_id="12345678901",
+            wid=None,
+            legal_status=(
+                GcdShareholderLegalStatus.NATURAL_PERSON
+            ),
+            share_divide_key=GcdShareDivideKey(
+                numerator="1",
+                denominator="2",
+            ),
+        ),
+    )
+
 
 def test_e_bilanz_service_validates_document_with_relative_schema_refs(
     tmp_path: Path,

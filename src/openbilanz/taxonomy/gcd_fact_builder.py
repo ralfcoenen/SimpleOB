@@ -172,7 +172,10 @@ class GcdFactBuilder:
         data: GcdCompanyData,
         taxonomy_model: TaxonomyModel,
         context: TaxonomyContext,
-    ) -> tuple[TaxonomyTextFact, ...]:
+        ) -> tuple[
+        TaxonomyTextFact | TaxonomyNilFact,
+            ...,
+        ]:
         """Erzeugt GCD-Text-Facts für Unternehmensstammdaten."""
 
         if not isinstance(
@@ -851,6 +854,9 @@ class GcdFactBuilder:
                 "genInfo.company.id.shareholder.id",
                 shareholder.shareholder_id,
             ),
+        ]
+
+        identifier_values = (
             (
                 "genInfo.company.id.shareholder.taxnumber",
                 shareholder.tax_number,
@@ -863,7 +869,7 @@ class GcdFactBuilder:
                 "genInfo.company.id.shareholder.WID",
                 shareholder.wid,
             ),
-        ]
+        )
 
         if shareholder.first_name is not None:
             values.append(
@@ -915,7 +921,9 @@ class GcdFactBuilder:
                 )
             )
 
-        facts: list[TaxonomyTextFact] = []
+        facts: list[
+            TaxonomyTextFact | TaxonomyNilFact
+        ] = []
 
         for concept_name, value in values:
             concept = concepts_by_name.get(
@@ -935,6 +943,34 @@ class GcdFactBuilder:
                     context=context,
                 )
             )
+
+        for concept_name, value in identifier_values:
+            concept = concepts_by_name.get(
+                concept_name
+            )
+
+            if concept is None:
+                raise ValueError(
+                    "GCD taxonomy concept not found: "
+                    f"{concept_name}"
+                )
+
+            if value is None:
+                facts.append(
+                    TaxonomyNilFact(
+                        concept=concept,
+                        context=context,
+                        unit=None,
+                    )
+                )
+            else:
+                facts.append(
+                    TaxonomyTextFact(
+                        concept=concept,
+                        value=value,
+                        context=context,
+                    )
+                )
 
         return tuple(facts)
 

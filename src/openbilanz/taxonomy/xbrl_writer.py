@@ -433,9 +433,23 @@ class TaxonomyXbrlWriter:
 
         def append_text_fact(
             parent: ET.Element,
-            fact: TaxonomyTextFact | None,
+            fact: TaxonomyTextFact | TaxonomyNilFact | None,
         ) -> None:
             if fact is None:
+                return
+
+            if isinstance(
+                fact,
+                TaxonomyNilFact,
+            ):
+                parent.append(
+                    self.nil_fact_element(
+                        fact=fact,
+                        context_id=context_id,
+                        unit_id=None,
+                        namespace=namespace,
+                    )
+                )
                 return
 
             parent.append(
@@ -445,7 +459,6 @@ class TaxonomyXbrlWriter:
                     namespace=namespace,
                 )
             )
-
         append_text_fact(
             element,
             shareholder.name,

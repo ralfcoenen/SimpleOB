@@ -1998,6 +1998,111 @@ def test_gcd_fact_builder_builds_domestic_branch_of_foreign_company() -> None:
     assert result.fact.value == "HGB"
     assert result.fact.context is context
 
+def test_gcd_fact_builder_builds_nil_facts_for_missing_shareholder_identifiers() -> None:
+    """Fehlende Gesellschafter-Kennungen werden als NIL-Facts erzeugt."""
+
+    from openbilanz.taxonomy.nil_fact import TaxonomyNilFact
+
+    shareholder = GcdShareholder(
+        name="Mustermann",
+        first_name="Max",
+        shareholder_id="1",
+        tax_number=None,
+        tax_id=None,
+        wid=None,
+        legal_status=(
+            GcdShareholderLegalStatus.NATURAL_PERSON
+        ),
+        share_divide_key=GcdShareDivideKey(
+            numerator="25",
+            denominator="100",
+        ),
+    )
+
+    concept_names = (
+        "genInfo.company.id.shareholder.name",
+        "genInfo.company.id.shareholder.FirstName",
+        "genInfo.company.id.shareholder.id",
+        "genInfo.company.id.shareholder.taxnumber",
+        "genInfo.company.id.shareholder.taxid",
+        "genInfo.company.id.shareholder.WID",
+        (
+            "genInfo.company.id.shareholder."
+            "legalStatus.legalStatus.NPP"
+        ),
+        (
+            "genInfo.company.id.shareholder."
+            "ShareDivideKey.numerator"
+        ),
+        (
+            "genInfo.company.id.shareholder."
+            "ShareDivideKey.denominator"
+        ),
+    )
+
+    concepts = tuple(
+        TaxonomyConcept(
+            name=name,
+            concept_id="de-gcd_" + name,
+            type_name="xbrli:stringItemType",
+            substitution_group="xbrli:item",
+            period_type=TaxonomyPeriodType.DURATION,
+            balance=TaxonomyBalance.NONE,
+            abstract=False,
+            nillable=True,
+        )
+        for name in concept_names
+    )
+
+    taxonomy_model = _taxonomy_model(
+        *concepts
+    )
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    builder = GcdFactBuilder()
+
+    result = builder.shareholder(
+        shareholder=shareholder,
+        taxonomy_model=taxonomy_model,
+        context=context,
+    )
+
+    assert isinstance(
+        result.tax_number,
+        TaxonomyNilFact,
+    )
+    assert result.tax_number.concept.name == (
+        "genInfo.company.id.shareholder.taxnumber"
+    )
+    assert result.tax_number.context is context
+    assert result.tax_number.unit is None
+
+    assert isinstance(
+        result.tax_id,
+        TaxonomyNilFact,
+    )
+    assert result.tax_id.concept.name == (
+        "genInfo.company.id.shareholder.taxid"
+    )
+    assert result.tax_id.context is context
+    assert result.tax_id.unit is None
+
+    assert isinstance(
+        result.wid,
+        TaxonomyNilFact,
+    )
+    assert result.wid.concept.name == (
+        "genInfo.company.id.shareholder.WID"
+    )
+    assert result.wid.context is context
+    assert result.wid.unit is None
 
 def test_gcd_fact_builder_builds_entity_with_taxable_purpose_business() -> None:
     """Der Builder erzeugt das Tuple für den steuerpflichtigen Betrieb."""

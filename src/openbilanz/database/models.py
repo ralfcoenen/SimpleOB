@@ -110,6 +110,11 @@ class Mandant(Base):
         cascade="all, delete-orphan",
     )
 
+    gesellschafter: Mapped[list["Gesellschafter"]] = relationship(
+        back_populates="mandant",
+        cascade="all, delete-orphan",
+    )
+
     konten: Mapped[list["Konto"]] = relationship(
         back_populates="mandant",
         cascade="all, delete-orphan",
@@ -403,6 +408,102 @@ class Buchungszeile(Base):
 
     buchung: Mapped[Buchung] = relationship(
         back_populates="zeilen",
+    )
+
+class Gesellschafter(Base):
+    """Persistierter Gesellschafter."""
+
+    __tablename__ = "gesellschafter"
+
+    __table_args__ = (
+        UniqueConstraint(
+            "mandant_id",
+            "shareholder_number",
+            name=(
+                "uq_gesellschafter_mandant_"
+                "shareholder_number"
+            ),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+    )
+
+    shareholder_id: Mapped[str] = mapped_column(
+        String(36),
+        unique=True,
+        nullable=False,
+    )
+
+    mandant_id: Mapped[int] = mapped_column(
+        ForeignKey("mandanten.id"),
+        nullable=False,
+    )
+
+    shareholder_number: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    name: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    first_name: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+        default="",
+        server_default="",
+    )
+
+    legal_status: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    share_numerator: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    share_denominator: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    tax_number: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+        default="",
+        server_default="",
+    )
+
+    tax_number_federal_state: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+        default="",
+        server_default="",
+    )
+
+    tax_id: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+        default="",
+        server_default="",
+    )
+
+    wid: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+        default="",
+        server_default="",
+    )
+
+    mandant: Mapped[Mandant] = relationship(
+        back_populates="gesellschafter",
     )
 
 class Anlagegut(Base):

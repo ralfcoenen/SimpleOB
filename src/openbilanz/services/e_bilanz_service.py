@@ -16,6 +16,7 @@ from openbilanz.domain.e_bilanz_account_detail import (
     EBilanzAccountDetail,
 )
 from openbilanz.domain.fiscal_year import FiscalYear
+from openbilanz.domain.shareholder import Shareholder
 from openbilanz.services.fixed_asset_schedule_service import (
     FixedAssetSchedulePosition,
 )
@@ -32,6 +33,11 @@ from openbilanz.taxonomy.entry_point import (
 )
 from openbilanz.taxonomy.gcd_company_data_mapper import (
     GcdCompanyDataMapper,
+)
+from openbilanz.taxonomy.gcd_shareholder import (
+    GcdShareDivideKey,
+    GcdShareholder,
+    GcdShareholderLegalStatus,
 )
 from openbilanz.taxonomy.resolver import TaxonomyResolver
 from openbilanz.taxonomy.taxonomy import (
@@ -77,6 +83,10 @@ class EBilanzService:
         ] = (),
         fixed_asset_schedule: tuple[
             FixedAssetSchedulePosition,
+            ...
+        ] = (),
+        shareholders: tuple[
+            Shareholder,
             ...
         ] = (),
     ) -> EBilanzDocument:
@@ -141,6 +151,12 @@ class EBilanzService:
             liabilities=self._liabilities,
             income_statement=self._income_statement,
         )
+        gcd_shareholders = tuple(
+            self._map_shareholder(
+                shareholder
+            )
+            for shareholder in shareholders
+        )
 
         return builder.build(
             company_data=mapping.company_data,
@@ -152,6 +168,59 @@ class EBilanzService:
             identifiers=mapping.identifiers,
             account_details=account_details,
             fixed_asset_schedule=fixed_asset_schedule,
+            shareholders=gcd_shareholders,
+        )
+
+    @staticmethod
+    def _map_shareholder(
+        shareholder: Shareholder,
+    ) -> GcdShareholder:
+        """Überführt produktive Gesellschafterdaten in GCD-Daten."""
+
+        if not isinstance(
+            shareholder,
+            Shareholder,
+        ):
+            raise TypeError(
+                "shareholder must be a Shareholder"
+            )
+
+        return GcdShareholder(
+            name=shareholder.name,
+            first_name=(
+                shareholder.first_name
+                or None
+            ),
+            shareholder_id=(
+                shareholder.shareholder_number
+            ),
+            tax_number=(
+                shareholder.tax_number
+                or None
+            ),
+            tax_id=(
+                shareholder.tax_id
+                or None
+            ),
+            wid=(
+                shareholder.wid
+                or None
+            ),
+            legal_status=(
+                GcdShareholderLegalStatus(
+                    shareholder.legal_status
+                )
+            ),
+            share_divide_key=(
+                GcdShareDivideKey(
+                    numerator=(
+                        shareholder.share_numerator
+                    ),
+                    denominator=(
+                        shareholder.share_denominator
+                    ),
+                )
+            ),
         )
 
     def validate(
