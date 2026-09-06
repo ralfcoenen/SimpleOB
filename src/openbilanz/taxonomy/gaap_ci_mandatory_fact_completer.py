@@ -46,8 +46,20 @@ class GaapCiMandatoryFactCompleter:
         instant_context: TaxonomyContext,
         duration_context: TaxonomyContext,
         unit: TaxonomyUnit,
+        active_report_element_roles: tuple[str, ...] | None = None,
     ) -> tuple[TaxonomyNilFact, ...]:
         """Erzeugt NIL-Facts für fehlende KSt-relevante Mussfelder."""
+
+        if (
+            active_report_element_roles is not None
+            and not isinstance(
+                active_report_element_roles,
+                tuple,
+            )
+        ):
+            raise TypeError(
+                "active_report_element_roles must be a tuple or None"
+            )
 
         existing_concept_names = {
             fact.concept.name
@@ -86,6 +98,17 @@ class GaapCiMandatoryFactCompleter:
                     f"{requirement.concept_name}"
                 )
 
+            if (
+                active_report_element_roles is not None
+                and not self._belongs_to_active_report_element(
+                    concept_id=concept.concept_id,
+                    active_report_element_roles=(
+                        active_report_element_roles
+                    ),
+                )
+            ):
+                continue
+
             if not concept.is_numeric:
                 raise ValueError(
                     "mandatory taxonomy concept is not numeric: "
@@ -123,3 +146,24 @@ class GaapCiMandatoryFactCompleter:
             )
 
         return tuple(nil_facts)
+
+    def _belongs_to_active_report_element(
+        self,
+        *,
+        concept_id: str,
+        active_report_element_roles: tuple[str, ...],
+    ) -> bool:
+        """Prüft die Presentation-Zugehörigkeit zu einem aktiven Berichtsteil."""
+
+        active_roles = set(
+            active_report_element_roles
+        )
+
+        return any(
+            relation.role_uri in active_roles
+            and (
+                relation.parent_concept_id == concept_id
+                or relation.child_concept_id == concept_id
+            )
+            for relation in self._taxonomy_model.presentation.relations
+        )

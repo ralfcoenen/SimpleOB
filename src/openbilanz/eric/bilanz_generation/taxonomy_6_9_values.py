@@ -59,6 +59,14 @@ class Taxonomy69ValueBuilder:
             "genInfo.report.id.reportElement."
             "reportElements.GuV"
         ): "GuV",
+        (
+            "genInfo.report.id.reportElement."
+            "reportElements.KS"
+        ): "Kontennachweis",
+        (
+            "genInfo.report.id.reportElement."
+            "reportElements.BAL"
+        ): "Anlagenspiegel",
     }
 
     @classmethod
@@ -70,6 +78,7 @@ class Taxonomy69ValueBuilder:
         fiscal_year: FiscalYear,
         report_profile: GcdReportProfile,
         gaap_ci_values: GaapCi69Values,
+        previous_fiscal_year: FiscalYear | None = None,
     ) -> dict[FactPlanPath, FactPlanValue]:
         """Erzeugt die Werte für den unterstützten 6.9-Standardfall."""
 
@@ -79,6 +88,7 @@ class Taxonomy69ValueBuilder:
             fiscal_year=fiscal_year,
             report_profile=report_profile,
             gaap_ci_values=gaap_ci_values,
+            previous_fiscal_year=previous_fiscal_year,
         )
 
         values: dict[
@@ -106,7 +116,15 @@ class Taxonomy69ValueBuilder:
         cls._add_fiscal_year_values(
             values=values,
             fiscal_year=fiscal_year,
+            previous_fiscal_year=previous_fiscal_year,
         )
+
+        values[
+            (
+                "genInfo.report.id."
+                "incomeStatementendswithBalProfit",
+            )
+        ] = "false"
 
         cls._add_gaap_ci_values(
             values=values,
@@ -234,6 +252,11 @@ class Taxonomy69ValueBuilder:
             ("genInfo.company.id.location.country",)
         ] = company_data.country
 
+        if company_data.business.strip():
+            values[
+                ("genInfo.company.id.business",)
+            ] = company_data.business
+
         id_no_parent = "genInfo.company.id.idNo"
 
         values[
@@ -297,6 +320,7 @@ class Taxonomy69ValueBuilder:
         *,
         values: dict[FactPlanPath, FactPlanValue],
         fiscal_year: FiscalYear,
+        previous_fiscal_year: FiscalYear | None,
     ) -> None:
         start_date = fiscal_year.start_date.isoformat()
         end_date = fiscal_year.end_date.isoformat()
@@ -320,6 +344,31 @@ class Taxonomy69ValueBuilder:
         values[
             ("genInfo.report.period.balSheetClosingDate",)
         ] = end_date
+
+        if previous_fiscal_year is None:
+            return
+
+        previous_start_date = (
+            previous_fiscal_year.start_date.isoformat()
+        )
+        previous_end_date = (
+            previous_fiscal_year.end_date.isoformat()
+        )
+
+        values[
+            ("genInfo.report.period.fiscalPreviousYearBegin",)
+        ] = previous_start_date
+
+        values[
+            ("genInfo.report.period.fiscalPreviousYearEnd",)
+        ] = previous_end_date
+
+        values[
+            (
+                "genInfo.report.period."
+                "balSheetClosingDatePreviousYear",
+            )
+        ] = previous_end_date
 
     @staticmethod
     def _add_gaap_ci_values(
@@ -356,6 +405,7 @@ class Taxonomy69ValueBuilder:
         fiscal_year: FiscalYear,
         report_profile: GcdReportProfile,
         gaap_ci_values: GaapCi69Values,
+        previous_fiscal_year: FiscalYear | None,
     ) -> None:
         if not isinstance(
             company_data,
@@ -379,6 +429,17 @@ class Taxonomy69ValueBuilder:
         ):
             raise TypeError(
                 "fiscal_year must be a FiscalYear"
+            )
+
+        if (
+            previous_fiscal_year is not None
+            and not isinstance(
+                previous_fiscal_year,
+                FiscalYear,
+            )
+        ):
+            raise TypeError(
+                "previous_fiscal_year must be a FiscalYear or None"
             )
 
         if not isinstance(

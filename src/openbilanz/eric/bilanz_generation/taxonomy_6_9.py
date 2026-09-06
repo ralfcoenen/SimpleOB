@@ -42,10 +42,74 @@ def _add_value_or_nil(
     )
 
 
-def _value_or_nil_changes(
+def _add_conditional(
+    concept_name: str,
+) -> ProfileChange:
+    """Erzeugt eine CONDITIONAL-Ergänzung für das 6.9-Profil."""
+
+    return ProfileChange(
+        change_type=ProfileChangeType.ADD,
+        concept_name=concept_name,
+        node=FactPlanNode(
+            concept_name=concept_name,
+            state=FactPlanState.CONDITIONAL,
+        ),
+    )
+
+
+def _conditional_changes(
     concept_names: tuple[str, ...],
 ) -> tuple[ProfileChange, ...]:
-    return tuple(_add_value_or_nil(concept_name) for concept_name in concept_names)
+    return tuple(
+        _add_conditional(concept_name)
+        for concept_name in concept_names
+    )
+
+
+ERIC_REQUIRED_BALANCE_SHEET_CONCEPTS = (
+    "bs.ass.prepaidExp",
+    "bs.eqLiab.equity.capRes",
+    "bs.eqLiab.equity.revenueRes.legal",
+    "bs.eqLiab.equity.revenueRes.statutory",
+    "bs.eqLiab.equity.revenueRes.other",
+    (
+        "bs.eqLiab.equity.netIncome."
+        "taxBalanceGenerally.finalPrev"
+    ),
+    (
+        "bs.eqLiab.equity.netIncome."
+        "taxBalanceGenerally.transferDiffTaxAccounts"
+    ),
+    "bs.eqLiab.equity.profitLoss",
+    (
+        "bs.eqLiab.otherSpecRes.other."
+        "releaseWithdrawalEStG4g"
+    ),
+    "bs.eqLiab.otherSpecRes.other.EStG6b",
+    "bs.eqLiab.otherSpecRes.other.replacement",
+    "bs.eqLiab.accruals.pensions.shareholder",
+    "bs.eqLiab.accruals.pensions.direct",
+    "bs.eqLiab.accruals.pensions.externalFunds",
+    "bs.eqLiab.accruals.tax.gewst",
+    "bs.eqLiab.accruals.other",
+    "bs.eqLiab.liab.securities",
+    "bs.eqLiab.liab.bank.silentPartner",
+)
+
+
+def _balance_sheet_changes(
+    concept_names: tuple[str, ...],
+) -> tuple[ProfileChange, ...]:
+    required = set(ERIC_REQUIRED_BALANCE_SHEET_CONCEPTS)
+
+    return tuple(
+        (
+            _add_value_or_nil(concept_name)
+            if concept_name in required
+            else _add_conditional(concept_name)
+        )
+        for concept_name in concept_names
+    )
 
 
 DELTA_6_9 = BilanzProfileDelta(
@@ -59,7 +123,10 @@ DELTA_6_9 = BilanzProfileDelta(
                 state=FactPlanState.CONDITIONAL,
                 children=(
                     FactPlanNode(
-                        concept_name=("genInfo.report.id.reportStatus.reportStatus.E"),
+                        concept_name=(
+                            "genInfo.report.id.reportStatus."
+                            "reportStatus.E"
+                        ),
                         state=FactPlanState.VALUE,
                     ),
                 ),
@@ -74,7 +141,8 @@ DELTA_6_9 = BilanzProfileDelta(
                 children=(
                     FactPlanNode(
                         concept_name=(
-                            "genInfo.report.id.revisionStatus.revisionStatus.E"
+                            "genInfo.report.id.revisionStatus."
+                            "revisionStatus.E"
                         ),
                         state=FactPlanState.VALUE,
                     ),
@@ -90,7 +158,8 @@ DELTA_6_9 = BilanzProfileDelta(
                 children=(
                     FactPlanNode(
                         concept_name=(
-                            "genInfo.report.id.statementType.statementType.E"
+                            "genInfo.report.id.statementType."
+                            "statementType.E"
                         ),
                         state=FactPlanState.VALUE,
                     ),
@@ -116,13 +185,20 @@ DELTA_6_9 = BilanzProfileDelta(
         ),
         ProfileChange(
             change_type=ProfileChangeType.ADD,
-            concept_name=("genInfo.report.id.specialAccountingStandard"),
+            concept_name=(
+                "genInfo.report.id.specialAccountingStandard"
+            ),
             node=FactPlanNode(
-                concept_name=("genInfo.report.id.specialAccountingStandard"),
+                concept_name=(
+                    "genInfo.report.id.specialAccountingStandard"
+                ),
                 state=FactPlanState.CONDITIONAL,
                 children=(
                     FactPlanNode(
-                        concept_name=("genInfo.report.id.specialAccountingStandard.K"),
+                        concept_name=(
+                            "genInfo.report.id."
+                            "specialAccountingStandard.K"
+                        ),
                         state=FactPlanState.VALUE,
                     ),
                 ),
@@ -154,7 +230,8 @@ DELTA_6_9 = BilanzProfileDelta(
                 children=(
                     FactPlanNode(
                         concept_name=(
-                            "genInfo.report.id.consolidationRange.consolidationRange.EA"
+                            "genInfo.report.id.consolidationRange."
+                            "consolidationRange.EA"
                         ),
                         state=FactPlanState.VALUE,
                     ),
@@ -169,7 +246,10 @@ DELTA_6_9 = BilanzProfileDelta(
                 state=FactPlanState.CONDITIONAL,
                 children=(
                     FactPlanNode(
-                        concept_name=("genInfo.company.id.incomeClassification.trade"),
+                        concept_name=(
+                            "genInfo.company.id."
+                            "incomeClassification.trade"
+                        ),
                         state=FactPlanState.VALUE,
                     ),
                 ),
@@ -183,12 +263,16 @@ DELTA_6_9 = BilanzProfileDelta(
                 state=FactPlanState.CONDITIONAL,
                 children=(
                     FactPlanNode(
-                        concept_name=("genInfo.company.id.legalStatus.legalStatus.UG"),
+                        concept_name=(
+                            "genInfo.company.id.legalStatus."
+                            "legalStatus.UG"
+                        ),
                         state=FactPlanState.CONDITIONAL,
                     ),
                     FactPlanNode(
                         concept_name=(
-                            "genInfo.company.id.legalStatus.legalStatus.GMBH"
+                            "genInfo.company.id.legalStatus."
+                            "legalStatus.GMBH"
                         ),
                         state=FactPlanState.CONDITIONAL,
                     ),
@@ -233,6 +317,58 @@ DELTA_6_9 = BilanzProfileDelta(
             node=FactPlanNode(
                 concept_name="genInfo.report.period.balSheetClosingDate",
                 state=FactPlanState.VALUE,
+            ),
+        ),
+        ProfileChange(
+            change_type=ProfileChangeType.ADD,
+            concept_name="genInfo.report.period.fiscalPreviousYearBegin",
+            node=FactPlanNode(
+                concept_name="genInfo.report.period.fiscalPreviousYearBegin",
+                state=FactPlanState.VALUE_OR_NIL,
+            ),
+        ),
+        ProfileChange(
+            change_type=ProfileChangeType.ADD,
+            concept_name="genInfo.report.period.fiscalPreviousYearEnd",
+            node=FactPlanNode(
+                concept_name="genInfo.report.period.fiscalPreviousYearEnd",
+                state=FactPlanState.VALUE_OR_NIL,
+            ),
+        ),
+        ProfileChange(
+            change_type=ProfileChangeType.ADD,
+            concept_name=(
+                "genInfo.report.period."
+                "balSheetClosingDatePreviousYear"
+            ),
+            node=FactPlanNode(
+                concept_name=(
+                    "genInfo.report.period."
+                    "balSheetClosingDatePreviousYear"
+                ),
+                state=FactPlanState.VALUE_OR_NIL,
+            ),
+        ),
+        ProfileChange(
+            change_type=ProfileChangeType.ADD,
+            concept_name=(
+                "genInfo.report.id."
+                "incomeStatementendswithBalProfit"
+            ),
+            node=FactPlanNode(
+                concept_name=(
+                    "genInfo.report.id."
+                    "incomeStatementendswithBalProfit"
+                ),
+                state=FactPlanState.VALUE,
+            ),
+        ),
+        ProfileChange(
+            change_type=ProfileChangeType.ADD,
+            concept_name="genInfo.company.id.business",
+            node=FactPlanNode(
+                concept_name="genInfo.company.id.business",
+                state=FactPlanState.VALUE_OR_NIL,
             ),
         ),
         ProfileChange(
@@ -299,19 +435,31 @@ DELTA_6_9 = BilanzProfileDelta(
                 state=FactPlanState.CONDITIONAL,
                 children=(
                     FactPlanNode(
-                        concept_name=("genInfo.company.id.idNo.type.companyId.ST13"),
+                        concept_name=(
+                            "genInfo.company.id.idNo."
+                            "type.companyId.ST13"
+                        ),
                         state=FactPlanState.VALUE,
                     ),
                     FactPlanNode(
-                        concept_name=("genInfo.company.id.idNo.type.companyId.STID"),
+                        concept_name=(
+                            "genInfo.company.id.idNo."
+                            "type.companyId.STID"
+                        ),
                         state=FactPlanState.VALUE_OR_NIL,
                     ),
                     FactPlanNode(
-                        concept_name=("genInfo.company.id.idNo.type.companyId.STWID"),
+                        concept_name=(
+                            "genInfo.company.id.idNo."
+                            "type.companyId.STWID"
+                        ),
                         state=FactPlanState.VALUE_OR_NIL,
                     ),
                     FactPlanNode(
-                        concept_name=("genInfo.company.id.idNo.type.companyId.BF4"),
+                        concept_name=(
+                            "genInfo.company.id.idNo."
+                            "type.companyId.BF4"
+                        ),
                         state=FactPlanState.CONDITIONAL,
                     ),
                 ),
@@ -334,35 +482,23 @@ DELTA_6_9 = BilanzProfileDelta(
                         children=(
                             FactPlanNode(
                                 concept_name=(
-                                    "genInfo.company.id.idNo.type.companyId.ST13"
+                                    "genInfo.company.id.idNo."
+                                    "type.companyId.ST13"
                                 ),
                                 state=FactPlanState.NIL,
                             ),
                             FactPlanNode(
                                 concept_name=(
-                                    "genInfo.company.id.idNo.type.companyId.BF4"
+                                    "genInfo.company.id.idNo."
+                                    "type.companyId.BF4"
                                 ),
                                 state=FactPlanState.NIL,
                             ),
                         ),
                     ),
                     FactPlanNode(
-                        concept_name=("genInfo.report.id.accordingTo.yearEnd"),
-                        state=FactPlanState.NIL,
-                    ),
-                ),
-            ),
-        ),
-        ProfileChange(
-            change_type=ProfileChangeType.ADD,
-            concept_name=("genInfo.company.id.domesticBranchOfForeignCompany"),
-            node=FactPlanNode(
-                concept_name=("genInfo.company.id.domesticBranchOfForeignCompany"),
-                state=FactPlanState.REQUIRED_NIL_TUPLE,
-                children=(
-                    FactPlanNode(
                         concept_name=(
-                            "genInfo.company.id.domesticBranchOfForeignCompany.other"
+                            "genInfo.report.id.accordingTo.yearEnd"
                         ),
                         state=FactPlanState.NIL,
                     ),
@@ -371,9 +507,34 @@ DELTA_6_9 = BilanzProfileDelta(
         ),
         ProfileChange(
             change_type=ProfileChangeType.ADD,
-            concept_name=("genInfo.company.id.entityWithTaxablePurposeBusiness"),
+            concept_name=(
+                "genInfo.company.id.domesticBranchOfForeignCompany"
+            ),
             node=FactPlanNode(
-                concept_name=("genInfo.company.id.entityWithTaxablePurposeBusiness"),
+                concept_name=(
+                    "genInfo.company.id.domesticBranchOfForeignCompany"
+                ),
+                state=FactPlanState.REQUIRED_NIL_TUPLE,
+                children=(
+                    FactPlanNode(
+                        concept_name=(
+                            "genInfo.company.id."
+                            "domesticBranchOfForeignCompany.other"
+                        ),
+                        state=FactPlanState.NIL,
+                    ),
+                ),
+            ),
+        ),
+        ProfileChange(
+            change_type=ProfileChangeType.ADD,
+            concept_name=(
+                "genInfo.company.id.entityWithTaxablePurposeBusiness"
+            ),
+            node=FactPlanNode(
+                concept_name=(
+                    "genInfo.company.id.entityWithTaxablePurposeBusiness"
+                ),
                 state=FactPlanState.REQUIRED_NIL_TUPLE,
                 children=(
                     FactPlanNode(
@@ -396,55 +557,64 @@ DELTA_6_9 = BilanzProfileDelta(
                 children=(
                     FactPlanNode(
                         concept_name=(
-                            "genInfo.report.id.reportElement.reportElements.B"
+                            "genInfo.report.id.reportElement."
+                            "reportElements.B"
                         ),
                         state=FactPlanState.VALUE,
                     ),
                     FactPlanNode(
                         concept_name=(
-                            "genInfo.report.id.reportElement.reportElements.GuV"
+                            "genInfo.report.id.reportElement."
+                            "reportElements.GuV"
                         ),
                         state=FactPlanState.VALUE,
                     ),
                     FactPlanNode(
                         concept_name=(
-                            "genInfo.report.id.reportElement.reportElements.BAL"
+                            "genInfo.report.id.reportElement."
+                            "reportElements.BAL"
                         ),
                         state=FactPlanState.CONDITIONAL,
                     ),
                     FactPlanNode(
                         concept_name=(
-                            "genInfo.report.id.reportElement.reportElements.KS"
+                            "genInfo.report.id.reportElement."
+                            "reportElements.KS"
                         ),
                         state=FactPlanState.CONDITIONAL,
                     ),
                     FactPlanNode(
                         concept_name=(
-                            "genInfo.report.id.reportElement.reportElements.EV"
+                            "genInfo.report.id.reportElement."
+                            "reportElements.EV"
                         ),
                         state=FactPlanState.NIL,
                     ),
                     FactPlanNode(
                         concept_name=(
-                            "genInfo.report.id.reportElement.reportElements.BVV"
+                            "genInfo.report.id.reportElement."
+                            "reportElements.BVV"
                         ),
                         state=FactPlanState.NIL,
                     ),
                     FactPlanNode(
                         concept_name=(
-                            "genInfo.report.id.reportElement.reportElements.EB"
+                            "genInfo.report.id.reportElement."
+                            "reportElements.EB"
                         ),
                         state=FactPlanState.NIL,
                     ),
                     FactPlanNode(
                         concept_name=(
-                            "genInfo.report.id.reportElement.reportElements.STU"
+                            "genInfo.report.id.reportElement."
+                            "reportElements.STU"
                         ),
                         state=FactPlanState.NIL,
                     ),
                 ),
             ),
         ),
+
         ProfileChange(
             change_type=ProfileChangeType.ADD,
             concept_name=(
@@ -459,6 +629,7 @@ DELTA_6_9 = BilanzProfileDelta(
                 state=FactPlanState.NIL,
             ),
         ),
+
         ProfileChange(
             change_type=ProfileChangeType.ADD,
             concept_name="is.netIncome",
@@ -485,14 +656,20 @@ DELTA_6_9 = BilanzProfileDelta(
         ),
         ProfileChange(
             change_type=ProfileChangeType.ADD,
-            concept_name=("is.netIncome.regular.operatingTC.grossTradingProfit"),
+            concept_name=(
+                "is.netIncome.regular.operatingTC."
+                "grossTradingProfit"
+            ),
             node=FactPlanNode(
-                concept_name=("is.netIncome.regular.operatingTC.grossTradingProfit"),
+                concept_name=(
+                    "is.netIncome.regular.operatingTC."
+                    "grossTradingProfit"
+                ),
                 state=FactPlanState.VALUE,
             ),
         ),
-        *_value_or_nil_changes(BALANCE_SHEET_CONCEPTS),
-        *_value_or_nil_changes(INCOME_STATEMENT_CONCEPTS),
+        *_balance_sheet_changes(BALANCE_SHEET_CONCEPTS),
+        *_conditional_changes(INCOME_STATEMENT_CONCEPTS),
     ),
 )
 

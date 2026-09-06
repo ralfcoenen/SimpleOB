@@ -10,10 +10,18 @@ from openbilanz.eric.bilanz_generation.fact_plan_resolver import (
 from openbilanz.eric.bilanz_generation.resolved_fact_plan_xbrl_serializer import (
     ResolvedFactPlanXbrlSerializer,
 )
+from openbilanz.taxonomy.account_balance_tuple import (
+    TaxonomyAccountBalance,
+)
 from openbilanz.taxonomy.context import TaxonomyContext
 from openbilanz.taxonomy.entry_point import TaxonomyEntryPoint
+from openbilanz.taxonomy.fact import TaxonomyFact
+from openbilanz.taxonomy.gcd_shareholder_tuple import (
+    GcdShareholderTuple,
+)
 from openbilanz.taxonomy.unit import TaxonomyUnit
 from openbilanz.taxonomy.xbrl_writer import TaxonomyXbrlWriter
+
 
 GCD_69_NAMESPACE = (
     "http://www.xbrl.de/taxonomies/"
@@ -82,6 +90,19 @@ class Taxonomy69XbrlDocumentBuilder:
             TaxonomyEntryPoint,
             ...,
         ],
+        shareholders: tuple[
+            GcdShareholderTuple,
+            ...,
+        ] = (),
+        nil_facts: tuple[
+            TaxonomyNilFact,
+            ...,
+        ] = (),
+        account_balances: tuple[
+            TaxonomyAccountBalance,
+            ...,
+        ] = (),
+        facts: tuple[TaxonomyFact, ...] = (),
     ) -> ET.Element:
         """Erzeugt das Root-Element der vollständigen 6.9-XBRL-Instanz."""
 
@@ -96,13 +117,16 @@ class Taxonomy69XbrlDocumentBuilder:
         root = self._writer.instance_element(
             contexts=contexts,
             units=units,
-            facts=(),
+            facts=facts,
             taxonomy_namespace=GAAP_CI_69_NAMESPACE,
             entry_points=entry_points,
             taxonomy_namespaces={
                 "de-gcd": GCD_69_NAMESPACE,
                 "de-gaap-ci": GAAP_CI_69_NAMESPACE,
             },
+            shareholders=shareholders,
+            nil_facts=nil_facts,
+            account_balances=account_balances,
         )
 
         elements = self._serializer.serialize(
@@ -133,6 +157,19 @@ class Taxonomy69XbrlDocumentBuilder:
             TaxonomyEntryPoint,
             ...,
         ],
+        shareholders: tuple[
+            GcdShareholderTuple,
+            ...,
+        ] = (),
+        nil_facts: tuple[
+            TaxonomyNilFact,
+            ...,
+        ] = (),
+        account_balances: tuple[
+            TaxonomyAccountBalance,
+            ...,
+        ] = (),
+        facts: tuple[TaxonomyFact, ...] = (),
     ) -> str:
         """Erzeugt die vollständige 6.9-XBRL-Instanz als XML-String."""
 
@@ -141,6 +178,10 @@ class Taxonomy69XbrlDocumentBuilder:
             contexts=contexts,
             units=units,
             entry_points=entry_points,
+            shareholders=shareholders,
+            nil_facts=nil_facts,
+            account_balances=account_balances,
+            facts=facts,
         )
 
         return self._writer.to_xml_string(

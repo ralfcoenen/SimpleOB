@@ -56,6 +56,9 @@ from openbilanz.database.chart_of_accounts_repository import (
 )
 from openbilanz.database.company_repository import CompanyRepository
 from openbilanz.database.database import Database
+from openbilanz.database.shareholder_repository import (
+    ShareholderRepository,
+)
 from openbilanz.domain.account_type import AccountType
 from openbilanz.domain.booking_type import BookingType
 from openbilanz.domain.company import Company
@@ -100,6 +103,9 @@ from openbilanz.services.e_bilanz_account_detail_service import (
     EBilanzAccountDetailService,
 )
 from openbilanz.services.posting_service import PostingService
+from openbilanz.taxonomy.account_balance_builder import (
+    AccountBalanceBuilder,
+)
 from openbilanz.taxonomy.arelle_adapter import ArelleAdapter
 from openbilanz.taxonomy.concept import TaxonomyPeriodType
 from openbilanz.taxonomy.concept_set import TaxonomyConceptSet
@@ -108,7 +114,26 @@ from openbilanz.taxonomy.entry_point import TaxonomyEntryPoint
 from openbilanz.taxonomy.gcd_company_data_mapper import (
     GcdCompanyDataMapper,
 )
+from openbilanz.taxonomy.gcd_fact_builder import GcdFactBuilder
+from openbilanz.taxonomy.gcd_shareholder import (
+    GcdShareDivideKey,
+    GcdShareholder,
+    GcdShareholderLegalStatus,
+)
 from openbilanz.taxonomy.gcd_report_profile import GcdReportProfile
+from openbilanz.taxonomy.hgb_gaap_ci_mapping import (
+    create_hgb_gaap_ci_mapping,
+)
+from openbilanz.taxonomy.gaap_ci_mandatory_fact_completer import (
+    GaapCiMandatoryFactCompleter,
+)
+from openbilanz.taxonomy.fact import TaxonomyFact
+from openbilanz.taxonomy.fiscal_requirement_reader import (
+    FiscalRequirement,
+    FiscalRequirementReader,
+)
+from openbilanz.taxonomy.mapper import TaxonomyMapper
+from openbilanz.taxonomy.nil_fact import TaxonomyNilFact
 from openbilanz.taxonomy.resolver import TaxonomyResolver
 from openbilanz.taxonomy.taxonomy import TaxonomyVersion
 from openbilanz.taxonomy.unit import TaxonomyUnit
@@ -128,6 +153,14 @@ OUTPUT_XBRL_FILE = (
 
 ENTITY_SCHEME = (
     "http://www.rzf-nrw.de/Steuernummer"
+)
+
+BALANCE_SHEET_ROLE = (
+    "http://www.xbrl.de/taxonomies/de-gaap-ci/role/balanceSheet"
+)
+
+INCOME_STATEMENT_ROLE = (
+    "http://www.xbrl.de/taxonomies/de-gaap-ci/role/incomeStatement"
 )
 
 
@@ -304,6 +337,85 @@ def select_fiscal_year(
         print(
             "Die Auswahl ist ungültig."
         )
+
+
+def find_previous_fiscal_year(
+    *,
+    fiscal_year: FiscalYear,
+    fiscal_years: tuple[
+        ManagedFiscalYear,
+        ...,
+    ],
+) -> FiscalYear | None:
+    """Ermittelt das chronologisch vorherige Geschäftsjahr."""
+
+    previous_candidates = tuple(
+        managed.fiscal_year
+        for managed in fiscal_years
+        if managed.fiscal_year.end_date < fiscal_year.start_date
+    )
+
+    if not previous_candidates:
+        return None
+
+    return max(
+        previous_candidates,
+        key=lambda candidate: candidate.end_date,
+    )
+
+
+def create_gcd_shareholders(
+    shareholders,
+) -> tuple[GcdShareholder, ...]:
+    """Überführt gespeicherte Gesellschafter in das bestehende GCD-Modell."""
+
+    result: list[GcdShareholder] = []
+
+    for shareholder in shareholders:
+        try:
+            legal_status = GcdShareholderLegalStatus(
+                shareholder.legal_status
+            )
+        except ValueError as exc:
+            raise ValueError(
+                "Unbekannte GCD-Rechtsstellung des Gesellschafters "
+                f"{shareholder.shareholder_number}: "
+                f"{shareholder.legal_status}"
+            ) from exc
+
+        result.append(
+            GcdShareholder(
+                name=shareholder.name,
+                first_name=(
+                    shareholder.first_name
+                    if shareholder.first_name
+                    else None
+                ),
+                shareholder_id=shareholder.shareholder_number,
+                tax_number=(
+                    shareholder.tax_number
+                    if shareholder.tax_number
+                    else None
+                ),
+                tax_id=(
+                    shareholder.tax_id
+                    if shareholder.tax_id
+                    else None
+                ),
+                wid=(
+                    shareholder.wid
+                    if shareholder.wid
+                    else None
+                ),
+                legal_status=legal_status,
+                share_divide_key=GcdShareDivideKey(
+                    numerator=shareholder.share_numerator,
+                    denominator=shareholder.share_denominator,
+                ),
+            )
+        )
+
+    return tuple(result)
 
 
 def create_mandant_financial_statement_context(
@@ -592,6 +704,29 @@ def print_balance_sheet_diagnostics(
     )
 
 
+def collect_existing_numeric_or_nil_facts(
+    resolved_fact_plan,
+):
+    """Sammelt vorhandene numerische VALUE- und NIL-Facts rekursiv."""
+
+    facts: list[TaxonomyFact | TaxonomyNilFact] = []
+
+    def visit(node) -> None:
+        if isinstance(
+            node.fact,
+            (TaxonomyFact, TaxonomyNilFact),
+        ):
+            facts.append(node.fact)
+
+        for child in node.children:
+            visit(child)
+
+    for node in resolved_fact_plan.nodes:
+        visit(node)
+
+    return tuple(facts)
+
+
 def load_taxonomy_models():
     """Lädt die echten lokalen Taxonomie-6.9-Modelle."""
 
@@ -644,6 +779,8 @@ def load_taxonomy_models():
         return (
             adapter,
             concepts,
+            gcd_model,
+            gaap_ci_model,
             gcd_entry_point,
             gaap_ci_entry_point,
         )
@@ -657,9 +794,12 @@ def build_new_xbrl(
     *,
     master_data,
     fiscal_year: FiscalYear,
+    previous_fiscal_year: FiscalYear | None,
+    shareholders: tuple[GcdShareholder, ...],
     income_statement: IncomeStatement,
     balance_sheet: BalanceSheet,
     account_details,
+    financial_statement_context,
     net_income,
 ) -> str:
     """Erzeugt die neue Taxonomie-6.9-XBRL-Instanz."""
@@ -717,6 +857,7 @@ def build_new_xbrl(
         identifiers=identifiers,
         report_profile=report_profile,
         fiscal_year=fiscal_year,
+        previous_fiscal_year=previous_fiscal_year,
         gaap_ci_values=gaap_ci_values,
     )
 
@@ -798,11 +939,64 @@ def build_new_xbrl(
     (
         adapter,
         concepts,
+        gcd_model,
+        gaap_ci_model,
         gcd_entry_point,
         gaap_ci_entry_point,
     ) = load_taxonomy_models()
 
     try:
+        gcd_fact_builder = GcdFactBuilder()
+
+        shareholder_tuples = tuple(
+            gcd_fact_builder.shareholder(
+                shareholder=shareholder,
+                taxonomy_model=gcd_model,
+                context=duration_context,
+            )
+            for shareholder in shareholders
+        )
+
+        print(
+            "GCD-Gesellschafter-Tuples erzeugt: "
+            f"{len(shareholder_tuples)}"
+        )
+
+        taxonomy_mapper = TaxonomyMapper(
+            create_hgb_gaap_ci_mapping(
+                assets=(
+                    financial_statement_context.assets
+                ),
+                liabilities=(
+                    financial_statement_context.liabilities
+                ),
+                income_statement=(
+                    financial_statement_context.income_statement
+                ),
+            ),
+            gaap_ci_model,
+        )
+
+        account_balance_builder = (
+            AccountBalanceBuilder(
+                taxonomy_model=gaap_ci_model,
+                taxonomy_mapper=taxonomy_mapper,
+            )
+        )
+
+        account_balances = tuple(
+            account_balance_builder.build(
+                detail=detail,
+                context=duration_context,
+            )
+            for detail in account_details
+        )
+
+        print(
+            "KS-Kontennachweis-Tuples erzeugt: "
+            f"{len(account_balances)}"
+        )
+
         resolved_fact_plan = (
             FactPlanResolver().resolve(
                 fact_plan=profile.fact_plan,
@@ -812,6 +1006,84 @@ def build_new_xbrl(
                 ),
                 values=values,
             )
+        )
+
+        existing_numeric_or_nil_facts = (
+            collect_existing_numeric_or_nil_facts(
+                resolved_fact_plan
+            )
+        )
+
+        requirements = FiscalRequirementReader(
+            gaap_ci_entry_point
+        ).requirements()
+
+        mandatory_nil_facts = (
+            GaapCiMandatoryFactCompleter(
+                taxonomy_model=gaap_ci_model
+            ).build_missing_nil_facts(
+                requirements=requirements,
+                existing_facts=existing_numeric_or_nil_facts,
+                instant_context=instant_context,
+                duration_context=duration_context,
+                unit=TaxonomyUnit.eur(),
+                active_report_element_roles=(
+                    BALANCE_SHEET_ROLE,
+                    INCOME_STATEMENT_ROLE,
+                ),
+            )
+        )
+
+        requirement_by_concept = {
+            requirement.concept_name: requirement
+            for requirement in requirements
+        }
+
+        added_required = sum(
+            1
+            for fact in mandatory_nil_facts
+            if requirement_by_concept[
+                fact.concept.name
+            ].requirement is FiscalRequirement.REQUIRED
+        )
+        added_sum_required = sum(
+            1
+            for fact in mandatory_nil_facts
+            if requirement_by_concept[
+                fact.concept.name
+            ].requirement is FiscalRequirement.SUM_REQUIRED
+        )
+
+        kst_mandatory_count = sum(
+            1
+            for requirement in requirements
+            if requirement.legal_form_kst
+            and requirement.requirement in {
+                FiscalRequirement.REQUIRED,
+                FiscalRequirement.SUM_REQUIRED,
+            }
+        )
+
+        print()
+        print(
+            "KSt-Pflichtfelder Taxonomie 6.9: "
+            f"{kst_mandatory_count}"
+        )
+        print(
+            "Bereits vorhandene numerische/NIL-Facts: "
+            f"{len(existing_numeric_or_nil_facts)}"
+        )
+        print(
+            "Zusätzlich erzeugte B/GuV-KSt-Pflicht-NIL-Facts: "
+            f"{len(mandatory_nil_facts)}"
+        )
+        print(
+            "  davon Mussfelder: "
+            f"{added_required}"
+        )
+        print(
+            "  davon Summenmussfelder: "
+            f"{added_sum_required}"
         )
 
         year = fiscal_year.end_date.year
@@ -840,6 +1112,9 @@ def build_new_xbrl(
                     gcd_entry_point,
                     gaap_ci_entry_point,
                 ),
+                shareholders=shareholder_tuples,
+                nil_facts=mandatory_nil_facts,
+                account_balances=account_balances,
             )
         )
 
@@ -882,6 +1157,12 @@ def main() -> None:
             )
         )
 
+        shareholder_repository = (
+            ShareholderRepository(
+                session
+            )
+        )
+
         company = select_company(
             company_repository
             .list_companies()
@@ -893,12 +1174,23 @@ def main() -> None:
             f"{company.name}"
         )
 
+        managed_fiscal_years = (
+            company_repository
+            .get_managed_fiscal_years(
+                company.company_id
+            )
+        )
+
         fiscal_year = (
             select_fiscal_year(
-                company_repository
-                .get_managed_fiscal_years(
-                    company.company_id
-                )
+                managed_fiscal_years
+            )
+        )
+
+        previous_fiscal_year = (
+            find_previous_fiscal_year(
+                fiscal_year=fiscal_year,
+                fiscal_years=managed_fiscal_years,
             )
         )
 
@@ -906,6 +1198,17 @@ def main() -> None:
             "Ausgewähltes Geschäftsjahr: "
             f"{fiscal_year.display_name}"
         )
+
+        if previous_fiscal_year is None:
+            print(
+                "Vorheriges Geschäftsjahr: "
+                "nicht vorhanden"
+            )
+        else:
+            print(
+                "Vorheriges Geschäftsjahr: "
+                f"{previous_fiscal_year.display_name}"
+            )
 
         master_data = (
             company_repository
@@ -1020,14 +1323,34 @@ def main() -> None:
             ),
         )
 
+        stored_shareholders = (
+            shareholder_repository.list_for_company(
+                company.company_id
+            )
+        )
+
+        gcd_shareholders = create_gcd_shareholders(
+            stored_shareholders
+        )
+
+        print(
+            "Gesellschafter aus SimpleOB geladen: "
+            f"{len(gcd_shareholders)}"
+        )
+
         xbrl_xml = build_new_xbrl(
             master_data=master_data,
             fiscal_year=fiscal_year,
+            previous_fiscal_year=previous_fiscal_year,
+            shareholders=gcd_shareholders,
             income_statement=(
                 income_statement
             ),
             balance_sheet=balance_sheet,
             account_details=account_details,
+            financial_statement_context=(
+                financial_statement_context
+            ),
             net_income=net_income,
         )
 
