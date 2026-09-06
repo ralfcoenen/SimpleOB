@@ -32,9 +32,9 @@ class NewFixedAssetDialog(tk.Toplevel):
         self._editing = fixed_asset is not None
 
         self.title(
-            "OpenBilanz – Anlagegut bearbeiten"
+            "SimpleOB – Anlagegut bearbeiten"
             if self._editing
-            else "OpenBilanz – Neues Anlagegut"
+            else "SimpleOB – Neues Anlagegut"
         )
         self.geometry("620x570")
         self.resizable(False, False)

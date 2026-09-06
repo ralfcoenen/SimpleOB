@@ -342,3 +342,165 @@ def test_builds_complete_e_bilanz_and_validates_with_arelle(
 
     assert result.is_valid
     assert result.errors == ()
+
+@pytest.mark.integration
+def test_nil_facts_do_not_announce_ev_or_bvv(
+    tmp_path: Path,
+) -> None:
+    """NIL-Mussfelder allein kündigen EV oder BVV nicht an."""
+
+    version_root = TAXONOMY_ROOT / "6.10"
+
+    if not version_root.is_dir():
+        pytest.skip(
+            "Taxonomy 6.10 is not installed locally"
+        )
+
+    gcd_namespace = (
+        "http://www.xbrl.de/taxonomies/"
+        "de-gcd-2026-04-01"
+    )
+
+    gaap_namespace = (
+        "http://www.xbrl.de/taxonomies/"
+        "de-gaap-ci-2026-04-01"
+    )
+
+    resolver = TaxonomyResolver(
+        root=TAXONOMY_ROOT
+    )
+
+    gcd_entry_point_path = resolver.gcd_entry_point(
+        TaxonomyVersion.V6_10
+    )
+
+    gaap_entry_point_path = (
+        resolver.gaap_ci_fiscal_entry_point(
+            TaxonomyVersion.V6_10
+        )
+    )
+
+    gcd_base_entry_point = TaxonomyEntryPoint.from_file(
+        gcd_entry_point_path
+    )
+
+    gaap_base_entry_point = TaxonomyEntryPoint.from_file(
+        gaap_entry_point_path
+    )
+
+    gcd_entry_point = TaxonomyEntryPoint(
+        path=gcd_base_entry_point.path,
+        namespace=gcd_base_entry_point.namespace,
+        schema_imports=gcd_base_entry_point.schema_imports,
+        linkbase_references=(
+            gcd_base_entry_point.linkbase_references
+        ),
+        schema_ref=gcd_entry_point_path.as_uri(),
+    )
+
+    gaap_entry_point = TaxonomyEntryPoint(
+        path=gaap_base_entry_point.path,
+        namespace=gaap_base_entry_point.namespace,
+        schema_imports=gaap_base_entry_point.schema_imports,
+        linkbase_references=(
+            gaap_base_entry_point.linkbase_references
+        ),
+        schema_ref=gaap_entry_point_path.as_uri(),
+    )
+
+    adapter = ArelleAdapter()
+
+    try:
+        gcd_model = adapter.model(
+            gcd_entry_point_path
+        )
+
+        gaap_model = adapter.model(
+            gaap_entry_point_path
+        )
+
+        assets, liabilities = (
+            create_hgb_balance_sheet_structure()
+        )
+
+        income_statement = (
+            create_hgb_income_statement_structure()
+        )
+
+        positions = _positions_by_code(
+            assets,
+            liabilities,
+            income_statement,
+        )
+
+        company = Company(
+            company_id=uuid4(),
+            name="Muster UG (haftungsbeschränkt)",
+        )
+
+        company_data = GcdCompanyData(
+            company=company,
+            tax_number="1234567890123",
+            legal_form="UG (haftungsbeschränkt)",
+            street="Musterstraße",
+            house_number="12a",
+            postal_code="12345",
+            city="Musterstadt",
+            country="DE",
+            business="Softwareentwicklung",
+        )
+
+        fiscal_year = FiscalYear(
+            start_date=date(2027, 1, 1),
+            end_date=date(2027, 12, 31),
+        )
+
+        builder = EBilanzBuilder(
+            gcd_model=gcd_model,
+            gaap_ci_model=gaap_model,
+            gcd_entry_point=gcd_entry_point,
+            gaap_ci_entry_point=gaap_entry_point,
+            gcd_namespace=gcd_namespace,
+            gaap_ci_namespace=gaap_namespace,
+            assets=assets,
+            liabilities=liabilities,
+            income_statement=income_statement,
+        )
+
+        document = builder.build(
+            company_data=company_data,
+            fiscal_year=fiscal_year,
+            amounts={
+                positions["HGB.266.AKTIVA.B.IV"]:
+                    Decimal("10000.00"),
+                positions["HGB.266.PASSIVA.A.I"]:
+                    Decimal("1000.00"),
+                positions["HGB.266.PASSIVA.C.4"]:
+                    Decimal("9000.00"),
+                positions["HGB.275.GKV.1"]:
+                    Decimal("5000.00"),
+                positions["HGB.275.GKV.8"]:
+                    Decimal("2000.00"),
+                positions["HGB.275.GKV"]:
+                    Decimal("3000.00"),
+            },
+            entity_identifier=str(
+                company.company_id
+            ),
+            entity_scheme="urn:openbilanz:company-id",
+        )
+
+        xml = document.xml
+
+    finally:
+        adapter.close()
+
+    assert (
+        "genInfo.report.id.reportElement.reportElements.EV"
+        not in xml
+    )
+
+    assert (
+        "genInfo.report.id.reportElement.reportElements.BVV"
+        not in xml
+    )

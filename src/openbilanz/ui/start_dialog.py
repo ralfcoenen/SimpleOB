@@ -1,4 +1,4 @@
-"""Startdialog für OpenBilanz."""
+"""Startdialog für SimpleOB."""
 
 import tkinter as tk
 from tkinter import ttk
@@ -33,7 +33,7 @@ class StartDialog(tk.Toplevel):
             tuple[FiscalYear, FiscalYear] | None
         ) = None
 
-        self.title("OpenBilanz – Buchhaltung öffnen")
+        self.title("SimpleOB – Buchhaltung öffnen")
         self.geometry("800x320")
         self.resizable(False, False)
 
@@ -64,7 +64,7 @@ class StartDialog(tk.Toplevel):
 
         ttk.Label(
             container,
-            text="OpenBilanz",
+            text="SimpleOB",
             font=("TkDefaultFont", 22, "bold"),
         ).pack(
             anchor="w",

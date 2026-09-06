@@ -1,31 +1,38 @@
 # Python
 __pycache__/
 *.py[cod]
-
-# Virtuelle Umgebung
-.venv/
+*$py.class
+.pytest_cache/
+.ruff_cache/
 
 # Datenbanken
 data/*.db
 data/*.sqlite
+data/config.toml
 
 # Konfiguration
 .env
 
-# IDE
+# Virtuelle Umgebungen
+.venv/
+venv/
+
+# IDE / Editor
+.idea/
 .vscode/
 
-# macOS
+# Betriebssystem
 .DS_Store
 
-# Python package metadata
+# Build / Packaging
+build/
+dist/
 *.egg-info/
 
-# Scripts Ausgaben
-script_results/
+# Lokale Taxonomiedateien
+/data/taxonomy/
 
-# Taxonomien
-data/taxonomy/
+# Taxonomie-Arbeits- und Sicherungsverzeichnisse
 data/taxonomy-backup-*/
 
 # Chat-Übergabedokumente
@@ -37,3 +44,8 @@ docs/development/eric/
 
 # Lokale ERiC-SDK- und Arbeitsdateien
 /ERIC/
+
+# Lokale ERiC-Laufzeitartefakte
+/data/eric-log/
+/eric_69_generated.xbrl
+/export2.xbrl

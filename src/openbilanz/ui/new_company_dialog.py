@@ -28,7 +28,7 @@ class NewCompanyDialog(tk.Toplevel):
         self._repository = repository
         self.result: ApplicationContext | None = None
 
-        self.title("OpenBilanz – Neue Buchhaltung")
+        self.title("SimpleOB – Neue Buchhaltung")
         self.geometry("560x390")
         self.resizable(False, False)
 

@@ -1,7 +1,7 @@
 """Orchestrierung einer vollständigen E-Bilanz aus GCD und GAAP-CI."""
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal
 
 from openbilanz.accounting.financial_statement_position import (
@@ -20,6 +20,7 @@ from openbilanz.taxonomy.account_balance_builder import (
 )
 from openbilanz.taxonomy.entry_point import TaxonomyEntryPoint
 from openbilanz.taxonomy.fiscal_requirement_reader import (
+    FiscalConceptRequirement,
     FiscalRequirementReader,
 )
 from openbilanz.taxonomy.fixed_asset_schedule_builder import (
@@ -54,6 +55,26 @@ from openbilanz.taxonomy.model import TaxonomyModel
 from openbilanz.taxonomy.nil_fact import TaxonomyNilFact
 from openbilanz.taxonomy.text_fact import TaxonomyTextFact
 from openbilanz.taxonomy.unit import TaxonomyUnit
+
+BALANCE_SHEET_ROLE_URI = (
+    "http://www.xbrl.de/taxonomies/"
+    "de-gaap-ci/role/balanceSheet"
+)
+
+INCOME_STATEMENT_ROLE_URI = (
+    "http://www.xbrl.de/taxonomies/"
+    "de-gaap-ci/role/incomeStatement"
+)
+
+APPROPRIATION_PROFITS_ROLE_URI = (
+    "http://www.xbrl.de/taxonomies/"
+    "de-gaap-ci/role/appropriationProfits"
+)
+
+TRANSFERS_TAX_ASSETS_ROLE_URI = (
+    "http://www.xbrl.de/taxonomies/"
+    "de-gaap-ci/role/transfersTaxAssets"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,19 +127,19 @@ class EBilanzBuilder:
         shareholders: tuple[GcdShareholder, ...] = (),
         domestic_branch_types: tuple[
             GcdDomesticBranchOfForeignCompanyType,
-            ...
+            ...,
         ] = (),
         taxable_purpose_business_types: tuple[
             GcdEntityWithTaxablePurposeBusinessType,
-            ...
+            ...,
         ] = (),
         account_details: tuple[
             EBilanzAccountDetail,
-            ...
+            ...,
         ] = (),
         fixed_asset_schedule: tuple[
             FixedAssetSchedulePosition,
-            ...
+            ...,
         ] = (),
         report_profile: GcdReportProfile | None = None,
     ) -> EBilanzDocument:
@@ -141,10 +162,48 @@ class EBilanzBuilder:
 
         duration_context = gaap_statement.duration_context
 
+        has_appropriation_profits = any(
+            fact.concept.name.startswith(
+                "incomeUse."
+            )
+            for fact in gaap_statement.facts
+        )
+
+        has_transfers_tax_assets = any(
+            fact.concept.name.startswith(
+                "BVV."
+            )
+            for fact in gaap_statement.facts
+        )
+
+        active_gaap_ci_roles = [
+            BALANCE_SHEET_ROLE_URI,
+            INCOME_STATEMENT_ROLE_URI,
+        ]
+
+        if has_appropriation_profits:
+            active_gaap_ci_roles.append(
+                APPROPRIATION_PROFITS_ROLE_URI
+            )
+
+        if has_transfers_tax_assets:
+            active_gaap_ci_roles.append(
+                TRANSFERS_TAX_ASSETS_ROLE_URI
+            )
+
         fiscal_requirements = (
             FiscalRequirementReader(
                 self._gaap_ci_entry_point
             ).corporation_requirements()
+        )
+
+        fiscal_requirements = (
+            self._requirements_for_roles(
+                requirements=fiscal_requirements,
+                role_uris=tuple(
+                    active_gaap_ci_roles
+                ),
+            )
         )
 
         nil_facts = (
@@ -240,6 +299,41 @@ class EBilanzBuilder:
             report_profile
             if report_profile is not None
             else GcdReportProfile.standard()
+        )
+
+        report_elements = list(
+            profile.report_elements
+        )
+
+        if account_balances:
+            report_elements.append(
+                "genInfo.report.id.reportElement."
+                "reportElements.KS"
+            )
+
+        if fixed_asset_schedule_xbrl.facts:
+            report_elements.append(
+                "genInfo.report.id.reportElement."
+                "reportElements.BAL"
+            )
+
+        if has_appropriation_profits:
+            report_elements.append(
+                "genInfo.report.id.reportElement."
+                "reportElements.EV"
+            )
+
+        if has_transfers_tax_assets:
+            report_elements.append(
+                "genInfo.report.id.reportElement."
+                "reportElements.BVV"
+            )
+
+        profile = replace(
+            profile,
+            report_elements=tuple(
+                dict.fromkeys(report_elements)
+            ),
         )
 
         profile_facts = gcd_builder.report_profile_facts(
@@ -361,4 +455,55 @@ class EBilanzBuilder:
         return EBilanzDocument(
             xml=xml,
             gaap_ci_statement=gaap_statement,
+        )
+
+    def _requirements_for_roles(
+        self,
+        *,
+        requirements: tuple[
+            FiscalConceptRequirement,
+            ...,
+        ],
+        role_uris: tuple[str, ...],
+    ) -> tuple[
+        FiscalConceptRequirement,
+        ...,
+    ]:
+        """Beschränkt Mussfelder auf aktive GAAP-CI-Berichtsteile."""
+
+        concept_ids: set[str] = set()
+
+        for role_uri in role_uris:
+            relations = (
+                self._gaap_ci_model.presentation
+                .relations_for_role(
+                    role_uri
+                )
+            )
+
+            for relation in relations:
+                concept_ids.add(
+                    relation.parent_concept_id
+                )
+                concept_ids.add(
+                    relation.child_concept_id
+                )
+
+        concept_names = {
+            concept.name
+            for concept_id in concept_ids
+            if (
+                concept
+                := self._gaap_ci_model.concepts.by_id(
+                    concept_id
+                )
+            )
+            is not None
+        }
+
+        return tuple(
+            requirement
+            for requirement in requirements
+            if requirement.concept_name
+            in concept_names
         )

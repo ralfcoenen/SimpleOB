@@ -32,7 +32,7 @@ class TaxonomyConceptSet:
                 "concepts must contain only "
                 "TaxonomyConcept objects"
             )
-        
+
         concept_ids = [
             concept.concept_id
             for concept in self.concepts
@@ -54,6 +54,38 @@ class TaxonomyConceptSet:
                 return concept
 
         return None
+
+    def by_name(
+        self,
+        concept_name: str,
+    ) -> TaxonomyConcept | None:
+        """Liefert ein eindeutig bestimmbares Concept anhand seines Namens."""
+
+        if not isinstance(concept_name, str):
+            raise TypeError(
+                "concept_name must be a string"
+            )
+
+        if not concept_name.strip():
+            raise ValueError(
+                "concept_name must not be blank"
+            )
+
+        matches = tuple(
+            concept
+            for concept in self.concepts
+            if concept.name == concept_name
+        )
+
+        if not matches:
+            return None
+
+        if len(matches) > 1:
+            raise ValueError(
+                f"concept name is ambiguous: {concept_name}"
+            )
+
+        return matches[0]
 
     @classmethod
     def from_schemas(

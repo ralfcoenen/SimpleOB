@@ -31,6 +31,9 @@ def test_default_config_uses_project_data_directory() -> None:
         f"sqlite:///{config.database_file}"
     )
 
+    assert config.eric_lib_dir is None
+    assert config.eric_manufacturer_id is None
+
 
 def test_load_config_uses_defaults_when_file_is_missing(
     tmp_path: Path,
@@ -61,6 +64,9 @@ def test_load_config_uses_defaults_when_file_is_missing(
     assert config.config_file == (
         config_file
     )
+
+    assert config.eric_lib_dir is None
+    assert config.eric_manufacturer_id is None
 
 
 def test_load_config_reads_toml_file(
@@ -121,6 +127,9 @@ def test_load_config_reads_toml_file(
         config_file
     )
 
+    assert config.eric_lib_dir is None
+    assert config.eric_manufacturer_id is None
+
 
 def test_database_and_taxonomy_paths_follow_configured_data_dir(
     tmp_path: Path,
@@ -156,3 +165,100 @@ def test_database_and_taxonomy_paths_follow_configured_data_dir(
         data_dir
         / "taxonomy"
     )
+
+
+def test_load_config_reads_eric_configuration(
+    tmp_path: Path,
+) -> None:
+    config_file = (
+        tmp_path
+        / "config.toml"
+    )
+
+    eric_lib_dir = (
+        tmp_path
+        / "eric"
+        / "lib"
+    )
+
+    config_file.write_text(
+        (
+            "[eric]\n"
+            f'lib_dir = "{eric_lib_dir}"\n'
+            'manufacturer_id = " 12345 "\n'
+        ),
+        encoding="utf-8",
+    )
+
+    config = load_config(
+        config_file
+    )
+
+    assert config.eric_lib_dir == eric_lib_dir
+    assert config.eric_manufacturer_id == "12345"
+
+
+def test_load_config_expands_eric_lib_directory(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    home_dir = (
+        tmp_path
+        / "home"
+    )
+
+    monkeypatch.setenv(
+        "HOME",
+        str(home_dir),
+    )
+
+    config_file = (
+        tmp_path
+        / "config.toml"
+    )
+
+    config_file.write_text(
+        (
+            "[eric]\n"
+            'lib_dir = "~/Developer/ERiC/lib"\n'
+        ),
+        encoding="utf-8",
+    )
+
+    config = load_config(
+        config_file
+    )
+
+    assert config.eric_lib_dir == (
+        home_dir
+        / "Developer"
+        / "ERiC"
+        / "lib"
+    )
+
+    assert config.eric_manufacturer_id is None
+
+
+def test_load_config_treats_empty_eric_values_as_missing(
+    tmp_path: Path,
+) -> None:
+    config_file = (
+        tmp_path
+        / "config.toml"
+    )
+
+    config_file.write_text(
+        (
+            "[eric]\n"
+            'lib_dir = ""\n'
+            'manufacturer_id = "   "\n'
+        ),
+        encoding="utf-8",
+    )
+
+    config = load_config(
+        config_file
+    )
+
+    assert config.eric_lib_dir is None
+    assert config.eric_manufacturer_id is None

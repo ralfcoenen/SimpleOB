@@ -2677,3 +2677,348 @@ def test_xbrl_writer_serializes_optional_shareholder_identifiers() -> None:
     assert id_not_assigned is not None
     assert id_not_assigned.text == "NO-ID"
     assert id_not_assigned.get("contextRef") == "ctx-2026"
+
+def test_xbrl_writer_serializes_accounting_standard_inside_tuple() -> None:
+    """Der Rechnungslegungsstandard wird innerhalb seines GCD-Tuples serialisiert."""
+
+    gcd_namespace = (
+        "http://www.xbrl.de/taxonomies/"
+        "de-gcd-2025-04-01"
+    )
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    accounting_standard_concept = TaxonomyConcept(
+        name=(
+            "genInfo.report.id.accountingStandard."
+            "accountingStandard.HGBM"
+        ),
+        concept_id=(
+            "de-gcd_genInfo.report.id.accountingStandard."
+            "accountingStandard.HGBM"
+        ),
+        type_name="xbrli:stringItemType",
+        substitution_group=(
+            "de-gcd:"
+            "genInfo.report.id.accountingStandard."
+            "accountingStandard.head"
+        ),
+        period_type=TaxonomyPeriodType.DURATION,
+        balance=TaxonomyBalance.NONE,
+        abstract=False,
+        nillable=True,
+    )
+
+    accounting_standard_fact = TaxonomyTextFact(
+        concept=accounting_standard_concept,
+        value="deutsches Handelsrecht",
+        context=context,
+    )
+
+    writer = TaxonomyXbrlWriter()
+
+    root = writer.instance_element(
+        contexts={
+            "ctx-2025": context,
+        },
+        units={},
+        facts=(
+            accounting_standard_fact,
+        ),
+        taxonomy_namespace=gcd_namespace,
+        taxonomy_namespaces={
+            "de-gcd": gcd_namespace,
+        },
+        entry_points=(),
+    )
+
+    accounting_standard_tuples = root.findall(
+        f"{{{gcd_namespace}}}"
+        "genInfo.report.id.accountingStandard"
+    )
+
+    assert len(accounting_standard_tuples) == 1
+
+    accounting_standard_tuple = accounting_standard_tuples[0]
+
+    assert "contextRef" not in accounting_standard_tuple.attrib
+
+    children = list(accounting_standard_tuple)
+
+    assert len(children) == 1
+
+    accounting_standard = children[0]
+
+    assert accounting_standard.tag == (
+        f"{{{gcd_namespace}}}"
+        "genInfo.report.id.accountingStandard."
+        "accountingStandard.HGBM"
+    )
+    assert accounting_standard.attrib["contextRef"] == "ctx-2025"
+    assert accounting_standard.text == "deutsches Handelsrecht"
+
+    flat_accounting_standard = root.findall(
+        f"{{{gcd_namespace}}}"
+        "genInfo.report.id.accountingStandard."
+        "accountingStandard.HGBM"
+    )
+
+    assert flat_accounting_standard == []
+
+def test_xbrl_writer_serializes_legal_status_inside_tuple() -> None:
+    """Der Rechtsstatus wird innerhalb seines GCD-Tuples serialisiert."""
+
+    gcd_namespace = (
+        "http://www.xbrl.de/taxonomies/"
+        "de-gcd-2025-04-01"
+    )
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    legal_status_concept = TaxonomyConcept(
+        name=(
+            "genInfo.company.id.legalStatus."
+            "legalStatus.G43"
+        ),
+        concept_id=(
+            "de-gcd_genInfo.company.id.legalStatus."
+            "legalStatus.G43"
+        ),
+        type_name="xbrli:stringItemType",
+        substitution_group=(
+            "de-gcd:"
+            "genInfo.company.id.legalStatus."
+            "legalStatus.head"
+        ),
+        period_type=TaxonomyPeriodType.DURATION,
+        balance=TaxonomyBalance.NONE,
+        abstract=False,
+        nillable=True,
+    )
+
+    legal_status_fact = TaxonomyTextFact(
+        concept=legal_status_concept,
+        value="G43",
+        context=context,
+    )
+
+    writer = TaxonomyXbrlWriter()
+
+    root = writer.instance_element(
+        contexts={
+            "ctx-2025": context,
+        },
+        units={},
+        facts=(
+            legal_status_fact,
+        ),
+        taxonomy_namespace=gcd_namespace,
+        taxonomy_namespaces={
+            "de-gcd": gcd_namespace,
+        },
+        entry_points=(),
+    )
+
+    legal_status_tuples = root.findall(
+        f"{{{gcd_namespace}}}"
+        "genInfo.company.id.legalStatus"
+    )
+
+    assert len(legal_status_tuples) == 1
+
+    legal_status_tuple = legal_status_tuples[0]
+
+    assert "contextRef" not in legal_status_tuple.attrib
+
+    children = list(legal_status_tuple)
+
+    assert len(children) == 1
+
+    legal_status = children[0]
+
+    assert legal_status.tag == (
+        f"{{{gcd_namespace}}}"
+        "genInfo.company.id.legalStatus."
+        "legalStatus.G43"
+    )
+    assert legal_status.attrib["contextRef"] == "ctx-2025"
+    assert legal_status.text == "G43"
+
+    flat_legal_status = root.findall(
+        f"{{{gcd_namespace}}}"
+        "genInfo.company.id.legalStatus."
+        "legalStatus.G43"
+    )
+
+    assert flat_legal_status == []
+
+
+def test_xbrl_writer_serializes_statement_type_and_report_status_inside_tuples() -> None:
+    """Statement-Type und Report-Status werden innerhalb ihrer GCD-Tuples serialisiert."""
+
+    gcd_namespace = (
+        "http://www.xbrl.de/taxonomies/"
+        "de-gcd-2025-04-01"
+    )
+
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    statement_type_concept = TaxonomyConcept(
+        name=(
+            "genInfo.report.id.statementType."
+            "statementType.E"
+        ),
+        concept_id=(
+            "de-gcd_genInfo.report.id.statementType."
+            "statementType.E"
+        ),
+        type_name="xbrli:stringItemType",
+        substitution_group=(
+            "de-gcd:"
+            "genInfo.report.id.statementType."
+            "statementType.head"
+        ),
+        period_type=TaxonomyPeriodType.DURATION,
+        balance=TaxonomyBalance.NONE,
+        abstract=False,
+        nillable=True,
+    )
+
+    report_status_concept = TaxonomyConcept(
+        name=(
+            "genInfo.report.id.reportStatus."
+            "reportStatus.E"
+        ),
+        concept_id=(
+            "de-gcd_genInfo.report.id.reportStatus."
+            "reportStatus.E"
+        ),
+        type_name="xbrli:stringItemType",
+        substitution_group=(
+            "de-gcd:"
+            "genInfo.report.id.reportStatus."
+            "reportStatus.head"
+        ),
+        period_type=TaxonomyPeriodType.DURATION,
+        balance=TaxonomyBalance.NONE,
+        abstract=False,
+        nillable=True,
+    )
+
+    statement_type_fact = TaxonomyTextFact(
+        concept=statement_type_concept,
+        value="Jahresabschluss",
+        context=context,
+    )
+
+    report_status_fact = TaxonomyTextFact(
+        concept=report_status_concept,
+        value="endgültig",
+        context=context,
+    )
+
+    writer = TaxonomyXbrlWriter()
+
+    root = writer.instance_element(
+        contexts={
+            "ctx-2025": context,
+        },
+        units={},
+        facts=(
+            statement_type_fact,
+            report_status_fact,
+        ),
+        taxonomy_namespace=gcd_namespace,
+        taxonomy_namespaces={
+            "de-gcd": gcd_namespace,
+        },
+        entry_points=(),
+    )
+
+    statement_type_tuples = root.findall(
+        f"{{{gcd_namespace}}}"
+        "genInfo.report.id.statementType"
+    )
+
+    assert len(statement_type_tuples) == 1
+
+    statement_type_tuple = statement_type_tuples[0]
+
+    assert "contextRef" not in statement_type_tuple.attrib
+
+    statement_type_children = list(
+        statement_type_tuple
+    )
+
+    assert len(statement_type_children) == 1
+
+    statement_type = statement_type_children[0]
+
+    assert statement_type.tag == (
+        f"{{{gcd_namespace}}}"
+        "genInfo.report.id.statementType."
+        "statementType.E"
+    )
+    assert statement_type.attrib["contextRef"] == "ctx-2025"
+    assert statement_type.text == "Jahresabschluss"
+
+    flat_statement_type = root.findall(
+        f"{{{gcd_namespace}}}"
+        "genInfo.report.id.statementType."
+        "statementType.E"
+    )
+
+    assert flat_statement_type == []
+
+    report_status_tuples = root.findall(
+        f"{{{gcd_namespace}}}"
+        "genInfo.report.id.reportStatus"
+    )
+
+    assert len(report_status_tuples) == 1
+
+    report_status_tuple = report_status_tuples[0]
+
+    assert "contextRef" not in report_status_tuple.attrib
+
+    report_status_children = list(
+        report_status_tuple
+    )
+
+    assert len(report_status_children) == 1
+
+    report_status = report_status_children[0]
+
+    assert report_status.tag == (
+        f"{{{gcd_namespace}}}"
+        "genInfo.report.id.reportStatus."
+        "reportStatus.E"
+    )
+    assert report_status.attrib["contextRef"] == "ctx-2025"
+    assert report_status.text == "endgültig"
+
+    flat_report_status = root.findall(
+        f"{{{gcd_namespace}}}"
+        "genInfo.report.id.reportStatus."
+        "reportStatus.E"
+    )
+
+    assert flat_report_status == []

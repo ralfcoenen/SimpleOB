@@ -31,7 +31,7 @@ class NewFiscalYearDialog(tk.Toplevel):
         self.result: FiscalYear | None = None
         self.requested_opening_source: FiscalYear | None = None
 
-        self.title("OpenBilanz – Neues Geschäftsjahr")
+        self.title("SimpleOB – Neues Geschäftsjahr")
         self.geometry("520x280")
         self.resizable(False, False)
 

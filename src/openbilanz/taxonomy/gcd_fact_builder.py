@@ -479,7 +479,14 @@ class GcdFactBuilder:
             "genInfo.report.id.reportElement.reportElements.KS": (
                 "Kontennachweis"
             ),
+            "genInfo.report.id.reportElement.reportElements.EV": (
+                "Ergebnisverwendung"
+            ),
+            "genInfo.report.id.reportElement.reportElements.BVV": (
+                "Steuerlicher Betriebsvermögensvergleich"
+            ),
         }
+
 
         facts: list[TaxonomyTextFact] = []
 

@@ -1,4 +1,4 @@
-"""Hauptfenster der OpenBilanz-Anwendung."""
+"""Hauptfenster der SimpleOB-Anwendung."""
 
 import tkinter as tk
 from pathlib import Path
@@ -72,7 +72,7 @@ from openbilanz.ui.vat_booking_frame import VatBookingFrame
 
 
 class MainWindow(tk.Tk):
-    """Hauptfenster von OpenBilanz."""
+    """Hauptfenster von SimpleOB."""
 
     def __init__(
         self,
@@ -175,7 +175,7 @@ class MainWindow(tk.Tk):
 
         ttk.Label(
             container,
-            text="OpenBilanz",
+            text="SimpleOB",
             font=("TkDefaultFont", 24, "bold"),
         ).pack(
             anchor="w",

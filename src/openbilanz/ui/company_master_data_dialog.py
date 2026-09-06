@@ -51,7 +51,7 @@ class CompanyMasterDataDialog(tk.Toplevel):
         self.result: CompanyMasterData | None = None
 
         self.title(
-            "OpenBilanz – Unternehmensstammdaten"
+            "SimpleOB – Unternehmensstammdaten"
         )
         self.geometry("760x760")
         self.minsize(700, 700)

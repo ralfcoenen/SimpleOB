@@ -219,6 +219,38 @@ class TaxonomyXbrlWriter:
             attributes,
         )
 
+    def gcd_report_id_tuple_element(
+        self,
+        *,
+        fact: TaxonomyTextFact,
+        context_id: str,
+        namespace: str,
+        tuple_name: str,
+    ) -> ET.Element:
+        """Erzeugt ein GCD-Report-ID-Tuple mit einem Text-Fact."""
+
+        if not isinstance(
+            fact,
+            TaxonomyTextFact,
+        ):
+            raise TypeError(
+                "fact must be a TaxonomyTextFact"
+            )
+
+        element = ET.Element(
+            f"{{{namespace}}}{tuple_name}"
+        )
+
+        element.append(
+            self.text_fact_element(
+                fact=fact,
+                context_id=context_id,
+                namespace=namespace,
+            )
+        )
+
+        return element
+
     def gcd_report_element_element(
         self,
         *,
@@ -570,7 +602,6 @@ class TaxonomyXbrlWriter:
 
         return element
 
-
     def instance_element(
         self,
         *,
@@ -600,7 +631,7 @@ class TaxonomyXbrlWriter:
         shareholders: tuple[GcdShareholderTuple, ...] = (),
         account_balances: tuple[
             TaxonomyAccountBalance,
-            ...
+            ...,
         ] = (),
     ) -> ET.Element:
         """Erzeugt das Root-Element einer XBRL-Instanz."""
@@ -655,13 +686,103 @@ class TaxonomyXbrlWriter:
                 fact,
                 TaxonomyTextFact,
             ):
-                root.append(
-                    self.text_fact_element(
-                        fact=fact,
-                        context_id=context_id,
-                        namespace=namespace,
-                    )
+                gcd_report_id_tuple_names = (
+                    "accountingStandard",
+                    "statementType",
+                    "reportStatus",
+                    "revisionStatus",
+                    "incomeStatementFormat",
+                    "consolidationRange",
                 )
+
+                tuple_created = False
+
+                for tuple_name in gcd_report_id_tuple_names:
+                    if fact.concept.name.startswith(
+                        f"genInfo.report.id.{tuple_name}."
+                        f"{tuple_name}."
+                    ):
+                        root.append(
+                            self.gcd_report_id_tuple_element(
+                                fact=fact,
+                                context_id=context_id,
+                                namespace=namespace,
+                                tuple_name=(
+                                    f"genInfo.report.id.{tuple_name}"
+                                ),
+                            )
+                        )
+                        tuple_created = True
+                        break
+
+                if (
+                    not tuple_created
+                    and fact.concept.name.startswith(
+                        "genInfo.report.id."
+                        "specialAccountingStandard."
+                    )
+                ):
+                    root.append(
+                        self.gcd_report_id_tuple_element(
+                            fact=fact,
+                            context_id=context_id,
+                            namespace=namespace,
+                            tuple_name=(
+                                "genInfo.report.id."
+                                "specialAccountingStandard"
+                            ),
+                        )
+                    )
+                    tuple_created = True
+
+                if (
+                    not tuple_created
+                    and fact.concept.name.startswith(
+                        "genInfo.company.id."
+                        "incomeClassification."
+                    )
+                ):
+                    root.append(
+                        self.gcd_report_id_tuple_element(
+                            fact=fact,
+                            context_id=context_id,
+                            namespace=namespace,
+                            tuple_name=(
+                                "genInfo.company.id."
+                                "incomeClassification"
+                            ),
+                        )
+                    )
+                    tuple_created = True
+
+                if (
+                    not tuple_created
+                    and fact.concept.name.startswith(
+                        "genInfo.company.id.legalStatus."
+                        "legalStatus."
+                    )
+                ):
+                    root.append(
+                        self.gcd_report_id_tuple_element(
+                            fact=fact,
+                            context_id=context_id,
+                            namespace=namespace,
+                            tuple_name=(
+                                "genInfo.company.id.legalStatus"
+                            ),
+                        )
+                    )
+                    tuple_created = True
+
+                if not tuple_created:
+                    root.append(
+                        self.text_fact_element(
+                            fact=fact,
+                            context_id=context_id,
+                            namespace=namespace,
+                        )
+                    )
+
                 continue
 
             root.append(
@@ -704,7 +825,6 @@ class TaxonomyXbrlWriter:
                     namespace=namespace,
                 )
             )
-
 
         for company_id_no in company_id_nos:
             if not company_id_no.facts:

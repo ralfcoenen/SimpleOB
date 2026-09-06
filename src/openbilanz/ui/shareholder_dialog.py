@@ -48,7 +48,7 @@ class ShareholdersDialog(tk.Toplevel):
         ] = {}
 
         self.title(
-            "OpenBilanz – Gesellschafter"
+            "SimpleOB – Gesellschafter"
         )
         self.geometry("980x520")
         self.minsize(850, 450)
@@ -431,7 +431,7 @@ class ShareholderEditDialog(tk.Toplevel):
         self.result: Shareholder | None = None
 
         self.title(
-            "OpenBilanz – Gesellschafter"
+            "SimpleOB – Gesellschafter"
         )
         self.geometry("620x650")
         self.minsize(560, 600)

@@ -67,9 +67,9 @@ class AccountEditorDialog(tk.Toplevel):
         ] = {}
 
         self.title(
-            "OpenBilanz – Konto bearbeiten"
+            "SimpleOB – Konto bearbeiten"
             if self._is_edit_mode
-            else "OpenBilanz – Neues Konto"
+            else "SimpleOB – Neues Konto"
         )
         self.geometry("720x430")
         self.resizable(False, False)
@@ -167,7 +167,7 @@ class AccountEditorDialog(tk.Toplevel):
             self._account_number_entry.configure(
                 state="disabled"
             )
-        
+
 
         ttk.Label(
             form,
@@ -636,7 +636,7 @@ class AccountEditorDialog(tk.Toplevel):
             f"{position.code} – "
             f"{position.name}"
         )
-    
+
     def _load_account(self) -> None:
         """Übernimmt die Werte eines vorhandenen Kontos."""
 
