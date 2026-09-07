@@ -10,6 +10,12 @@ from openbilanz.eric.bilanz_generation.fact_plan_resolver import (
 from openbilanz.eric.bilanz_generation.resolved_fact_plan_xbrl_serializer import (
     ResolvedFactPlanXbrlSerializer,
 )
+from openbilanz.eric.bilanz_generation.tax_reconciliation import (
+    TaxReconciliationTransfer,
+)
+from openbilanz.eric.bilanz_generation.taxonomy_6_9_tax_reconciliation_serializer import (
+    Taxonomy69TaxReconciliationSerializer,
+)
 from openbilanz.taxonomy.account_balance_tuple import (
     TaxonomyAccountBalance,
 )
@@ -19,6 +25,7 @@ from openbilanz.taxonomy.fact import TaxonomyFact
 from openbilanz.taxonomy.gcd_shareholder_tuple import (
     GcdShareholderTuple,
 )
+from openbilanz.taxonomy.nil_fact import TaxonomyNilFact
 from openbilanz.taxonomy.unit import TaxonomyUnit
 from openbilanz.taxonomy.xbrl_writer import TaxonomyXbrlWriter
 
@@ -103,6 +110,11 @@ class Taxonomy69XbrlDocumentBuilder:
             ...,
         ] = (),
         facts: tuple[TaxonomyFact, ...] = (),
+        tax_reconciliation: (
+            TaxReconciliationTransfer | None
+        ) = None,
+        tax_reconciliation_context_id: str | None = None,
+        tax_reconciliation_unit_id: str | None = None,
     ) -> ET.Element:
         """Erzeugt das Root-Element der vollständigen 6.9-XBRL-Instanz."""
 
@@ -113,6 +125,12 @@ class Taxonomy69XbrlDocumentBuilder:
             raise TypeError(
                 "resolved_fact_plan must be a ResolvedFactPlan"
             )
+
+        self._validate_tax_reconciliation_arguments(
+            tax_reconciliation=tax_reconciliation,
+            context_id=tax_reconciliation_context_id,
+            unit_id=tax_reconciliation_unit_id,
+        )
 
         root = self._writer.instance_element(
             contexts=contexts,
@@ -145,6 +163,18 @@ class Taxonomy69XbrlDocumentBuilder:
                 element
             )
 
+        if tax_reconciliation is not None:
+            assert tax_reconciliation_context_id is not None
+            assert tax_reconciliation_unit_id is not None
+
+            root.append(
+                Taxonomy69TaxReconciliationSerializer.serialize(
+                    transfer=tax_reconciliation,
+                    context_id=tax_reconciliation_context_id,
+                    unit_id=tax_reconciliation_unit_id,
+                )
+            )
+
         return root
 
     def build_xml(
@@ -170,6 +200,11 @@ class Taxonomy69XbrlDocumentBuilder:
             ...,
         ] = (),
         facts: tuple[TaxonomyFact, ...] = (),
+        tax_reconciliation: (
+            TaxReconciliationTransfer | None
+        ) = None,
+        tax_reconciliation_context_id: str | None = None,
+        tax_reconciliation_unit_id: str | None = None,
     ) -> str:
         """Erzeugt die vollständige 6.9-XBRL-Instanz als XML-String."""
 
@@ -182,8 +217,51 @@ class Taxonomy69XbrlDocumentBuilder:
             nil_facts=nil_facts,
             account_balances=account_balances,
             facts=facts,
+            tax_reconciliation=tax_reconciliation,
+            tax_reconciliation_context_id=(
+                tax_reconciliation_context_id
+            ),
+            tax_reconciliation_unit_id=(
+                tax_reconciliation_unit_id
+            ),
         )
 
         return self._writer.to_xml_string(
             root
         )
+
+    @staticmethod
+    def _validate_tax_reconciliation_arguments(
+        *,
+        tax_reconciliation: TaxReconciliationTransfer | None,
+        context_id: str | None,
+        unit_id: str | None,
+    ) -> None:
+        if tax_reconciliation is None:
+            if context_id is not None or unit_id is not None:
+                raise ValueError(
+                    "tax reconciliation context/unit ids "
+                    "require a tax reconciliation"
+                )
+            return
+
+        if not isinstance(
+            tax_reconciliation,
+            TaxReconciliationTransfer,
+        ):
+            raise TypeError(
+                "tax_reconciliation must be a "
+                "TaxReconciliationTransfer or None"
+            )
+
+        if context_id is None or not context_id.strip():
+            raise ValueError(
+                "tax_reconciliation_context_id is required "
+                "for a tax reconciliation"
+            )
+
+        if unit_id is None or not unit_id.strip():
+            raise ValueError(
+                "tax_reconciliation_unit_id is required "
+                "for a tax reconciliation"
+            )
