@@ -226,6 +226,52 @@ def test_builds_report_elements_and_gaap_ci_values() -> None:
     ] == Decimal("6000.00")
 
 
+def test_standard_report_profile_omits_stu() -> None:
+    values = Taxonomy69ValueBuilder.build(
+        company_data=_company_data(),
+        identifiers=_identifiers(),
+        fiscal_year=_fiscal_year(),
+        report_profile=GcdReportProfile.standard(),
+        gaap_ci_values=_gaap_ci_values(),
+    )
+
+    assert (
+        "genInfo.report.id.reportElement",
+        (
+            "genInfo.report.id.reportElement."
+            "reportElements.STU"
+        ),
+    ) not in values
+
+
+def test_report_profile_with_stu_builds_stu_value() -> None:
+    report_profile = (
+        GcdReportProfile.standard()
+        .with_report_element(
+            "genInfo.report.id.reportElement."
+            "reportElements.STU"
+        )
+    )
+
+    values = Taxonomy69ValueBuilder.build(
+        company_data=_company_data(),
+        identifiers=_identifiers(),
+        fiscal_year=_fiscal_year(),
+        report_profile=report_profile,
+        gaap_ci_values=_gaap_ci_values(),
+    )
+
+    assert values[
+        (
+            "genInfo.report.id.reportElement",
+            (
+                "genInfo.report.id.reportElement."
+                "reportElements.STU"
+            ),
+        )
+    ] == "Steuerliche Überleitungsrechnung"
+
+
 def test_optional_identifiers_are_omitted() -> None:
     identifiers = GcdCompanyIdentifiers(
         tax_number_13="5123045678901",

@@ -618,7 +618,7 @@ DELTA_6_9 = BilanzProfileDelta(
                             "genInfo.report.id.reportElement."
                             "reportElements.STU"
                         ),
-                        state=FactPlanState.NIL,
+                        state=FactPlanState.CONDITIONAL,
                     ),
                 ),
             ),
