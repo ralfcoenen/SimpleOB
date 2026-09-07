@@ -71,6 +71,10 @@ class Taxonomy69ValueBuilder:
             "genInfo.report.id.reportElement."
             "reportElements.BVV"
         ): "Steuerlicher Betriebsvermögensvergleich",
+        (
+            "genInfo.report.id.reportElement."
+                "reportElements.STU"
+        ): "Steuerliche Überleitungsrechnung",
     }
 
     @classmethod
