@@ -50,6 +50,20 @@ class GaapCi69AccountDetailValueBuilder:
             "grossSales.generalRateVAT"
         ),
     )
+    _CASH_POSITION = "HGB.266.AKTIVA.B.IV"
+    _INPUT_TAX_RECEIVABLE_POSITION = "HGB.266.AKTIVA.B.II.4"
+
+    _CASH_CONCEPT = (
+        "bs.ass.currAss.cashEquiv.cash"
+    )
+    _BANK_CONCEPT = (
+        "bs.ass.currAss.cashEquiv.bank"
+    )
+    _INPUT_TAX_RECEIVABLE_CONCEPT = (
+        "bs.ass.currAss.receiv.other.vat"
+    )
+
+
     @classmethod
     def build(
         cls,
@@ -57,6 +71,9 @@ class GaapCi69AccountDetailValueBuilder:
         account_details: tuple[EBilanzAccountDetail, ...],
         tax_liability_accounts: Iterable[str] = (),
         general_rate_sales_accounts: Iterable[str] = (),
+        cash_accounts: Iterable[str] = (),
+        bank_accounts: Iterable[str] = (),
+        input_tax_receivable_accounts: Iterable[str] = (),
     ) -> dict[FactPlanPath, FactPlanValue]:
         """Erzeugt die konkret ableitbaren GAAP-CI-Unterpositionen."""
 
@@ -78,6 +95,15 @@ class GaapCi69AccountDetailValueBuilder:
         sales_accounts = cls._normalize_account_numbers(
             general_rate_sales_accounts
         )
+        cash_account_numbers = cls._normalize_account_numbers(
+            cash_accounts
+        )
+        bank_account_numbers = cls._normalize_account_numbers(
+            bank_accounts
+        )
+        input_tax_accounts = cls._normalize_account_numbers(
+            input_tax_receivable_accounts
+        )
 
         values: dict[FactPlanPath, FactPlanValue] = {}
 
@@ -93,6 +119,35 @@ class GaapCi69AccountDetailValueBuilder:
                     values=values,
                     concept_name=cls._BGA_CONCEPT,
                     amount=detail.balance,
+                )
+                continue
+
+            if position_code == cls._CASH_POSITION:
+                if account_number in cash_account_numbers:
+                    cls._add_value(
+                        values=values,
+                        concept_name=cls._CASH_CONCEPT,
+                        amount=abs(detail.balance),
+                    )
+                    continue
+
+                if account_number in bank_account_numbers:
+                    cls._add_value(
+                        values=values,
+                        concept_name=cls._BANK_CONCEPT,
+                        amount=abs(detail.balance),
+                    )
+                    continue
+
+            if (
+                position_code
+                == cls._INPUT_TAX_RECEIVABLE_POSITION
+                and account_number in input_tax_accounts
+            ):
+                cls._add_value(
+                    values=values,
+                    concept_name=cls._INPUT_TAX_RECEIVABLE_CONCEPT,
+                    amount=abs(detail.balance),
                 )
                 continue
 

@@ -121,6 +121,11 @@ class FixedAssetScheduleBuilder:
         "accDepr.DeprPeriod.EStG6b_3",
     )
 
+    _BGA_HGB_POSITION = "HGB.266.AKTIVA.A.II.3"
+    _BGA_TAXONOMY_CONCEPT = (
+        "bs.ass.fixAss.tan.otherEquipm.otherbga"
+    )
+
     def __init__(
         self,
         *,
@@ -470,14 +475,17 @@ class FixedAssetScheduleBuilder:
         self,
         position_code: str,
     ) -> TaxonomyConcept:
+        if position_code == self._BGA_HGB_POSITION:
+            return self._concept_by_name(
+                self._BGA_TAXONOMY_CONCEPT
+            )
+
         position = FinancialStatementPosition(
             code=position_code,
             name=position_code,
         )
+        return self._taxonomy_mapper.concept_for(position)
 
-        return self._taxonomy_mapper.concept_for(
-            position
-        )
 
     def _concept_by_name(
         self,

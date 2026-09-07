@@ -107,6 +107,7 @@ INCOME_STATEMENT_CONCEPTS = (
     "is.netIncome.regular.operatingTC.deprAmort.fixAss.tan.lowValueAs",
     "is.netIncome.regular.operatingTC.deprAmort.fixAss.tan.lowValueAsCollItem",
     "is.netIncome.regular.operatingTC.deprAmort.fixAss.tan.buildings",
+    "is.netIncome.regular.operatingTC.deprAmort.fixAss.tan.other",
     "is.netIncome.regular.operatingTC.deprAmort.fixAss.specific.except.goodwill",
     "is.netIncome.regular.operatingTC.deprAmort.fixAss.specific.except.otherIntan",
     "is.netIncome.regular.fin.netParticipation.amortFinanc.financialsExcept.participCorp",

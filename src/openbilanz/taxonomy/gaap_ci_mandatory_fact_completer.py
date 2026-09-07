@@ -47,6 +47,7 @@ class GaapCiMandatoryFactCompleter:
         duration_context: TaxonomyContext,
         unit: TaxonomyUnit,
         active_report_element_roles: tuple[str, ...] | None = None,
+        excluded_concept_prefixes: tuple[str, ...] = (),
     ) -> tuple[TaxonomyNilFact, ...]:
         """Erzeugt NIL-Facts für fehlende KSt-relevante Mussfelder."""
 
@@ -59,6 +60,14 @@ class GaapCiMandatoryFactCompleter:
         ):
             raise TypeError(
                 "active_report_element_roles must be a tuple or None"
+            )
+
+        if not isinstance(
+            excluded_concept_prefixes,
+            tuple,
+        ):
+            raise TypeError(
+                "excluded_concept_prefixes must be a tuple"
             )
 
         existing_concept_names = {
@@ -76,6 +85,12 @@ class GaapCiMandatoryFactCompleter:
                 FiscalRequirement.REQUIRED,
                 FiscalRequirement.SUM_REQUIRED,
             }:
+                continue
+
+            if self._is_excluded_concept(
+                concept_name=requirement.concept_name,
+                excluded_concept_prefixes=excluded_concept_prefixes,
+            ):
                 continue
 
             if requirement.concept_name in existing_concept_names:
@@ -146,6 +161,20 @@ class GaapCiMandatoryFactCompleter:
             )
 
         return tuple(nil_facts)
+
+    @staticmethod
+    def _is_excluded_concept(
+        *,
+        concept_name: str,
+        excluded_concept_prefixes: tuple[str, ...],
+    ) -> bool:
+        """Prüft, ob ein Concept zu einem ausgeschlossenen Taxonomiezweig gehört."""
+
+        return any(
+            concept_name == prefix
+            or concept_name.startswith(f"{prefix}.")
+            for prefix in excluded_concept_prefixes
+        )
 
     def _belongs_to_active_report_element(
         self,

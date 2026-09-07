@@ -67,6 +67,10 @@ class Taxonomy69ValueBuilder:
             "genInfo.report.id.reportElement."
             "reportElements.BAL"
         ): "Anlagenspiegel",
+        (
+            "genInfo.report.id.reportElement."
+            "reportElements.BVV"
+        ): "Steuerlicher Betriebsvermögensvergleich",
     }
 
     @classmethod

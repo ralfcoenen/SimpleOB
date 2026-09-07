@@ -96,6 +96,15 @@ ERIC_REQUIRED_BALANCE_SHEET_CONCEPTS = (
     "bs.eqLiab.liab.bank.silentPartner",
 )
 
+BVV_CONCEPTS = (
+    "BVV.profitLoss",
+    "BVV.profitLoss.assetsCurrentYear",
+    "BVV.profitLoss.assetsPreviousYear",
+    "BVV.profitLoss.assetsPreviousYear.assets",
+    "BVV.profitLoss.assetsPreviousYear.capAdjustments",
+    "BVV.profitLoss.withdrawalDistrib",
+    "BVV.profitLoss.contribution",
+)
 
 def _balance_sheet_changes(
     concept_names: tuple[str, ...],
@@ -595,7 +604,7 @@ DELTA_6_9 = BilanzProfileDelta(
                             "genInfo.report.id.reportElement."
                             "reportElements.BVV"
                         ),
-                        state=FactPlanState.NIL,
+                        state=FactPlanState.CONDITIONAL,
                     ),
                     FactPlanNode(
                         concept_name=(
@@ -670,6 +679,7 @@ DELTA_6_9 = BilanzProfileDelta(
         ),
         *_balance_sheet_changes(BALANCE_SHEET_CONCEPTS),
         *_conditional_changes(INCOME_STATEMENT_CONCEPTS),
+        *_conditional_changes(BVV_CONCEPTS),
     ),
 )
 
