@@ -1137,6 +1137,54 @@ class FiscalYearWorkspace:
             )
         )
 
+    def tax_depreciation_difference_for_bga(
+        self,
+    ) -> Decimal:
+        """Summiert steuerliche AfA-Abweichungen für BGA im Geschäftsjahr."""
+
+        if (
+            self._fixed_asset_repository is None
+            or self._fixed_asset_depreciation_repository is None
+        ):
+            raise RuntimeError(
+                "Die Anlagenbuchhaltung ist nicht konfiguriert."
+            )
+
+        if self._tax_depreciation_adjustment_repository is None:
+            raise RuntimeError(
+                "Steuerliche AfA-Abweichungen sind nicht konfiguriert."
+            )
+
+        assets = self._fixed_asset_repository.list_for_company(
+            self._context.company.company_id
+        )
+
+        bga_asset_ids = {
+            asset.fixed_asset_id
+            for asset in assets
+            if asset.position_code == "HGB.266.AKTIVA.A.II.3"
+        }
+
+        difference = Decimal("0.00")
+
+        for depreciation in self.list_confirmed_depreciations():
+            if depreciation.fixed_asset_id not in bga_asset_ids:
+                continue
+
+            adjustment = (
+                self._tax_depreciation_adjustment_repository
+                .get_for_depreciation(
+                    depreciation.depreciation_id
+                )
+            )
+
+            if adjustment is None:
+                continue
+
+            difference += adjustment.difference
+
+        return difference
+
     def save_tax_depreciation_adjustment(
         self,
         *,

@@ -528,6 +528,160 @@ def test_list_confirmed_depreciations_requires_fixed_asset_configuration(
     ):
         workspace.list_confirmed_depreciations()
 
+
+def test_aggregates_tax_depreciation_difference_for_bga(
+    context: ApplicationContext,
+) -> None:
+    booking_repository = Mock()
+    company_repository = Mock()
+    fixed_asset_repository = Mock()
+    depreciation_repository = Mock()
+    adjustment_repository = Mock()
+
+    booking_repository.list_for_fiscal_year.return_value = ()
+
+    bga_asset = FixedAsset(
+        company_id=context.company.company_id,
+        asset_code="BGA-001",
+        description="MacBook Pro",
+        position_code="HGB.266.AKTIVA.A.II.3",
+        asset_account_number="0690",
+        depreciation_expense_account_number="4830",
+        acquisition_date=date(2026, 1, 1),
+        acquisition_cost=Decimal("2400.00"),
+        depreciation_start_date=date(2026, 1, 1),
+        useful_life_months=36,
+    )
+
+    other_asset = FixedAsset(
+        company_id=context.company.company_id,
+        asset_code="MAS-001",
+        description="Maschine",
+        position_code="HGB.266.AKTIVA.A.II.2",
+        asset_account_number="0400",
+        depreciation_expense_account_number="4830",
+        acquisition_date=date(2026, 1, 1),
+        acquisition_cost=Decimal("12000.00"),
+        depreciation_start_date=date(2026, 1, 1),
+        useful_life_months=60,
+    )
+
+    first_bga_depreciation = FixedAssetDepreciation(
+        fixed_asset_id=bga_asset.fixed_asset_id,
+        fiscal_year_end=context.fiscal_year.end_date,
+        depreciation_date=context.fiscal_year.end_date,
+        amount=Decimal("600.00"),
+        booking_id=uuid4(),
+        kind=DepreciationKind.LINEAR,
+        source=DepreciationSource.CALCULATED,
+    )
+
+    second_bga_depreciation = FixedAssetDepreciation(
+        fixed_asset_id=bga_asset.fixed_asset_id,
+        fiscal_year_end=context.fiscal_year.end_date,
+        depreciation_date=context.fiscal_year.end_date,
+        amount=Decimal("200.00"),
+        booking_id=uuid4(),
+        kind=DepreciationKind.LINEAR,
+        source=DepreciationSource.CALCULATED,
+    )
+
+    other_depreciation = FixedAssetDepreciation(
+        fixed_asset_id=other_asset.fixed_asset_id,
+        fiscal_year_end=context.fiscal_year.end_date,
+        depreciation_date=context.fiscal_year.end_date,
+        amount=Decimal("1000.00"),
+        booking_id=uuid4(),
+        kind=DepreciationKind.LINEAR,
+        source=DepreciationSource.CALCULATED,
+    )
+
+    fixed_asset_repository.list_for_company.return_value = (
+        bga_asset,
+        other_asset,
+    )
+
+    depreciation_repository.list_for_fixed_asset.side_effect = (
+        lambda fixed_asset_id: {
+            bga_asset.fixed_asset_id: (
+                first_bga_depreciation,
+                second_bga_depreciation,
+            ),
+            other_asset.fixed_asset_id: (
+                other_depreciation,
+            ),
+        }[fixed_asset_id]
+    )
+
+    adjustments = {
+        first_bga_depreciation.depreciation_id: (
+            TaxDepreciationAdjustment(
+                depreciation_id=(
+                    first_bga_depreciation.depreciation_id
+                ),
+                commercial_amount=Decimal("600.00"),
+                tax_amount=Decimal("620.00"),
+            )
+        ),
+        second_bga_depreciation.depreciation_id: (
+            TaxDepreciationAdjustment(
+                depreciation_id=(
+                    second_bga_depreciation.depreciation_id
+                ),
+                commercial_amount=Decimal("200.00"),
+                tax_amount=Decimal("195.00"),
+            )
+        ),
+        other_depreciation.depreciation_id: (
+            TaxDepreciationAdjustment(
+                depreciation_id=other_depreciation.depreciation_id,
+                commercial_amount=Decimal("1000.00"),
+                tax_amount=Decimal("1100.00"),
+            )
+        ),
+    }
+
+    adjustment_repository.get_for_depreciation.side_effect = (
+        lambda depreciation_id: adjustments.get(depreciation_id)
+    )
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=company_repository,
+        posting_service=Mock(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
+        e_bilanz_export_service=Mock(),
+        taxonomy_management_service=Mock(),
+        fixed_asset_repository=fixed_asset_repository,
+        fixed_asset_depreciation_repository=(
+            depreciation_repository
+        ),
+        tax_depreciation_adjustment_repository=(
+            adjustment_repository
+        ),
+    )
+
+    result = workspace.tax_depreciation_difference_for_bga()
+
+    assert result == Decimal("15.00")
+
+    assert (
+        adjustment_repository.get_for_depreciation.call_count
+        == 2
+    )
+
+    adjustment_repository.get_for_depreciation.assert_any_call(
+        first_bga_depreciation.depreciation_id
+    )
+    adjustment_repository.get_for_depreciation.assert_any_call(
+        second_bga_depreciation.depreciation_id
+    )
+
 def test_builds_open_depreciation_proposal(
     context: ApplicationContext,
 ) -> None:
