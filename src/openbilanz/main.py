@@ -562,6 +562,9 @@ def main() -> None:
                 fixed_asset_depreciation_repository=(
                     fixed_asset_depreciation_repository
                 ),
+                tax_depreciation_adjustment_repository=(
+                    tax_depreciation_adjustment_repository
+                ),
                 fixed_asset_movement_repository=(
                     fixed_asset_movement_repository
                 ),

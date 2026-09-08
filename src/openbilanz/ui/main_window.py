@@ -68,6 +68,9 @@ from openbilanz.ui.opening_balance_dialog import (
 from openbilanz.ui.shareholder_dialog import (
     ShareholdersDialog,
 )
+from openbilanz.ui.tax_depreciation_adjustment_dialog import (
+    TaxDepreciationAdjustmentDialog,
+)
 from openbilanz.ui.vat_booking_frame import VatBookingFrame
 
 
@@ -897,7 +900,15 @@ class MainWindow(tk.Tk):
             side="right",
             padx=(0, 8),
         )
-
+        self._tax_depreciation_adjustments_button = ttk.Button(
+            header,
+            text="Steuerliche AfA-Abweichungen",
+            command=self._manage_tax_depreciation_adjustments,
+        )
+        self._tax_depreciation_adjustments_button.pack(
+            side="right",
+            padx=(0, 8),
+        )
         self._process_depreciations_button = ttk.Button(
             header,
             text="Abschreibungen prüfen/buchen",
@@ -1338,6 +1349,107 @@ class MainWindow(tk.Tk):
 
         # Gebuchte AfA verändert Journal, GuV und Bilanz.
         self._refresh_all()
+
+    def _manage_tax_depreciation_adjustments(self) -> None:
+        """Bearbeitet steuerliche AfA-Abweichungen."""
+
+        try:
+            depreciations = (
+                self._workspace.list_confirmed_depreciations()
+            )
+            fixed_assets = (
+                self._workspace.list_fixed_assets()
+            )
+        except (ValueError, RuntimeError) as exc:
+            messagebox.showerror(
+                "Steuerliche AfA-Abweichungen",
+                str(exc),
+                parent=self,
+            )
+            return
+
+        if not depreciations:
+            messagebox.showinfo(
+                "Steuerliche AfA-Abweichungen",
+                (
+                    "Für dieses Geschäftsjahr sind noch keine "
+                    "bestätigten Abschreibungen vorhanden."
+                ),
+                parent=self,
+            )
+            return
+
+        fixed_assets_by_id = {
+            fixed_asset.fixed_asset_id: fixed_asset
+            for fixed_asset in fixed_assets
+        }
+
+        for depreciation in depreciations:
+            fixed_asset = fixed_assets_by_id.get(
+                depreciation.fixed_asset_id
+            )
+
+            if fixed_asset is None:
+                messagebox.showerror(
+                    "Steuerliche AfA-Abweichungen",
+                    (
+                        "Das Anlagegut zu einer bestätigten "
+                        "Abschreibung konnte nicht gefunden werden."
+                    ),
+                    parent=self,
+                )
+                return
+
+            try:
+                adjustment = (
+                    self._workspace
+                    .get_tax_depreciation_adjustment(
+                        depreciation.depreciation_id
+                    )
+                )
+            except (ValueError, RuntimeError) as exc:
+                messagebox.showerror(
+                    "Steuerliche AfA-Abweichungen",
+                    str(exc),
+                    parent=self,
+                )
+                return
+
+            initial_tax_amount = (
+                adjustment.tax_amount
+                if adjustment is not None
+                else depreciation.amount
+            )
+
+            dialog = TaxDepreciationAdjustmentDialog(
+                self,
+                fixed_asset=fixed_asset,
+                depreciation=depreciation,
+                initial_tax_amount=initial_tax_amount,
+            )
+            self.wait_window(
+                dialog
+            )
+
+            if dialog.result is None:
+                break
+
+            try:
+                self._workspace.save_tax_depreciation_adjustment(
+                    depreciation_id=(
+                        depreciation.depreciation_id
+                    ),
+                    tax_amount=dialog.result,
+                )
+            except (ValueError, RuntimeError) as exc:
+                messagebox.showerror(
+                    "Steuerliche AfA-Abweichung konnte "
+                    "nicht gespeichert werden",
+                    str(exc),
+                    parent=self,
+                )
+                break
+
 
     def _close_fiscal_year(self) -> None:
         """Schließt das Geschäftsjahr persistent ab."""
@@ -2027,6 +2139,9 @@ class MainWindow(tk.Tk):
             self._process_depreciations_button.state(
                 ["!disabled"]
             )
+            self._tax_depreciation_adjustments_button.state(
+                ["!disabled"]
+            )
         else:
             self._add_fixed_asset_button.state(
                 ["disabled"]
@@ -2044,6 +2159,9 @@ class MainWindow(tk.Tk):
                 ["disabled"]
             )
             self._process_depreciations_button.state(
+                ["disabled"]
+            )
+            self._tax_depreciation_adjustments_button.state(
                 ["disabled"]
             )
 
