@@ -27,11 +27,11 @@ from openbilanz.database.fixed_asset_movement_repository import (
 from openbilanz.database.fixed_asset_repository import (
     FixedAssetRepository,
 )
-from openbilanz.database.tax_depreciation_adjustment_repository import (
-    TaxDepreciationAdjustmentRepository,
-)
 from openbilanz.database.shareholder_repository import (
     ShareholderRepository,
+)
+from openbilanz.database.tax_depreciation_adjustment_repository import (
+    TaxDepreciationAdjustmentRepository,
 )
 from openbilanz.domain.account import Account
 from openbilanz.domain.account_mapping_rule import (

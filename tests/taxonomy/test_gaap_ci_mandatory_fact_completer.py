@@ -28,7 +28,6 @@ from openbilanz.taxonomy.presentation_set import (
 )
 from openbilanz.taxonomy.unit import TaxonomyUnit
 
-
 BALANCE_SHEET_ROLE = (
     "http://www.xbrl.de/taxonomies/de-gaap-ci/role/balanceSheet"
 )

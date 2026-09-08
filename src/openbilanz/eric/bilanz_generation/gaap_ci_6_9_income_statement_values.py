@@ -21,7 +21,6 @@ from openbilanz.taxonomy.hgb_gaap_ci_mapping import (
 )
 from openbilanz.taxonomy.mapping_set import TaxonomyMappingSet
 
-
 _TANGIBLE_FIXED_ASSET_PREFIX = (
     "HGB.266.AKTIVA.A.II"
 )

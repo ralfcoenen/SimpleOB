@@ -29,7 +29,6 @@ from openbilanz.taxonomy.nil_fact import TaxonomyNilFact
 from openbilanz.taxonomy.unit import TaxonomyUnit
 from openbilanz.taxonomy.xbrl_writer import TaxonomyXbrlWriter
 
-
 GCD_69_NAMESPACE = (
     "http://www.xbrl.de/taxonomies/"
     "de-gcd-2025-04-01"

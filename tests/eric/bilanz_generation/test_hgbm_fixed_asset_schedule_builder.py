@@ -1,11 +1,13 @@
 """Tests für die HGBM-Ergänzung des Anlagenspiegels."""
 
+from datetime import date
 from decimal import Decimal
 
 import pytest
 
-from datetime import date
-
+from openbilanz.eric.bilanz_generation.hgbm_fixed_asset_schedule_builder import (
+    HgbmFixedAssetScheduleBuilder,
+)
 from openbilanz.taxonomy.concept import (
     TaxonomyBalance,
     TaxonomyConcept,
@@ -17,10 +19,8 @@ from openbilanz.taxonomy.context import (
 )
 from openbilanz.taxonomy.fact import TaxonomyFact
 from openbilanz.taxonomy.unit import TaxonomyUnit
-from openbilanz.eric.bilanz_generation.hgbm_fixed_asset_schedule_builder import (
-    HgbmFixedAssetScheduleBuilder,
-)
 from openbilanz.taxonomy.xbrl_writer import TaxonomyXbrlWriter
+
 
 @pytest.mark.parametrize(
     ("concept_name", "expected"),

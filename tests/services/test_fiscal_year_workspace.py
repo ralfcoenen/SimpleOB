@@ -49,12 +49,12 @@ from openbilanz.domain.fixed_asset_movement_type import (
 from openbilanz.domain.fixed_asset_status import (
     FixedAssetStatus,
 )
-from openbilanz.domain.tax_depreciation_adjustment import (
-    TaxDepreciationAdjustment,
-)
 from openbilanz.domain.journal import Journal
 from openbilanz.domain.managed_fiscal_year import ManagedFiscalYear
 from openbilanz.domain.shareholder import Shareholder
+from openbilanz.domain.tax_depreciation_adjustment import (
+    TaxDepreciationAdjustment,
+)
 from openbilanz.services.closing_result import ClosingResult
 from openbilanz.services.e_bilanz_export_service import (
     EBilanzExportService,
