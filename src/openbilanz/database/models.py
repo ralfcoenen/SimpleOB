@@ -755,3 +755,36 @@ class Anlageabschreibung(Base):
         String,
         nullable=False,
     )
+
+    steuerliche_afa_abweichung: Mapped[
+        "SteuerlicheAfaAbweichung | None"
+        ] = relationship(
+            back_populates="anlageabschreibung",
+            cascade="all, delete-orphan",
+            uselist=False,
+        )
+
+class SteuerlicheAfaAbweichung(Base):
+    """Persistierte steuerlich abweichende AfA."""
+
+    __tablename__ = "steuerliche_afa_abweichungen"
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+    )
+
+    anlageabschreibung_id: Mapped[int] = mapped_column(
+        ForeignKey("anlageabschreibungen.id"),
+        unique=True,
+        nullable=False,
+    )
+
+    tax_amount: Mapped[Decimal] = mapped_column(
+        Numeric(15, 2),
+        nullable=False,
+    )
+
+    anlageabschreibung: Mapped["Anlageabschreibung"] = relationship(
+        back_populates="steuerliche_afa_abweichung",
+    )
