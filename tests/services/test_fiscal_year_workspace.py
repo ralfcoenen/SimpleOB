@@ -49,6 +49,9 @@ from openbilanz.domain.fixed_asset_movement_type import (
 from openbilanz.domain.fixed_asset_status import (
     FixedAssetStatus,
 )
+from openbilanz.domain.tax_depreciation_adjustment import (
+    TaxDepreciationAdjustment,
+)
 from openbilanz.domain.journal import Journal
 from openbilanz.domain.managed_fiscal_year import ManagedFiscalYear
 from openbilanz.domain.shareholder import Shareholder
@@ -410,6 +413,120 @@ def test_post_booking_does_not_change_workspace_when_persistence_fails(
         company_id=context.company.company_id,
         fiscal_year=context.fiscal_year,
     )
+
+def test_lists_confirmed_depreciations_for_open_fiscal_year(
+    context: ApplicationContext,
+) -> None:
+    booking_repository = Mock()
+    company_repository = Mock()
+    fixed_asset_repository = Mock()
+    depreciation_repository = Mock()
+
+    booking_repository.list_for_fiscal_year.return_value = ()
+
+    asset = FixedAsset(
+        company_id=context.company.company_id,
+        asset_code="A-0001",
+        description="MacBook Pro",
+        position_code="HGB.266.AKTIVA.A.II.3",
+        asset_account_number="0690",
+        depreciation_expense_account_number="4830",
+        acquisition_date=date(2025, 3, 15),
+        acquisition_cost=Decimal("2400.00"),
+        depreciation_start_date=date(2025, 3, 15),
+        useful_life_months=36,
+    )
+
+    previous_depreciation = FixedAssetDepreciation(
+        fixed_asset_id=asset.fixed_asset_id,
+        fiscal_year_end=date(2025, 12, 31),
+        depreciation_date=date(2025, 12, 31),
+        amount=Decimal("600.00"),
+        booking_id=uuid4(),
+        kind=DepreciationKind.LINEAR,
+        source=DepreciationSource.CALCULATED,
+    )
+
+    current_depreciation = FixedAssetDepreciation(
+        fixed_asset_id=asset.fixed_asset_id,
+        fiscal_year_end=context.fiscal_year.end_date,
+        depreciation_date=context.fiscal_year.end_date,
+        amount=Decimal("800.00"),
+        booking_id=uuid4(),
+        kind=DepreciationKind.LINEAR,
+        source=DepreciationSource.CALCULATED,
+    )
+
+    fixed_asset_repository.list_for_company.return_value = (
+        asset,
+    )
+
+    depreciation_repository.list_for_fixed_asset.return_value = (
+        previous_depreciation,
+        current_depreciation,
+    )
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=company_repository,
+        posting_service=Mock(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
+        e_bilanz_export_service=Mock(),
+        taxonomy_management_service=Mock(),
+        fixed_asset_repository=(
+            fixed_asset_repository
+        ),
+        fixed_asset_depreciation_repository=(
+            depreciation_repository
+        ),
+    )
+
+    result = workspace.list_confirmed_depreciations()
+
+    assert result == (
+        current_depreciation,
+    )
+
+    fixed_asset_repository.list_for_company.assert_called_once_with(
+        context.company.company_id
+    )
+
+    depreciation_repository.list_for_fixed_asset.assert_called_once_with(
+        asset.fixed_asset_id
+    )
+
+
+def test_list_confirmed_depreciations_requires_fixed_asset_configuration(
+    context: ApplicationContext,
+) -> None:
+    booking_repository = Mock()
+
+    booking_repository.list_for_fiscal_year.return_value = ()
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=Mock(),
+        posting_service=Mock(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
+        e_bilanz_export_service=Mock(),
+        taxonomy_management_service=Mock(),
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="Die Anlagenbuchhaltung ist nicht konfiguriert.",
+    ):
+        workspace.list_confirmed_depreciations()
 
 def test_builds_open_depreciation_proposal(
     context: ApplicationContext,
@@ -1877,4 +1994,99 @@ def test_manages_shareholders_independent_of_fiscal_year_status(
         shareholder_id=(
             updated_shareholder.shareholder_id
         )
+    )
+
+def test_gets_tax_depreciation_adjustment(
+    context: ApplicationContext,
+) -> None:
+    booking_repository = Mock()
+    adjustment_repository = Mock()
+
+    booking_repository.list_for_fiscal_year.return_value = ()
+
+    depreciation_id = uuid4()
+
+    adjustment = TaxDepreciationAdjustment(
+        depreciation_id=depreciation_id,
+        commercial_amount=Decimal("600.00"),
+        tax_amount=Decimal("620.00"),
+    )
+
+    adjustment_repository.get_for_depreciation.return_value = (
+        adjustment
+    )
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=Mock(),
+        posting_service=Mock(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
+        e_bilanz_export_service=Mock(),
+        taxonomy_management_service=Mock(),
+        tax_depreciation_adjustment_repository=(
+            adjustment_repository
+        ),
+    )
+
+    result = workspace.get_tax_depreciation_adjustment(
+        depreciation_id
+    )
+
+    assert result == adjustment
+
+    adjustment_repository.get_for_depreciation.assert_called_once_with(
+        depreciation_id
+    )
+
+
+def test_saves_tax_depreciation_adjustment(
+    context: ApplicationContext,
+) -> None:
+    booking_repository = Mock()
+    adjustment_repository = Mock()
+
+    booking_repository.list_for_fiscal_year.return_value = ()
+
+    depreciation_id = uuid4()
+
+    adjustment = TaxDepreciationAdjustment(
+        depreciation_id=depreciation_id,
+        commercial_amount=Decimal("600.00"),
+        tax_amount=Decimal("620.00"),
+    )
+
+    adjustment_repository.save.return_value = adjustment
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=Mock(),
+        posting_service=Mock(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
+        e_bilanz_export_service=Mock(),
+        taxonomy_management_service=Mock(),
+        tax_depreciation_adjustment_repository=(
+            adjustment_repository
+        ),
+    )
+
+    result = workspace.save_tax_depreciation_adjustment(
+        depreciation_id=depreciation_id,
+        tax_amount=Decimal("620.00"),
+    )
+
+    assert result == adjustment
+
+    adjustment_repository.save.assert_called_once_with(
+        depreciation_id=depreciation_id,
+        tax_amount=Decimal("620.00"),
     )

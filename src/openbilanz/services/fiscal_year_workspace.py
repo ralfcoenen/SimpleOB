@@ -27,6 +27,9 @@ from openbilanz.database.fixed_asset_movement_repository import (
 from openbilanz.database.fixed_asset_repository import (
     FixedAssetRepository,
 )
+from openbilanz.database.tax_depreciation_adjustment_repository import (
+    TaxDepreciationAdjustmentRepository,
+)
 from openbilanz.database.shareholder_repository import (
     ShareholderRepository,
 )
@@ -67,6 +70,9 @@ from openbilanz.domain.fixed_asset_status import (
 from openbilanz.domain.journal import Journal
 from openbilanz.domain.managed_fiscal_year import ManagedFiscalYear
 from openbilanz.domain.shareholder import Shareholder
+from openbilanz.domain.tax_depreciation_adjustment import (
+    TaxDepreciationAdjustment,
+)
 from openbilanz.reporting.account_activity_report import (
     AccountActivityReport,
 )
@@ -142,6 +148,9 @@ class FiscalYearWorkspace:
         fixed_asset_depreciation_repository: (
             FixedAssetDepreciationRepository | None
         ) = None,
+        tax_depreciation_adjustment_repository: (
+            TaxDepreciationAdjustmentRepository | None
+        ) = None,
         depreciation_service: DepreciationService | None = None,
         fixed_asset_depreciation_workflow: (
             FixedAssetDepreciationWorkflow | None
@@ -189,6 +198,9 @@ class FiscalYearWorkspace:
         )
         self._fixed_asset_schedule_service = (
             fixed_asset_schedule_service
+        )
+        self._tax_depreciation_adjustment_repository = (
+            tax_depreciation_adjustment_repository
         )
 
         self.reload()
@@ -1070,6 +1082,78 @@ class FiscalYearWorkspace:
         )
 
         return movement
+
+    def list_confirmed_depreciations(
+        self,
+    ) -> tuple[FixedAssetDepreciation, ...]:
+        """Lädt bestätigte Abschreibungen des geöffneten Geschäftsjahres."""
+
+        if (
+            self._fixed_asset_repository is None
+            or self._fixed_asset_depreciation_repository is None
+        ):
+            raise RuntimeError(
+                "Die Anlagenbuchhaltung ist nicht konfiguriert."
+            )
+
+        assets = self._fixed_asset_repository.list_for_company(
+            self._context.company.company_id
+        )
+
+        depreciations: list[FixedAssetDepreciation] = []
+
+        for asset in assets:
+            asset_depreciations = (
+                self._fixed_asset_depreciation_repository
+                .list_for_fixed_asset(
+                    asset.fixed_asset_id
+                )
+            )
+
+            depreciations.extend(
+                depreciation
+                for depreciation in asset_depreciations
+                if depreciation.fiscal_year_end
+                == self._context.fiscal_year.end_date
+            )
+
+        return tuple(depreciations)
+
+    def get_tax_depreciation_adjustment(
+        self,
+        depreciation_id: UUID,
+    ) -> TaxDepreciationAdjustment | None:
+        """Lädt die steuerliche AfA-Abweichung einer Abschreibung."""
+
+        if self._tax_depreciation_adjustment_repository is None:
+            raise RuntimeError(
+                "Steuerliche AfA-Abweichungen sind nicht konfiguriert."
+            )
+
+        return (
+            self._tax_depreciation_adjustment_repository
+            .get_for_depreciation(
+                depreciation_id
+            )
+        )
+
+    def save_tax_depreciation_adjustment(
+        self,
+        *,
+        depreciation_id: UUID,
+        tax_amount: Decimal,
+    ) -> TaxDepreciationAdjustment | None:
+        """Speichert die steuerliche AfA-Abweichung einer Abschreibung."""
+
+        if self._tax_depreciation_adjustment_repository is None:
+            raise RuntimeError(
+                "Steuerliche AfA-Abweichungen sind nicht konfiguriert."
+            )
+
+        return self._tax_depreciation_adjustment_repository.save(
+            depreciation_id=depreciation_id,
+            tax_amount=tax_amount,
+        )
 
     def build_depreciation_proposals(
         self,

@@ -32,6 +32,9 @@ from openbilanz.database.fixed_asset_repository import (
 from openbilanz.database.shareholder_repository import (
     ShareholderRepository,
 )
+from openbilanz.database.tax_depreciation_adjustment_repository import (
+    TaxDepreciationAdjustmentRepository,
+)
 from openbilanz.services.chart_of_accounts_initialization_service import (
     ChartOfAccountsInitializationService,
 )
@@ -183,6 +186,12 @@ def main() -> None:
 
         fixed_asset_depreciation_repository = (
             FixedAssetDepreciationRepository(
+                session
+            )
+        )
+
+        tax_depreciation_adjustment_repository = (
+            TaxDepreciationAdjustmentRepository(
                 session
             )
         )
