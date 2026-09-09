@@ -240,6 +240,11 @@ def test_saves_and_validates_control_accounts() -> None:
             account_type=AccountType.EQUITY,
         ),
         TemplateAccount(
+            account_number="4830",
+            name="Abschreibungen auf Sachanlagen",
+            account_type=AccountType.EXPENSE,
+        ),
+        TemplateAccount(
             account_number="1571",
             name="Abziehbare Vorsteuer 7 %",
             account_type=AccountType.ASSET,
@@ -274,6 +279,7 @@ def test_saves_and_validates_control_accounts() -> None:
             name="Umsatzerlöse 19 %",
             account_type=AccountType.REVENUE,
         ),
+
     )
 
     chart_of_accounts = ChartOfAccountsTemplate(
@@ -299,6 +305,7 @@ def test_saves_and_validates_control_accounts() -> None:
         profit_account="8020",
         loss_account="8021",
         profit_loss_carryforward_account="2970",
+        depreciation_expense_account="4830",
     )
 
     vat_accounts = VatAccounts(
@@ -369,6 +376,7 @@ def test_saves_and_validates_control_accounts() -> None:
             profit_account="8020",
             loss_account="8021",
             profit_loss_carryforward_account="2970",
+            depreciation_expense_account="4830",
         )
 
         with pytest.raises(
@@ -648,6 +656,11 @@ def test_replaces_existing_account_roles() -> None:
             account_number="8410",
             name="Weitere Umsatzerlöse 19 %",
             account_type=AccountType.REVENUE,
+        ),
+        TemplateAccount(
+            account_number="4830",
+            name="Abschreibungen auf Sachanlagen",
+            account_type=AccountType.EXPENSE,
         ),
     )
 

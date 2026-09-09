@@ -594,6 +594,10 @@ class ChartOfAccountsRepository:
                     control_accounts
                     .profit_loss_carryforward_account
                 ),
+                depreciation_expense_account=(
+                    control_accounts
+                    .depreciation_expense_account
+                ),
                 input_tax_7="1571",
                 input_tax_19="1576",
                 output_tax_7="1771",
@@ -619,6 +623,10 @@ class ChartOfAccountsRepository:
             model.profit_loss_carryforward_account = (
                 control_accounts
                 .profit_loss_carryforward_account
+            )
+            model.depreciation_expense_account = (
+                control_accounts
+                .depreciation_expense_account
             )
 
         if commit:
@@ -758,6 +766,9 @@ class ChartOfAccountsRepository:
             loss_account=model.loss_account,
             profit_loss_carryforward_account=(
                 model.profit_loss_carryforward_account
+            ),
+            depreciation_expense_account=(
+                model.depreciation_expense_account
             ),
         )
 

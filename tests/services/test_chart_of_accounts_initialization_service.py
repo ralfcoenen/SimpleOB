@@ -98,6 +98,11 @@ def _standard_chart_of_accounts() -> ChartOfAccountsTemplate:
                 name="Umsatzerlöse 19 %",
                 account_type=AccountType.REVENUE,
             ),
+            TemplateAccount(
+                account_number="4830",
+                name="Abschreibungen auf Sachanlagen",
+                account_type=AccountType.EXPENSE,
+            ),
         ),
     )
 
@@ -274,6 +279,7 @@ def test_does_not_replace_existing_chart_of_accounts() -> None:
         "1771",
         "1776",
         "2970",
+        "4830",
         "8020",
         "8021",
         "8400",
