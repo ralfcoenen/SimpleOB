@@ -37,6 +37,12 @@ from openbilanz.domain.account import Account
 from openbilanz.domain.account_mapping_rule import (
     AccountMappingRule,
 )
+from openbilanz.domain.accounting_account_roles import (
+    AccountingAccountRoles,
+)
+from openbilanz.domain.accounting_control_accounts import (
+    AccountingControlAccounts,
+)
 from openbilanz.domain.booking import Booking
 from openbilanz.domain.booking_type import BookingType
 from openbilanz.domain.chart_of_accounts_template import (
@@ -73,6 +79,7 @@ from openbilanz.domain.shareholder import Shareholder
 from openbilanz.domain.tax_depreciation_adjustment import (
     TaxDepreciationAdjustment,
 )
+from openbilanz.domain.vat_accounts import VatAccounts
 from openbilanz.reporting.account_activity_report import (
     AccountActivityReport,
 )
@@ -247,6 +254,78 @@ class FiscalYearWorkspace:
             company_id=self._context.company.company_id,
             account=account,
             mapping_rule=mapping_rule,
+        )
+
+
+    def load_account_configuration(
+        self,
+    ) -> tuple[
+        AccountingControlAccounts,
+        VatAccounts,
+        AccountingAccountRoles,
+    ]:
+        """Lädt die Kontenkonfiguration des geöffneten Mandanten."""
+
+        if self._chart_of_accounts_repository is None:
+            raise RuntimeError(
+                "Die Kontenrahmenverwaltung ist nicht konfiguriert."
+            )
+
+        company_id = self._context.company.company_id
+
+        control_accounts = (
+            self._chart_of_accounts_repository
+            .load_control_accounts(company_id)
+        )
+        vat_accounts = (
+            self._chart_of_accounts_repository
+            .load_vat_accounts(company_id)
+        )
+        account_roles = (
+            self._chart_of_accounts_repository
+            .load_account_roles(company_id)
+        )
+
+        if (
+            control_accounts is None
+            or vat_accounts is None
+            or account_roles is None
+        ):
+            raise RuntimeError(
+                "Die Kontenkonfiguration des Mandanten "
+                "ist nicht vollständig."
+            )
+
+        return (
+            control_accounts,
+            vat_accounts,
+            account_roles,
+        )
+
+    def update_account_configuration(
+        self,
+        *,
+        control_accounts: AccountingControlAccounts,
+        vat_accounts: VatAccounts,
+        account_roles: AccountingAccountRoles,
+    ) -> None:
+        """Aktualisiert die Kontenkonfiguration des geöffneten Mandanten."""
+
+        if self._chart_of_accounts_repository is None:
+            raise RuntimeError(
+                "Die Kontenrahmenverwaltung ist nicht konfiguriert."
+            )
+
+        (
+            self._chart_of_accounts_repository
+            .save_account_configuration(
+                company_id=(
+                    self._context.company.company_id
+                ),
+                control_accounts=control_accounts,
+                vat_accounts=vat_accounts,
+                account_roles=account_roles,
+            )
         )
 
 
@@ -1424,6 +1503,8 @@ class FiscalYearWorkspace:
             master_data=master_data,
             fiscal_year=self._context.fiscal_year,
             amounts=preparation.amounts,
+            income_statement=preparation.income_statement,
+            balance_sheet=preparation.balance_sheet,
             entity_identifier=entity.value,
             entity_scheme=entity.scheme,
             previous_fiscal_year=self.previous_fiscal_year,

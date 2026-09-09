@@ -915,6 +915,40 @@ class ChartOfAccountsRepository:
             self._session.commit()
 
 
+    def save_account_configuration(
+        self,
+        *,
+        company_id: UUID,
+        control_accounts: AccountingControlAccounts,
+        vat_accounts: VatAccounts,
+        account_roles: AccountingAccountRoles,
+    ) -> None:
+        """Speichert die Kontenkonfiguration eines Mandanten atomar."""
+
+        try:
+            self.save_control_accounts(
+                company_id=company_id,
+                control_accounts=control_accounts,
+                commit=False,
+            )
+            self.save_vat_accounts(
+                company_id=company_id,
+                vat_accounts=vat_accounts,
+                commit=False,
+            )
+            self.save_account_roles(
+                company_id=company_id,
+                account_roles=account_roles,
+                commit=False,
+            )
+
+            self._session.commit()
+
+        except Exception:
+            self._session.rollback()
+            raise
+
+
     def load_account_roles(
         self,
         company_id: UUID,

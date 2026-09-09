@@ -14,6 +14,12 @@ from openbilanz.accounting.income_statement import IncomeStatement
 from openbilanz.accounting.ledger import Ledger
 from openbilanz.accounting.mapper import AccountMapper
 from openbilanz.core.context import ApplicationContext
+from openbilanz.domain.accounting_account_roles import (
+    AccountingAccountRoles,
+)
+from openbilanz.domain.accounting_control_accounts import (
+    AccountingControlAccounts,
+)
 from openbilanz.domain.booking import Booking
 from openbilanz.domain.booking_line import BookingLine
 from openbilanz.domain.booking_type import BookingType
@@ -55,6 +61,7 @@ from openbilanz.domain.shareholder import Shareholder
 from openbilanz.domain.tax_depreciation_adjustment import (
     TaxDepreciationAdjustment,
 )
+from openbilanz.domain.vat_accounts import VatAccounts
 from openbilanz.services.closing_result import ClosingResult
 from openbilanz.services.e_bilanz_export_service import (
     EBilanzExportService,
@@ -1427,6 +1434,8 @@ def test_builds_e_bilanz_from_prepared_data(
         master_data=master_data,
         fiscal_year=context.fiscal_year,
         amounts=preparation.amounts,
+        income_statement=preparation.income_statement,
+        balance_sheet=preparation.balance_sheet,
         entity_identifier=str(
             context.company.company_id
         ),
@@ -1778,6 +1787,109 @@ def test_updates_account_via_chart_of_accounts_repository(
         account=account,
         mapping_rule=mapping_rule,
     )
+
+
+def test_loads_and_updates_account_configuration(
+    context: ApplicationContext,
+) -> None:
+    """Kontenkonfiguration wird über den Workspace geladen und gespeichert."""
+
+    booking_repository = Mock()
+    company_repository = Mock()
+    chart_of_accounts_repository = Mock()
+
+    booking_repository.list_for_fiscal_year.return_value = ()
+
+    company_repository.get_managed_fiscal_years.return_value = (
+        ManagedFiscalYear(
+            fiscal_year=context.fiscal_year,
+            status=FiscalYearStatus.OPEN,
+            opening_source=None,
+        ),
+    )
+
+    control_accounts = AccountingControlAccounts(
+        opening_balance_account="9000",
+        income_summary_account="8990",
+        profit_account="8020",
+        loss_account="8021",
+        profit_loss_carryforward_account="2970",
+        depreciation_expense_account="4830",
+    )
+
+    vat_accounts = VatAccounts(
+        input_tax_7="1571",
+        input_tax_19="1576",
+        output_tax_7="1771",
+        output_tax_19="1776",
+    )
+
+    account_roles = AccountingAccountRoles(
+        cash_accounts=frozenset({"1000"}),
+        bank_accounts=frozenset({"1200"}),
+        general_rate_sales_accounts=frozenset({"8400"}),
+    )
+
+    chart_of_accounts_repository.load_control_accounts.return_value = (
+        control_accounts
+    )
+    chart_of_accounts_repository.load_vat_accounts.return_value = (
+        vat_accounts
+    )
+    chart_of_accounts_repository.load_account_roles.return_value = (
+        account_roles
+    )
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=company_repository,
+        chart_of_accounts_repository=(
+            chart_of_accounts_repository
+        ),
+        posting_service=Mock(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
+        taxonomy_management_service=Mock(),
+        e_bilanz_export_service=Mock(),
+    )
+
+    loaded = workspace.load_account_configuration()
+
+    assert loaded == (
+        control_accounts,
+        vat_accounts,
+        account_roles,
+    )
+
+    workspace.update_account_configuration(
+        control_accounts=control_accounts,
+        vat_accounts=vat_accounts,
+        account_roles=account_roles,
+    )
+
+    company_id = context.company.company_id
+
+    chart_of_accounts_repository.load_control_accounts.assert_called_once_with(
+        company_id
+    )
+    chart_of_accounts_repository.load_vat_accounts.assert_called_once_with(
+        company_id
+    )
+    chart_of_accounts_repository.load_account_roles.assert_called_once_with(
+        company_id
+    )
+
+    chart_of_accounts_repository.save_account_configuration.assert_called_once_with(
+        company_id=company_id,
+        control_accounts=control_accounts,
+        vat_accounts=vat_accounts,
+        account_roles=account_roles,
+    )
+
 
 def test_links_fixed_asset_disposal_to_existing_booking(
     context: ApplicationContext,

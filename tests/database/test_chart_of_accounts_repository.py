@@ -413,6 +413,195 @@ def test_saves_and_validates_control_accounts() -> None:
     assert loaded_account_roles == account_roles
 
 
+def test_saves_account_configuration_atomically() -> None:
+    """Eine ungültige Kontenrolle rollt die gesamte Konfiguration zurück."""
+
+    engine = create_engine(
+        "sqlite:///:memory:"
+    )
+    Base.metadata.create_all(engine)
+
+    Session = sessionmaker(
+        bind=engine
+    )
+
+    company = Company(
+        company_id=uuid4(),
+        name="Muster UG",
+    )
+
+    chart_of_accounts = ChartOfAccountsTemplate(
+        name="Testkontenrahmen",
+        accounts=(
+            TemplateAccount(
+                account_number="1000",
+                name="Kasse",
+                account_type=AccountType.ASSET,
+            ),
+            TemplateAccount(
+                account_number="1200",
+                name="Bank",
+                account_type=AccountType.ASSET,
+            ),
+            TemplateAccount(
+                account_number="1571",
+                name="Vorsteuer 7 %",
+                account_type=AccountType.ASSET,
+            ),
+            TemplateAccount(
+                account_number="1576",
+                name="Vorsteuer 19 %",
+                account_type=AccountType.ASSET,
+            ),
+            TemplateAccount(
+                account_number="1771",
+                name="Umsatzsteuer 7 %",
+                account_type=AccountType.LIABILITY,
+            ),
+            TemplateAccount(
+                account_number="1776",
+                name="Umsatzsteuer 19 %",
+                account_type=AccountType.LIABILITY,
+            ),
+            TemplateAccount(
+                account_number="2970",
+                name="Gewinn-/Verlustvortrag",
+                account_type=AccountType.EQUITY,
+            ),
+            TemplateAccount(
+                account_number="4830",
+                name="Abschreibungen",
+                account_type=AccountType.EXPENSE,
+            ),
+            TemplateAccount(
+                account_number="8020",
+                name="Jahresüberschuss",
+                account_type=AccountType.EQUITY,
+            ),
+            TemplateAccount(
+                account_number="8021",
+                name="Jahresfehlbetrag",
+                account_type=AccountType.EQUITY,
+            ),
+            TemplateAccount(
+                account_number="8400",
+                name="Umsatzerlöse",
+                account_type=AccountType.REVENUE,
+            ),
+            TemplateAccount(
+                account_number="8990",
+                name="GuV-Sammelkonto",
+                account_type=AccountType.EQUITY,
+            ),
+            TemplateAccount(
+                account_number="9000",
+                name="Eröffnungsbilanzkonto",
+                account_type=AccountType.EQUITY,
+            ),
+        ),
+        account_mapping_rules=(),
+    )
+
+    accounts = tuple(
+        Account(template=template_account)
+        for template_account in chart_of_accounts.accounts
+    )
+
+    original_control_accounts = AccountingControlAccounts(
+        opening_balance_account="9000",
+        income_summary_account="8990",
+        profit_account="8020",
+        loss_account="8021",
+        profit_loss_carryforward_account="2970",
+        depreciation_expense_account="4830",
+    )
+
+    original_vat_accounts = VatAccounts(
+        input_tax_7="1571",
+        input_tax_19="1576",
+        output_tax_7="1771",
+        output_tax_19="1776",
+    )
+
+    original_account_roles = AccountingAccountRoles(
+        cash_accounts=frozenset({"1000"}),
+        bank_accounts=frozenset({"1200"}),
+        general_rate_sales_accounts=frozenset({"8400"}),
+    )
+
+    changed_control_accounts = AccountingControlAccounts(
+        opening_balance_account="8990",
+        income_summary_account="9000",
+        profit_account="8020",
+        loss_account="8021",
+        profit_loss_carryforward_account="2970",
+        depreciation_expense_account="4830",
+    )
+
+    invalid_account_roles = AccountingAccountRoles(
+        cash_accounts=frozenset({"9999"}),
+        bank_accounts=frozenset({"1200"}),
+        general_rate_sales_accounts=frozenset({"8400"}),
+    )
+
+    with Session() as session:
+        company_repository = CompanyRepository(
+            session
+        )
+        repository = ChartOfAccountsRepository(
+            session
+        )
+
+        company_repository.add(
+            company
+        )
+
+        repository.save_for_company(
+            company_id=company.company_id,
+            chart_of_accounts=chart_of_accounts,
+            accounts=accounts,
+        )
+
+        repository.save_account_configuration(
+            company_id=company.company_id,
+            control_accounts=original_control_accounts,
+            vat_accounts=original_vat_accounts,
+            account_roles=original_account_roles,
+        )
+
+        with pytest.raises(
+            ValueError,
+            match="9999",
+        ):
+            repository.save_account_configuration(
+                company_id=company.company_id,
+                control_accounts=changed_control_accounts,
+                vat_accounts=original_vat_accounts,
+                account_roles=invalid_account_roles,
+            )
+
+        loaded_control_accounts = (
+            repository.load_control_accounts(
+                company.company_id
+            )
+        )
+        loaded_vat_accounts = (
+            repository.load_vat_accounts(
+                company.company_id
+            )
+        )
+        loaded_account_roles = (
+            repository.load_account_roles(
+                company.company_id
+            )
+        )
+
+    assert loaded_control_accounts == original_control_accounts
+    assert loaded_vat_accounts == original_vat_accounts
+    assert loaded_account_roles == original_account_roles
+
+
+
 def test_adds_account_to_existing_chart_of_accounts() -> None:
     """Ein neues Konto wird dem Mandantenkontenrahmen hinzugefügt."""
 
