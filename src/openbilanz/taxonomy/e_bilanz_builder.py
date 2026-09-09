@@ -82,7 +82,7 @@ class EBilanzDocument:
     """Ergebnis der vollständigen E-Bilanz-Erzeugung."""
 
     xml: str
-    gaap_ci_statement: GaapCiStatement
+    gaap_ci_statement: GaapCiStatement | None = None
 
 
 class EBilanzBuilder:

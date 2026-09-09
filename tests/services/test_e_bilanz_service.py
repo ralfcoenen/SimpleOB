@@ -6,9 +6,11 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 from uuid import uuid4
 
+from openbilanz.accounting.balance_sheet import BalanceSheet
 from openbilanz.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
+from openbilanz.accounting.income_statement import IncomeStatement
 from openbilanz.domain.company import Company
 from openbilanz.domain.company_master_data import (
     CompanyMasterData,
@@ -181,6 +183,9 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
     income_statement = Mock(
         spec=FinancialStatementPosition
     )
+    prepared_balance_sheet = Mock(
+        spec=BalanceSheet
+    )
 
     gcd_entry_point = TaxonomyEntryPoint(
         path=gcd_path,
@@ -209,6 +214,10 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
         Decimal,
     ] = {}
 
+    prepared_income_statement = Mock(
+        spec=IncomeStatement
+    )
+
     service = EBilanzService(
         resolver=resolver,  # type: ignore[arg-type]
         adapter=adapter,  # type: ignore[arg-type]
@@ -222,6 +231,7 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
     builder.build.return_value = (
         expected_document
     )
+
 
     with (
         patch(
@@ -238,10 +248,13 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
             return_value=builder,
         ) as builder_class,
     ):
+
         result = service.build(
             master_data=master_data,
             fiscal_year=fiscal_year,
             amounts=amounts,
+            income_statement=prepared_income_statement,
+            balance_sheet=prepared_balance_sheet,
             entity_identifier="DE123456789",
             entity_scheme=(
                 "http://www.bundesfinanzministerium.de"
@@ -250,6 +263,7 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
                 shareholder,
             ),
         )
+
 
     assert result is expected_document
 
@@ -510,3 +524,12 @@ def test_e_bilanz_service_validates_document_with_relative_schema_refs(
 
     # Das eigentliche Exportdokument bleibt unverändert.
     assert document.xml == original_xml
+
+
+def test_e_bilanz_document_does_not_require_legacy_gaap_ci_statement() -> None:
+    document = EBilanzDocument(
+        xml="<xbrl/>",
+    )
+
+    assert document.xml == "<xbrl/>"
+    assert document.gaap_ci_statement is None

@@ -15,7 +15,7 @@ from openbilanz.taxonomy.e_bilanz_builder import (
 def _document() -> EBilanzDocument:
     return EBilanzDocument(
         xml='<?xml version="1.0" encoding="utf-8"?><xbrl/>',
-        gaap_ci_statement=None,  # type: ignore[arg-type]
+        gaap_ci_statement=None,
     )
 
 
