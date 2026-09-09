@@ -803,6 +803,45 @@ def test_updates_existing_account() -> None:
         == second_position
     )
 
+def test_loads_empty_account_roles_for_existing_company() -> None:
+    """Ein Altmandant ohne Rollen erhält eine leere Rollenbelegung."""
+
+    engine = create_engine(
+        "sqlite:///:memory:"
+    )
+    Base.metadata.create_all(engine)
+
+    Session = sessionmaker(
+        bind=engine
+    )
+
+    company = Company(
+        company_id=uuid4(),
+        name="Muster UG",
+    )
+
+    with Session() as session:
+        company_repository = CompanyRepository(
+            session
+        )
+        repository = ChartOfAccountsRepository(
+            session
+        )
+
+        company_repository.add(
+            company
+        )
+
+        loaded = repository.load_account_roles(
+            company.company_id
+        )
+
+    assert loaded == AccountingAccountRoles(
+        cash_accounts=frozenset(),
+        bank_accounts=frozenset(),
+        general_rate_sales_accounts=frozenset(),
+    )
+
 def test_replaces_existing_account_roles() -> None:
     """Eine vorhandene Rollenbelegung wird vollständig ersetzt."""
 

@@ -35,6 +35,9 @@ from openbilanz.services.pdf_reporting_service import PdfReportingService
 from openbilanz.taxonomy.e_bilanz_builder import (
     EBilanzDocument,
 )
+from openbilanz.ui.account_configuration_dialog import (
+    AccountConfigurationDialog,
+)
 from openbilanz.ui.account_editor_dialog import (
     AccountEditorDialog,
 )
@@ -237,6 +240,15 @@ class MainWindow(tk.Tk):
             context_buttons,
             text="Gesellschafter",
             command=self._open_shareholders,
+        ).pack(
+            side="left",
+            padx=(8, 0),
+        )
+
+        ttk.Button(
+            context_buttons,
+            text="Kontenkonfiguration",
+            command=self._open_account_configuration,
         ).pack(
             side="left",
             padx=(8, 0),
@@ -2208,6 +2220,102 @@ class MainWindow(tk.Tk):
             "Die Unternehmensstammdaten wurden gespeichert.",
             parent=self,
         )
+
+
+    def _open_account_configuration(
+        self,
+    ) -> None:
+        """Öffnet die mandantenspezifische Kontenkonfiguration."""
+
+        try:
+            (
+                control_accounts,
+                vat_accounts,
+                account_roles,
+            ) = self._workspace.load_account_configuration()
+
+        except (
+            RuntimeError,
+            ValueError,
+        ) as exc:
+            messagebox.showerror(
+                "Kontenkonfiguration",
+                str(exc),
+                parent=self,
+            )
+            return
+
+        dialog = AccountConfigurationDialog(
+            self,
+            accounts=self._accounts,
+            control_accounts=control_accounts,
+            vat_accounts=vat_accounts,
+            account_roles=account_roles,
+        )
+
+        self.wait_window(dialog)
+
+        if dialog.result is None:
+            return
+
+        (
+            new_control_accounts,
+            new_vat_accounts,
+            new_account_roles,
+        ) = dialog.result
+
+        try:
+            self._workspace.update_account_configuration(
+                control_accounts=new_control_accounts,
+                vat_accounts=new_vat_accounts,
+                account_roles=new_account_roles,
+            )
+
+        except (
+            RuntimeError,
+            ValueError,
+        ) as exc:
+            messagebox.showerror(
+                "Kontenkonfiguration",
+                str(exc),
+                parent=self,
+            )
+            return
+
+        self._closing_accounts = ClosingAccounts(
+            income_summary_account=(
+                new_control_accounts.income_summary_account
+            ),
+            profit_account=(
+                new_control_accounts.profit_account
+            ),
+            loss_account=(
+                new_control_accounts.loss_account
+            ),
+        )
+
+        self._opening_balance_account_number = (
+            new_control_accounts.opening_balance_account
+        )
+
+        self._depreciation_expense_account_number = (
+            new_control_accounts.depreciation_expense_account
+        )
+
+        self._vat_accounts = new_vat_accounts
+
+        self._opening_balance_service = OpeningBalanceService(
+            opening_balance_account_number=(
+                self._opening_balance_account_number
+            ),
+        )
+
+        messagebox.showinfo(
+            "Kontenkonfiguration",
+            "Die Kontenkonfiguration wurde gespeichert.",
+            parent=self,
+        )
+
 
     def _open_shareholders(
         self,

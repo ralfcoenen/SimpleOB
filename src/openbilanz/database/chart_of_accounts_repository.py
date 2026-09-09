@@ -977,7 +977,11 @@ class ChartOfAccountsRepository:
         )
 
         if not models:
-            return None
+            return AccountingAccountRoles(
+                cash_accounts=frozenset(),
+                bank_accounts=frozenset(),
+                general_rate_sales_accounts=frozenset(),
+            )
 
         cash_accounts = frozenset(
             model.account_number
