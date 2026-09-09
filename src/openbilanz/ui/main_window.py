@@ -84,6 +84,7 @@ class MainWindow(tk.Tk):
         financial_statement_context: FinancialStatementContext,
         closing_accounts: ClosingAccounts,
         opening_balance_account_number: str,
+        depreciation_expense_account_number: str,
         vat_accounts: VatAccounts,
         pdf_reporting_service: PdfReportingService,
     ) -> None:
@@ -97,9 +98,11 @@ class MainWindow(tk.Tk):
         self._opening_balance_account_number = (
             opening_balance_account_number
         )
+        self._depreciation_expense_account_number = (
+            depreciation_expense_account_number
+        )
         self._vat_accounts = vat_accounts
         self._pdf_reporting_service = pdf_reporting_service
-
         self._current_trial_balance_report = None
         self._current_account_activity_reports = ()
         self._current_account_activity_start_date = None
@@ -2327,10 +2330,12 @@ class MainWindow(tk.Tk):
             company_id=(
                 self._context.company.company_id
             ),
+            depreciation_expense_account_number=(
+                self._depreciation_expense_account_number
+            ),
             fixed_asset=fixed_asset,
             acquisition_linked=acquisition_linked,
         )
-
         self.wait_window(dialog)
 
         if dialog.result is None:
@@ -2423,8 +2428,10 @@ class MainWindow(tk.Tk):
         dialog = NewFixedAssetDialog(
             self,
             company_id=(self._context.company.company_id),
+            depreciation_expense_account_number=(
+                self._depreciation_expense_account_number
+            ),
         )
-
         self.wait_window(dialog)
 
         if dialog.result is None:

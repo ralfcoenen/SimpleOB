@@ -588,12 +588,14 @@ def main() -> None:
                 opening_balance_account_number=(
                     control_accounts.opening_balance_account
                 ),
+                depreciation_expense_account_number=(
+                    control_accounts.depreciation_expense_account
+                ),
                 vat_accounts=vat_accounts,
                 pdf_reporting_service=(
                     pdf_reporting_service
                 ),
             )
-
             window.mainloop()
 
             if not window.return_to_start_requested:

@@ -19,12 +19,16 @@ class NewFixedAssetDialog(tk.Toplevel):
         parent: tk.Misc,
         *,
         company_id,
+        depreciation_expense_account_number: str,
         fixed_asset: FixedAsset | None = None,
         acquisition_linked: bool = False,
     ) -> None:
         super().__init__(parent)
 
         self._company_id = company_id
+        self._depreciation_expense_account_number = (
+            depreciation_expense_account_number
+        )
         self._fixed_asset = fixed_asset
         self._acquisition_linked = acquisition_linked
         self.result: FixedAsset | None = None
@@ -464,7 +468,9 @@ class NewFixedAssetDialog(tk.Toplevel):
                     asset_account_number
                 ),
                 "depreciation_expense_account_number": (
-                    "4830"
+                    self._fixed_asset.depreciation_expense_account_number
+                    if self._fixed_asset is not None
+                    else self._depreciation_expense_account_number
                 ),
                 "acquisition_date": acquisition_date,
                 "acquisition_cost": acquisition_cost,
