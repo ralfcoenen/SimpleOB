@@ -255,6 +255,39 @@ class KontenrahmenKonfiguration(Base):
         back_populates="kontenrahmen_konfiguration",
     )
 
+class Kontenrolle(Base):
+    """Fachliche Rollenbelegung eines Mandantenkontos."""
+
+    __tablename__ = "kontenrollen"
+
+    __table_args__ = (
+        UniqueConstraint(
+            "mandant_id",
+            "account_number",
+            name="uq_kontenrollen_mandant_account",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+    )
+
+    mandant_id: Mapped[int] = mapped_column(
+        ForeignKey("mandanten.id"),
+        nullable=False,
+    )
+
+    role: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    account_number: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
 class Wirtschaftsjahr(Base):
     """Persistiertes Wirtschaftsjahr."""
 

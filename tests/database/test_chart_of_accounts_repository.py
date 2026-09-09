@@ -24,6 +24,9 @@ from openbilanz.domain.account_mapping_rule import (
     AccountMappingRule,
 )
 from openbilanz.domain.account_type import AccountType
+from openbilanz.domain.accounting_account_roles import (
+    AccountingAccountRoles,
+)
 from openbilanz.domain.accounting_control_accounts import (
     AccountingControlAccounts,
 )
@@ -256,6 +259,21 @@ def test_saves_and_validates_control_accounts() -> None:
             name="Umsatzsteuer 19 %",
             account_type=AccountType.LIABILITY,
         ),
+        TemplateAccount(
+            account_number="1000",
+            name="Kasse",
+            account_type=AccountType.ASSET,
+        ),
+        TemplateAccount(
+            account_number="1200",
+            name="Bank",
+            account_type=AccountType.ASSET,
+        ),
+        TemplateAccount(
+            account_number="8400",
+            name="Umsatzerlöse 19 %",
+            account_type=AccountType.REVENUE,
+        ),
     )
 
     chart_of_accounts = ChartOfAccountsTemplate(
@@ -290,6 +308,12 @@ def test_saves_and_validates_control_accounts() -> None:
         output_tax_19="1776",
     )
 
+    account_roles = AccountingAccountRoles(
+        cash_accounts=frozenset({"1000"}),
+        bank_accounts=frozenset({"1200"}),
+        general_rate_sales_accounts=frozenset({"8400"}),
+    )
+
     with Session() as session:
         company_repository = CompanyRepository(
             session
@@ -318,6 +342,11 @@ def test_saves_and_validates_control_accounts() -> None:
             vat_accounts=vat_accounts,
         )
 
+        repository.save_account_roles(
+            company_id=company.company_id,
+            account_roles=account_roles,
+        )
+
         loaded = repository.load_control_accounts(
             company.company_id
         )
@@ -328,14 +357,18 @@ def test_saves_and_validates_control_accounts() -> None:
             )
         )
 
-        invalid_control_accounts = (
-            AccountingControlAccounts(
-                opening_balance_account="9999",
-                income_summary_account="8990",
-                profit_account="8020",
-                loss_account="8021",
-                profit_loss_carryforward_account="2970",
+        loaded_account_roles = (
+            repository.load_account_roles(
+                company.company_id
             )
+        )
+
+        invalid_control_accounts = AccountingControlAccounts(
+            opening_balance_account="9999",
+            income_summary_account="8990",
+            profit_account="8020",
+            loss_account="8021",
+            profit_loss_carryforward_account="2970",
         )
 
         with pytest.raises(
@@ -347,12 +380,29 @@ def test_saves_and_validates_control_accounts() -> None:
                 control_accounts=invalid_control_accounts,
             )
 
+        invalid_account_roles = AccountingAccountRoles(
+            cash_accounts=frozenset({"9999"}),
+            bank_accounts=frozenset({"1200"}),
+            general_rate_sales_accounts=frozenset({"8400"}),
+        )
+
+        with pytest.raises(
+            ValueError,
+            match="9999",
+        ):
+            repository.save_account_roles(
+                company_id=company.company_id,
+                account_roles=invalid_account_roles,
+            )
+
     assert loaded == control_accounts
     assert (
         loaded.profit_loss_carryforward_account
         == "2970"
     )
     assert loaded_vat_accounts == vat_accounts
+
+    assert loaded_account_roles == account_roles
 
 
 def test_adds_account_to_existing_chart_of_accounts() -> None:
@@ -555,3 +605,111 @@ def test_updates_existing_account() -> None:
         mapping_rule.debit_position
         == second_position
     )
+
+def test_replaces_existing_account_roles() -> None:
+    """Eine vorhandene Rollenbelegung wird vollständig ersetzt."""
+
+    engine = create_engine(
+        "sqlite:///:memory:"
+    )
+    Base.metadata.create_all(engine)
+
+    Session = sessionmaker(
+        bind=engine
+    )
+
+    template_accounts = (
+        TemplateAccount(
+            account_number="1000",
+            name="Kasse",
+            account_type=AccountType.ASSET,
+        ),
+        TemplateAccount(
+            account_number="1010",
+            name="Nebenkasse",
+            account_type=AccountType.ASSET,
+        ),
+        TemplateAccount(
+            account_number="1200",
+            name="Bank",
+            account_type=AccountType.ASSET,
+        ),
+        TemplateAccount(
+            account_number="1210",
+            name="Weitere Bank",
+            account_type=AccountType.ASSET,
+        ),
+        TemplateAccount(
+            account_number="8400",
+            name="Umsatzerlöse 19 %",
+            account_type=AccountType.REVENUE,
+        ),
+        TemplateAccount(
+            account_number="8410",
+            name="Weitere Umsatzerlöse 19 %",
+            account_type=AccountType.REVENUE,
+        ),
+    )
+
+    chart_of_accounts = ChartOfAccountsTemplate(
+        name="Testkontenrahmen",
+        accounts=template_accounts,
+    )
+
+    accounts = tuple(
+        Account(
+            template=template_account
+        )
+        for template_account in template_accounts
+    )
+
+    company = Company(
+        company_id=uuid4(),
+        name="Muster UG",
+    )
+
+    original_roles = AccountingAccountRoles(
+        cash_accounts=frozenset({"1000"}),
+        bank_accounts=frozenset({"1200"}),
+        general_rate_sales_accounts=frozenset({"8400"}),
+    )
+
+    replacement_roles = AccountingAccountRoles(
+        cash_accounts=frozenset({"1010"}),
+        bank_accounts=frozenset({"1200", "1210"}),
+        general_rate_sales_accounts=frozenset({"8410"}),
+    )
+
+    with Session() as session:
+        company_repository = CompanyRepository(
+            session
+        )
+        repository = ChartOfAccountsRepository(
+            session
+        )
+
+        company_repository.add(
+            company
+        )
+
+        repository.save_for_company(
+            company_id=company.company_id,
+            chart_of_accounts=chart_of_accounts,
+            accounts=accounts,
+        )
+
+        repository.save_account_roles(
+            company_id=company.company_id,
+            account_roles=original_roles,
+        )
+
+        repository.save_account_roles(
+            company_id=company.company_id,
+            account_roles=replacement_roles,
+        )
+
+        loaded = repository.load_account_roles(
+            company.company_id
+        )
+
+    assert loaded == replacement_roles

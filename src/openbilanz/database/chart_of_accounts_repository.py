@@ -9,6 +9,7 @@ from openbilanz.accounting.financial_statement_position_provider import (
 )
 from openbilanz.database.models import (
     KontenrahmenKonfiguration,
+    Kontenrolle,
     Konto,
     Mandant,
 )
@@ -17,6 +18,9 @@ from openbilanz.domain.account_mapping_rule import (
     AccountMappingRule,
 )
 from openbilanz.domain.account_type import AccountType
+from openbilanz.domain.accounting_account_roles import (
+    AccountingAccountRoles,
+)
 from openbilanz.domain.accounting_control_accounts import (
     AccountingControlAccounts,
 )
@@ -794,6 +798,188 @@ class ChartOfAccountsRepository:
             input_tax_19=model.input_tax_19,
             output_tax_7=model.output_tax_7,
             output_tax_19=model.output_tax_19,
+        )
+
+    def save_account_roles(
+        self,
+        *,
+        company_id: UUID,
+        account_roles: AccountingAccountRoles,
+        commit: bool = True,
+    ) -> None:
+        """Speichert fachliche Kontenrollen eines Mandanten."""
+
+        if not isinstance(company_id, UUID):
+            raise TypeError(
+                "company_id must be a UUID"
+            )
+
+        if not isinstance(
+            account_roles,
+            AccountingAccountRoles,
+        ):
+            raise TypeError(
+                "account_roles must be "
+                "AccountingAccountRoles"
+            )
+
+        company_model = self._find_company(
+            company_id
+        )
+
+        if company_model is None:
+            raise ValueError(
+                "Das Unternehmen ist nicht vorhanden."
+            )
+
+        self._session.flush()
+
+        account_numbers = {
+            model.account_number
+            for model in (
+                self._session.query(Konto)
+                .filter(
+                    Konto.mandant_id
+                    == company_model.id
+                )
+                .all()
+            )
+        }
+
+        missing_accounts = (
+            account_roles.account_numbers
+            - account_numbers
+        )
+
+        if missing_accounts:
+            missing = ", ".join(
+                sorted(missing_accounts)
+            )
+
+            raise ValueError(
+                "Konten mit fachlichen Rollen sind im "
+                "Kontenrahmen nicht vorhanden: "
+                f"{missing}"
+            )
+
+        (
+            self._session.query(Kontenrolle)
+            .filter(
+                Kontenrolle.mandant_id
+                == company_model.id
+            )
+            .delete(
+                synchronize_session=False
+            )
+        )
+
+        role_assignments = (
+            (
+                "CASH",
+                account_roles.cash_accounts,
+            ),
+            (
+                "BANK",
+                account_roles.bank_accounts,
+            ),
+            (
+                "GENERAL_RATE_SALES",
+                account_roles.general_rate_sales_accounts,
+            ),
+        )
+
+        for role, role_account_numbers in role_assignments:
+            for account_number in sorted(
+                role_account_numbers
+            ):
+                self._session.add(
+                    Kontenrolle(
+                        mandant_id=company_model.id,
+                        role=role,
+                        account_number=account_number,
+                    )
+                )
+
+        if commit:
+            self._session.commit()
+
+
+    def load_account_roles(
+        self,
+        company_id: UUID,
+    ) -> AccountingAccountRoles | None:
+        """Lädt fachliche Kontenrollen eines Mandanten."""
+
+        if not isinstance(company_id, UUID):
+            raise TypeError(
+                "company_id must be a UUID"
+            )
+
+        company_model = self._find_company(
+            company_id
+        )
+
+        if company_model is None:
+            return None
+
+        models = (
+            self._session.query(Kontenrolle)
+            .filter(
+                Kontenrolle.mandant_id
+                == company_model.id
+            )
+            .all()
+        )
+
+        if not models:
+            return None
+
+        cash_accounts = frozenset(
+            model.account_number
+            for model in models
+            if model.role == "CASH"
+        )
+
+        bank_accounts = frozenset(
+            model.account_number
+            for model in models
+            if model.role == "BANK"
+        )
+
+        general_rate_sales_accounts = frozenset(
+            model.account_number
+            for model in models
+            if model.role == "GENERAL_RATE_SALES"
+        )
+
+        known_roles = {
+            "CASH",
+            "BANK",
+            "GENERAL_RATE_SALES",
+        }
+
+        unknown_roles = {
+            model.role
+            for model in models
+            if model.role not in known_roles
+        }
+
+        if unknown_roles:
+            roles = ", ".join(
+                sorted(unknown_roles)
+            )
+
+            raise ValueError(
+                "Unbekannte fachliche Kontenrollen "
+                f"gespeichert: {roles}"
+            )
+
+        return AccountingAccountRoles(
+            cash_accounts=cash_accounts,
+            bank_accounts=bank_accounts,
+            general_rate_sales_accounts=(
+                general_rate_sales_accounts
+            ),
         )
 
     def _find_company(

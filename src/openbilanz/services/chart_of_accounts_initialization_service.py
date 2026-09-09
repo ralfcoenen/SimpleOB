@@ -7,6 +7,9 @@ from openbilanz.database.chart_of_accounts_repository import (
     ChartOfAccountsRepository,
 )
 from openbilanz.domain.account import Account
+from openbilanz.domain.accounting_account_roles import (
+    AccountingAccountRoles,
+)
 from openbilanz.domain.accounting_control_accounts import (
     AccountingControlAccounts,
 )
@@ -71,6 +74,12 @@ class ChartOfAccountsInitializationService:
             output_tax_19="1776",
         )
 
+        account_roles = AccountingAccountRoles(
+            cash_accounts=frozenset(("1000",)),
+            bank_accounts=frozenset(("1200",)),
+            general_rate_sales_accounts=frozenset(("8400",)),
+        )
+
         self._repository.save_for_company(
             company_id=company.company_id,
             chart_of_accounts=standard_chart_of_accounts,
@@ -87,6 +96,12 @@ class ChartOfAccountsInitializationService:
         self._repository.save_vat_accounts(
             company_id=company.company_id,
             vat_accounts=vat_accounts,
+            commit=False,
+        )
+
+        self._repository.save_account_roles(
+            company_id=company.company_id,
+            account_roles=account_roles,
             commit=False,
         )
 

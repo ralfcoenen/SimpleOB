@@ -64,6 +64,16 @@ def _standard_chart_of_accounts() -> ChartOfAccountsTemplate:
                 account_type=AccountType.EQUITY,
             ),
             TemplateAccount(
+                account_number="1000",
+                name="Kasse",
+                account_type=AccountType.ASSET,
+            ),
+            TemplateAccount(
+                account_number="1200",
+                name="Bank",
+                account_type=AccountType.ASSET,
+            ),
+            TemplateAccount(
                 account_number="1571",
                 name="Abziehbare Vorsteuer 7 %",
                 account_type=AccountType.ASSET,
@@ -83,9 +93,13 @@ def _standard_chart_of_accounts() -> ChartOfAccountsTemplate:
                 name="Umsatzsteuer 19 %",
                 account_type=AccountType.LIABILITY,
             ),
+            TemplateAccount(
+                account_number="8400",
+                name="Umsatzerlöse 19 %",
+                account_type=AccountType.REVENUE,
+            ),
         ),
     )
-
 
 def _position_provider() -> HgbFinancialStatementPositionProvider:
     assets, liabilities = (
@@ -156,6 +170,11 @@ def test_initializes_chart_of_accounts_for_company() -> None:
             company.company_id
         )
     )
+    loaded_account_roles = (
+        repository.load_account_roles(
+            company.company_id
+        )
+    )
 
     assert initialized is True
     assert loaded is not None
@@ -168,6 +187,17 @@ def test_initializes_chart_of_accounts_for_company() -> None:
     assert loaded_vat_accounts.input_tax_19 == "1576"
     assert loaded_vat_accounts.output_tax_7 == "1771"
     assert loaded_vat_accounts.output_tax_19 == "1776"
+    assert loaded_account_roles is not None
+    assert loaded_account_roles.cash_accounts == frozenset(
+        {"1000"}
+    )
+    assert loaded_account_roles.bank_accounts == frozenset(
+        {"1200"}
+    )
+    assert (
+        loaded_account_roles.general_rate_sales_accounts
+        == frozenset({"8400"})
+    )
 
 
 def test_does_not_replace_existing_chart_of_accounts() -> None:
@@ -237,6 +267,8 @@ def test_does_not_replace_existing_chart_of_accounts() -> None:
         account.account_number
         for account in chart_of_accounts.accounts
     } == {
+        "1000",
+        "1200",
         "1571",
         "1576",
         "1771",
@@ -244,6 +276,7 @@ def test_does_not_replace_existing_chart_of_accounts() -> None:
         "2970",
         "8020",
         "8021",
+        "8400",
         "8990",
         "9000",
     }
