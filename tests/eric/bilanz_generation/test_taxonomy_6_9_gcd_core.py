@@ -136,7 +136,7 @@ def test_country_iso_code_is_optional_value_or_nil() -> None:
     assert node.state is FactPlanState.VALUE_OR_NIL
 
 
-def test_previous_year_period_facts_are_not_in_standard_profile() -> None:
+def test_previous_year_period_facts_are_optional_in_standard_profile() -> None:
     plan = create_profile_6_9().fact_plan
 
     concept_names = (
@@ -146,6 +146,9 @@ def test_previous_year_period_facts_are_not_in_standard_profile() -> None:
     )
 
     for concept_name in concept_names:
-        assert plan.node_for(
+        node = plan.node_for(
             concept_name
-        ) is None
+        )
+
+        assert node is not None
+        assert node.state is FactPlanState.VALUE_OR_NIL

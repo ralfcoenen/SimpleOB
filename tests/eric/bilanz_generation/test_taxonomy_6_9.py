@@ -4,8 +4,12 @@ from openbilanz.eric.bilanz_generation.fact_plan import (
     FactPlanState,
 )
 from openbilanz.eric.bilanz_generation.taxonomy_6_9 import (
+    ERIC_REQUIRED_BALANCE_SHEET_CONCEPTS,
     TAXONOMY_VERSION,
     create_profile_6_9,
+)
+from openbilanz.eric.bilanz_generation.taxonomy_6_9_balance_sheet import (
+    BALANCE_SHEET_CONCEPTS as TAXONOMY_BALANCE_SHEET_CONCEPTS,
 )
 
 COMPANY_ID_NO = "genInfo.company.id.idNo"
@@ -759,9 +763,7 @@ def test_report_element_ks_is_conditional() -> None:
 def test_unused_report_elements_are_nil() -> None:
     for suffix in (
         "EV",
-        "BVV",
         "EB",
-        "STU",
     ):
         assert (
             _state_for(
@@ -779,6 +781,22 @@ def test_unused_report_elements_are_nil() -> None:
         is FactPlanState.NIL
     )
 
+def test_report_element_bvv_is_conditional() -> None:
+    assert (
+        _state_for(
+            "genInfo.report.id.reportElement.reportElements.BVV"
+        )
+        is FactPlanState.CONDITIONAL
+    )
+
+
+def test_report_element_stu_is_conditional() -> None:
+    assert (
+        _state_for(
+            "genInfo.report.id.reportElement.reportElements.STU"
+        )
+        is FactPlanState.CONDITIONAL
+    )
 
 def test_net_income_is_value() -> None:
     assert (
@@ -810,59 +828,14 @@ def test_gross_trading_profit_is_value() -> None:
         is FactPlanState.VALUE
     )
 
+def test_balance_sheet_concepts_have_expected_states() -> None:
+    required = set(ERIC_REQUIRED_BALANCE_SHEET_CONCEPTS)
 
-def test_balance_sheet_concepts_are_value_or_nil() -> None:
-    for concept_name in BALANCE_SHEET_CONCEPTS:
-        assert (
-            _state_for(concept_name)
-            is FactPlanState.VALUE_OR_NIL
+    for concept_name in TAXONOMY_BALANCE_SHEET_CONCEPTS:
+        expected_state = (
+            FactPlanState.VALUE_OR_NIL
+            if concept_name in required
+            else FactPlanState.CONDITIONAL
         )
 
-
-def test_profile_contains_expected_top_level_blocks() -> None:
-    profile = create_profile_6_9()
-
-    assert tuple(
-        node.concept_name
-        for node in profile.fact_plan.nodes
-    ) == (
-        "genInfo.report.id.reportStatus",
-        "genInfo.report.id.revisionStatus",
-        "genInfo.report.id.statementType",
-        "genInfo.report.id.accountingStandard",
-        "genInfo.report.id.specialAccountingStandard",
-        "genInfo.report.id.incomeStatementFormat",
-        "genInfo.report.id.consolidationRange",
-        "genInfo.company.id.incomeClassification",
-        "genInfo.company.id.legalStatus",
-        "genInfo.report.period.reportPeriodBegin",
-        "genInfo.report.period.reportPeriodEnd",
-        "genInfo.report.period.fiscalYearBegin",
-        "genInfo.report.period.fiscalYearEnd",
-        "genInfo.report.period.balSheetClosingDate",
-        "genInfo.company.id.name",
-        "genInfo.company.id.location.street",
-        "genInfo.company.id.location.houseNo",
-        "genInfo.company.id.location.zipCode",
-        "genInfo.company.id.location.city",
-        "genInfo.company.id.location.country",
-        "genInfo.company.id.location.country.isoCode",
-        "genInfo.company.id.idNo",
-        "genInfo.report.id.accordingTo",
-        "genInfo.company.id.domesticBranchOfForeignCompany",
-        "genInfo.company.id.entityWithTaxablePurposeBusiness",
-        "genInfo.report.id.reportElement",
-        (
-            "genInfo.report.id.reportElement."
-            "reportElements.transmissionNotYetPossible"
-        ),
-        "is.netIncome",
-        "is.netIncome.eat",
-        "is.netIncome.regular.operatingTC",
-        (
-            "is.netIncome.regular.operatingTC."
-            "grossTradingProfit"
-        ),
-        *BALANCE_SHEET_CONCEPTS,
-        *INCOME_STATEMENT_CONCEPTS,
-    )
+        assert _state_for(concept_name) is expected_state

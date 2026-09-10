@@ -77,6 +77,13 @@ def test_combines_pre_closing_income_statement_with_closed_balance_sheet(
         closed_ledger=ledger,
     )
 
+    assert result.balance_sheet.assets is assets
+    assert result.balance_sheet.liabilities is liabilities
+
+    assert dict(result.balance_sheet.amounts) == {
+        profit_position: Decimal("5080.00"),
+    }
+
     assert result.income_statement_amounts == {
         revenue_position: Decimal("16500.00"),
     }

@@ -7,8 +7,13 @@ from uuid import uuid4
 
 import pytest
 
+from openbilanz.accounting.balance_sheet import BalanceSheet
 from openbilanz.accounting.financial_statement_position import (
     FinancialStatementPosition,
+)
+from openbilanz.accounting.income_statement import IncomeStatement
+from openbilanz.domain.accounting_account_roles import (
+    AccountingAccountRoles,
 )
 from openbilanz.domain.company import Company
 from openbilanz.domain.company_master_data import (
@@ -18,6 +23,7 @@ from openbilanz.domain.e_bilanz_account_detail import (
     EBilanzAccountDetail,
 )
 from openbilanz.domain.fiscal_year import FiscalYear
+from openbilanz.domain.vat_accounts import VatAccounts
 from openbilanz.hgb.balance_sheet_structure import (
     create_hgb_balance_sheet_structure,
 )
@@ -95,14 +101,14 @@ def test_e_bilanz_69_validates_supported_legal_forms(
         create_hgb_balance_sheet_structure()
     )
 
-    income_statement = (
+    income_statement_root = (
         create_hgb_income_statement_structure()
     )
 
     positions = _positions_by_code(
         assets,
         liabilities,
-        income_statement,
+        income_statement_root,
     )
 
     company = Company(
@@ -147,6 +153,30 @@ def test_e_bilanz_69_validates_supported_legal_forms(
         capital_position: Decimal("10000.00"),
     }
 
+    balance_sheet = BalanceSheet(
+        assets=assets,
+        liabilities=liabilities,
+        amounts=amounts,
+    )
+
+    income_statement = IncomeStatement(
+        income_statement=income_statement_root,
+        amounts={},
+    )
+
+    vat_accounts = VatAccounts(
+        input_tax_7="1571",
+        input_tax_19="1576",
+        output_tax_7="1771",
+        output_tax_19="1776",
+    )
+
+    account_roles = AccountingAccountRoles(
+        cash_accounts=frozenset(),
+        bank_accounts=frozenset({"1200"}),
+        general_rate_sales_accounts=frozenset(),
+    )
+
     account_details = (
         EBilanzAccountDetail(
             position=cash_position,
@@ -174,7 +204,7 @@ def test_e_bilanz_69_validates_supported_legal_forms(
         company_data_mapper=GcdCompanyDataMapper(),
         assets=assets,
         liabilities=liabilities,
-        income_statement=income_statement,
+        income_statement=income_statement_root,
     )
 
     try:
@@ -182,6 +212,10 @@ def test_e_bilanz_69_validates_supported_legal_forms(
             master_data=master_data,
             fiscal_year=fiscal_year,
             amounts=amounts,
+            income_statement=income_statement,
+            balance_sheet=balance_sheet,
+            vat_accounts=vat_accounts,
+            account_roles=account_roles,
             entity_identifier="DE123456789",
             entity_scheme=TEST_ENTITY_SCHEME,
             account_details=account_details,

@@ -103,6 +103,9 @@ def _taxonomy_model() -> TaxonomyModel:
         _monetary_instant_concept(
             "bs.ass.fixAss.tan.otherEquipm"
         ),
+        _monetary_instant_concept(
+            "bs.ass.fixAss.tan.otherEquipm.otherbga"
+        ),
     )
 
     movement_concepts = tuple(
@@ -155,6 +158,11 @@ def _taxonomy_model() -> TaxonomyModel:
                     "bs.ass.fixAss.tan",
                     "bs.ass.fixAss.tan.otherEquipm",
                     "2",
+                ),
+                _relation(
+                    "bs.ass.fixAss.tan.otherEquipm",
+                    "bs.ass.fixAss.tan.otherEquipm.otherbga",
+                    "1",
                 ),
             ),
         ),
@@ -481,9 +489,9 @@ def test_aggregates_sibling_positions_into_parent_contexts() -> None:
         ),
     )
 
-    assert len(result.contexts) == 4
-    assert len(result.facts) == 40
-    assert len(result.nil_facts) == 32
+    assert len(result.contexts) == 5
+    assert len(result.facts) == 50
+    assert len(result.nil_facts) == 40
 
     tan_facts = _facts_for_member(
         result,

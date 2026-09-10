@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from decimal import Decimal
 
+from openbilanz.accounting.balance_sheet import BalanceSheet
 from openbilanz.accounting.financial_statement_builder import (
     FinancialStatementBuilder,
 )
@@ -19,6 +20,9 @@ from openbilanz.domain.money import ZERO
 @dataclass(frozen=True, slots=True)
 class EBilanzPreparationResult:
     """Enthält die aufbereiteten HGB-Werte für die E-Bilanz."""
+
+    income_statement: IncomeStatement
+    balance_sheet: BalanceSheet
 
     amounts: dict[
         FinancialStatementPosition,
@@ -99,6 +103,12 @@ class EBilanzPreparationService:
             )
         )
 
+        balance_sheet = BalanceSheet(
+            assets=self._assets,
+            liabilities=self._liabilities,
+            amounts=balance_sheet_amounts,
+        )
+
         income_statement_amounts = dict(
             income_statement.amounts
         )
@@ -109,6 +119,8 @@ class EBilanzPreparationService:
         }
 
         return EBilanzPreparationResult(
+            income_statement=income_statement,
+            balance_sheet=balance_sheet,
             amounts=amounts,
             balance_sheet_amounts=balance_sheet_amounts,
             income_statement_amounts=(
