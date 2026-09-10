@@ -2,13 +2,17 @@
 
 import os
 from collections.abc import Mapping
+from dataclasses import replace
 from decimal import Decimal
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from openbilanz.accounting.balance_sheet import BalanceSheet
 from openbilanz.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
+from openbilanz.accounting.income_statement import IncomeStatement
+from openbilanz.domain.accounting_account_roles import AccountingAccountRoles
 from openbilanz.domain.company_master_data import (
     CompanyMasterData,
 )
@@ -17,31 +21,82 @@ from openbilanz.domain.e_bilanz_account_detail import (
 )
 from openbilanz.domain.fiscal_year import FiscalYear
 from openbilanz.domain.shareholder import Shareholder
+from openbilanz.domain.vat_accounts import VatAccounts
+from openbilanz.eric.bilanz_generation.fact_plan_resolver import (
+    FactPlanResolver,
+)
+from openbilanz.eric.bilanz_generation.gaap_ci_6_9_account_detail_values import (
+    GaapCi69AccountDetailValueBuilder,
+)
+from openbilanz.eric.bilanz_generation.gaap_ci_6_9_balance_sheet_values import (
+    GaapCi69BalanceSheetValueBuilder,
+)
+from openbilanz.eric.bilanz_generation.gaap_ci_6_9_income_statement_values import (
+    GaapCi69IncomeStatementValueBuilder,
+)
+from openbilanz.eric.bilanz_generation.gaap_ci_6_9_values import (
+    GaapCi69ValueCalculator,
+)
+from openbilanz.eric.bilanz_generation.taxonomy_6_9 import (
+    create_profile_6_9,
+)
+from openbilanz.eric.bilanz_generation.taxonomy_6_9_values import (
+    Taxonomy69ValueBuilder,
+)
+from openbilanz.eric.bilanz_generation.taxonomy_6_9_xbrl_document_builder import (
+    Taxonomy69XbrlDocumentBuilder,
+)
+from openbilanz.services.closing_service import ClosingService
 from openbilanz.services.fixed_asset_schedule_service import (
     FixedAssetSchedulePosition,
 )
+from openbilanz.taxonomy.account_balance_builder import AccountBalanceBuilder
 from openbilanz.taxonomy.arelle_adapter import (
     ArelleAdapter,
     ArelleValidationResult,
 )
-from openbilanz.taxonomy.e_bilanz_builder import (
-    EBilanzBuilder,
-    EBilanzDocument,
-)
+from openbilanz.taxonomy.concept import TaxonomyPeriodType
+from openbilanz.taxonomy.concept_set import TaxonomyConceptSet
+from openbilanz.taxonomy.context import TaxonomyContext
+from openbilanz.taxonomy.e_bilanz_builder import EBilanzDocument
 from openbilanz.taxonomy.entry_point import (
     TaxonomyEntryPoint,
+)
+from openbilanz.taxonomy.fact import TaxonomyFact
+from openbilanz.taxonomy.fiscal_requirement_reader import (
+    FiscalRequirementReader,
+)
+from openbilanz.taxonomy.gaap_ci_mandatory_fact_completer import (
+    GaapCiMandatoryFactCompleter,
 )
 from openbilanz.taxonomy.gcd_company_data_mapper import (
     GcdCompanyDataMapper,
 )
+from openbilanz.taxonomy.gcd_fact_builder import GcdFactBuilder
+from openbilanz.taxonomy.gcd_report_profile import GcdReportProfile
 from openbilanz.taxonomy.gcd_shareholder import (
     GcdShareDivideKey,
     GcdShareholder,
     GcdShareholderLegalStatus,
 )
+from openbilanz.taxonomy.hgb_gaap_ci_mapping import (
+    create_hgb_gaap_ci_mapping,
+)
+from openbilanz.taxonomy.mapper import TaxonomyMapper
+from openbilanz.taxonomy.nil_fact import TaxonomyNilFact
 from openbilanz.taxonomy.resolver import TaxonomyResolver
 from openbilanz.taxonomy.taxonomy import (
+    TaxonomyVersion,
     taxonomy_version_for,
+)
+from openbilanz.taxonomy.unit import TaxonomyUnit
+
+BALANCE_SHEET_ROLE = (
+    "http://www.xbrl.de/taxonomies/de-gaap-ci/role/balanceSheet"
+)
+
+INCOME_STATEMENT_ROLE = (
+    "http://www.xbrl.de/taxonomies/de-gaap-ci/role/incomeStatement"
 )
 
 
@@ -74,6 +129,10 @@ class EBilanzService:
             FinancialStatementPosition,
             Decimal,
         ],
+        income_statement: IncomeStatement,
+        balance_sheet: BalanceSheet,
+        vat_accounts: VatAccounts,
+        account_roles: AccountingAccountRoles,
         entity_identifier: str,
         entity_scheme: str,
         previous_fiscal_year: FiscalYear | None = None,
@@ -90,7 +149,7 @@ class EBilanzService:
             ...
         ] = (),
     ) -> EBilanzDocument:
-        """Erzeugt die E-Bilanz-XBRL-Instanz."""
+        """Erzeugt die E-Bilanz-XBRL-Instanz über den Taxonomie-6.9-FactPlan."""
 
         mapping = self._company_data_mapper.map(
             master_data
@@ -99,6 +158,12 @@ class EBilanzService:
         version = taxonomy_version_for(
             fiscal_year
         )
+
+        if version is not TaxonomyVersion.V6_9:
+            raise ValueError(
+                "Der ERiC-konforme E-Bilanz-Erzeugungspfad "
+                "unterstützt derzeit ausschließlich Taxonomie 6.9."
+            )
 
         gcd_path = self._resolver.gcd_entry_point(
             version
@@ -130,27 +195,212 @@ class EBilanzService:
             gaap_ci_path
         )
 
-        gcd_namespace = (
-            gcd_entry_point.namespace
-            .removesuffix("/shell")
+        concepts = TaxonomyConceptSet(
+            concepts=(
+                gcd_model.concepts.concepts
+                + gaap_ci_model.concepts.concepts
+            )
         )
 
-        gaap_ci_namespace = (
-            gaap_ci_entry_point.namespace
-            .removesuffix("/shell-fiscal")
+        net_income = (
+            ClosingService()
+            .calculate_net_income(
+                income_statement=income_statement,
+            )
         )
 
-        builder = EBilanzBuilder(
-            gcd_model=gcd_model,
-            gaap_ci_model=gaap_ci_model,
-            gcd_entry_point=gcd_entry_point,
-            gaap_ci_entry_point=gaap_ci_entry_point,
-            gcd_namespace=gcd_namespace,
-            gaap_ci_namespace=gaap_ci_namespace,
-            assets=self._assets,
-            liabilities=self._liabilities,
-            income_statement=self._income_statement,
+        gaap_ci_values = (
+            GaapCi69ValueCalculator.calculate(
+                income_statement=income_statement,
+                net_income=net_income,
+            )
         )
+
+        profile = create_profile_6_9()
+
+        report_profile = (
+            GcdReportProfile.standard()
+        )
+
+        if account_details:
+            report_profile = replace(
+                report_profile,
+                report_elements=(
+                    *report_profile.report_elements,
+                    (
+                        "genInfo.report.id.reportElement."
+                        "reportElements.KS"
+                    ),
+                ),
+            )
+
+        balance_sheet_values = (
+            GaapCi69BalanceSheetValueBuilder.build(
+                balance_sheet=balance_sheet,
+                income_statement=(
+                    income_statement.income_statement
+                ),
+            )
+        )
+
+        income_statement_values = (
+            GaapCi69IncomeStatementValueBuilder.build(
+                income_statement=income_statement,
+                assets=balance_sheet.assets,
+                liabilities=balance_sheet.liabilities,
+                fixed_asset_schedule=fixed_asset_schedule,
+            )
+        )
+
+        account_detail_values = (
+            GaapCi69AccountDetailValueBuilder.build(
+                account_details=account_details,
+                tax_liability_accounts=(
+                    vat_accounts.output_tax_7,
+                    vat_accounts.output_tax_19,
+                ),
+                general_rate_sales_accounts=(
+                    account_roles.general_rate_sales_accounts
+                ),
+                cash_accounts=(
+                    account_roles.cash_accounts
+                ),
+                bank_accounts=(
+                    account_roles.bank_accounts
+                ),
+                input_tax_receivable_accounts=(
+                    vat_accounts.input_tax_7,
+                    vat_accounts.input_tax_19,
+                ),
+            )
+        )
+
+        instant_context = TaxonomyContext(
+            entity_identifier=entity_identifier,
+            entity_scheme=entity_scheme,
+            period_type=TaxonomyPeriodType.INSTANT,
+            start_date=None,
+            end_date=fiscal_year.end_date,
+        )
+
+        duration_context = TaxonomyContext(
+            entity_identifier=entity_identifier,
+            entity_scheme=entity_scheme,
+            period_type=TaxonomyPeriodType.DURATION,
+            start_date=fiscal_year.start_date,
+            end_date=fiscal_year.end_date,
+        )
+
+        contexts_by_period_type = {
+            TaxonomyPeriodType.INSTANT: instant_context,
+            TaxonomyPeriodType.DURATION: duration_context,
+        }
+
+        values = Taxonomy69ValueBuilder.build(
+            company_data=mapping.company_data,
+            identifiers=mapping.identifiers,
+            fiscal_year=fiscal_year,
+            report_profile=report_profile,
+            gaap_ci_values=gaap_ci_values,
+            previous_fiscal_year=previous_fiscal_year,
+        )
+
+        values.update(
+            balance_sheet_values
+        )
+
+        values.update(
+            income_statement_values
+        )
+
+        values.update(
+            account_detail_values
+        )
+
+        resolved_fact_plan = (
+            FactPlanResolver.resolve(
+                fact_plan=profile.fact_plan,
+                concepts=concepts,
+                contexts=contexts_by_period_type,
+                values=values,
+            )
+        )
+
+        existing_numeric_or_nil_facts: list[
+            TaxonomyFact | TaxonomyNilFact
+        ] = []
+
+        def collect_numeric_or_nil_facts(
+            node,
+        ) -> None:
+            if isinstance(
+                node.fact,
+                (
+                    TaxonomyFact,
+                    TaxonomyNilFact,
+                ),
+            ):
+                existing_numeric_or_nil_facts.append(
+                    node.fact
+                )
+
+            for child in node.children:
+                collect_numeric_or_nil_facts(
+                    child
+                )
+
+        for node in resolved_fact_plan.nodes:
+            collect_numeric_or_nil_facts(
+                node
+            )
+
+        requirements = FiscalRequirementReader(
+            gaap_ci_entry_point
+        ).requirements()
+
+        mandatory_nil_facts = (
+            GaapCiMandatoryFactCompleter(
+                taxonomy_model=gaap_ci_model
+            ).build_missing_nil_facts(
+                requirements=requirements,
+                existing_facts=tuple(
+                    existing_numeric_or_nil_facts
+                ),
+                instant_context=instant_context,
+                duration_context=duration_context,
+                unit=TaxonomyUnit.eur(),
+                active_report_element_roles=(
+                    BALANCE_SHEET_ROLE,
+                    INCOME_STATEMENT_ROLE,
+                ),
+                excluded_concept_prefixes=(
+                    "is.netIncome.regular.operatingCOGS",
+                ),
+            )
+        )
+
+        taxonomy_mapper = TaxonomyMapper(
+            create_hgb_gaap_ci_mapping(
+                assets=self._assets,
+                liabilities=self._liabilities,
+                income_statement=self._income_statement,
+            ),
+            gaap_ci_model,
+        )
+
+        account_balance_builder = AccountBalanceBuilder(
+            taxonomy_model=gaap_ci_model,
+            taxonomy_mapper=taxonomy_mapper,
+        )
+
+        account_balances = tuple(
+            account_balance_builder.build(
+                detail=detail,
+                context=duration_context,
+            )
+            for detail in account_details
+        )
+
         gcd_shareholders = tuple(
             self._map_shareholder(
                 shareholder
@@ -158,17 +408,47 @@ class EBilanzService:
             for shareholder in shareholders
         )
 
-        return builder.build(
-            company_data=mapping.company_data,
-            fiscal_year=fiscal_year,
-            amounts=amounts,
-            entity_identifier=entity_identifier,
-            entity_scheme=entity_scheme,
-            previous_fiscal_year=previous_fiscal_year,
-            identifiers=mapping.identifiers,
-            account_details=account_details,
-            fixed_asset_schedule=fixed_asset_schedule,
-            shareholders=gcd_shareholders,
+        gcd_fact_builder = GcdFactBuilder()
+
+        shareholder_tuples = tuple(
+            gcd_fact_builder.shareholder(
+                shareholder=shareholder,
+                taxonomy_model=gcd_model,
+                context=duration_context,
+            )
+            for shareholder in gcd_shareholders
+        )
+
+        year = fiscal_year.end_date.year
+
+        contexts = {
+            f"ctx-instant-{year}": instant_context,
+            f"ctx-duration-{year}": duration_context,
+        }
+
+        units = {
+            "EUR": TaxonomyUnit.eur(),
+            "PURE": TaxonomyUnit.pure(),
+        }
+
+        xml = (
+            Taxonomy69XbrlDocumentBuilder()
+            .build_xml(
+                resolved_fact_plan=resolved_fact_plan,
+                contexts=contexts,
+                units=units,
+                entry_points=(
+                    gcd_entry_point,
+                    gaap_ci_entry_point,
+                ),
+                shareholders=shareholder_tuples,
+                nil_facts=mandatory_nil_facts,
+                account_balances=account_balances,
+            )
+        )
+
+        return EBilanzDocument(
+            xml=xml
         )
 
     @staticmethod

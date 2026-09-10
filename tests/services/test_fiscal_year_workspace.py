@@ -1329,13 +1329,13 @@ def test_rejects_e_bilanz_preparation_for_open_fiscal_year(
             ),
         )
 
-
 def test_builds_e_bilanz_from_prepared_data(
     context: ApplicationContext,
 ) -> None:
     booking_repository = Mock()
     company_repository = Mock()
     shareholder_repository = Mock()
+    chart_of_accounts_repository = Mock()
     preparation_service = Mock()
     e_bilanz_service = Mock()
     account_detail_service = Mock()
@@ -1370,6 +1370,36 @@ def test_builds_e_bilanz_from_prepared_data(
         master_data
     )
 
+    control_accounts = Mock(
+        spec=AccountingControlAccounts
+    )
+
+    vat_accounts = Mock(
+        spec=VatAccounts
+    )
+
+    account_roles = Mock(
+        spec=AccountingAccountRoles
+    )
+
+    (
+        chart_of_accounts_repository
+        .load_control_accounts
+        .return_value
+    ) = control_accounts
+
+    (
+        chart_of_accounts_repository
+        .load_vat_accounts
+        .return_value
+    ) = vat_accounts
+
+    (
+        chart_of_accounts_repository
+        .load_account_roles
+        .return_value
+    ) = account_roles
+
     shareholders = (
         Mock(),
         Mock(),
@@ -1401,6 +1431,9 @@ def test_builds_e_bilanz_from_prepared_data(
         booking_repository=booking_repository,
         company_repository=company_repository,
         shareholder_repository=shareholder_repository,
+        chart_of_accounts_repository=(
+            chart_of_accounts_repository
+        ),
         posting_service=PostingService(),
         closing_workflow=Mock(),
         closing_consistency_service=Mock(),
@@ -1426,6 +1459,30 @@ def test_builds_e_bilanz_from_prepared_data(
         closed_ledger=workspace.ledger,
     )
 
+    (
+        chart_of_accounts_repository
+        .load_control_accounts
+        .assert_called_once_with(
+            context.company.company_id
+        )
+    )
+
+    (
+        chart_of_accounts_repository
+        .load_vat_accounts
+        .assert_called_once_with(
+            context.company.company_id
+        )
+    )
+
+    (
+        chart_of_accounts_repository
+        .load_account_roles
+        .assert_called_once_with(
+            context.company.company_id
+        )
+    )
+
     shareholder_repository.list_for_company.assert_called_once_with(
         context.company.company_id
     )
@@ -1436,6 +1493,8 @@ def test_builds_e_bilanz_from_prepared_data(
         amounts=preparation.amounts,
         income_statement=preparation.income_statement,
         balance_sheet=preparation.balance_sheet,
+        vat_accounts=vat_accounts,
+        account_roles=account_roles,
         entity_identifier=str(
             context.company.company_id
         ),

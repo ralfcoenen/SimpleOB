@@ -1468,6 +1468,12 @@ class FiscalYearWorkspace:
         master_data = self.load_company_master_data()
         entity = EntityIdentifier.from_company(self._context.company)
 
+        (
+            _control_accounts,
+            vat_accounts,
+            account_roles,
+        ) = self.load_account_configuration()
+
         account_details = self._e_bilanz_account_detail_service.build_for_e_bilanz(
             pre_closing_ledger=self._pre_closing_ledger,
             closed_ledger=self._ledger,
@@ -1505,6 +1511,8 @@ class FiscalYearWorkspace:
             amounts=preparation.amounts,
             income_statement=preparation.income_statement,
             balance_sheet=preparation.balance_sheet,
+            vat_accounts=vat_accounts,
+            account_roles=account_roles,
             entity_identifier=entity.value,
             entity_scheme=entity.scheme,
             previous_fiscal_year=self.previous_fiscal_year,

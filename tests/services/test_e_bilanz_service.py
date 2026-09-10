@@ -11,12 +11,16 @@ from openbilanz.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
 from openbilanz.accounting.income_statement import IncomeStatement
+from openbilanz.domain.accounting_account_roles import (
+    AccountingAccountRoles,
+)
 from openbilanz.domain.company import Company
 from openbilanz.domain.company_master_data import (
     CompanyMasterData,
 )
 from openbilanz.domain.fiscal_year import FiscalYear
 from openbilanz.domain.shareholder import Shareholder
+from openbilanz.domain.vat_accounts import VatAccounts
 from openbilanz.services.e_bilanz_service import EBilanzService
 from openbilanz.taxonomy.arelle_adapter import (
     ArelleValidationResult,
@@ -29,11 +33,6 @@ from openbilanz.taxonomy.entry_point import (
 )
 from openbilanz.taxonomy.gcd_company_data_mapper import (
     GcdCompanyDataMapper,
-)
-from openbilanz.taxonomy.gcd_shareholder import (
-    GcdShareDivideKey,
-    GcdShareholder,
-    GcdShareholderLegalStatus,
 )
 from openbilanz.taxonomy.taxonomy import TaxonomyVersion
 
@@ -120,7 +119,6 @@ def _company() -> Company:
         name="Muster UG",
     )
 
-
 def test_e_bilanz_service_orchestrates_builder() -> None:
     fiscal_year = FiscalYear(
         start_date=date(2026, 1, 1),
@@ -158,6 +156,27 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
         wid="",
     )
 
+    vat_accounts = Mock(
+        spec=VatAccounts
+    )
+    vat_accounts.input_tax_7 = "1571"
+    vat_accounts.input_tax_19 = "1576"
+    vat_accounts.output_tax_7 = "1771"
+    vat_accounts.output_tax_19 = "1776"
+
+    account_roles = Mock(
+        spec=AccountingAccountRoles
+    )
+    account_roles.cash_accounts = frozenset(
+        {"1000"}
+    )
+    account_roles.bank_accounts = frozenset(
+        {"1200"}
+    )
+    account_roles.general_rate_sales_accounts = frozenset(
+        {"8400"}
+    )
+
     gcd_path = Path("/tmp/gcd.xsd")
     gaap_ci_path = Path("/tmp/gaap-ci.xsd")
 
@@ -166,8 +185,11 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
         gaap_ci_path=gaap_ci_path,
     )
 
-    gcd_model = object()
-    gaap_ci_model = object()
+    gcd_model = Mock()
+    gcd_model.concepts.concepts = ()
+
+    gaap_ci_model = Mock()
+    gaap_ci_model.concepts.concepts = ()
 
     adapter = FakeAdapter(
         gcd_model=gcd_model,
@@ -180,12 +202,22 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
     liabilities = Mock(
         spec=FinancialStatementPosition
     )
-    income_statement = Mock(
+    income_statement_root = Mock(
         spec=FinancialStatementPosition
     )
+
+    prepared_income_statement = Mock(
+        spec=IncomeStatement
+    )
+    prepared_income_statement.income_statement = (
+        income_statement_root
+    )
+
     prepared_balance_sheet = Mock(
         spec=BalanceSheet
     )
+    prepared_balance_sheet.assets = assets
+    prepared_balance_sheet.liabilities = liabilities
 
     gcd_entry_point = TaxonomyEntryPoint(
         path=gcd_path,
@@ -205,18 +237,10 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
         schema_imports=(),
     )
 
-    expected_document = Mock(
-        spec=EBilanzDocument
-    )
-
     amounts: dict[
         FinancialStatementPosition,
         Decimal,
     ] = {}
-
-    prepared_income_statement = Mock(
-        spec=IncomeStatement
-    )
 
     service = EBilanzService(
         resolver=resolver,  # type: ignore[arg-type]
@@ -224,14 +248,54 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
         company_data_mapper=GcdCompanyDataMapper(),
         assets=assets,
         liabilities=liabilities,
-        income_statement=income_statement,
+        income_statement=income_statement_root,
     )
 
-    builder = Mock()
-    builder.build.return_value = (
-        expected_document
+    profile = Mock()
+    profile.fact_plan = Mock()
+
+    concepts = Mock()
+    resolved_fact_plan = Mock()
+    resolved_fact_plan.nodes = ()
+
+    closing_service = Mock()
+    closing_service.calculate_net_income.return_value = (
+        Decimal("100.00")
     )
 
+    gaap_ci_values = Mock()
+
+    balance_sheet_values = {
+        ("bs.test",): Decimal("100.00"),
+    }
+
+    income_statement_values = {
+        ("is.test",): Decimal("100.00"),
+    }
+
+    account_detail_values = {
+        ("ks.test",): Decimal("100.00"),
+    }
+
+    gcd_fact_builder = Mock()
+    shareholder_tuple = Mock()
+    gcd_fact_builder.shareholder.return_value = (
+        shareholder_tuple
+    )
+
+    mandatory_completer = Mock()
+    mandatory_completer.build_missing_nil_facts.return_value = ()
+
+    requirement_reader = Mock()
+    requirement_reader.requirements.return_value = ()
+
+    document_builder = Mock()
+    document_builder.build_xml.return_value = (
+        "<xbrl />"
+    )
+
+    taxonomy_mapper = Mock()
+    account_balance_builder = Mock()
 
     with (
         patch(
@@ -244,112 +308,169 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
         ),
         patch(
             "openbilanz.services.e_bilanz_service."
-            "EBilanzBuilder",
-            return_value=builder,
-        ) as builder_class,
+            "TaxonomyConceptSet",
+            return_value=concepts,
+        ) as concept_set_class,
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "ClosingService",
+            return_value=closing_service,
+        ),
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "GaapCi69ValueCalculator.calculate",
+            return_value=gaap_ci_values,
+        ) as gaap_ci_calculate,
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "create_profile_6_9",
+            return_value=profile,
+        ),
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "GaapCi69BalanceSheetValueBuilder.build",
+            return_value=balance_sheet_values,
+        ) as balance_sheet_builder,
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "GaapCi69IncomeStatementValueBuilder.build",
+            return_value=income_statement_values,
+        ) as income_statement_builder,
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "GaapCi69AccountDetailValueBuilder.build",
+            return_value=account_detail_values,
+        ) as account_detail_builder,
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "Taxonomy69ValueBuilder.build",
+            return_value={},
+        ) as value_builder,
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "FactPlanResolver.resolve",
+            return_value=resolved_fact_plan,
+        ) as fact_plan_resolver,
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "FiscalRequirementReader",
+            return_value=requirement_reader,
+        ),
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "GaapCiMandatoryFactCompleter",
+            return_value=mandatory_completer,
+        ),
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "GcdFactBuilder",
+            return_value=gcd_fact_builder,
+        ),
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "create_hgb_gaap_ci_mapping",
+            return_value=Mock(),
+        ),
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "TaxonomyMapper",
+            return_value=taxonomy_mapper,
+        ),
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "AccountBalanceBuilder",
+            return_value=account_balance_builder,
+        ),
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "Taxonomy69XbrlDocumentBuilder",
+            return_value=document_builder,
+        ),
     ):
-
-        result = service.build(
+        document = service.build(
             master_data=master_data,
             fiscal_year=fiscal_year,
             amounts=amounts,
             income_statement=prepared_income_statement,
             balance_sheet=prepared_balance_sheet,
-            entity_identifier="DE123456789",
+            vat_accounts=vat_accounts,
+            account_roles=account_roles,
+            entity_identifier="1234567890123",
             entity_scheme=(
-                "http://www.bundesfinanzministerium.de"
+                "http://www.rzf-nrw.de/Steuernummer"
             ),
-            shareholders=(
-                shareholder,
-            ),
+            account_details=(),
+            fixed_asset_schedule=(),
+            shareholders=(shareholder,),
         )
 
-
-    assert result is expected_document
-
-    assert (
-        resolver.received_gcd_version
-        is TaxonomyVersion.V6_9
-    )
-    assert (
-        resolver.received_gaap_ci_version
-        is TaxonomyVersion.V6_9
+    assert isinstance(
+        document,
+        EBilanzDocument,
     )
 
-    assert adapter.received_paths == [
-        gcd_path,
-        gaap_ci_path,
-    ]
+    assert document.xml == "<xbrl />"
 
-    builder_class.assert_called_once_with(
-        gcd_model=gcd_model,
-        gaap_ci_model=gaap_ci_model,
-        gcd_entry_point=gcd_entry_point,
-        gaap_ci_entry_point=gaap_ci_entry_point,
-        gcd_namespace=(
-            "http://www.xbrl.de/taxonomies/"
-            "de-gcd-2025-04-01"
-        ),
-        gaap_ci_namespace=(
-            "http://www.xbrl.de/taxonomies/"
-            "de-gaap-ci-2025-04-01"
-        ),
+    concept_set_class.assert_called_once_with(
+        concepts=(
+            gcd_model.concepts.concepts
+            + gaap_ci_model.concepts.concepts
+        )
+    )
+
+    closing_service.calculate_net_income.assert_called_once_with(
+        income_statement=prepared_income_statement,
+    )
+
+    gaap_ci_calculate.assert_called_once_with(
+        income_statement=prepared_income_statement,
+        net_income=Decimal("100.00"),
+    )
+
+    balance_sheet_builder.assert_called_once_with(
+        balance_sheet=prepared_balance_sheet,
+        income_statement=income_statement_root,
+    )
+
+    income_statement_builder.assert_called_once_with(
+        income_statement=prepared_income_statement,
         assets=assets,
         liabilities=liabilities,
-        income_statement=income_statement,
+        fixed_asset_schedule=(),
     )
 
-    builder.build.assert_called_once()
-
-    call_kwargs = (
-        builder.build.call_args.kwargs
-    )
-
-    assert (
-        call_kwargs["fiscal_year"]
-        is fiscal_year
-    )
-    assert call_kwargs["amounts"] is amounts
-    assert (
-        call_kwargs["entity_identifier"]
-        == "DE123456789"
-    )
-    assert (
-        call_kwargs["entity_scheme"]
-        == "http://www.bundesfinanzministerium.de"
-    )
-
-    assert (
-        call_kwargs["company_data"].company
-        == master_data.company
-    )
-    assert (
-        call_kwargs["company_data"].tax_number
-        == "5123045678901"
-    )
-    assert (
-        call_kwargs["identifiers"].tax_number_13
-        == "5123045678901"
-    )
-
-    assert call_kwargs["shareholders"] == (
-        GcdShareholder(
-            name="Muster",
-            first_name="Max",
-            shareholder_id="1",
-            tax_number=None,
-            tax_id="12345678901",
-            wid=None,
-            legal_status=(
-                GcdShareholderLegalStatus.NATURAL_PERSON
-            ),
-            share_divide_key=GcdShareDivideKey(
-                numerator="1",
-                denominator="2",
-            ),
+    account_detail_builder.assert_called_once_with(
+        account_details=(),
+        tax_liability_accounts=(
+            "1771",
+            "1776",
+        ),
+        general_rate_sales_accounts=frozenset(
+            {"8400"}
+        ),
+        cash_accounts=frozenset(
+            {"1000"}
+        ),
+        bank_accounts=frozenset(
+            {"1200"}
+        ),
+        input_tax_receivable_accounts=(
+            "1571",
+            "1576",
         ),
     )
 
+    value_builder.assert_called_once()
+
+    fact_plan_resolver.assert_called_once()
+
+    gcd_fact_builder.shareholder.assert_called_once()
+
+    mandatory_completer.build_missing_nil_facts.assert_called_once()
+
+    account_balance_builder.build.assert_not_called()
+
+    document_builder.build_xml.assert_called_once()
 
 def test_e_bilanz_service_validates_document_with_relative_schema_refs(
     tmp_path: Path,
