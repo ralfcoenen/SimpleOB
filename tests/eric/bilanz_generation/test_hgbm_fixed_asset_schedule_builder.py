@@ -23,96 +23,167 @@ from openbilanz.taxonomy.xbrl_writer import TaxonomyXbrlWriter
 
 
 @pytest.mark.parametrize(
-    ("concept_name", "expected"),
+    (
+        "concept_name",
+        "current_difference",
+        "previous_difference",
+        "expected",
+    ),
     [
         (
+            "accDepr.beginning",
+            Decimal("-83.33"),
+            Decimal("0.00"),
+            Decimal("0.00"),
+        ),
+        (
             "accDepr.DeprPeriod.regular",
-            Decimal("13.26"),
+            Decimal("-83.33"),
+            Decimal("0.00"),
+            Decimal("-83.33"),
         ),
         (
             "accDepr.DeprPeriod",
-            Decimal("13.26"),
+            Decimal("-83.33"),
+            Decimal("0.00"),
+            Decimal("-83.33"),
         ),
         (
             "accDepr",
-            Decimal("13.26"),
+            Decimal("-83.33"),
+            Decimal("0.00"),
+            Decimal("-83.33"),
         ),
         (
             "all",
-            Decimal("-13.26"),
+            Decimal("-83.33"),
+            Decimal("0.00"),
+            Decimal("83.33"),
+        ),
+        (
+            "accDepr.beginning",
+            Decimal("-83.33"),
+            Decimal("-83.33"),
+            Decimal("-83.33"),
+        ),
+        (
+            "accDepr.DeprPeriod.regular",
+            Decimal("-83.33"),
+            Decimal("-83.33"),
+            Decimal("-83.33"),
+        ),
+        (
+            "accDepr.DeprPeriod",
+            Decimal("-83.33"),
+            Decimal("-83.33"),
+            Decimal("-83.33"),
+        ),
+        (
+            "accDepr",
+            Decimal("-83.33"),
+            Decimal("-83.33"),
+            Decimal("-166.66"),
+        ),
+        (
+            "all",
+            Decimal("-83.33"),
+            Decimal("-83.33"),
+            Decimal("166.66"),
         ),
         (
             "grossCost.beginning",
+            Decimal("-83.33"),
+            Decimal("-83.33"),
             Decimal("0.00"),
         ),
         (
             "gross.addition",
+            Decimal("-83.33"),
+            Decimal("-83.33"),
             Decimal("0.00"),
         ),
         (
             "gross.release",
+            Decimal("-83.33"),
+            Decimal("-83.33"),
             Decimal("0.00"),
         ),
         (
             "gross",
-            Decimal("0.00"),
-        ),
-        (
-            "accDepr.beginning",
+            Decimal("-83.33"),
+            Decimal("-83.33"),
             Decimal("0.00"),
         ),
         (
             "accDepr.release",
+            Decimal("-83.33"),
+            Decimal("-83.33"),
             Decimal("0.00"),
         ),
     ],
 )
-def test_difference_for_confirmed_v10_bal_fact(
+def test_difference_for_eric_confirmed_bal_fact(
     concept_name: str,
+    current_difference: Decimal,
+    previous_difference: Decimal,
     expected: Decimal,
 ) -> None:
     result = HgbmFixedAssetScheduleBuilder._difference_for_concept(
         concept_name=concept_name,
-        additional_tax_depreciation=Decimal("13.26"),
+        current_depreciation_difference=current_difference,
+        previous_depreciation_difference=previous_difference,
     )
 
     assert result == expected
 
-
-@pytest.mark.parametrize(
-    "amount",
-    [
-        Decimal("0.00"),
-        Decimal("-0.01"),
-    ],
-)
-def test_rejects_non_positive_additional_tax_depreciation(
-    amount: Decimal,
-) -> None:
+def test_rejects_zero_depreciation_reconciliation() -> None:
     with pytest.raises(
         ValueError,
-        match="must be greater than zero",
+        match="at least one depreciation difference must be non-zero",
     ):
         HgbmFixedAssetScheduleBuilder.build(
             commercial_contexts={},
             commercial_facts=(),
             commercial_nil_facts=(),
-            additional_tax_depreciation=amount,
+            current_depreciation_difference=Decimal("0.00"),
+            previous_depreciation_difference=Decimal("0.00"),
         )
 
-
-def test_rejects_non_decimal_additional_tax_depreciation() -> None:
+@pytest.mark.parametrize(
+    (
+        "current_difference",
+        "previous_difference",
+        "message",
+    ),
+    [
+        (
+            -83.33,
+            Decimal("0.00"),
+            "current_depreciation_difference must be a Decimal",
+        ),
+        (
+            Decimal("-83.33"),
+            -83.33,
+            "previous_depreciation_difference must be a Decimal",
+        ),
+    ],
+)
+def test_rejects_non_decimal_depreciation_difference(
+    current_difference,
+    previous_difference,
+    message: str,
+) -> None:
     with pytest.raises(
         TypeError,
-        match="must be a Decimal",
+        match=message,
     ):
         HgbmFixedAssetScheduleBuilder.build(
             commercial_contexts={},
             commercial_facts=(),
             commercial_nil_facts=(),
-            additional_tax_depreciation=13.26,  # type: ignore[arg-type]
+            current_depreciation_difference=current_difference,
+            previous_depreciation_difference=previous_difference,
         )
-
 
 def test_builds_confirmed_v10_bal_values_with_real_objects() -> None:
     unit = TaxonomyUnit.eur()
@@ -185,7 +256,8 @@ def test_builds_confirmed_v10_bal_values_with_real_objects() -> None:
         },
         commercial_facts=commercial_facts,
         commercial_nil_facts=(),
-        additional_tax_depreciation=Decimal("13.26"),
+        current_depreciation_difference=Decimal("13.26"),
+        previous_depreciation_difference=Decimal("0.00"),
     )
 
     assert set(result.contexts) == {
@@ -300,7 +372,8 @@ def test_serializes_hgbm_bal_context_and_fact() -> None:
         },
         commercial_facts=(commercial_fact,),
         commercial_nil_facts=(),
-        additional_tax_depreciation=Decimal("13.26"),
+        current_depreciation_difference=Decimal("13.26"),
+        previous_depreciation_difference=Decimal("0.00"),
     )
 
     difference_context = result.contexts[

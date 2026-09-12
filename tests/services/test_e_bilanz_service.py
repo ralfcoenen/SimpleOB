@@ -296,6 +296,12 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
 
     taxonomy_mapper = Mock()
     account_balance_builder = Mock()
+    fixed_asset_schedule_builder = Mock()
+    fixed_asset_schedule_builder.build.return_value = Mock(
+        contexts={},
+        facts=(),
+        nil_facts=(),
+    )
 
     with (
         patch(
@@ -376,6 +382,11 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
             "TaxonomyMapper",
             return_value=taxonomy_mapper,
         ),
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "FixedAssetScheduleBuilder",
+            return_value=fixed_asset_schedule_builder,
+        ) as fixed_asset_schedule_builder_class,
         patch(
             "openbilanz.services.e_bilanz_service."
             "AccountBalanceBuilder",
@@ -471,6 +482,632 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
     account_balance_builder.build.assert_not_called()
 
     document_builder.build_xml.assert_called_once()
+
+def test_e_bilanz_service_integrates_bvv_for_hgbm(
+    monkeypatch,
+) -> None:
+    """HGBM integriert BVV mit den steuerlichen Buchwertdifferenzen."""
+
+    service = object.__new__(EBilanzService)
+
+    current_hgb_equity = Decimal("13535.02")
+
+    balance_sheet_values = {
+        ("bs.eqLiab.equity",): current_hgb_equity,
+    }
+
+    commercial_schedule = Mock(
+        contexts={"commercial": Mock()},
+        facts=(Mock(),),
+        nil_facts=(),
+    )
+
+    hgbm_schedule = Mock()
+
+    tax_reconciliation = Mock()
+
+    bvv_values = {
+        ("BVV.profitLoss",): Decimal("-250.00"),
+        (
+            "BVV.profitLoss.assetsCurrentYear",
+        ): Decimal("13701.68"),
+        (
+            "BVV.profitLoss.assetsPreviousYear",
+        ): Decimal("13951.68"),
+        (
+            "BVV.profitLoss.assetsPreviousYear",
+            "BVV.profitLoss.assetsPreviousYear.assets",
+        ): Decimal("13951.68"),
+        (
+            "BVV.profitLoss.assetsPreviousYear",
+            (
+                "BVV.profitLoss.assetsPreviousYear."
+                "capAdjustments"
+            ),
+        ): Decimal("0.00"),
+        (
+            "BVV.profitLoss.withdrawalDistrib",
+        ): Decimal("0.00"),
+        (
+            "BVV.profitLoss.contribution",
+        ): Decimal("0.00"),
+    }
+
+    hgbm_builder = Mock(
+        return_value=hgbm_schedule
+    )
+    reconciliation_builder = Mock(
+        return_value=tax_reconciliation
+    )
+    bvv_builder = Mock(
+        return_value=bvv_values
+    )
+
+    monkeypatch.setattr(
+        HgbmFixedAssetScheduleBuilder,
+        "build",
+        hgbm_builder,
+    )
+    monkeypatch.setattr(
+        TaxDepreciationReconciliationBuilder,
+        "build",
+        reconciliation_builder,
+    )
+    monkeypatch.setattr(
+        BvvValueBuilder,
+        "build",
+        bvv_builder,
+    )
+
+    current_depreciation_difference = Decimal("-83.33")
+    previous_depreciation_difference = Decimal("-83.33")
+
+    current_book_value_difference = (
+        -current_depreciation_difference
+    )
+    previous_book_value_difference = (
+        -previous_depreciation_difference
+    )
+
+    hgbm_result = HgbmFixedAssetScheduleBuilder.build(
+        commercial_contexts=commercial_schedule.contexts,
+        commercial_facts=commercial_schedule.facts,
+        commercial_nil_facts=commercial_schedule.nil_facts,
+        current_depreciation_difference=(
+            current_depreciation_difference
+        ),
+        previous_depreciation_difference=(
+            previous_depreciation_difference
+        ),
+    )
+
+    reconciliation_result = (
+        TaxDepreciationReconciliationBuilder.build(
+            current_book_value_difference=(
+                current_book_value_difference
+            ),
+            previous_book_value_difference=(
+                previous_book_value_difference
+            ),
+        )
+    )
+
+    result = BvvValueBuilder.build(
+        current_hgb_equity=(
+            balance_sheet_values[
+                ("bs.eqLiab.equity",)
+            ]
+        ),
+        previous_hgb_equity=Decimal("13868.35"),
+        current_book_value_difference=(
+            current_book_value_difference
+        ),
+        previous_book_value_difference=(
+            previous_book_value_difference
+        ),
+        contribution=Decimal("0.00"),
+        withdrawal_distribution=Decimal("0.00"),
+    )
+
+    assert hgbm_result is hgbm_schedule
+    assert reconciliation_result is tax_reconciliation
+    assert result == bvv_values
+
+    hgbm_builder.assert_called_once_with(
+        commercial_contexts=(
+            commercial_schedule.contexts
+        ),
+        commercial_facts=(
+            commercial_schedule.facts
+        ),
+        commercial_nil_facts=(
+            commercial_schedule.nil_facts
+        ),
+        current_depreciation_difference=(
+            Decimal("-83.33")
+        ),
+        previous_depreciation_difference=(
+            Decimal("-83.33")
+        ),
+    )
+
+    reconciliation_builder.assert_called_once_with(
+        current_book_value_difference=Decimal("83.33"),
+        previous_book_value_difference=Decimal("83.33"),
+    )
+
+    bvv_builder.assert_called_once_with(
+        current_hgb_equity=Decimal("13535.02"),
+        previous_hgb_equity=Decimal("13868.35"),
+        current_book_value_difference=Decimal("83.33"),
+        previous_book_value_difference=Decimal("83.33"),
+        contribution=Decimal("0.00"),
+        withdrawal_distribution=Decimal("0.00"),
+    )
+
+def test_e_bilanz_service_integrates_bvv_for_hgbm() -> None:
+    """HGBM aktiviert BVV und übernimmt die bestätigten BVV-Werte."""
+
+    fiscal_year = FiscalYear(
+        start_date=date(2026, 1, 1),
+        end_date=date(2026, 12, 31),
+    )
+
+    previous_fiscal_year = FiscalYear(
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    company = _company()
+
+    master_data = CompanyMasterData(
+        company=company,
+        legal_form="UG (haftungsbeschränkt)",
+        tax_number="123/4567/8901",
+        federal_state="NW",
+        tax_id="12345678901",
+        tax_economic_id="DE123456789",
+        bf4="1234",
+        street="Musterstraße",
+        house_number="1",
+        postal_code="50667",
+        city="Köln",
+        country="DE",
+        business="Softwareentwicklung",
+    )
+
+    vat_accounts = Mock(
+        spec=VatAccounts
+    )
+    vat_accounts.input_tax_7 = "1571"
+    vat_accounts.input_tax_19 = "1576"
+    vat_accounts.output_tax_7 = "1771"
+    vat_accounts.output_tax_19 = "1776"
+
+    account_roles = Mock(
+        spec=AccountingAccountRoles
+    )
+    account_roles.cash_accounts = frozenset(
+        {"1000"}
+    )
+    account_roles.bank_accounts = frozenset(
+        {"1200"}
+    )
+    account_roles.general_rate_sales_accounts = frozenset(
+        {"8400"}
+    )
+
+    gcd_path = Path("/tmp/gcd.xsd")
+    gaap_ci_path = Path("/tmp/gaap-ci.xsd")
+
+    resolver = FakeResolver(
+        gcd_path=gcd_path,
+        gaap_ci_path=gaap_ci_path,
+    )
+
+    gcd_model = Mock()
+    gcd_model.concepts.concepts = ()
+
+    gaap_ci_model = Mock()
+    gaap_ci_model.concepts.concepts = ()
+
+    adapter = FakeAdapter(
+        gcd_model=gcd_model,
+        gaap_ci_model=gaap_ci_model,
+    )
+
+    assets = Mock(
+        spec=FinancialStatementPosition
+    )
+    liabilities = Mock(
+        spec=FinancialStatementPosition
+    )
+    income_statement_root = Mock(
+        spec=FinancialStatementPosition
+    )
+
+    prepared_income_statement = Mock(
+        spec=IncomeStatement
+    )
+    prepared_income_statement.income_statement = (
+        income_statement_root
+    )
+
+    prepared_balance_sheet = Mock(
+        spec=BalanceSheet
+    )
+    prepared_balance_sheet.assets = assets
+    prepared_balance_sheet.liabilities = liabilities
+
+    gcd_entry_point = TaxonomyEntryPoint(
+        path=gcd_path,
+        namespace=(
+            "http://www.xbrl.de/taxonomies/"
+            "de-gcd-2025-04-01/shell"
+        ),
+        schema_imports=(),
+    )
+
+    gaap_ci_entry_point = TaxonomyEntryPoint(
+        path=gaap_ci_path,
+        namespace=(
+            "http://www.xbrl.de/taxonomies/"
+            "de-gaap-ci-2025-04-01/shell-fiscal"
+        ),
+        schema_imports=(),
+    )
+
+    service = EBilanzService(
+        resolver=resolver,  # type: ignore[arg-type]
+        adapter=adapter,  # type: ignore[arg-type]
+        company_data_mapper=GcdCompanyDataMapper(),
+        assets=assets,
+        liabilities=liabilities,
+        income_statement=income_statement_root,
+    )
+
+    profile = Mock()
+    profile.fact_plan = Mock()
+
+    concepts = Mock()
+
+    resolved_fact_plan = Mock()
+    resolved_fact_plan.nodes = ()
+
+    closing_service = Mock()
+    closing_service.calculate_net_income.return_value = (
+        Decimal("-333.33")
+    )
+
+    gaap_ci_values = Mock()
+
+    balance_sheet_values = {
+        (
+            "bs.eqLiab.equity",
+        ): Decimal("13535.02"),
+    }
+
+    income_statement_values = {}
+
+    account_detail_values = {}
+
+    commercial_schedule = Mock(
+        contexts={"commercial": Mock()},
+        facts=(Mock(),),
+        nil_facts=(),
+    )
+
+    hgbm_schedule = Mock(
+        contexts={"hgbm": Mock()},
+        facts=(Mock(),),
+        nil_facts=(),
+    )
+
+    tax_reconciliation = Mock()
+
+    bvv_values = {
+        (
+            "BVV.profitLoss",
+        ): Decimal("-250.00"),
+        (
+            "BVV.profitLoss.assetsCurrentYear",
+        ): Decimal("13701.68"),
+        (
+            "BVV.profitLoss.assetsPreviousYear",
+        ): Decimal("13951.68"),
+        (
+            "BVV.profitLoss.assetsPreviousYear",
+            "BVV.profitLoss.assetsPreviousYear.assets",
+        ): Decimal("13951.68"),
+        (
+            "BVV.profitLoss.assetsPreviousYear",
+            (
+                "BVV.profitLoss.assetsPreviousYear."
+                "capAdjustments"
+            ),
+        ): Decimal("0.00"),
+        (
+            "BVV.profitLoss.withdrawalDistrib",
+        ): Decimal("0.00"),
+        (
+            "BVV.profitLoss.contribution",
+        ): Decimal("0.00"),
+    }
+
+    fixed_asset_schedule_builder = Mock()
+    fixed_asset_schedule_builder.build.return_value = (
+        commercial_schedule
+    )
+
+    mandatory_completer = Mock()
+    mandatory_completer.build_missing_nil_facts.return_value = ()
+
+    requirement_reader = Mock()
+    requirement_reader.requirements.return_value = ()
+
+    document_builder = Mock()
+    document_builder.build_xml.return_value = "<xbrl />"
+
+    taxonomy_mapper = Mock()
+    account_balance_builder = Mock()
+    gcd_fact_builder = Mock()
+
+    fixed_asset_schedule = (Mock(),)
+
+    amounts: dict[
+        FinancialStatementPosition,
+        Decimal,
+    ] = {}
+
+    with (
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "TaxonomyEntryPoint.from_file",
+            side_effect=(
+                gcd_entry_point,
+                gaap_ci_entry_point,
+            ),
+        ),
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "TaxonomyConceptSet",
+            return_value=concepts,
+        ),
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "ClosingService",
+            return_value=closing_service,
+        ),
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "GaapCi69ValueCalculator.calculate",
+            return_value=gaap_ci_values,
+        ),
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "create_profile_6_9",
+            return_value=profile,
+        ),
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "GaapCi69BalanceSheetValueBuilder.build",
+            return_value=balance_sheet_values,
+        ),
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "GaapCi69IncomeStatementValueBuilder.build",
+            return_value=income_statement_values,
+        ),
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "GaapCi69AccountDetailValueBuilder.build",
+            return_value=account_detail_values,
+        ),
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "HgbmFixedAssetScheduleBuilder.build",
+            return_value=hgbm_schedule,
+        ) as hgbm_builder,
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "TaxDepreciationReconciliationBuilder.build",
+            return_value=tax_reconciliation,
+        ) as reconciliation_builder,
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "BvvValueBuilder.build",
+            return_value=bvv_values,
+        ) as bvv_builder,
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "Taxonomy69ValueBuilder.build",
+            return_value={},
+        ) as value_builder,
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "FactPlanResolver.resolve",
+            return_value=resolved_fact_plan,
+        ) as fact_plan_resolver,
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "FiscalRequirementReader",
+            return_value=requirement_reader,
+        ),
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "GaapCiMandatoryFactCompleter",
+            return_value=mandatory_completer,
+        ),
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "GcdFactBuilder",
+            return_value=gcd_fact_builder,
+        ),
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "create_hgb_gaap_ci_mapping",
+            return_value=Mock(),
+        ),
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "TaxonomyMapper",
+            return_value=taxonomy_mapper,
+        ),
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "FixedAssetScheduleBuilder",
+            return_value=fixed_asset_schedule_builder,
+        ),
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "AccountBalanceBuilder",
+            return_value=account_balance_builder,
+        ),
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "Taxonomy69XbrlDocumentBuilder",
+            return_value=document_builder,
+        ),
+    ):
+        document = service.build(
+            master_data=master_data,
+            fiscal_year=fiscal_year,
+            previous_fiscal_year=previous_fiscal_year,
+            amounts=amounts,
+            income_statement=prepared_income_statement,
+            balance_sheet=prepared_balance_sheet,
+            vat_accounts=vat_accounts,
+            account_roles=account_roles,
+            entity_identifier="1234567890123",
+            entity_scheme=(
+                "http://www.rzf-nrw.de/Steuernummer"
+            ),
+            fixed_asset_schedule=fixed_asset_schedule,
+            current_depreciation_difference=(
+                Decimal("-83.33")
+            ),
+            previous_depreciation_difference=(
+                Decimal("-83.33")
+            ),
+            previous_hgb_equity=Decimal("13868.35"),
+            contribution=Decimal("0.00"),
+            withdrawal_distribution=Decimal("0.00"),
+        )
+
+    assert document.xml == "<xbrl />"
+
+    hgbm_builder.assert_called_once_with(
+        commercial_contexts=(
+            commercial_schedule.contexts
+        ),
+        commercial_facts=(
+            commercial_schedule.facts
+        ),
+        commercial_nil_facts=(
+            commercial_schedule.nil_facts
+        ),
+        current_depreciation_difference=(
+            Decimal("-83.33")
+        ),
+        previous_depreciation_difference=(
+            Decimal("-83.33")
+        ),
+    )
+
+    reconciliation_builder.assert_called_once_with(
+        current_book_value_difference=(
+            Decimal("83.33")
+        ),
+        previous_book_value_difference=(
+            Decimal("83.33")
+        ),
+    )
+
+    bvv_builder.assert_called_once_with(
+        current_hgb_equity=Decimal("13535.02"),
+        previous_hgb_equity=Decimal("13868.35"),
+        current_book_value_difference=(
+            Decimal("83.33")
+        ),
+        previous_book_value_difference=(
+            Decimal("83.33")
+        ),
+        contribution=Decimal("0.00"),
+        withdrawal_distribution=Decimal("0.00"),
+    )
+
+    value_builder_kwargs = (
+        value_builder.call_args.kwargs
+    )
+
+    report_profile = (
+        value_builder_kwargs["report_profile"]
+    )
+
+    assert (
+        "genInfo.report.id.reportElement."
+        "reportElements.BVV"
+        in report_profile.report_elements
+    )
+
+    assert (
+        "genInfo.report.id.reportElement."
+        "reportElements.STU"
+        in report_profile.report_elements
+    )
+
+    fact_plan_values = (
+        fact_plan_resolver.call_args.kwargs[
+            "values"
+        ]
+    )
+
+    assert (
+        fact_plan_values[
+            ("BVV.profitLoss",)
+        ]
+        == Decimal("-250.00")
+    )
+
+    assert (
+        fact_plan_values[
+            (
+                "BVV.profitLoss."
+                "assetsCurrentYear",
+            )
+        ]
+        == Decimal("13701.68")
+    )
+
+    assert (
+        fact_plan_values[
+            (
+                "BVV.profitLoss."
+                "assetsPreviousYear",
+            )
+        ]
+        == Decimal("13951.68")
+    )
+
+    assert (
+        fact_plan_values[
+            (
+                "BVV.profitLoss."
+                "withdrawalDistrib",
+            )
+        ]
+        == Decimal("0.00")
+    )
+
+    assert (
+        fact_plan_values[
+            (
+                "BVV.profitLoss."
+                "contribution",
+            )
+        ]
+        == Decimal("0.00")
+    )
 
 def test_e_bilanz_service_validates_document_with_relative_schema_refs(
     tmp_path: Path,

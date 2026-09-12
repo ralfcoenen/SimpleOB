@@ -8,6 +8,7 @@ from openbilanz.domain.account_type import AccountType
 from openbilanz.domain.booking import Booking
 from openbilanz.domain.booking_line import BookingLine
 from openbilanz.domain.entry_side import EntrySide
+from openbilanz.domain.booking_type import BookingType
 
 
 class FiscalYearTransferService:
@@ -126,6 +127,7 @@ class FiscalYearTransferService:
                     "Saldovortrag Konto "
                     f"{source_account_number}"
                 ),
+                booking_type=BookingType.OPENING,
                 lines=(
                     BookingLine(
                         account_number=target_account_number,
@@ -150,6 +152,7 @@ class FiscalYearTransferService:
                     "Saldovortrag Konto "
                     f"{source_account_number}"
                 ),
+                booking_type=BookingType.OPENING,
                 lines=(
                     BookingLine(
                         account_number=(

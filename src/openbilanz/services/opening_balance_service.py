@@ -7,6 +7,7 @@ from openbilanz.domain.booking import Booking
 from openbilanz.domain.booking_line import BookingLine
 from openbilanz.domain.entry_side import EntrySide
 from openbilanz.domain.opening_balance import OpeningBalance
+from openbilanz.domain.booking_type import BookingType
 
 
 class OpeningBalanceService:
@@ -33,9 +34,9 @@ class OpeningBalanceService:
             raise ValueError(
                 "Die Eröffnungsbilanz muss ausgeglichen sein."
             )
-            
+
         bookings: list[Booking] = []
-            
+
         for item in opening_balance.items:
             if item.account.account_type is AccountType.ASSET:
                 debit_account = item.account.number
@@ -49,6 +50,7 @@ class OpeningBalanceService:
                 Booking(
                     booking_date=booking_date,
                     description="Eröffnungsbuchung",
+                    booking_type=BookingType.OPENING,
                     lines=(
                         BookingLine(
                             account_number=debit_account,

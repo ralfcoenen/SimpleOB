@@ -12,11 +12,23 @@ from openbilanz.eric.bilanz_generation.tax_reconciliation import (
 
 
 class TaxDepreciationReconciliationBuilder:
-    """Erzeugt die bestätigte HGBM-Überleitung einer AfA-Wertänderung.
+    """Erzeugt die ERiC-bestätigte HGBM-Überleitung einer AfA-Differenz.
 
-    Der Builder berechnet keine steuerlich zulässige AfA. Er erhält nur
-    die bereits fachlich bestimmte zusätzliche steuerliche AfA und bildet
-    daraus die für Taxonomie 6.9 bestätigte Überleitungsstruktur.
+    Der Builder berechnet keine steuerlich zulässige AfA.
+
+    Er erhält ausschließlich die bereits fachlich ermittelten
+    Buchwertdifferenzen zwischen Steuerbilanz und Handelsbilanz:
+
+    current_book_value_difference
+        Steuerlicher Buchwert minus HGB-Buchwert aus dem laufenden
+        Geschäftsjahr.
+
+    previous_book_value_difference
+        Steuerlicher Buchwert minus HGB-Buchwert, der bereits zu Beginn
+        des Geschäftsjahres aus Vorjahren bestand.
+
+    Die erzeugte Struktur entspricht den real mit ERiC bestätigten
+    Taxonomie-6.9-Fällen für Erstjahr und Folgejahr.
     """
 
     _ASSET_CONCEPTS = (
@@ -25,12 +37,6 @@ class TaxDepreciationReconciliationBuilder:
         "bs.ass.fixAss.tan",
         "bs.ass.fixAss",
         "bs.ass",
-    )
-
-    _EQUITY_LIABILITY_CONCEPTS = (
-        "bs.eqLiab.equity.netIncome",
-        "bs.eqLiab.equity",
-        "bs.eqLiab",
     )
 
     _DEPRECIATION_EXPENSE_CONCEPTS = (
@@ -62,49 +68,81 @@ class TaxDepreciationReconciliationBuilder:
     def build(
         cls,
         *,
-        additional_tax_depreciation: Decimal,
+        current_book_value_difference: Decimal,
+        previous_book_value_difference: Decimal = Decimal("0.00"),
     ) -> TaxReconciliationTransfer:
-        """Erzeugt die Überleitung für zusätzliche steuerliche AfA."""
+        """Erzeugt die bestätigte HGBM-AfA-Überleitungsstruktur."""
 
         if not isinstance(
-            additional_tax_depreciation,
+            current_book_value_difference,
             Decimal,
         ):
             raise TypeError(
-                "additional_tax_depreciation must be a Decimal"
+                "current_book_value_difference must be a Decimal"
             )
 
-        if additional_tax_depreciation <= Decimal("0"):
-            raise ValueError(
-                "additional_tax_depreciation must be greater than zero"
+        if not isinstance(
+            previous_book_value_difference,
+            Decimal,
+        ):
+            raise TypeError(
+                "previous_book_value_difference must be a Decimal"
             )
 
-        amount = additional_tax_depreciation.quantize(
+        current_difference = current_book_value_difference.quantize(
             Decimal("0.01")
         )
-        negative_amount = -amount
+        previous_difference = previous_book_value_difference.quantize(
+            Decimal("0.01")
+        )
+
+        if (
+            current_difference == Decimal("0.00")
+            and previous_difference == Decimal("0.00")
+        ):
+            raise ValueError(
+                "at least one book value difference must be non-zero"
+            )
+
+        zero = Decimal("0.00")
 
         return TaxReconciliationTransfer(
             kind=TaxReconciliationKind.CHANGE_VALUE,
             asset_changes=tuple(
                 TaxReconciliationChange(
                     concept_name=concept_name,
-                    actual_period=negative_amount,
+                    actual_period=current_difference,
+                    previous_period=previous_difference,
                 )
                 for concept_name in cls._ASSET_CONCEPTS
             ),
-            equity_liability_changes=tuple(
+            equity_liability_changes=(
                 TaxReconciliationChange(
-                    concept_name=concept_name,
-                    actual_period=negative_amount,
-                )
-                for concept_name in cls._EQUITY_LIABILITY_CONCEPTS
+                    concept_name="bs.eqLiab.equity.netIncome",
+                    actual_period=current_difference,
+                    previous_period=zero,
+                ),
+                TaxReconciliationChange(
+                    concept_name="bs.eqLiab.equity.retainedEarnings",
+                    actual_period=zero,
+                    previous_period=previous_difference,
+                ),
+                TaxReconciliationChange(
+                    concept_name="bs.eqLiab.equity",
+                    actual_period=current_difference,
+                    previous_period=previous_difference,
+                ),
+                TaxReconciliationChange(
+                    concept_name="bs.eqLiab",
+                    actual_period=current_difference,
+                    previous_period=previous_difference,
+                ),
             ),
             income_statement_changes=(
                 *(
                     TaxReconciliationChange(
                         concept_name=concept_name,
-                        actual_period=amount,
+                        actual_period=-current_difference,
                     )
                     for concept_name in (
                         cls._DEPRECIATION_EXPENSE_CONCEPTS
@@ -113,7 +151,7 @@ class TaxDepreciationReconciliationBuilder:
                 *(
                     TaxReconciliationChange(
                         concept_name=concept_name,
-                        actual_period=negative_amount,
+                        actual_period=current_difference,
                     )
                     for concept_name in cls._RESULT_CONCEPTS
                 ),

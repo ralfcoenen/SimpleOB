@@ -49,7 +49,6 @@ def test_build_element_without_tax_reconciliation_is_unchanged() -> None:
         f"{{{GAAP_CI_69_NAMESPACE}}}hbst.transfer"
     ) is None
 
-
 def test_build_element_appends_tax_reconciliation() -> None:
     builder = Taxonomy69XbrlDocumentBuilder()
 
@@ -71,17 +70,21 @@ def test_build_element_appends_tax_reconciliation() -> None:
     assert transfer is not None
 
     kind = transfer.find(
+        f"{{{GAAP_CI_69_NAMESPACE}}}hbst.transfer.kind"
+    )
+    assert kind is not None
+
+    kind_value = kind.find(
         (
             f"{{{GAAP_CI_69_NAMESPACE}}}"
             "hbst.transfer.kind.changeValue"
         )
     )
-    assert kind is not None
-    assert kind.attrib == {
+    assert kind_value is not None
+    assert kind_value.attrib == {
         "contextRef": "D-2026",
     }
-    assert kind.text == "true"
-
+    assert kind_value.text == "true"
 
 def test_tax_reconciliation_requires_context_and_unit_ids() -> None:
     builder = Taxonomy69XbrlDocumentBuilder()

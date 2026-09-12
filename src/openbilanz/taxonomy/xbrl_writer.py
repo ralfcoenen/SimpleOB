@@ -684,6 +684,28 @@ class TaxonomyXbrlWriter:
 
             if isinstance(
                 fact,
+                TaxonomyNilFact,
+            ):
+                unit_id = None
+
+                if fact.unit is not None:
+                    unit_id = self.unit_id_for(
+                        unit=fact.unit,
+                        units=units,
+                    )
+
+                root.append(
+                    self.nil_fact_element(
+                        fact=fact,
+                        context_id=context_id,
+                        unit_id=unit_id,
+                        namespace=namespace,
+                    )
+                )
+                continue
+
+            if isinstance(
+                fact,
                 TaxonomyTextFact,
             ):
                 gcd_report_id_tuple_names = (

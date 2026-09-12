@@ -149,6 +149,14 @@ class ReportingService:
             if booking.booking_type is BookingType.CLOSING:
                 continue
 
+            is_legacy_opening_booking = (
+                booking.booking_date == start_date
+                and any(
+                    line.account_number == opening_account
+                    for line in booking.lines
+                )
+            )
+
             for line in booking.lines:
                 account_number = line.account_number
 
@@ -159,6 +167,7 @@ class ReportingService:
                 if (
                     booking.booking_type is BookingType.OPENING
                     or booking.booking_date < start_date
+                    or is_legacy_opening_booking
                 ):
                     account_numbers.add(account_number)
 

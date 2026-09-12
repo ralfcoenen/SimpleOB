@@ -33,6 +33,9 @@ from openbilanz.database.shareholder_repository import (
 from openbilanz.database.tax_depreciation_adjustment_repository import (
     TaxDepreciationAdjustmentRepository,
 )
+from openbilanz.database.bvv_annual_data_repository import (
+    BvvAnnualDataRepository,
+)
 from openbilanz.domain.account import Account
 from openbilanz.domain.account_mapping_rule import (
     AccountMappingRule,
@@ -80,6 +83,9 @@ from openbilanz.domain.tax_depreciation_adjustment import (
     TaxDepreciationAdjustment,
 )
 from openbilanz.domain.vat_accounts import VatAccounts
+from openbilanz.domain.bvv_annual_data import (
+    BvvAnnualData,
+)
 from openbilanz.reporting.account_activity_report import (
     AccountActivityReport,
 )
@@ -140,6 +146,9 @@ class FiscalYearWorkspace:
         context: ApplicationContext,
         booking_repository: BookingRepository,
         company_repository: CompanyRepository,
+        bvv_annual_data_repository: (
+            BvvAnnualDataRepository | None
+        ) = None,
         shareholder_repository: ShareholderRepository | None = None,
         chart_of_accounts_repository: ChartOfAccountsRepository | None = None,
         posting_service: PostingService,
@@ -172,6 +181,9 @@ class FiscalYearWorkspace:
         self._context = context
         self._booking_repository = booking_repository
         self._company_repository = company_repository
+        self._bvv_annual_data_repository = (
+            bvv_annual_data_repository
+        )
         self._shareholder_repository = (
             shareholder_repository
         )
@@ -1216,10 +1228,22 @@ class FiscalYearWorkspace:
             )
         )
 
-    def tax_depreciation_difference_for_bga(
+    def tax_depreciation_differences_for_bga(
         self,
-    ) -> Decimal:
-        """Summiert steuerliche AfA-Abweichungen für BGA im Geschäftsjahr."""
+    ) -> tuple[Decimal, Decimal]:
+        """
+        Ermittelt steuerliche AfA-Abweichungen für BGA.
+
+        Der erste Rückgabewert enthält die AfA-Differenz des
+        geöffneten Geschäftsjahres.
+
+        Der zweite Rückgabewert enthält die kumulierte AfA-Differenz
+        aller vorherigen Geschäftsjahre.
+
+        Die AfA-Differenz ist definiert als:
+
+            steuerliche AfA - handelsrechtliche AfA
+        """
 
         if (
             self._fixed_asset_repository is None
@@ -1238,31 +1262,72 @@ class FiscalYearWorkspace:
             self._context.company.company_id
         )
 
-        bga_asset_ids = {
-            asset.fixed_asset_id
-            for asset in assets
-            if asset.position_code == "HGB.266.AKTIVA.A.II.3"
-        }
+        current_difference = Decimal("0.00")
+        previous_difference = Decimal("0.00")
 
-        difference = Decimal("0.00")
+        current_fiscal_year_end = (
+            self._context.fiscal_year.end_date
+        )
 
-        for depreciation in self.list_confirmed_depreciations():
-            if depreciation.fixed_asset_id not in bga_asset_ids:
+        for asset in assets:
+            if (
+                asset.position_code
+                != "HGB.266.AKTIVA.A.II.3"
+            ):
                 continue
 
-            adjustment = (
-                self._tax_depreciation_adjustment_repository
-                .get_for_depreciation(
-                    depreciation.depreciation_id
+            depreciations = (
+                self._fixed_asset_depreciation_repository
+                .list_for_fixed_asset(
+                    asset.fixed_asset_id
                 )
             )
 
-            if adjustment is None:
-                continue
+            for depreciation in depreciations:
+                if (
+                    depreciation.fiscal_year_end
+                    > current_fiscal_year_end
+                ):
+                    continue
 
-            difference += adjustment.difference
+                adjustment = (
+                    self._tax_depreciation_adjustment_repository
+                    .get_for_depreciation(
+                        depreciation.depreciation_id
+                    )
+                )
 
-        return difference
+                if adjustment is None:
+                    continue
+
+                if (
+                    depreciation.fiscal_year_end
+                    == current_fiscal_year_end
+                ):
+                    current_difference += (
+                        adjustment.difference
+                    )
+                else:
+                    previous_difference += (
+                        adjustment.difference
+                    )
+
+        return (
+            current_difference,
+            previous_difference,
+        )
+
+    def tax_depreciation_difference_for_bga(
+        self,
+    ) -> Decimal:
+        """Summiert steuerliche AfA-Abweichungen für BGA im Geschäftsjahr."""
+
+        (
+            current_difference,
+            _previous_difference,
+        ) = self.tax_depreciation_differences_for_bga()
+
+        return current_difference
 
     def save_tax_depreciation_adjustment(
         self,
@@ -1453,10 +1518,161 @@ class FiscalYearWorkspace:
             closed_ledger=self._ledger,
         )
 
+    def load_bvv_annual_data(
+        self,
+    ) -> BvvAnnualData | None:
+        """Lädt die BVV-Jahresdaten des geöffneten Geschäftsjahres."""
+
+        if self._bvv_annual_data_repository is None:
+            raise RuntimeError(
+                "Die BVV-Jahresdatenverwaltung ist nicht konfiguriert."
+            )
+
+        return (
+            self._bvv_annual_data_repository
+            .get_for_fiscal_year(
+                company_id=(
+                    self._context.company.company_id
+                ),
+                fiscal_year=(
+                    self._context.fiscal_year
+                ),
+            )
+        )
+
+
+    def save_bvv_annual_data(
+        self,
+        data: BvvAnnualData,
+    ) -> None:
+        """Speichert die BVV-Jahresdaten des geöffneten Geschäftsjahres."""
+
+        if self._bvv_annual_data_repository is None:
+            raise RuntimeError(
+                "Die BVV-Jahresdatenverwaltung ist nicht konfiguriert."
+            )
+
+        self._bvv_annual_data_repository.save_for_fiscal_year(
+            company_id=(
+                self._context.company.company_id
+            ),
+            fiscal_year=(
+                self._context.fiscal_year
+            ),
+            data=data,
+        )
+
+
+    def effective_previous_hgb_equity(
+        self,
+        *,
+        chart_of_accounts: ChartOfAccountsTemplate,
+    ) -> Decimal | None:
+        """Ermittelt das für BVV maßgebliche HGB-Vorjahreseigenkapital."""
+
+        annual_data = self.load_bvv_annual_data()
+
+        if (
+            annual_data is not None
+            and annual_data.previous_hgb_equity
+            is not None
+        ):
+            return annual_data.previous_hgb_equity
+
+        managed_fiscal_years = (
+            self._company_repository
+            .get_managed_fiscal_years(
+                self._context.company.company_id
+            )
+        )
+
+        current_managed_fiscal_year = next(
+            (
+                managed_fiscal_year
+                for managed_fiscal_year
+                in managed_fiscal_years
+                if (
+                    managed_fiscal_year.fiscal_year
+                    == self._context.fiscal_year
+                )
+            ),
+            None,
+        )
+
+        if (
+            current_managed_fiscal_year is None
+            or current_managed_fiscal_year.opening_source
+            is None
+        ):
+            return None
+
+        return self.opening_hgb_equity(
+            chart_of_accounts=chart_of_accounts,
+        )
+
+    def opening_hgb_equity(
+        self,
+        *,
+        chart_of_accounts: ChartOfAccountsTemplate,
+    ) -> Decimal:
+        """Ermittelt das HGB-Eigenkapital zu Beginn des Geschäftsjahres."""
+
+        control_accounts, _, _ = self.load_account_configuration()
+
+        report = self.build_trial_balance_report(
+            start_date=self._context.fiscal_year.start_date,
+            end_date=self._context.fiscal_year.end_date,
+            opening_balance_account_number=(
+                control_accounts.opening_balance_account
+            ),
+        )
+
+        mapping_rules = {
+            rule.account_number: rule
+            for rule in chart_of_accounts.account_mapping_rules
+        }
+
+        opening_equity = Decimal("0.00")
+
+        for row in report.rows:
+            opening_balance = (
+                row.opening_credit
+                - row.opening_debit
+            )
+
+            if opening_balance == Decimal("0.00"):
+                continue
+
+            mapping_rule = mapping_rules.get(
+                row.account_number
+            )
+
+            if mapping_rule is None:
+                continue
+
+            position = (
+                mapping_rule.credit_position
+                if opening_balance > Decimal("0.00")
+                else mapping_rule.debit_position
+            )
+
+            if position is None:
+                continue
+
+            if not position.code.startswith(
+                "HGB.266.PASSIVA.A"
+            ):
+                continue
+
+            opening_equity += opening_balance
+
+        return opening_equity
+
     def build_e_bilanz(
         self,
         *,
         preparation: EBilanzPreparationResult,
+        chart_of_accounts: ChartOfAccountsTemplate,
     ) -> EBilanzDocument:
         """Erzeugt die E-Bilanz des geöffneten Geschäftsjahres."""
 
@@ -1496,6 +1712,61 @@ class FiscalYearWorkspace:
                 )
             )
 
+        current_depreciation_difference = Decimal("0.00")
+        previous_depreciation_difference = Decimal("0.00")
+
+        if (
+            self._fixed_asset_repository is not None
+            and self._fixed_asset_depreciation_repository is not None
+            and self._tax_depreciation_adjustment_repository is not None
+        ):
+            (
+                current_depreciation_difference,
+                previous_depreciation_difference,
+            ) = self.tax_depreciation_differences_for_bga()
+
+        previous_hgb_equity: Decimal | None = None
+        contribution = Decimal("0.00")
+        withdrawal_distribution = Decimal("0.00")
+
+        hgbm_required = (
+            bool(fixed_asset_schedule)
+            and (
+                current_depreciation_difference
+                != Decimal("0.00")
+                or previous_depreciation_difference
+                != Decimal("0.00")
+            )
+        )
+
+        if hgbm_required:
+            bvv_annual_data = self.load_bvv_annual_data()
+
+            if bvv_annual_data is None:
+                raise ValueError(
+                    "Für den Betriebsvermögensvergleich "
+                    "fehlen die BVV-Jahresdaten."
+                )
+
+            previous_hgb_equity = (
+                self.effective_previous_hgb_equity(
+                    chart_of_accounts=chart_of_accounts,
+                )
+            )
+
+            if previous_hgb_equity is None:
+                raise ValueError(
+                    "Für den Betriebsvermögensvergleich "
+                    "fehlt das HGB-Vorjahreseigenkapital."
+                )
+
+            contribution = (
+                bvv_annual_data.contribution
+            )
+            withdrawal_distribution = (
+                bvv_annual_data.withdrawal_distribution
+            )
+
         shareholders = ()
 
         if self._shareholder_repository is not None:
@@ -1519,6 +1790,19 @@ class FiscalYearWorkspace:
             account_details=account_details,
             fixed_asset_schedule=fixed_asset_schedule,
             shareholders=shareholders,
+            current_depreciation_difference=(
+                current_depreciation_difference
+            ),
+            previous_depreciation_difference=(
+                previous_depreciation_difference
+            ),
+                        previous_hgb_equity=(
+                previous_hgb_equity
+            ),
+            contribution=contribution,
+            withdrawal_distribution=(
+                withdrawal_distribution
+            ),
         )
 
         self._validated_e_bilanz_document = None

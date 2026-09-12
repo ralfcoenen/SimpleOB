@@ -66,6 +66,7 @@ def _conditional_changes(
     )
 
 
+
 ERIC_REQUIRED_BALANCE_SHEET_CONCEPTS = (
     "bs.ass.prepaidExp",
     "bs.eqLiab.equity.capRes",

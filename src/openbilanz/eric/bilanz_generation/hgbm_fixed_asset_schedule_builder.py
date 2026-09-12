@@ -25,29 +25,26 @@ class HgbmFixedAssetScheduleXbrl:
 class HgbmFixedAssetScheduleBuilder:
     """Erzeugt diffComToTaxBal und taxBal aus einem comBal-Anlagenspiegel.
 
-    Unterstützt wird ausschließlich der durch den praktischen ERiC-v10-Test
-    bestätigte Fall einer zusätzlichen steuerlichen AfA auf den vorhandenen
-    BGA-Anlagenspiegel.
+    Der Builder berechnet keine steuerliche AfA.
+
+    Er erhält ausschließlich die bereits fachlich ermittelten
+    AfA-Differenzen zwischen Steuerbilanz und Handelsbilanz:
+
+    current_depreciation_difference
+        Steuerliche AfA minus HGB-AfA des laufenden Geschäftsjahres.
+
+    previous_depreciation_difference
+        Kumulierte steuerliche AfA minus kumulierte HGB-AfA,
+        die bereits zu Beginn des Geschäftsjahres aus Vorjahren bestand.
+
+    Daraus werden die real mit ERiC bestätigten Taxonomie-6.9-
+    Differenzwerte für Erstjahr und Folgejahr erzeugt.
     """
 
     _TAX_TRANS_DIMENSION = "de-gaap-ci:dim_taxTrans"
     _COMMERCIAL_MEMBER = "de-gaap-ci:dim_comBal"
     _DIFFERENCE_MEMBER = "de-gaap-ci:dim_diffComToTaxBal"
     _TAX_MEMBER = "de-gaap-ci:dim_taxBal"
-
-    _POSITIVE_DIFFERENCE_FACTS = frozenset(
-        {
-            "accDepr.DeprPeriod.regular",
-            "accDepr.DeprPeriod",
-            "accDepr",
-        }
-    )
-
-    _NEGATIVE_DIFFERENCE_FACTS = frozenset(
-        {
-            "all",
-        }
-    )
 
     @classmethod
     def build(
@@ -56,7 +53,8 @@ class HgbmFixedAssetScheduleBuilder:
         commercial_contexts: dict[str, TaxonomyContext],
         commercial_facts: tuple[TaxonomyFact, ...],
         commercial_nil_facts: tuple[TaxonomyNilFact, ...],
-        additional_tax_depreciation: Decimal,
+        current_depreciation_difference: Decimal,
+        previous_depreciation_difference: Decimal = Decimal("0.00"),
     ) -> HgbmFixedAssetScheduleXbrl:
         """Erzeugt die zusätzlichen HGBM-Dimensionen."""
 
@@ -91,19 +89,36 @@ class HgbmFixedAssetScheduleBuilder:
                 "commercial_nil_facts must contain only TaxonomyNilFact"
             )
 
-        if not isinstance(additional_tax_depreciation, Decimal):
+        if not isinstance(
+            current_depreciation_difference,
+            Decimal,
+        ):
             raise TypeError(
-                "additional_tax_depreciation must be a Decimal"
+                "current_depreciation_difference must be a Decimal"
             )
 
-        if additional_tax_depreciation <= Decimal("0"):
-            raise ValueError(
-                "additional_tax_depreciation must be greater than zero"
+        if not isinstance(
+            previous_depreciation_difference,
+            Decimal,
+        ):
+            raise TypeError(
+                "previous_depreciation_difference must be a Decimal"
             )
 
-        amount = additional_tax_depreciation.quantize(
+        current_difference = current_depreciation_difference.quantize(
             Decimal("0.01")
         )
+        previous_difference = previous_depreciation_difference.quantize(
+            Decimal("0.01")
+        )
+
+        if (
+            current_difference == Decimal("0.00")
+            and previous_difference == Decimal("0.00")
+        ):
+            raise ValueError(
+                "at least one depreciation difference must be non-zero"
+            )
 
         difference_context_by_commercial: dict[
             TaxonomyContext,
@@ -174,7 +189,12 @@ class HgbmFixedAssetScheduleBuilder:
 
             difference = cls._difference_for_concept(
                 concept_name=commercial_fact.concept.name,
-                additional_tax_depreciation=amount,
+                current_depreciation_difference=(
+                    current_difference
+                ),
+                previous_depreciation_difference=(
+                    previous_difference
+                ),
             )
 
             facts.append(
@@ -238,18 +258,32 @@ class HgbmFixedAssetScheduleBuilder:
             nil_facts=tuple(nil_facts),
         )
 
-    @classmethod
+    @staticmethod
     def _difference_for_concept(
-        cls,
         *,
         concept_name: str,
-        additional_tax_depreciation: Decimal,
+        current_depreciation_difference: Decimal,
+        previous_depreciation_difference: Decimal,
     ) -> Decimal:
-        if concept_name in cls._POSITIVE_DIFFERENCE_FACTS:
-            return additional_tax_depreciation
+        cumulative_depreciation_difference = (
+            previous_depreciation_difference
+            + current_depreciation_difference
+        )
 
-        if concept_name in cls._NEGATIVE_DIFFERENCE_FACTS:
-            return -additional_tax_depreciation
+        if concept_name == "accDepr.beginning":
+            return previous_depreciation_difference
+
+        if concept_name in {
+            "accDepr.DeprPeriod.regular",
+            "accDepr.DeprPeriod",
+        }:
+            return current_depreciation_difference
+
+        if concept_name == "accDepr":
+            return cumulative_depreciation_difference
+
+        if concept_name == "all":
+            return -cumulative_depreciation_difference
 
         return Decimal("0.00")
 

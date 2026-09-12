@@ -46,6 +46,15 @@ from openbilanz.eric.bilanz_generation.taxonomy_6_9_values import (
 from openbilanz.eric.bilanz_generation.taxonomy_6_9_xbrl_document_builder import (
     Taxonomy69XbrlDocumentBuilder,
 )
+from openbilanz.eric.bilanz_generation.hgbm_fixed_asset_schedule_builder import (
+    HgbmFixedAssetScheduleBuilder,
+)
+from openbilanz.eric.bilanz_generation.tax_depreciation_reconciliation_builder import (
+    TaxDepreciationReconciliationBuilder,
+)
+from openbilanz.eric.bilanz_generation.bvv_value_builder import (
+    BvvValueBuilder,
+)
 from openbilanz.services.closing_service import ClosingService
 from openbilanz.services.fixed_asset_schedule_service import (
     FixedAssetSchedulePosition,
@@ -61,6 +70,9 @@ from openbilanz.taxonomy.context import TaxonomyContext
 from openbilanz.taxonomy.e_bilanz_builder import EBilanzDocument
 from openbilanz.taxonomy.entry_point import (
     TaxonomyEntryPoint,
+)
+from openbilanz.taxonomy.fixed_asset_schedule_builder import (
+    FixedAssetScheduleBuilder,
 )
 from openbilanz.taxonomy.fact import TaxonomyFact
 from openbilanz.taxonomy.fiscal_requirement_reader import (
@@ -148,6 +160,11 @@ class EBilanzService:
             Shareholder,
             ...
         ] = (),
+        current_depreciation_difference: Decimal = Decimal("0.00"),
+        previous_depreciation_difference: Decimal = Decimal("0.00"),
+        previous_hgb_equity: Decimal | None = None,
+        contribution: Decimal = Decimal("0.00"),
+        withdrawal_distribution: Decimal = Decimal("0.00"),
     ) -> EBilanzDocument:
         """Erzeugt die E-Bilanz-XBRL-Instanz über den Taxonomie-6.9-FactPlan."""
 
@@ -275,6 +292,135 @@ class EBilanzService:
             )
         )
 
+        taxonomy_mapper = TaxonomyMapper(
+            create_hgb_gaap_ci_mapping(
+                assets=self._assets,
+                liabilities=self._liabilities,
+                income_statement=self._income_statement,
+            ),
+            gaap_ci_model,
+        )
+
+        fixed_asset_schedule_xbrl = (
+            FixedAssetScheduleBuilder(
+                taxonomy_model=gaap_ci_model,
+                taxonomy_mapper=taxonomy_mapper,
+            ).build(
+                positions=fixed_asset_schedule,
+                entity_identifier=entity_identifier,
+                entity_scheme=entity_scheme,
+                fiscal_year_start=fiscal_year.start_date,
+                fiscal_year_end=fiscal_year.end_date,
+            )
+        )
+
+        if fixed_asset_schedule_xbrl.facts:
+            report_profile = replace(
+                report_profile,
+                report_elements=(
+                    *report_profile.report_elements,
+                    (
+                        "genInfo.report.id.reportElement."
+                        "reportElements.BAL"
+                    ),
+                ),
+            )
+
+        hgbm_fixed_asset_schedule_xbrl = None
+        tax_reconciliation = None
+        bvv_values = {}
+
+        if (
+            fixed_asset_schedule_xbrl.facts
+            and (
+                current_depreciation_difference != Decimal("0.00")
+                or previous_depreciation_difference != Decimal("0.00")
+            )
+        ):
+            hgbm_fixed_asset_schedule_xbrl = (
+                HgbmFixedAssetScheduleBuilder.build(
+                    commercial_contexts=(
+                        fixed_asset_schedule_xbrl.contexts
+                    ),
+                    commercial_facts=(
+                        fixed_asset_schedule_xbrl.facts
+                    ),
+                    commercial_nil_facts=(
+                        fixed_asset_schedule_xbrl.nil_facts
+                    ),
+                    current_depreciation_difference=(
+                        current_depreciation_difference
+                    ),
+                    previous_depreciation_difference=(
+                        previous_depreciation_difference
+                    ),
+                )
+            )
+
+            current_book_value_difference = (
+                -current_depreciation_difference
+            )
+            previous_book_value_difference = (
+                -previous_depreciation_difference
+            )
+
+            tax_reconciliation = (
+                TaxDepreciationReconciliationBuilder.build(
+                    current_book_value_difference=(
+                        current_book_value_difference
+                    ),
+                    previous_book_value_difference=(
+                        previous_book_value_difference
+                    ),
+                )
+            )
+
+            if previous_hgb_equity is None:
+                raise ValueError(
+                    "Für den Betriebsvermögensvergleich fehlt "
+                    "das HGB-Vorjahreseigenkapital."
+                )
+
+            current_hgb_equity = (
+                balance_sheet_values.get(
+                    ("bs.eqLiab.equity",)
+                )
+            )
+
+            if current_hgb_equity is None:
+                raise ValueError(
+                    "Für den Betriebsvermögensvergleich fehlt "
+                    "das aktuelle HGB-Eigenkapital."
+                )
+
+            bvv_values = BvvValueBuilder.build(
+                current_hgb_equity=current_hgb_equity,
+                previous_hgb_equity=previous_hgb_equity,
+                current_book_value_difference=(
+                    current_book_value_difference
+                ),
+                previous_book_value_difference=(
+                    previous_book_value_difference
+                ),
+                contribution=contribution,
+                withdrawal_distribution=(
+                    withdrawal_distribution
+                ),
+            )
+
+            report_profile = (
+                report_profile.with_report_element(
+                    "genInfo.report.id.reportElement."
+                    "reportElements.BVV"
+                )
+            )
+
+            report_profile = (
+                report_profile.with_report_element(
+                    "genInfo.report.id.reportElement."
+                    "reportElements.STU"
+                )
+            )
         instant_context = TaxonomyContext(
             entity_identifier=entity_identifier,
             entity_scheme=entity_scheme,
@@ -315,6 +461,10 @@ class EBilanzService:
 
         values.update(
             account_detail_values
+        )
+
+        values.update(
+            bvv_values
         )
 
         resolved_fact_plan = (
@@ -379,15 +529,6 @@ class EBilanzService:
             )
         )
 
-        taxonomy_mapper = TaxonomyMapper(
-            create_hgb_gaap_ci_mapping(
-                assets=self._assets,
-                liabilities=self._liabilities,
-                income_statement=self._income_statement,
-            ),
-            gaap_ci_model,
-        )
-
         account_balance_builder = AccountBalanceBuilder(
             taxonomy_model=gaap_ci_model,
             taxonomy_mapper=taxonomy_mapper,
@@ -424,12 +565,35 @@ class EBilanzService:
         contexts = {
             f"ctx-instant-{year}": instant_context,
             f"ctx-duration-{year}": duration_context,
+            **fixed_asset_schedule_xbrl.contexts,
         }
+
+        if hgbm_fixed_asset_schedule_xbrl is not None:
+            contexts.update(
+                hgbm_fixed_asset_schedule_xbrl.contexts
+            )
 
         units = {
             "EUR": TaxonomyUnit.eur(),
             "PURE": TaxonomyUnit.pure(),
         }
+
+        additional_facts = list(
+            fixed_asset_schedule_xbrl.facts
+        )
+
+        additional_nil_facts = list(
+            fixed_asset_schedule_xbrl.nil_facts
+        )
+
+        if hgbm_fixed_asset_schedule_xbrl is not None:
+            additional_facts.extend(
+                hgbm_fixed_asset_schedule_xbrl.facts
+            )
+
+            additional_nil_facts.extend(
+                hgbm_fixed_asset_schedule_xbrl.nil_facts
+            )
 
         xml = (
             Taxonomy69XbrlDocumentBuilder()
@@ -442,9 +606,25 @@ class EBilanzService:
                     gaap_ci_entry_point,
                 ),
                 shareholders=shareholder_tuples,
-                nil_facts=mandatory_nil_facts,
+                nil_facts=(
+                    *mandatory_nil_facts,
+                    *additional_nil_facts,
+                ),
                 account_balances=account_balances,
-            )
+                facts=tuple(
+                    additional_facts
+                ),
+                tax_reconciliation=tax_reconciliation,
+                tax_reconciliation_context_id=(
+                    f"ctx-duration-{year}"
+                    if tax_reconciliation is not None
+                    else None
+                ),
+                tax_reconciliation_unit_id=(
+                    "EUR"
+                    if tax_reconciliation is not None
+                    else None
+                ),            )
         )
 
         return EBilanzDocument(

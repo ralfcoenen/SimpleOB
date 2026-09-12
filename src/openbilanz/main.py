@@ -35,6 +35,9 @@ from openbilanz.database.shareholder_repository import (
 from openbilanz.database.tax_depreciation_adjustment_repository import (
     TaxDepreciationAdjustmentRepository,
 )
+from openbilanz.database.bvv_annual_data_repository import (
+    BvvAnnualDataRepository,
+)
 from openbilanz.services.chart_of_accounts_initialization_service import (
     ChartOfAccountsInitializationService,
 )
@@ -474,6 +477,7 @@ def main() -> None:
                     financial_statement_context
                     .statement_builder
                 ),
+                closing_service=closing_service,
                 account_types=(
                     financial_statement_context
                     .account_types
@@ -523,6 +527,12 @@ def main() -> None:
                 ),
             )
 
+            bvv_annual_data_repository = (
+                BvvAnnualDataRepository(
+                    session
+                )
+            )
+
             workspace = FiscalYearWorkspace(
                 context=context,
                 booking_repository=(
@@ -530,6 +540,9 @@ def main() -> None:
                 ),
                 company_repository=(
                     company_repository
+                ),
+                bvv_annual_data_repository=(
+                    bvv_annual_data_repository
                 ),
                 shareholder_repository=(
                     shareholder_repository

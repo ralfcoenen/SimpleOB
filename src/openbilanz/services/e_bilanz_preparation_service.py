@@ -15,7 +15,8 @@ from openbilanz.accounting.income_statement import IncomeStatement
 from openbilanz.accounting.ledger import Ledger
 from openbilanz.domain.account_type import AccountType
 from openbilanz.domain.money import ZERO
-
+from openbilanz.services.closing_result import ClosingResult
+from openbilanz.services.closing_service import ClosingService
 
 @dataclass(frozen=True, slots=True)
 class EBilanzPreparationResult:
@@ -47,12 +48,14 @@ class EBilanzPreparationService:
         self,
         *,
         statement_builder: FinancialStatementBuilder,
+        closing_service: ClosingService,
         account_types: Mapping[str, AccountType],
         assets: FinancialStatementPosition,
         liabilities: FinancialStatementPosition,
         income_summary_account_number: str,
     ) -> None:
         self._statement_builder = statement_builder
+        self._closing_service = closing_service
         self._account_types = account_types
         self._assets = assets
         self._liabilities = liabilities
@@ -93,6 +96,26 @@ class EBilanzPreparationService:
             )
         )
 
+        net_income = self._closing_service.calculate_net_income(
+            income_statement=income_statement,
+        )
+
+        closing_result = ClosingResult(
+            net_income=net_income,
+        )
+
+        equity = next(
+            position
+            for position in self._liabilities.children
+            if position.code == "HGB.266.PASSIVA.A"
+        )
+
+        result_position = next(
+            position
+            for position in equity.children
+            if position.code == "HGB.266.PASSIVA.A.V"
+        )
+
         balance_sheet_amounts = (
             self._statement_builder.build(
                 balances=balance_sheet_balances,
@@ -100,6 +123,8 @@ class EBilanzPreparationService:
                     self._assets,
                     self._liabilities,
                 ),
+                closing_result=closing_result,
+                result_position=result_position,
             )
         )
 

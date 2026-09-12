@@ -3,7 +3,7 @@
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
-from unittest.mock import ANY, Mock
+from unittest.mock import ANY, Mock, patch
 from uuid import uuid4
 
 import pytest
@@ -62,6 +62,7 @@ from openbilanz.domain.tax_depreciation_adjustment import (
     TaxDepreciationAdjustment,
 )
 from openbilanz.domain.vat_accounts import VatAccounts
+from openbilanz.domain.bvv_annual_data import BvvAnnualData
 from openbilanz.services.closing_result import ClosingResult
 from openbilanz.services.e_bilanz_export_service import (
     EBilanzExportService,
@@ -687,6 +688,273 @@ def test_aggregates_tax_depreciation_difference_for_bga(
     )
     adjustment_repository.get_for_depreciation.assert_any_call(
         second_bga_depreciation.depreciation_id
+    )
+
+def test_aggregates_current_and_previous_tax_depreciation_differences_for_bga(
+    context: ApplicationContext,
+) -> None:
+    booking_repository = Mock()
+    company_repository = Mock()
+    fixed_asset_repository = Mock()
+    depreciation_repository = Mock()
+    adjustment_repository = Mock()
+
+    booking_repository.list_for_fiscal_year.return_value = ()
+
+    bga_asset = FixedAsset(
+        company_id=context.company.company_id,
+        asset_code="BGA-001",
+        description="Maschine 1",
+        position_code="HGB.266.AKTIVA.A.II.3",
+        asset_account_number="0400",
+        depreciation_expense_account_number="4830",
+        acquisition_date=date(2025, 1, 1),
+        acquisition_cost=Decimal("1000.00"),
+        depreciation_start_date=date(2025, 1, 1),
+        useful_life_months=36,
+    )
+
+    other_asset = FixedAsset(
+        company_id=context.company.company_id,
+        asset_code="MAS-001",
+        description="Andere Maschine",
+        position_code="HGB.266.AKTIVA.A.II.2",
+        asset_account_number="0500",
+        depreciation_expense_account_number="4830",
+        acquisition_date=date(2025, 1, 1),
+        acquisition_cost=Decimal("2000.00"),
+        depreciation_start_date=date(2025, 1, 1),
+        useful_life_months=60,
+    )
+
+    previous_depreciation = FixedAssetDepreciation(
+        fixed_asset_id=bga_asset.fixed_asset_id,
+        fiscal_year_end=date(2025, 12, 31),
+        depreciation_date=date(2025, 12, 31),
+        amount=Decimal("333.33"),
+        booking_id=uuid4(),
+        kind=DepreciationKind.LINEAR,
+        source=DepreciationSource.CALCULATED,
+    )
+
+    current_depreciation = FixedAssetDepreciation(
+        fixed_asset_id=bga_asset.fixed_asset_id,
+        fiscal_year_end=context.fiscal_year.end_date,
+        depreciation_date=context.fiscal_year.end_date,
+        amount=Decimal("333.33"),
+        booking_id=uuid4(),
+        kind=DepreciationKind.LINEAR,
+        source=DepreciationSource.CALCULATED,
+    )
+
+    other_depreciation = FixedAssetDepreciation(
+        fixed_asset_id=other_asset.fixed_asset_id,
+        fiscal_year_end=context.fiscal_year.end_date,
+        depreciation_date=context.fiscal_year.end_date,
+        amount=Decimal("400.00"),
+        booking_id=uuid4(),
+        kind=DepreciationKind.LINEAR,
+        source=DepreciationSource.CALCULATED,
+    )
+
+    fixed_asset_repository.list_for_company.return_value = (
+        bga_asset,
+        other_asset,
+    )
+
+    depreciation_repository.list_for_fixed_asset.side_effect = (
+        lambda fixed_asset_id: {
+            bga_asset.fixed_asset_id: (
+                previous_depreciation,
+                current_depreciation,
+            ),
+            other_asset.fixed_asset_id: (
+                other_depreciation,
+            ),
+        }[fixed_asset_id]
+    )
+
+    adjustments = {
+        previous_depreciation.depreciation_id: (
+            TaxDepreciationAdjustment(
+                depreciation_id=(
+                    previous_depreciation.depreciation_id
+                ),
+                commercial_amount=Decimal("333.33"),
+                tax_amount=Decimal("250.00"),
+            )
+        ),
+        current_depreciation.depreciation_id: (
+            TaxDepreciationAdjustment(
+                depreciation_id=(
+                    current_depreciation.depreciation_id
+                ),
+                commercial_amount=Decimal("333.33"),
+                tax_amount=Decimal("250.00"),
+            )
+        ),
+        other_depreciation.depreciation_id: (
+            TaxDepreciationAdjustment(
+                depreciation_id=(
+                    other_depreciation.depreciation_id
+                ),
+                commercial_amount=Decimal("400.00"),
+                tax_amount=Decimal("300.00"),
+            )
+        ),
+    }
+
+    adjustment_repository.get_for_depreciation.side_effect = (
+        lambda depreciation_id: adjustments.get(
+            depreciation_id
+        )
+    )
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=company_repository,
+        posting_service=Mock(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
+        e_bilanz_export_service=Mock(),
+        taxonomy_management_service=Mock(),
+        fixed_asset_repository=fixed_asset_repository,
+        fixed_asset_depreciation_repository=(
+            depreciation_repository
+        ),
+        tax_depreciation_adjustment_repository=(
+            adjustment_repository
+        ),
+    )
+
+    (
+        current_difference,
+        previous_difference,
+    ) = workspace.tax_depreciation_differences_for_bga()
+
+    assert current_difference == Decimal("-83.33")
+    assert previous_difference == Decimal("-83.33")
+
+    depreciation_repository.list_for_fixed_asset.assert_called_once_with(
+        bga_asset.fixed_asset_id
+    )
+
+    assert (
+        adjustment_repository.get_for_depreciation.call_count
+        == 2
+    )
+
+    adjustment_repository.get_for_depreciation.assert_any_call(
+        previous_depreciation.depreciation_id
+    )
+    adjustment_repository.get_for_depreciation.assert_any_call(
+        current_depreciation.depreciation_id
+    )
+
+def test_calculates_opening_hgb_equity_from_trial_balance_mappings(
+    context: ApplicationContext,
+) -> None:
+    booking_repository = Mock()
+    company_repository = Mock()
+
+    booking_repository.list_for_fiscal_year.return_value = ()
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=company_repository,
+        posting_service=Mock(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
+        e_bilanz_export_service=Mock(),
+        taxonomy_management_service=Mock(),
+    )
+
+    control_accounts = Mock(
+        opening_balance_account="9000",
+    )
+
+    workspace.load_account_configuration = Mock(
+        return_value=(
+            control_accounts,
+            Mock(),
+            Mock(),
+        )
+    )
+
+    report = Mock()
+    report.rows = (
+        Mock(
+            account_number="0800",
+            opening_debit=Decimal("0.00"),
+            opening_credit=Decimal("10000.00"),
+        ),
+        Mock(
+            account_number="2970",
+            opening_debit=Decimal("0.00"),
+            opening_credit=Decimal("3868.35"),
+        ),
+        Mock(
+            account_number="1200",
+            opening_debit=Decimal("8810.00"),
+            opening_credit=Decimal("0.00"),
+        ),
+    )
+
+    workspace.build_trial_balance_report = Mock(
+        return_value=report
+    )
+
+    capital_position = Mock(
+        code="HGB.266.PASSIVA.A.I"
+    )
+    retained_earnings_position = Mock(
+        code="HGB.266.PASSIVA.A.IV"
+    )
+    bank_position = Mock(
+        code="HGB.266.AKTIVA.B.IV"
+    )
+
+    capital_rule = Mock(
+        account_number="0800",
+        debit_position=capital_position,
+        credit_position=capital_position,
+    )
+    retained_earnings_rule = Mock(
+        account_number="2970",
+        debit_position=retained_earnings_position,
+        credit_position=retained_earnings_position,
+    )
+    bank_rule = Mock(
+        account_number="1200",
+        debit_position=bank_position,
+        credit_position=bank_position,
+    )
+
+    chart_of_accounts = Mock()
+    chart_of_accounts.account_mapping_rules = (
+        capital_rule,
+        retained_earnings_rule,
+        bank_rule,
+    )
+
+    result = workspace.opening_hgb_equity(
+        chart_of_accounts=chart_of_accounts,
+    )
+
+    assert result == Decimal("13868.35")
+
+    workspace.build_trial_balance_report.assert_called_once_with(
+        start_date=context.fiscal_year.start_date,
+        end_date=context.fiscal_year.end_date,
+        opening_balance_account_number="9000",
     )
 
 def test_builds_open_depreciation_proposal(
@@ -1447,9 +1715,13 @@ def test_builds_e_bilanz_from_prepared_data(
         taxonomy_management_service=Mock(),
         e_bilanz_export_service=Mock(),
     )
+    chart_of_accounts = Mock(
+        spec=ChartOfAccountsTemplate
+    )
 
     result = workspace.build_e_bilanz(
         preparation=preparation,
+        chart_of_accounts=chart_of_accounts,
     )
 
     assert result is expected_document
@@ -1503,6 +1775,11 @@ def test_builds_e_bilanz_from_prepared_data(
         account_details=account_details,
         fixed_asset_schedule=(),
         shareholders=shareholders,
+        current_depreciation_difference=Decimal("0.00"),
+        previous_depreciation_difference=Decimal("0.00"),
+        previous_hgb_equity=None,
+        contribution=Decimal("0.00"),
+        withdrawal_distribution=Decimal("0.00"),
     )
 
 def test_rejects_e_bilanz_build_for_open_fiscal_year(
@@ -1535,6 +1812,10 @@ def test_rejects_e_bilanz_build_for_open_fiscal_year(
         e_bilanz_export_service=Mock(),
     )
 
+    chart_of_accounts = Mock(
+        spec=ChartOfAccountsTemplate
+    )
+
     with pytest.raises(
         ValueError,
         match=(
@@ -1544,6 +1825,7 @@ def test_rejects_e_bilanz_build_for_open_fiscal_year(
     ):
         workspace.build_e_bilanz(
             preparation=Mock(),
+            chart_of_accounts=chart_of_accounts,
         )
 
 def test_validates_e_bilanz_for_closed_fiscal_year(
@@ -2414,4 +2696,372 @@ def test_saves_tax_depreciation_adjustment(
     adjustment_repository.save.assert_called_once_with(
         depreciation_id=depreciation_id,
         tax_amount=Decimal("620.00"),
+    )
+
+def test_uses_explicit_previous_hgb_equity_for_bvv(
+    context: ApplicationContext,
+) -> None:
+    """Explizites BVV-Vorjahreseigenkapital hat Vorrang."""
+
+    booking_repository = Mock()
+    company_repository = Mock()
+    bvv_repository = Mock()
+
+    booking_repository.list_for_fiscal_year.return_value = ()
+
+    bvv_repository.get_for_fiscal_year.return_value = (
+        BvvAnnualData(
+            previous_hgb_equity=Decimal("12345.67"),
+            contribution=Decimal("0.00"),
+            withdrawal_distribution=Decimal("0.00"),
+        )
+    )
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=company_repository,
+        bvv_annual_data_repository=bvv_repository,
+        posting_service=Mock(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
+        e_bilanz_export_service=Mock(),
+        taxonomy_management_service=Mock(),
+    )
+
+    chart_of_accounts = Mock(
+        spec=ChartOfAccountsTemplate
+    )
+
+    result = workspace.effective_previous_hgb_equity(
+        chart_of_accounts=chart_of_accounts,
+    )
+
+    assert result == Decimal("12345.67")
+
+    bvv_repository.get_for_fiscal_year.assert_called_once_with(
+        company_id=context.company.company_id,
+        fiscal_year=context.fiscal_year,
+    )
+
+    company_repository.get_managed_fiscal_years.assert_not_called()
+
+
+def test_derives_previous_hgb_equity_from_opening_source_for_bvv(
+    context: ApplicationContext,
+) -> None:
+    """Vorjahreseigenkapital wird bei Saldovortrag aus der Eröffnung abgeleitet."""
+
+    booking_repository = Mock()
+    company_repository = Mock()
+    bvv_repository = Mock()
+
+    booking_repository.list_for_fiscal_year.return_value = ()
+
+    bvv_repository.get_for_fiscal_year.return_value = (
+        BvvAnnualData(
+            previous_hgb_equity=None,
+            contribution=Decimal("0.00"),
+            withdrawal_distribution=Decimal("0.00"),
+        )
+    )
+
+    previous_fiscal_year = FiscalYear(
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    company_repository.get_managed_fiscal_years.return_value = (
+        ManagedFiscalYear(
+            fiscal_year=previous_fiscal_year,
+            status=FiscalYearStatus.CLOSED,
+            opening_source=None,
+        ),
+        ManagedFiscalYear(
+            fiscal_year=context.fiscal_year,
+            status=FiscalYearStatus.OPEN,
+            opening_source=previous_fiscal_year,
+        ),
+    )
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=company_repository,
+        bvv_annual_data_repository=bvv_repository,
+        posting_service=Mock(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
+        e_bilanz_export_service=Mock(),
+        taxonomy_management_service=Mock(),
+    )
+
+    chart_of_accounts = Mock(
+        spec=ChartOfAccountsTemplate
+    )
+
+    workspace.opening_hgb_equity = Mock(
+        return_value=Decimal("13868.35")
+    )
+
+    result = workspace.effective_previous_hgb_equity(
+        chart_of_accounts=chart_of_accounts,
+    )
+
+    assert result == Decimal("13868.35")
+
+    workspace.opening_hgb_equity.assert_called_once_with(
+        chart_of_accounts=chart_of_accounts,
+    )
+
+
+def test_does_not_infer_previous_hgb_equity_without_opening_source(
+    context: ApplicationContext,
+) -> None:
+    """Ohne Vorjahresübernahme wird kein BVV-Vorjahreseigenkapital geraten."""
+
+    booking_repository = Mock()
+    company_repository = Mock()
+    bvv_repository = Mock()
+
+    booking_repository.list_for_fiscal_year.return_value = ()
+
+    bvv_repository.get_for_fiscal_year.return_value = (
+        BvvAnnualData(
+            previous_hgb_equity=None,
+            contribution=Decimal("10000.00"),
+            withdrawal_distribution=Decimal("0.00"),
+        )
+    )
+
+    company_repository.get_managed_fiscal_years.return_value = (
+        ManagedFiscalYear(
+            fiscal_year=context.fiscal_year,
+            status=FiscalYearStatus.OPEN,
+            opening_source=None,
+        ),
+    )
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=company_repository,
+        bvv_annual_data_repository=bvv_repository,
+        posting_service=Mock(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
+        e_bilanz_export_service=Mock(),
+        taxonomy_management_service=Mock(),
+    )
+
+    chart_of_accounts = Mock(
+        spec=ChartOfAccountsTemplate
+    )
+
+    workspace.opening_hgb_equity = Mock()
+
+    result = workspace.effective_previous_hgb_equity(
+        chart_of_accounts=chart_of_accounts,
+    )
+
+    assert result is None
+
+    workspace.opening_hgb_equity.assert_not_called()
+
+def test_build_e_bilanz_passes_bvv_data_for_hgbm(
+    context: ApplicationContext,
+) -> None:
+    """Reicht bei HGBM die BVV-Jahresdaten an den E-Bilanz-Service weiter."""
+
+    booking_repository = Mock()
+    company_repository = Mock()
+    chart_of_accounts_repository = Mock()
+    preparation_service = Mock()
+    e_bilanz_service = Mock()
+    account_detail_service = Mock()
+
+    fixed_asset_repository = Mock()
+    fixed_asset_depreciation_repository = Mock()
+    tax_depreciation_adjustment_repository = Mock()
+    fixed_asset_schedule_service = Mock()
+
+    booking_repository.list_for_fiscal_year.return_value = ()
+
+    company_repository.get_managed_fiscal_years.return_value = (
+        ManagedFiscalYear(
+            fiscal_year=context.fiscal_year,
+            status=FiscalYearStatus.CLOSED,
+            opening_source=None,
+        ),
+    )
+
+    master_data = CompanyMasterData(
+        company=context.company,
+        legal_form="UG (haftungsbeschränkt)",
+        tax_number="1234567890123",
+    )
+
+    company_repository.get_master_data.return_value = (
+        master_data
+    )
+
+    control_accounts = Mock(
+        spec=AccountingControlAccounts
+    )
+    vat_accounts = Mock(
+        spec=VatAccounts
+    )
+    account_roles = Mock(
+        spec=AccountingAccountRoles
+    )
+
+    (
+        chart_of_accounts_repository
+        .load_control_accounts
+        .return_value
+    ) = control_accounts
+
+    (
+        chart_of_accounts_repository
+        .load_vat_accounts
+        .return_value
+    ) = vat_accounts
+
+    (
+        chart_of_accounts_repository
+        .load_account_roles
+        .return_value
+    ) = account_roles
+
+    preparation = Mock()
+    preparation.amounts = {}
+
+    account_detail_service.build_for_e_bilanz.return_value = ()
+
+    fixed_asset_schedule = (
+        Mock(),
+    )
+
+    fixed_asset_schedule_service.build.return_value = (
+        fixed_asset_schedule
+    )
+
+    expected_document = Mock()
+
+    e_bilanz_service.build.return_value = (
+        expected_document
+    )
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=company_repository,
+        chart_of_accounts_repository=(
+            chart_of_accounts_repository
+        ),
+        posting_service=PostingService(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=(
+            preparation_service
+        ),
+        e_bilanz_service=e_bilanz_service,
+        e_bilanz_account_detail_service=(
+            account_detail_service
+        ),
+        taxonomy_management_service=Mock(),
+        e_bilanz_export_service=Mock(),
+        fixed_asset_repository=(
+            fixed_asset_repository
+        ),
+        fixed_asset_depreciation_repository=(
+            fixed_asset_depreciation_repository
+        ),
+        tax_depreciation_adjustment_repository=(
+            tax_depreciation_adjustment_repository
+        ),
+        fixed_asset_schedule_service=(
+            fixed_asset_schedule_service
+        ),
+    )
+
+    chart_of_accounts = Mock(
+        spec=ChartOfAccountsTemplate
+    )
+
+    bvv_annual_data = BvvAnnualData(
+        previous_hgb_equity=Decimal("13868.35"),
+        contribution=Decimal("0.00"),
+        withdrawal_distribution=Decimal("0.00"),
+    )
+
+    with (
+        patch.object(
+            workspace,
+            "tax_depreciation_differences_for_bga",
+            return_value=(
+                Decimal("-83.33"),
+                Decimal("-83.33"),
+            ),
+        ),
+        patch.object(
+            workspace,
+            "load_bvv_annual_data",
+            return_value=bvv_annual_data,
+        ) as load_bvv_annual_data,
+        patch.object(
+            workspace,
+            "effective_previous_hgb_equity",
+            return_value=Decimal("13868.35"),
+        ) as effective_previous_hgb_equity,
+    ):
+        result = workspace.build_e_bilanz(
+            preparation=preparation,
+            chart_of_accounts=chart_of_accounts,
+        )
+
+    assert result is expected_document
+
+    load_bvv_annual_data.assert_called_once_with()
+
+    effective_previous_hgb_equity.assert_called_once_with(
+        chart_of_accounts=chart_of_accounts,
+    )
+
+    build_kwargs = (
+        e_bilanz_service.build.call_args.kwargs
+    )
+
+    assert (
+        build_kwargs["current_depreciation_difference"]
+        == Decimal("-83.33")
+    )
+
+    assert (
+        build_kwargs["previous_depreciation_difference"]
+        == Decimal("-83.33")
+    )
+
+    assert (
+        build_kwargs["previous_hgb_equity"]
+        == Decimal("13868.35")
+    )
+
+    assert (
+        build_kwargs["contribution"]
+        == Decimal("0.00")
+    )
+
+    assert (
+        build_kwargs["withdrawal_distribution"]
+        == Decimal("0.00")
     )

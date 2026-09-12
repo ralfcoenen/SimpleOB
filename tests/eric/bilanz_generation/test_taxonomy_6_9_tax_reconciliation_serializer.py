@@ -77,15 +77,21 @@ def test_serializes_confirmed_hgbm_change_value_transfer() -> None:
     )
 
     kind = element.find(
+        _qname("hbst.transfer.kind")
+    )
+    assert kind is not None
+
+    kind_value = kind.find(
         _qname(
             "hbst.transfer.kind.changeValue"
         )
     )
-    assert kind is not None
-    assert kind.attrib == {
+    assert kind_value is not None
+
+    assert kind_value.attrib == {
         "contextRef": "D-2026",
     }
-    assert kind.text == "true"
+    assert kind_value.text == "true"
 
     bs_ass = element.find(
         _qname("hbst.transfer.bsAss")

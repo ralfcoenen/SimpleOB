@@ -1,6 +1,32 @@
 
 # Changelog
 
+# V0.44.001
+
+Das Script  scripts/eric_reference_hgbm_69_multiyear_success.py
+unter Grundlage folgedner Testdaten ezeugte heute eine ERIC-valide e-Bilanz:
+
+Mandant: UG-0002
+Geschäftsjahr: 2026
+Vorjahr: 2025
+
+HGB-AfA 2025:        333,33
+Steuer-AfA 2025:     250,00
+Vorjahresdifferenz:  +83,33 Buchwert
+
+HGB-AfA 2026:        333,33
+Steuer-AfA 2026:     250,00
+Periodendifferenz:   +83,33 Buchwert
+
+kumulierte
+Buchwertdifferenz:  +166,66
+
+HGB-Ergebnis 2026:  -333,33
+Steuer-Ergebnis:    -250,00
+
+ERiC:
+<Erfolg/>
+
 Alle wesentlichen Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
 ## v0.17.0 (2026-08-07)
@@ -63,9 +89,9 @@ Alle wesentlichen Änderungen an diesem Projekt werden in dieser Datei dokumenti
 ## v0.10.0-dev
 - Kontenmodell und Kontenplan
 
-## v0.9.0 – Reporting 
+## v0.9.0 – Reporting
 
-- Kontoblatt, 
+- Kontoblatt,
 - ReportingService
 
 ## v0.8.0 – Accounting
@@ -144,7 +170,7 @@ Alle wesentlichen Änderungen an diesem Projekt werden in dieser Datei dokumenti
 
 ## [v0.4.0-apha2.0] - 2026-07-27
 
-### Changed 
+### Changed
 
 - TrialBalanceEntry wieder entfernt.
 - TrialBalanceRow als einziges Modell einer Summen- und Saldenlistenzeile festgelegt.
@@ -218,4 +244,3 @@ Alle wesentlichen Änderungen an diesem Projekt werden in dieser Datei dokumenti
 ```
 
 ---
-

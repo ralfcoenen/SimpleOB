@@ -53,12 +53,17 @@ class Taxonomy69TaxReconciliationSerializer:
 
         kind = ET.SubElement(
             element,
+            cls._qname("hbst.transfer.kind"),
+        )
+
+        kind_value = ET.SubElement(
+            kind,
             cls._qname(transfer.kind.value),
             {
                 "contextRef": context_id,
             },
         )
-        kind.text = "true"
+        kind_value.text = "true"
 
         for change in transfer.asset_changes:
             element.append(

@@ -5,6 +5,7 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 from urllib.error import URLError
 from zipfile import BadZipFile
+from decimal import Decimal
 
 from openbilanz.accounting.balance_sheet import BalanceSheet
 from openbilanz.accounting.financial_statement_context import (
@@ -19,6 +20,9 @@ from openbilanz.domain.fixed_asset_status import FixedAssetStatus
 from openbilanz.domain.journal import Journal
 from openbilanz.domain.money import ZERO
 from openbilanz.domain.vat_accounts import VatAccounts
+from openbilanz.domain.bvv_annual_data import (
+    BvvAnnualData,
+)
 from openbilanz.services.closing_accounts import ClosingAccounts
 from openbilanz.services.closing_result import ClosingResult
 from openbilanz.services.closing_service import ClosingService
@@ -1177,7 +1181,172 @@ class MainWindow(tk.Tk):
             anchor="w",
             pady=(0, 16),
         )
+        bvv_frame = ttk.LabelFrame(
+            self._e_bilanz_tab,
+            text="BVV-Jahresdaten",
+            padding=12,
+        )
+        bvv_frame.pack(
+            fill="x",
+            pady=(0, 16),
+        )
 
+        self._bvv_effective_previous_hgb_equity_var = (
+            tk.StringVar(value="–")
+        )
+        self._bvv_previous_hgb_equity_source_var = (
+            tk.StringVar(value="")
+        )
+        self._bvv_previous_hgb_equity_override_var = (
+            tk.StringVar()
+        )
+        self._bvv_contribution_var = (
+            tk.StringVar(value="0,00")
+        )
+        self._bvv_withdrawal_distribution_var = (
+            tk.StringVar(value="0,00")
+        )
+
+        ttk.Label(
+            bvv_frame,
+            text="HGB-Vorjahreseigenkapital",
+        ).grid(
+            row=0,
+            column=0,
+            sticky="w",
+            padx=(0, 12),
+            pady=(0, 4),
+        )
+
+        ttk.Label(
+            bvv_frame,
+            textvariable=(
+                self._bvv_effective_previous_hgb_equity_var
+            ),
+        ).grid(
+            row=0,
+            column=1,
+            sticky="w",
+            pady=(0, 4),
+        )
+
+        ttk.Label(
+            bvv_frame,
+            text="Herkunft",
+        ).grid(
+            row=1,
+            column=0,
+            sticky="w",
+            padx=(0, 12),
+            pady=(0, 12),
+        )
+
+        ttk.Label(
+            bvv_frame,
+            textvariable=(
+                self._bvv_previous_hgb_equity_source_var
+            ),
+        ).grid(
+            row=1,
+            column=1,
+            sticky="w",
+            pady=(0, 12),
+        )
+
+        ttk.Label(
+            bvv_frame,
+            text="Manueller Korrekturwert",
+        ).grid(
+            row=2,
+            column=0,
+            sticky="w",
+            padx=(0, 12),
+            pady=(0, 4),
+        )
+
+        ttk.Entry(
+            bvv_frame,
+            textvariable=(
+                self._bvv_previous_hgb_equity_override_var
+            ),
+            width=18,
+        ).grid(
+            row=2,
+            column=1,
+            sticky="w",
+            pady=(0, 4),
+        )
+
+        ttk.Label(
+            bvv_frame,
+            text=(
+                "Leer lassen, um den automatisch "
+                "ermittelten Wert zu verwenden."
+            ),
+        ).grid(
+            row=3,
+            column=0,
+            columnspan=2,
+            sticky="w",
+            pady=(0, 12),
+        )
+
+        ttk.Label(
+            bvv_frame,
+            text="Einlagen",
+        ).grid(
+            row=4,
+            column=0,
+            sticky="w",
+            padx=(0, 12),
+            pady=(0, 8),
+        )
+
+        ttk.Entry(
+            bvv_frame,
+            textvariable=self._bvv_contribution_var,
+            width=18,
+        ).grid(
+            row=4,
+            column=1,
+            sticky="w",
+            pady=(0, 8),
+        )
+
+        ttk.Label(
+            bvv_frame,
+            text="Entnahmen / Ausschüttungen",
+        ).grid(
+            row=5,
+            column=0,
+            sticky="w",
+            padx=(0, 12),
+            pady=(0, 8),
+        )
+
+        ttk.Entry(
+            bvv_frame,
+            textvariable=(
+                self._bvv_withdrawal_distribution_var
+            ),
+            width=18,
+        ).grid(
+            row=5,
+            column=1,
+            sticky="w",
+            pady=(0, 8),
+        )
+
+        ttk.Button(
+            bvv_frame,
+            text="BVV-Daten speichern",
+            command=self._save_bvv_annual_data,
+        ).grid(
+            row=6,
+            column=0,
+            columnspan=2,
+            sticky="w",
+        )
         self._prepare_e_bilanz_button = ttk.Button(
             self._e_bilanz_tab,
             text="E-Bilanz vorbereiten",
@@ -1216,6 +1385,79 @@ class MainWindow(tk.Tk):
         self._export_e_bilanz_button.pack(
             anchor="w",
             pady=(8, 0),
+        )
+
+    def _save_bvv_annual_data(self) -> None:
+        """Speichert die BVV-Jahresdaten des aktuellen Geschäftsjahres."""
+
+        def parse_decimal(
+            value: str,
+            *,
+            allow_empty: bool = False,
+        ) -> Decimal | None:
+            normalized = (
+                value.strip()
+                .replace(".", "")
+                .replace(",", ".")
+            )
+
+            if not normalized:
+                if allow_empty:
+                    return None
+                return Decimal("0.00")
+
+            return Decimal(normalized)
+
+        try:
+            previous_hgb_equity = parse_decimal(
+                self._bvv_previous_hgb_equity_override_var.get(),
+                allow_empty=True,
+            )
+
+            contribution = parse_decimal(
+                self._bvv_contribution_var.get(),
+            )
+
+            withdrawal_distribution = parse_decimal(
+                self._bvv_withdrawal_distribution_var.get(),
+            )
+
+            assert contribution is not None
+            assert withdrawal_distribution is not None
+
+            data = BvvAnnualData(
+                previous_hgb_equity=previous_hgb_equity,
+                contribution=contribution,
+                withdrawal_distribution=(
+                    withdrawal_distribution
+                ),
+            )
+
+            self._workspace.save_bvv_annual_data(
+                data
+            )
+
+            self._refresh_bvv_annual_data()
+
+        except (
+            ValueError,
+            ArithmeticError,
+        ) as exc:
+            messagebox.showerror(
+                "BVV-Daten",
+                (
+                    "Die BVV-Jahresdaten konnten nicht "
+                    "gespeichert werden.\n\n"
+                    f"{exc}"
+                ),
+                parent=self,
+            )
+            return
+
+        messagebox.showinfo(
+            "BVV-Daten",
+            "Die BVV-Jahresdaten wurden gespeichert.",
+            parent=self,
         )
 
     def _post_booking(
@@ -1526,9 +1768,9 @@ class MainWindow(tk.Tk):
         self._refresh_trial_balance_report()
         self._refresh_closing()
         self._refresh_taxonomy_status()
+        self._refresh_bvv_annual_data()
         self._refresh_e_bilanz()
         self._update_editing_state()
-
         self.update_idletasks()
 
     def _refresh_taxonomy_status(self) -> None:
@@ -1582,6 +1824,66 @@ class MainWindow(tk.Tk):
             "Taxonomie",
             "Die benötigte Taxonomie wurde erfolgreich installiert.",
             parent=self,
+        )
+
+    def _refresh_bvv_annual_data(self) -> None:
+        """Aktualisiert die BVV-Jahresdaten des Geschäftsjahres."""
+
+        data = self._workspace.load_bvv_annual_data()
+
+        effective_previous_hgb_equity = (
+            self._workspace.effective_previous_hgb_equity(
+                chart_of_accounts=self._chart_of_accounts,
+            )
+        )
+
+        if effective_previous_hgb_equity is None:
+            self._bvv_effective_previous_hgb_equity_var.set(
+                "nicht ermittelbar"
+            )
+        else:
+            self._bvv_effective_previous_hgb_equity_var.set(
+                (
+                    str(effective_previous_hgb_equity)
+                    .replace(".", ",")
+                    + " €"
+                )
+            )
+
+        if data is None:
+            self._bvv_previous_hgb_equity_source_var.set(
+                "automatisch ermittelt"
+                if effective_previous_hgb_equity is not None
+                else "keine Angabe vorhanden"
+            )
+            self._bvv_previous_hgb_equity_override_var.set("")
+            self._bvv_contribution_var.set("0,00")
+            self._bvv_withdrawal_distribution_var.set("0,00")
+            return
+
+        if data.previous_hgb_equity is None:
+            self._bvv_previous_hgb_equity_source_var.set(
+                "automatisch ermittelt"
+                if effective_previous_hgb_equity is not None
+                else "keine Angabe vorhanden"
+            )
+            self._bvv_previous_hgb_equity_override_var.set("")
+        else:
+            self._bvv_previous_hgb_equity_source_var.set(
+                "manuell gespeichert"
+            )
+            self._bvv_previous_hgb_equity_override_var.set(
+                str(data.previous_hgb_equity).replace(".", ",")
+            )
+
+        self._bvv_contribution_var.set(
+            str(data.contribution).replace(".", ",")
+        )
+
+        self._bvv_withdrawal_distribution_var.set(
+            str(
+                data.withdrawal_distribution
+            ).replace(".", ",")
         )
 
     def _refresh_e_bilanz(self) -> None:
@@ -1722,6 +2024,7 @@ class MainWindow(tk.Tk):
         try:
             document = self._workspace.build_e_bilanz(
                 preparation=self._current_e_bilanz_preparation,
+                chart_of_accounts=self._chart_of_accounts,
             )
         except (ValueError, FileNotFoundError, RuntimeError) as exc:
             messagebox.showerror(
