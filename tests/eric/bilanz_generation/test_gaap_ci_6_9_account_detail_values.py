@@ -199,3 +199,26 @@ def test_rejects_empty_configured_account_number() -> None:
             account_details=(),
             tax_liability_accounts=(" ",),
         )
+
+def test_uses_explicit_account_taxonomy_concept_as_fallback() -> None:
+    detail = _detail(
+        position_code="HGB.266.AKTIVA.B.II.1",
+        account_number="1400",
+        account_description="Forderungen aus Lieferungen und Leistungen",
+        balance="2500.00",
+    )
+
+    values = GaapCi69AccountDetailValueBuilder.build(
+        account_details=(detail,),
+        account_taxonomy_concepts={
+            "1400": (
+                "bs.ass.currAss.receiv.trade.other"
+            ),
+        },
+    )
+
+    assert values == {
+        (
+            "bs.ass.currAss.receiv.trade.other",
+        ): Decimal("2500.00"),
+    }

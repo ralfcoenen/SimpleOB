@@ -74,6 +74,7 @@ class GaapCi69AccountDetailValueBuilder:
         cash_accounts: Iterable[str] = (),
         bank_accounts: Iterable[str] = (),
         input_tax_receivable_accounts: Iterable[str] = (),
+        account_taxonomy_concepts: dict[str, str] | None = None,
     ) -> dict[FactPlanPath, FactPlanValue]:
         """Erzeugt die konkret ableitbaren GAAP-CI-Unterpositionen."""
 
@@ -103,6 +104,9 @@ class GaapCi69AccountDetailValueBuilder:
         )
         input_tax_accounts = cls._normalize_account_numbers(
             input_tax_receivable_accounts
+        )
+        taxonomy_concepts = cls._normalize_taxonomy_concepts(
+            account_taxonomy_concepts
         )
 
         values: dict[FactPlanPath, FactPlanValue] = {}
@@ -174,6 +178,17 @@ class GaapCi69AccountDetailValueBuilder:
                         concept_name=concept_name,
                         amount=abs(detail.balance),
                     )
+                continue
+            concept_name = taxonomy_concepts.get(
+                account_number
+            )
+            if concept_name is not None:
+                cls._add_value(
+                    values=values,
+                    concept_name=concept_name,
+                    amount=abs(detail.balance),
+                )
+
         return values
 
     @staticmethod
@@ -198,6 +213,59 @@ class GaapCi69AccountDetailValueBuilder:
             result.add(normalized)
 
         return frozenset(result)
+
+    @staticmethod
+    def _normalize_taxonomy_concepts(
+        account_taxonomy_concepts: dict[str, str] | None,
+    ) -> dict[str, str]:
+        if account_taxonomy_concepts is None:
+            return {}
+
+        if not isinstance(
+            account_taxonomy_concepts,
+            dict,
+        ):
+            raise TypeError(
+                "account_taxonomy_concepts must be a dict"
+            )
+
+        result: dict[str, str] = {}
+
+        for account_number, concept_name in (
+            account_taxonomy_concepts.items()
+        ):
+            if not isinstance(account_number, str):
+                raise TypeError(
+                    "taxonomy account numbers must be strings"
+                )
+
+            if not isinstance(concept_name, str):
+                raise TypeError(
+                    "taxonomy concept names must be strings"
+                )
+
+            normalized_account_number = (
+                account_number.strip()
+            )
+            normalized_concept_name = (
+                concept_name.strip()
+            )
+
+            if not normalized_account_number:
+                raise ValueError(
+                    "taxonomy account numbers must not be empty"
+                )
+
+            if not normalized_concept_name:
+                raise ValueError(
+                    "taxonomy concept names must not be empty"
+                )
+
+            result[
+                normalized_account_number
+            ] = normalized_concept_name
+
+        return result
 
     @staticmethod
     def _add_value(
