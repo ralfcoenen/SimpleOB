@@ -538,6 +538,45 @@ class EBilanzService:
             TaxonomyPeriodType.DURATION: duration_context,
         }
 
+        for target_concept_name in extended_concepts:
+            source_path = (
+                target_concept_name,
+            )
+
+            if source_path not in account_detail_values:
+                continue
+
+            target_path = effective_fact_plan.path_for(
+                target_concept_name
+            )
+
+            if target_path is None:
+                raise ValueError(
+                    "account taxonomy concept is missing "
+                    "from effective fact plan: "
+                    f"{target_concept_name}"
+                )
+
+            if target_path == source_path:
+                continue
+
+            amount = account_detail_values.pop(
+                source_path
+            )
+
+            previous = account_detail_values.get(
+                target_path
+            )
+
+            if previous is None:
+                account_detail_values[
+                    target_path
+                ] = amount
+            else:
+                account_detail_values[
+                    target_path
+                ] = previous + amount
+
         values = Taxonomy69ValueBuilder.build(
             company_data=mapping.company_data,
             identifiers=mapping.identifiers,

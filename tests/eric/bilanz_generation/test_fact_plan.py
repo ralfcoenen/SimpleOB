@@ -306,6 +306,17 @@ def test_fact_plan_with_conditional_child_adds_child_to_existing_parent() -> Non
         state=FactPlanState.CONDITIONAL,
     )
 
+    assert extended.path_for(
+        "parent.child"
+    ) == (
+        "parent",
+        "parent.child",
+    )
+
     assert plan.node_for(
+        "parent.child"
+    ) is None
+
+    assert plan.path_for(
         "parent.child"
     ) is None

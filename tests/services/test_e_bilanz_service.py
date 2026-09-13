@@ -257,6 +257,16 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
     profile.fact_plan = Mock()
 
     extended_fact_plan = Mock()
+
+    structural_account_detail_path = (
+        "bs.ass.currAss.receiv.trade",
+        "bs.ass.currAss.receiv.trade.other",
+    )
+
+    extended_fact_plan.path_for.return_value = (
+        structural_account_detail_path
+    )
+
     profile.fact_plan.node_for.return_value = None
     profile.fact_plan.with_conditional_child.return_value = (
         extended_fact_plan
@@ -282,7 +292,9 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
     }
 
     account_detail_values = {
-        ("ks.test",): Decimal("100.00"),
+        (
+            "bs.ass.currAss.receiv.trade.other",
+        ): Decimal("100.00"),
     }
 
     gcd_fact_builder = Mock()
@@ -558,6 +570,28 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
     assert (
         fact_plan_resolver.call_args.kwargs["fact_plan"]
         is extended_fact_plan
+    )
+
+    extended_fact_plan.path_for.assert_called_once_with(
+        "bs.ass.currAss.receiv.trade.other"
+    )
+
+    resolver_values = (
+        fact_plan_resolver.call_args.kwargs["values"]
+    )
+
+    assert (
+        resolver_values[
+            structural_account_detail_path
+        ]
+        == Decimal("100.00")
+    )
+
+    assert (
+        (
+            "bs.ass.currAss.receiv.trade.other",
+        )
+        not in resolver_values
     )
 
     gcd_fact_builder.shareholder.assert_called_once()

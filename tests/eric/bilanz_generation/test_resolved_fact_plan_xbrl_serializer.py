@@ -357,16 +357,17 @@ def test_serializer_serializes_numeric_fact_with_unit() -> None:
     assert element.text == "4500.00"
 
 
-def test_serializer_rejects_fact_node_with_children() -> None:
-    """Ein Fact und Tuple-Kinder dürfen nicht denselben Knoten belegen."""
+def test_serializer_serializes_fact_node_with_children_as_siblings() -> None:
+    """Item-Fact und Item-Kinder werden als eigenständige Facts serialisiert."""
 
     context = create_context()
+    unit = TaxonomyUnit.eur()
 
-    parent_concept = create_text_concept(
+    parent_concept = create_monetary_concept(
         name="test.parent",
     )
 
-    child_concept = create_text_concept(
+    child_concept = create_monetary_concept(
         name="test.child",
     )
 
@@ -388,19 +389,23 @@ def test_serializer_rejects_fact_node_with_children() -> None:
             ResolvedFactPlanNode(
                 plan_node=parent_plan_node,
                 concept=parent_concept,
-                fact=TaxonomyTextFact(
+                fact=TaxonomyFact(
                     concept=parent_concept,
-                    value="Parent",
+                    amount=Decimal("2500.00"),
                     context=context,
+                    unit=unit,
+                    decimals=2,
                 ),
                 children=(
                     ResolvedFactPlanNode(
                         plan_node=child_plan_node,
                         concept=child_concept,
-                        fact=TaxonomyTextFact(
+                        fact=TaxonomyFact(
                             concept=child_concept,
-                            value="Child",
+                            amount=Decimal("2500.00"),
                             context=context,
+                            unit=unit,
+                            decimals=2,
                         ),
                     ),
                 ),
@@ -410,18 +415,38 @@ def test_serializer_rejects_fact_node_with_children() -> None:
 
     serializer = ResolvedFactPlanXbrlSerializer()
 
-    with pytest.raises(
-        ValueError,
-        match="resolved fact node must not contain children",
-    ):
-        serializer.serialize(
-            resolved_fact_plan=resolved,
-            contexts={
-                "ctx-duration-2026": context,
-            },
-            units={},
-            taxonomy_namespace=GCD_NAMESPACE,
-            taxonomy_namespaces={
-                "de-gcd": GCD_NAMESPACE,
-            },
-        )
+    elements = serializer.serialize(
+        resolved_fact_plan=resolved,
+        contexts={
+            "ctx-duration-2026": context,
+        },
+        units={
+            "EUR": unit,
+        },
+        taxonomy_namespace=GAAP_CI_NAMESPACE,
+        taxonomy_namespaces={
+            "de-gaap-ci": GAAP_CI_NAMESPACE,
+        },
+    )
+
+    assert len(elements) == 2
+
+    parent_element = elements[0]
+    child_element = elements[1]
+
+    assert parent_element.tag == (
+        f"{{{GAAP_CI_NAMESPACE}}}"
+        "test.parent"
+    )
+
+    assert parent_element.text == "2500.00"
+
+    assert child_element.tag == (
+        f"{{{GAAP_CI_NAMESPACE}}}"
+        "test.child"
+    )
+
+    assert child_element.text == "2500.00"
+
+    assert list(parent_element) == []
+    assert list(child_element) == []

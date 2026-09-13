@@ -154,6 +154,51 @@ class FactPlan:
 
         return current_node
 
+    def path_for(
+        self,
+        concept_name: str,
+    ) -> tuple[str, ...] | None:
+        """Liefert den eindeutigen strukturellen Pfad eines Concepts."""
+
+        self._validate_concept_name(concept_name)
+
+        matches: list[tuple[str, ...]] = []
+
+        def collect(
+            *,
+            node: FactPlanNode,
+            path: tuple[str, ...],
+        ) -> None:
+            current_path = (
+                *path,
+                node.concept_name,
+            )
+
+            if node.concept_name == concept_name:
+                matches.append(current_path)
+
+            for child in node.children:
+                collect(
+                    node=child,
+                    path=current_path,
+                )
+
+        for node in self.nodes:
+            collect(
+                node=node,
+                path=(),
+            )
+
+        if not matches:
+            return None
+
+        if len(matches) > 1:
+            raise ValueError(
+                f"concept name is ambiguous: {concept_name}"
+            )
+
+        return matches[0]
+
     def with_conditional_child(
         self,
         *,

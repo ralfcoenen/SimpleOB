@@ -61,18 +61,22 @@ class ResolvedFactPlanXbrlSerializer:
                 "resolved_fact_plan must be a ResolvedFactPlan"
             )
 
-        return tuple(
-            self._node_element(
-                node=node,
-                contexts=contexts,
-                units=units,
-                taxonomy_namespace=taxonomy_namespace,
-                taxonomy_namespaces=taxonomy_namespaces,
-            )
-            for node in resolved_fact_plan.nodes
-        )
+        elements: list[ET.Element] = []
 
-    def _node_element(
+        for node in resolved_fact_plan.nodes:
+            elements.extend(
+                self._node_elements(
+                    node=node,
+                    contexts=contexts,
+                    units=units,
+                    taxonomy_namespace=taxonomy_namespace,
+                    taxonomy_namespaces=taxonomy_namespaces,
+                )
+            )
+
+        return tuple(elements)
+
+    def _node_elements(
         self,
         *,
         node: ResolvedFactPlanNode,
@@ -80,21 +84,30 @@ class ResolvedFactPlanXbrlSerializer:
         units: dict[str, TaxonomyUnit],
         taxonomy_namespace: str,
         taxonomy_namespaces: dict[str, str] | None,
-    ) -> ET.Element:
+    ) -> tuple[ET.Element, ...]:
         if node.fact is not None:
-            if node.children:
-                raise ValueError(
-                    "resolved fact node must not contain children: "
-                    f"{node.concept.name}"
+            elements = [
+                self._fact_element(
+                    fact=node.fact,
+                    contexts=contexts,
+                    units=units,
+                    taxonomy_namespace=taxonomy_namespace,
+                    taxonomy_namespaces=taxonomy_namespaces,
+                )
+            ]
+
+            for child in node.children:
+                elements.extend(
+                    self._node_elements(
+                        node=child,
+                        contexts=contexts,
+                        units=units,
+                        taxonomy_namespace=taxonomy_namespace,
+                        taxonomy_namespaces=taxonomy_namespaces,
+                    )
                 )
 
-            return self._fact_element(
-                fact=node.fact,
-                contexts=contexts,
-                units=units,
-                taxonomy_namespace=taxonomy_namespace,
-                taxonomy_namespaces=taxonomy_namespaces,
-            )
+            return tuple(elements)
 
         if not node.children:
             raise ValueError(
@@ -113,17 +126,20 @@ class ResolvedFactPlanXbrlSerializer:
         )
 
         for child in node.children:
-            element.append(
-                self._node_element(
-                    node=child,
-                    contexts=contexts,
-                    units=units,
-                    taxonomy_namespace=taxonomy_namespace,
-                    taxonomy_namespaces=taxonomy_namespaces,
-                )
+            child_elements = self._node_elements(
+                node=child,
+                contexts=contexts,
+                units=units,
+                taxonomy_namespace=taxonomy_namespace,
+                taxonomy_namespaces=taxonomy_namespaces,
             )
 
-        return element
+            for child_element in child_elements:
+                element.append(
+                    child_element
+                )
+
+        return (element,)
 
     def _fact_element(
         self,
