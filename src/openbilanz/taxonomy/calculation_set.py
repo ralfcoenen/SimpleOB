@@ -70,3 +70,31 @@ class TaxonomyCalculationSet:
                 key=lambda relation: relation.order,
             )
         )
+
+    def parents_of(
+        self,
+        child_concept_id: str,
+        *,
+        role_uri: str,
+    ) -> tuple[TaxonomyCalculationRelation, ...]:
+        """Liefert die rechnerischen Eltern eines Concepts."""
+
+        relations = (
+            relation
+            for relation in self.relations
+            if (
+                relation.child_concept_id
+                == child_concept_id
+                and relation.role_uri == role_uri
+            )
+        )
+
+        return tuple(
+            sorted(
+                relations,
+                key=lambda relation: (
+                    relation.parent_concept_id,
+                    relation.order,
+                ),
+            )
+        )

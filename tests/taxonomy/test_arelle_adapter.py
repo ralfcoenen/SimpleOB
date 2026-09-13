@@ -1,12 +1,16 @@
 """Tests für den Arelle-Adapter."""
 
 from pathlib import Path
+from decimal import Decimal
 
 import pytest
 
 from openbilanz.taxonomy.arelle_adapter import ArelleAdapter
 from openbilanz.taxonomy.calculation_set import (
     TaxonomyCalculationSet,
+)
+from openbilanz.taxonomy.calculation import (
+    TaxonomyCalculationRelation,
 )
 from openbilanz.taxonomy.concept import (
     TaxonomyBalance,
@@ -440,3 +444,43 @@ def test_arelle_adapter_returns_taxonomy_model() -> None:
 
     finally:
         adapter.close()
+
+def test_calculation_set_returns_parents_for_role() -> None:
+    calculation = TaxonomyCalculationSet(
+        relations=(
+            TaxonomyCalculationRelation(
+                parent_concept_id="parent-a",
+                child_concept_id="child",
+                order=Decimal("2"),
+                weight=Decimal("1"),
+                role_uri="role-a",
+            ),
+            TaxonomyCalculationRelation(
+                parent_concept_id="parent-b",
+                child_concept_id="child",
+                order=Decimal("1"),
+                weight=Decimal("-1"),
+                role_uri="role-a",
+            ),
+            TaxonomyCalculationRelation(
+                parent_concept_id="parent-other-role",
+                child_concept_id="child",
+                order=Decimal("1"),
+                weight=Decimal("1"),
+                role_uri="role-b",
+            ),
+        )
+    )
+
+    parents = calculation.parents_of(
+        "child",
+        role_uri="role-a",
+    )
+
+    assert tuple(
+        relation.parent_concept_id
+        for relation in parents
+    ) == (
+        "parent-a",
+        "parent-b",
+    )
