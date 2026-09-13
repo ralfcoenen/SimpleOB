@@ -34,7 +34,6 @@ class FakePayloadService:
         )
         return "<DatenTeil>test</DatenTeil>"
 
-
 class FakeCreateThAdapter:
     def __init__(self) -> None:
         self.calls = []
@@ -58,12 +57,14 @@ class FakeCreateThAdapter:
             }
         )
 
+        if test_marker is None:
+            return "<Elster></Elster>"
+
         return (
             "<Elster>"
             f"<Testmerker>{test_marker}</Testmerker>"
             "</Elster>"
         )
-
 
 class FakeValidateAdapter:
     def __init__(self) -> None:
@@ -176,3 +177,108 @@ def test_test_transmission_uses_validated_test_marker_path() -> None:
 
     assert result.response_xml == "<Erfolg/>"
     assert result.server_response_xml == "<Code>0</Code>"
+
+def test_production_transmission_uses_path_without_test_marker() -> None:
+    payload_service = FakePayloadService()
+    create_th_adapter = FakeCreateThAdapter()
+    validate_adapter = FakeValidateAdapter()
+    send_adapter = FakeSendAdapter()
+
+    certificate_path = Path(
+        "/test/test-softidnr-pse.pfx"
+    )
+
+    service = ElsterBilanzTransmissionService(
+        payload_service=payload_service,
+        create_th_adapter=create_th_adapter,
+        validate_adapter=validate_adapter,
+        send_adapter=send_adapter,
+        manufacturer_id="22924",
+        data_supplier="SimpleOB Testdatenlieferant",
+        certificate_path=certificate_path,
+        certificate_pin="123456",
+    )
+
+    master_data = SimpleNamespace()
+
+    validated = service.validate_production_transmission(
+        xbrl_xml="<xbrl/>",
+        master_data=master_data,
+        balance_sheet_date=date(2026, 12, 31),
+    )
+
+    assert validated.data_part_xml == (
+        "<DatenTeil>test</DatenTeil>"
+    )
+
+    assert create_th_adapter.calls[0]["test_marker"] is None
+
+    assert "<Testmerker" not in validated.elster_xml
+
+    assert validate_adapter.calls[0]["elster_xml"] == (
+        validated.elster_xml
+    )
+
+    result = service.send_production_transmission(
+        validated=validated,
+    )
+
+    assert send_adapter.calls == [
+        {
+            "elster_xml": validated.elster_xml,
+            "certificate_path": certificate_path,
+            "certificate_pin": "123456",
+            "datenart_version": "Bilanz_6.9",
+        }
+    ]
+
+    assert result.response_xml == "<Erfolg/>"
+    assert result.server_response_xml == "<Code>0</Code>"
+
+def test_production_transmission_rejects_test_marker_before_send() -> None:
+    payload_service = FakePayloadService()
+    create_th_adapter = FakeCreateThAdapter()
+    validate_adapter = FakeValidateAdapter()
+    send_adapter = FakeSendAdapter()
+
+    service = ElsterBilanzTransmissionService(
+        payload_service=payload_service,
+        create_th_adapter=create_th_adapter,
+        validate_adapter=validate_adapter,
+        send_adapter=send_adapter,
+        manufacturer_id="22924",
+        data_supplier="SimpleOB Testdatenlieferant",
+        certificate_path=Path(
+            "/test/test-softidnr-pse.pfx"
+        ),
+        certificate_pin="123456",
+    )
+
+    validated = service.validate_production_transmission(
+        xbrl_xml="<xbrl/>",
+        master_data=SimpleNamespace(),
+        balance_sheet_date=date(2026, 12, 31),
+    )
+
+    manipulated = type(validated)(
+        data_part_xml=validated.data_part_xml,
+        elster_xml=(
+            "<Elster>"
+            "<Testmerker>700000004</Testmerker>"
+            "</Elster>"
+        ),
+        eric_validation=validated.eric_validation,
+    )
+
+    try:
+        service.send_production_transmission(
+            validated=manipulated,
+        )
+    except RuntimeError as exc:
+        assert "SICHERHEITSABBRUCH" in str(exc)
+    else:
+        raise AssertionError(
+            "Produktivversand mit Testmerker wurde nicht abgebrochen."
+        )
+
+    assert send_adapter.calls == []

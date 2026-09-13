@@ -124,6 +124,46 @@ class ElsterBilanzTransmissionService:
             eric_validation=validation_result,
         )
 
+    def validate_production_transmission(
+        self,
+        *,
+        xbrl_xml: str,
+        master_data: CompanyMasterData,
+        balance_sheet_date: date,
+        datenart_version: str = DEFAULT_BILANZ_DATENART_VERSION,
+    ) -> ElsterBilanzValidationResult:
+        """Bereitet eine Produktivsendung vor und validiert sie lokal mit ERiC."""
+
+        data_part_xml = self._payload_service.build(
+            xbrl_xml=xbrl_xml,
+            master_data=master_data,
+            balance_sheet_date=balance_sheet_date,
+            data_supplier=self._data_supplier,
+        )
+
+        elster_xml = self._create_th_adapter.create(
+            data_part_xml=data_part_xml,
+            manufacturer_id=self._manufacturer_id,
+            version_client=get_application_version(),
+            data_supplier=self._data_supplier,
+            test_marker=None,
+        )
+
+        self._assert_no_test_marker(
+            elster_xml=elster_xml,
+        )
+
+        validation_result = self._validate_adapter.validate(
+            elster_xml=elster_xml,
+            datenart_version=datenart_version,
+        )
+
+        return ElsterBilanzValidationResult(
+            data_part_xml=data_part_xml,
+            elster_xml=elster_xml,
+            eric_validation=validation_result,
+        )
+
     def send_test_transmission(
         self,
         *,
@@ -135,6 +175,25 @@ class ElsterBilanzTransmissionService:
         self._assert_test_marker(
             elster_xml=validated.elster_xml,
             expected_test_marker=ELSTER_TEST_MARKER,
+        )
+
+        return self._send_adapter.send(
+            elster_xml=validated.elster_xml,
+            certificate_path=self._certificate_path,
+            certificate_pin=self._certificate_pin,
+            datenart_version=datenart_version,
+        )
+
+    def send_production_transmission(
+        self,
+        *,
+        validated: ElsterBilanzValidationResult,
+        datenart_version: str = DEFAULT_BILANZ_DATENART_VERSION,
+    ) -> EricSendResult:
+        """Versendet einen zuvor lokal validierten ELSTER-Produktivdatensatz."""
+
+        self._assert_no_test_marker(
+            elster_xml=validated.elster_xml,
         )
 
         return self._send_adapter.send(
@@ -178,6 +237,43 @@ class ElsterBilanzTransmissionService:
                 "SICHERHEITSABBRUCH: "
                 "Das ElsterXML enthält nicht genau den erwarteten "
                 f"Testmerker {expected_test_marker!r}. "
+                f"Gefunden: {test_markers!r}. "
+                "Es werden keine Daten an ELSTER gesendet."
+            )
+
+    @staticmethod
+    def _assert_no_test_marker(
+        *,
+        elster_xml: str,
+    ) -> None:
+        """Verhindert einen Produktivversand mit einem Testmerker."""
+
+        try:
+            root = ET.fromstring(elster_xml)
+        except ET.ParseError as exc:
+            raise RuntimeError(
+                "Das von EricCreateTH erzeugte ElsterXML "
+                "konnte nicht geparst werden. "
+                "Ein Versand wird nicht durchgeführt."
+            ) from exc
+
+        test_markers: list[str] = []
+
+        for element in root.iter():
+            local_name = element.tag.rsplit("}", 1)[-1]
+
+            if local_name != "Testmerker":
+                continue
+
+            test_markers.append(
+                (element.text or "").strip()
+            )
+
+        if test_markers:
+            raise RuntimeError(
+                "SICHERHEITSABBRUCH: "
+                "Das ElsterXML für eine Produktivübermittlung "
+                "enthält mindestens einen Testmerker. "
                 f"Gefunden: {test_markers!r}. "
                 "Es werden keine Daten an ELSTER gesendet."
             )

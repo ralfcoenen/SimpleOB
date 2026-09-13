@@ -1401,6 +1401,16 @@ class MainWindow(tk.Tk):
             anchor="w",
             pady=(8, 0),
         )
+        self._send_e_bilanz_production_button = ttk.Button(
+            self._e_bilanz_tab,
+            text="ELSTER-Produktivübermittlung",
+            command=self._send_e_bilanz_production,
+            state="disabled",
+        )
+        self._send_e_bilanz_production_button.pack(
+            anchor="w",
+            pady=(8, 0),
+        )
 
     def _save_bvv_annual_data(self) -> None:
         """Speichert die BVV-Jahresdaten des aktuellen Geschäftsjahres."""
@@ -1910,6 +1920,9 @@ class MainWindow(tk.Tk):
         self._send_e_bilanz_test_button.config(
             state="disabled",
         )
+        self._send_e_bilanz_production_button.config(
+            state="disabled",
+        )
 
         if not self._workspace.is_closed:
             self._e_bilanz_status.config(
@@ -1986,6 +1999,9 @@ class MainWindow(tk.Tk):
                     is not None
                 ):
                     self._send_e_bilanz_test_button.config(
+                        state="normal",
+                    )
+                    self._send_e_bilanz_production_button.config(
                         state="normal",
                     )
 
@@ -2214,6 +2230,89 @@ class MainWindow(tk.Tk):
                 "Testmerker: 700000004\n\n"
                 "Es wurde keine produktive "
                 "Steuerübermittlung durchgeführt."
+            ),
+            parent=self,
+        )
+
+    def _send_e_bilanz_production(self) -> None:
+        """Übermittelt die E-Bilanz produktiv an ELSTER."""
+
+        if self._elster_bilanz_transmission_service is None:
+            messagebox.showerror(
+                "ELSTER-Produktivübermittlung",
+                (
+                    "Die ERiC-/ELSTER-Konfiguration ist "
+                    "nicht vollständig."
+                ),
+                parent=self,
+            )
+            return
+
+        if self._current_e_bilanz_document is None:
+            messagebox.showwarning(
+                "ELSTER-Produktivübermittlung",
+                "Die E-Bilanz wurde noch nicht erzeugt.",
+                parent=self,
+            )
+            return
+
+        if not self._current_e_bilanz_arelle_valid:
+            messagebox.showwarning(
+                "ELSTER-Produktivübermittlung",
+                (
+                    "Die E-Bilanz muss zuerst erfolgreich "
+                    "mit Arelle validiert werden."
+                ),
+                parent=self,
+            )
+            return
+
+        confirmation = simpledialog.askstring(
+            "ELSTER-Produktivübermittlung",
+            (
+                "ACHTUNG: Dies ist eine PRODUKTIVE "
+                "ELSTER-Übermittlung.\n\n"
+                "Der Datensatz wird ohne Testmerker an ELSTER "
+                "übertragen und ist keine Testsendung.\n\n"
+                "Bitte prüfen Sie vor dem Versand nochmals "
+                "Mandant, Geschäftsjahr und E-Bilanz.\n\n"
+                "Zum endgültigen Start bitte exakt "
+                "PRODUKTIV SENDEN eingeben:"
+            ),
+            parent=self,
+        )
+
+        if confirmation != "PRODUKTIV SENDEN":
+            return
+
+        try:
+            master_data = self._workspace.load_company_master_data()
+
+            validated = (
+                self._elster_bilanz_transmission_service
+                .validate_production_transmission(
+                    xbrl_xml=self._current_e_bilanz_document.xml,
+                    master_data=master_data,
+                    balance_sheet_date=self._context.fiscal_year.end_date,
+                )
+            )
+
+            self._elster_bilanz_transmission_service.send_production_transmission(
+                validated=validated,
+            )
+        except (ValueError, FileNotFoundError, RuntimeError) as exc:
+            messagebox.showerror(
+                "ELSTER-Produktivübermittlung fehlgeschlagen",
+                str(exc),
+                parent=self,
+            )
+            return
+
+        messagebox.showinfo(
+            "ELSTER-Produktivübermittlung",
+            (
+                "Die E-Bilanz wurde ohne Fehler produktiv "
+                "an ELSTER übermittelt."
             ),
             parent=self,
         )

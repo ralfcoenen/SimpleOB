@@ -191,6 +191,7 @@ def _create_e_bilanz_window_double(
     window._validate_e_bilanz_button = Mock()
     window._export_e_bilanz_button = Mock()
     window._send_e_bilanz_test_button = Mock()
+    window._send_e_bilanz_production_button = Mock()
 
     return window
 
