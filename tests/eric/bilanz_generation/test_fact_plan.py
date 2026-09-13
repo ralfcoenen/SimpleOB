@@ -277,3 +277,35 @@ def test_fact_plan_rejects_invalid_state() -> None:
             concept_name=ST13_CONCEPT,
             state="value",  # type: ignore[arg-type]
         )
+
+
+def test_fact_plan_with_conditional_child_adds_child_to_existing_parent() -> None:
+    plan = FactPlan(
+        nodes=(
+            FactPlanNode(
+                concept_name="parent",
+                state=FactPlanState.CONDITIONAL,
+            ),
+        )
+    )
+
+    extended = plan.with_conditional_child(
+        parent_concept_name="parent",
+        child_concept_name="parent.child",
+    )
+
+    parent = extended.node_for(
+        "parent"
+    )
+
+    assert parent is not None
+    assert parent.state is FactPlanState.CONDITIONAL
+    assert len(parent.children) == 1
+    assert parent.children[0] == FactPlanNode(
+        concept_name="parent.child",
+        state=FactPlanState.CONDITIONAL,
+    )
+
+    assert plan.node_for(
+        "parent.child"
+    ) is None

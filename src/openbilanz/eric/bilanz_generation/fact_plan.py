@@ -154,6 +154,88 @@ class FactPlan:
 
         return current_node
 
+    def with_conditional_child(
+        self,
+        *,
+        parent_concept_name: str,
+        child_concept_name: str,
+    ) -> "FactPlan":
+        """Ergänzt genau einen CONDITIONAL-Child unter einem vorhandenen Knoten."""
+
+        self._validate_concept_name(
+            parent_concept_name
+        )
+        self._validate_concept_name(
+            child_concept_name
+        )
+
+        if self.node_for(
+            child_concept_name
+        ) is not None:
+            raise ValueError(
+                "child concept already exists in fact plan: "
+                f"{child_concept_name}"
+            )
+
+        parent_matches: list[
+            FactPlanNode
+        ] = []
+
+        for node in self.nodes:
+            self._collect_nodes(
+                node=node,
+                concept_name=parent_concept_name,
+                matches=parent_matches,
+            )
+
+        if not parent_matches:
+            raise ValueError(
+                "parent concept not found in fact plan: "
+                f"{parent_concept_name}"
+            )
+
+        if len(parent_matches) > 1:
+            raise ValueError(
+                "parent concept is ambiguous in fact plan: "
+                f"{parent_concept_name}"
+            )
+
+        child = FactPlanNode(
+            concept_name=child_concept_name,
+            state=FactPlanState.CONDITIONAL,
+        )
+
+        def replace_node(
+            node: FactPlanNode,
+        ) -> FactPlanNode:
+            if node.concept_name == parent_concept_name:
+                return FactPlanNode(
+                    concept_name=node.concept_name,
+                    state=node.state,
+                    children=(
+                        *node.children,
+                        child,
+                    ),
+                )
+
+            return FactPlanNode(
+                concept_name=node.concept_name,
+                state=node.state,
+                children=tuple(
+                    replace_node(
+                        existing_child
+                    )
+                    for existing_child in node.children
+                ),
+            )
+
+        return FactPlan(
+            nodes=tuple(
+                replace_node(node)
+                for node in self.nodes
+            )
+        )
+
     @classmethod
     def _collect_nodes(
         cls,
