@@ -2687,6 +2687,9 @@ class MainWindow(tk.Tk):
         self._refresh_journal()
         self._refresh_balance_sheet()
 
+        if self._current_trial_balance_report is not None:
+            self._refresh_trial_balance_report()
+
         messagebox.showinfo(
             "Buchung storniert",
             (
