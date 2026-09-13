@@ -23,6 +23,9 @@ class ApplicationConfig:
     config_file: Path
     eric_lib_dir: Path | None = None
     eric_manufacturer_id: str | None = None
+    eric_data_supplier: str | None = None
+    eric_certificate_path: Path | None = None
+    eric_certificate_pin: str | None = None
 
     @property
     def database_url(self) -> str:
@@ -124,6 +127,39 @@ def load_config(
     if not eric_manufacturer_id:
         eric_manufacturer_id = None
 
+    eric_data_supplier_value = eric.get(
+        "data_supplier",
+    )
+    eric_data_supplier = (
+        str(eric_data_supplier_value).strip()
+        if eric_data_supplier_value is not None
+        else None
+    )
+
+    if not eric_data_supplier:
+        eric_data_supplier = None
+
+    eric_certificate_path_value = eric.get(
+        "certificate_path",
+    )
+    eric_certificate_path = (
+        Path(eric_certificate_path_value).expanduser()
+        if eric_certificate_path_value
+        else None
+    )
+
+    eric_certificate_pin_value = eric.get(
+        "certificate_pin",
+    )
+    eric_certificate_pin = (
+        str(eric_certificate_pin_value)
+        if eric_certificate_pin_value is not None
+        else None
+    )
+
+    if not eric_certificate_pin:
+        eric_certificate_pin = None
+
     return ApplicationConfig(
         data_dir=data_dir,
         database_file=database_file,
@@ -131,6 +167,9 @@ def load_config(
         config_file=path,
         eric_lib_dir=eric_lib_dir,
         eric_manufacturer_id=eric_manufacturer_id,
+        eric_data_supplier=eric_data_supplier,
+        eric_certificate_path=eric_certificate_path,
+        eric_certificate_pin=eric_certificate_pin,
     )
 
 

@@ -181,12 +181,16 @@ def _create_e_bilanz_window_double(
     window._current_e_bilanz_preparation.balance_sheet_amounts = {}
     window._current_e_bilanz_preparation.income_statement_amounts = {}
     window._current_e_bilanz_document = None
+    window._current_e_bilanz_arelle_valid = False
+
+    window._elster_bilanz_transmission_service = None
 
     window._e_bilanz_status = Mock()
     window._prepare_e_bilanz_button = Mock()
     window._build_e_bilanz_button = Mock()
     window._validate_e_bilanz_button = Mock()
     window._export_e_bilanz_button = Mock()
+    window._send_e_bilanz_test_button = Mock()
 
     return window
 
@@ -350,11 +354,11 @@ def test_e_bilanz_export_is_disabled_by_refresh() -> None:
     )
 
 def test_successful_e_bilanz_validation_enables_export() -> None:
-    window = object.__new__(MainWindow)
+    window = _create_e_bilanz_window_double(
+        taxonomy_usable=True,
+    )
 
-    window._workspace = Mock()
     window._current_e_bilanz_document = Mock()
-    window._export_e_bilanz_button = Mock()
 
     window._workspace.validate_e_bilanz.return_value = Mock(
         is_valid=True,
@@ -366,16 +370,19 @@ def test_successful_e_bilanz_validation_enables_export() -> None:
     ):
         window._validate_e_bilanz()
 
-    window._export_e_bilanz_button.config.assert_called_once_with(
+    assert window._current_e_bilanz_arelle_valid is True
+
+    window._export_e_bilanz_button.config.assert_called_with(
         state="normal"
     )
 
 def test_failed_e_bilanz_validation_disables_export() -> None:
-    window = object.__new__(MainWindow)
+    window = _create_e_bilanz_window_double(
+        taxonomy_usable=True,
+    )
 
-    window._workspace = Mock()
     window._current_e_bilanz_document = Mock()
-    window._export_e_bilanz_button = Mock()
+    window._current_e_bilanz_arelle_valid = True
 
     window._workspace.validate_e_bilanz.return_value = Mock(
         is_valid=False,
@@ -387,7 +394,9 @@ def test_failed_e_bilanz_validation_disables_export() -> None:
     ):
         window._validate_e_bilanz()
 
-    window._export_e_bilanz_button.config.assert_called_once_with(
+    assert window._current_e_bilanz_arelle_valid is False
+
+    window._export_e_bilanz_button.config.assert_called_with(
         state="disabled"
     )
 

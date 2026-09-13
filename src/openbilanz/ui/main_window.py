@@ -2,7 +2,7 @@
 
 import tkinter as tk
 from pathlib import Path
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, simpledialog, ttk
 from urllib.error import URLError
 from zipfile import BadZipFile
 from decimal import Decimal
@@ -22,6 +22,9 @@ from openbilanz.domain.money import ZERO
 from openbilanz.domain.vat_accounts import VatAccounts
 from openbilanz.domain.bvv_annual_data import (
     BvvAnnualData,
+)
+from openbilanz.eric.elster_bilanz_transmission_service import (
+    ElsterBilanzTransmissionService,
 )
 from openbilanz.services.closing_accounts import ClosingAccounts
 from openbilanz.services.closing_result import ClosingResult
@@ -94,7 +97,11 @@ class MainWindow(tk.Tk):
         depreciation_expense_account_number: str,
         vat_accounts: VatAccounts,
         pdf_reporting_service: PdfReportingService,
+        elster_bilanz_transmission_service: (
+            ElsterBilanzTransmissionService | None
+        ) = None,
     ) -> None:
+
         super().__init__()
 
         self._workspace = workspace
@@ -110,6 +117,9 @@ class MainWindow(tk.Tk):
         )
         self._vat_accounts = vat_accounts
         self._pdf_reporting_service = pdf_reporting_service
+        self._elster_bilanz_transmission_service = (
+            elster_bilanz_transmission_service
+        )
         self._current_trial_balance_report = None
         self._current_account_activity_reports = ()
         self._current_account_activity_start_date = None
@@ -139,18 +149,13 @@ class MainWindow(tk.Tk):
             financial_statement_context.statement_builder
         )
         self._account_types = financial_statement_context.account_types
-
         self._current_income_statement: IncomeStatement | None = None
-
         self._current_closing_result: ClosingResult | None = None
-
         self._current_balance_sheet: BalanceSheet | None = None
-
         self._current_closing_balances = ()
-
         self._current_e_bilanz_preparation: EBilanzPreparationResult | None = None
-
         self._current_e_bilanz_document: EBilanzDocument | None = None
+        self._current_e_bilanz_arelle_valid = False
 
         self._create_ui()
 
@@ -1386,6 +1391,16 @@ class MainWindow(tk.Tk):
             anchor="w",
             pady=(8, 0),
         )
+        self._send_e_bilanz_test_button = ttk.Button(
+            self._e_bilanz_tab,
+            text="ELSTER-Testübermittlung",
+            command=self._send_e_bilanz_test,
+            state="disabled",
+        )
+        self._send_e_bilanz_test_button.pack(
+            anchor="w",
+            pady=(8, 0),
+        )
 
     def _save_bvv_annual_data(self) -> None:
         """Speichert die BVV-Jahresdaten des aktuellen Geschäftsjahres."""
@@ -1892,6 +1907,9 @@ class MainWindow(tk.Tk):
         self._export_e_bilanz_button.config(
             state="disabled",
         )
+        self._send_e_bilanz_test_button.config(
+            state="disabled",
+        )
 
         if not self._workspace.is_closed:
             self._e_bilanz_status.config(
@@ -1958,6 +1976,19 @@ class MainWindow(tk.Tk):
                 state="normal",
             )
 
+            if self._current_e_bilanz_arelle_valid:
+                self._export_e_bilanz_button.config(
+                    state="normal",
+                )
+
+                if (
+                    self._elster_bilanz_transmission_service
+                    is not None
+                ):
+                    self._send_e_bilanz_test_button.config(
+                        state="normal",
+                    )
+
         status_text = (
             "Die E-Bilanz wurde vorbereitet.\n"
             f"Bilanzpositionen: "
@@ -2007,8 +2038,11 @@ class MainWindow(tk.Tk):
             return
 
         self._current_e_bilanz_preparation = preparation
+        self._current_e_bilanz_document = None
+        self._current_e_bilanz_arelle_valid = False
 
         self._refresh_e_bilanz()
+
 
     def _build_e_bilanz(self) -> None:
         """Erzeugt die E-Bilanz aus den vorbereiteten Abschlusswerten."""
@@ -2035,6 +2069,7 @@ class MainWindow(tk.Tk):
             return
 
         self._current_e_bilanz_document = document
+        self._current_e_bilanz_arelle_valid = False
 
         self._refresh_e_bilanz()
 
@@ -2066,9 +2101,8 @@ class MainWindow(tk.Tk):
             return
 
         if result.is_valid:
-            self._export_e_bilanz_button.config(
-                state="normal",
-            )
+            self._current_e_bilanz_arelle_valid = True
+            self._refresh_e_bilanz()
 
             messagebox.showinfo(
                 "E-Bilanz",
@@ -2077,13 +2111,110 @@ class MainWindow(tk.Tk):
             )
             return
 
+        self._current_e_bilanz_arelle_valid = False
+        self._refresh_e_bilanz()
+
         errors = "\n".join(result.errors)
-        self._export_e_bilanz_button.config(
-            state="disabled",
-        )
+
         messagebox.showerror(
             "E-Bilanz-Validierung fehlgeschlagen",
             (f"Arelle hat Fehler in der E-Bilanz festgestellt.\n\n{errors}"),
+            parent=self,
+        )
+
+    def _send_e_bilanz_test(self) -> None:
+        """Übermittelt die E-Bilanz als echte ELSTER-Testsendung."""
+
+        if self._elster_bilanz_transmission_service is None:
+            messagebox.showerror(
+                "ELSTER-Testübermittlung",
+                (
+                    "Die ERiC-/ELSTER-Konfiguration ist "
+                    "nicht vollständig."
+                ),
+                parent=self,
+            )
+            return
+
+        if self._current_e_bilanz_document is None:
+            messagebox.showwarning(
+                "ELSTER-Testübermittlung",
+                "Die E-Bilanz wurde noch nicht erzeugt.",
+                parent=self,
+            )
+            return
+
+        if not self._current_e_bilanz_arelle_valid:
+            messagebox.showwarning(
+                "ELSTER-Testübermittlung",
+                (
+                    "Die E-Bilanz muss zuerst erfolgreich "
+                    "mit Arelle validiert werden."
+                ),
+                parent=self,
+            )
+            return
+
+        confirmation = simpledialog.askstring(
+            "ELSTER-Testübermittlung",
+            (
+                "ACHTUNG: Diese Funktion stellt eine echte "
+                "Verbindung zum ELSTER-Server her.\n\n"
+                "Der Datensatz wird ausschließlich als "
+                "Testsendung mit dem ELSTER-Testmerker "
+                "700000004 übertragen.\n\n"
+                "Zum Start bitte exakt TESTSENDUNG eingeben:"
+            ),
+            parent=self,
+        )
+
+        if confirmation != "TESTSENDUNG":
+            return
+
+        try:
+            master_data = (
+                self._workspace.load_company_master_data()
+            )
+
+            validated = (
+                self._elster_bilanz_transmission_service
+                .validate_test_transmission(
+                    xbrl_xml=(
+                        self._current_e_bilanz_document.xml
+                    ),
+                    master_data=master_data,
+                    balance_sheet_date=(
+                        self._context.fiscal_year.end_date
+                    ),
+                )
+            )
+
+            self._elster_bilanz_transmission_service\
+                .send_test_transmission(
+                    validated=validated,
+                )
+
+        except (
+            ValueError,
+            FileNotFoundError,
+            RuntimeError,
+        ) as exc:
+            messagebox.showerror(
+                "ELSTER-Testübermittlung fehlgeschlagen",
+                str(exc),
+                parent=self,
+            )
+            return
+
+        messagebox.showinfo(
+            "ELSTER-Testübermittlung",
+            (
+                "Die ELSTER-Testübermittlung wurde "
+                "ohne Fehler abgeschlossen.\n\n"
+                "Testmerker: 700000004\n\n"
+                "Es wurde keine produktive "
+                "Steuerübermittlung durchgeführt."
+            ),
             parent=self,
         )
 

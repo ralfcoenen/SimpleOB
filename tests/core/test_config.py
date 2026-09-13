@@ -181,11 +181,20 @@ def test_load_config_reads_eric_configuration(
         / "lib"
     )
 
+    certificate_path = (
+        tmp_path
+        / "certificate"
+        / "elster.pfx"
+    )
+
     config_file.write_text(
         (
             "[eric]\n"
             f'lib_dir = "{eric_lib_dir}"\n'
             'manufacturer_id = " 12345 "\n'
+            'data_supplier = " Test-Datenlieferant "\n'
+            f'certificate_path = "{certificate_path}"\n'
+            'certificate_pin = "123456"\n'
         ),
         encoding="utf-8",
     )
@@ -196,7 +205,8 @@ def test_load_config_reads_eric_configuration(
 
     assert config.eric_lib_dir == eric_lib_dir
     assert config.eric_manufacturer_id == "12345"
-
+    assert config.eric_certificate_path == certificate_path
+    assert config.eric_certificate_pin == "123456"
 
 def test_load_config_expands_eric_lib_directory(
     tmp_path: Path,
@@ -262,3 +272,4 @@ def test_load_config_treats_empty_eric_values_as_missing(
 
     assert config.eric_lib_dir is None
     assert config.eric_manufacturer_id is None
+    assert config.eric_data_supplier is None

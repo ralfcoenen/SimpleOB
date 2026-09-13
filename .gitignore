@@ -49,3 +49,8 @@ docs/development/eric/
 /data/eric-log/
 /eric_69_generated.xbrl
 /export2.xbrl
+
+
+# ELSTER-Zertifikate
+*.pfx
+*.p12
