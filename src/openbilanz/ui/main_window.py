@@ -6,6 +6,8 @@ from tkinter import filedialog, messagebox, simpledialog, ttk
 from urllib.error import URLError
 from zipfile import BadZipFile
 from decimal import Decimal
+from uuid import UUID
+from datetime import date
 
 from openbilanz.accounting.balance_sheet import BalanceSheet
 from openbilanz.accounting.financial_statement_context import (
@@ -685,6 +687,8 @@ class MainWindow(tk.Tk):
             anchor="w",
         )
 
+        self._journal_booking_ids: dict[str, UUID] = {}
+
         columns = (
             "date",
             "voucher",
@@ -770,7 +774,23 @@ class MainWindow(tk.Tk):
         self._journal_table.pack(
             fill="both",
             expand=True,
-            pady=(12, 0),
+            pady=(12, 8),
+        )
+
+        journal_actions = ttk.Frame(
+            self._journal_tab
+        )
+        journal_actions.pack(
+            fill="x",
+        )
+
+        self._journal_reversal_button = ttk.Button(
+            journal_actions,
+            text="Buchung stornieren",
+            command=self._reverse_selected_journal_booking,
+        )
+        self._journal_reversal_button.pack(
+            side="left",
         )
 
     def _create_booking_tab(self) -> None:
@@ -2404,49 +2424,249 @@ class MainWindow(tk.Tk):
                 ),
             )
 
-
     def _refresh_journal(self) -> None:
         """Aktualisiert die Journalanzeige."""
 
         for item in self._journal_table.get_children():
             self._journal_table.delete(item)
 
-        account_names = {account.number: account.name for account in self._accounts}
+        self._journal_booking_ids.clear()
+
+        account_names = {
+            account.number: account.name
+            for account in self._accounts
+        }
 
         for booking in self._journal:
             first_line = True
 
-            for line in booking.lines:
+            for line_number, line in enumerate(
+                booking.lines
+            ):
                 account_name = account_names.get(
                     line.account_number,
                     "Unbekanntes Konto",
                 )
 
-                account_display = f"{line.account_number} – {account_name}"
+                account_display = (
+                    f"{line.account_number} – "
+                    f"{account_name}"
+                )
 
                 if line.is_debit:
                     side = "Soll"
                 else:
                     side = "Haben"
 
+                item_id = (
+                    f"{booking.booking_id}:"
+                    f"{line_number}"
+                )
+
                 self._journal_table.insert(
                     "",
                     "end",
+                    iid=item_id,
                     values=(
                         (
-                            booking.booking_date.strftime("%d.%m.%Y")
+                            booking.booking_date.strftime(
+                                "%d.%m.%Y"
+                            )
                             if first_line
                             else ""
                         ),
-                        (booking.voucher_no or "" if first_line else ""),
-                        (booking.description or "" if first_line else ""),
+                        (
+                            booking.voucher_no or ""
+                            if first_line
+                            else ""
+                        ),
+                        (
+                            booking.description or ""
+                            if first_line
+                            else ""
+                        ),
                         account_display,
                         side,
-                        self._format_amount(line.amount),
+                        self._format_amount(
+                            line.amount
+                        ),
                     ),
                 )
 
+                self._journal_booking_ids[
+                    item_id
+                ] = booking.booking_id
+
                 first_line = False
+
+    def _reverse_selected_journal_booking(
+        self,
+    ) -> None:
+        """Storniert die im Journal ausgewählte reguläre Buchung."""
+
+        selection = self._journal_table.selection()
+
+        if not selection:
+            messagebox.showwarning(
+                "Buchung stornieren",
+                "Bitte wählen Sie zuerst eine "
+                "Buchung im Journal aus.",
+                parent=self,
+            )
+            return
+
+        item_id = selection[0]
+
+        booking_id = self._journal_booking_ids.get(
+            item_id
+        )
+
+        if booking_id is None:
+            messagebox.showerror(
+                "Buchung stornieren",
+                "Die ausgewählte Buchung konnte "
+                "nicht ermittelt werden.",
+                parent=self,
+            )
+            return
+
+        if self._workspace.is_closed:
+            messagebox.showerror(
+                "Buchung stornieren",
+                "Das Geschäftsjahr ist abgeschlossen. "
+                "Eine Stornobuchung ist nicht mehr möglich.",
+                parent=self,
+            )
+            return
+
+        default_date = date.today()
+
+        if not self._context.fiscal_year.contains(
+            default_date
+        ):
+            default_date = (
+                self._context.fiscal_year.end_date
+            )
+
+        reversal_date_text = simpledialog.askstring(
+            "Buchung stornieren",
+            (
+                "Bitte geben Sie das Stornodatum ein "
+                "(TT.MM.JJJJ):"
+            ),
+            initialvalue=default_date.strftime(
+                "%d.%m.%Y"
+            ),
+            parent=self,
+        )
+
+        if reversal_date_text is None:
+            return
+
+        try:
+            reversal_date = parse_german_date(
+                reversal_date_text
+            )
+
+            reversal_booking = (
+                self._workspace
+                .create_reversal_booking(
+                    booking_id=booking_id,
+                    reversal_date=reversal_date,
+                )
+            )
+
+        except (TypeError, ValueError) as exc:
+            messagebox.showerror(
+                "Buchung stornieren",
+                str(exc),
+                parent=self,
+            )
+            return
+
+        account_names = {
+            account.number: account.name
+            for account in self._accounts
+        }
+
+        preview_lines = []
+
+        for line in reversal_booking.lines:
+            account_name = account_names.get(
+                line.account_number,
+                "Unbekanntes Konto",
+            )
+
+            side = (
+                "Soll"
+                if line.side is EntrySide.DEBIT
+                else "Haben"
+            )
+
+            preview_lines.append(
+                (
+                    f"{line.account_number} "
+                    f"{account_name}\n"
+                    f"    {side}: "
+                    f"{self._format_amount(line.amount)}"
+                )
+            )
+
+        preview = "\n\n".join(
+            preview_lines
+        )
+
+        confirmation = simpledialog.askstring(
+            "Stornobuchung bestätigen",
+            (
+                "Folgende Stornobuchung wird erzeugt:\n\n"
+                f"Datum: "
+                f"{reversal_booking.booking_date.strftime('%d.%m.%Y')}\n"
+                f"Buchungstext: "
+                f"{reversal_booking.description or ''}\n\n"
+                f"{preview}\n\n"
+                "Die ursprüngliche Buchung bleibt "
+                "unverändert bestehen.\n\n"
+                "Zum endgültigen Buchen geben Sie exakt "
+                "DURCHFÜHREN ein:"
+            ),
+            parent=self,
+        )
+
+        if confirmation != "DURCHFÜHREN":
+            if confirmation is not None:
+                messagebox.showinfo(
+                    "Buchung stornieren",
+                    "Die Stornobuchung wurde nicht durchgeführt.",
+                    parent=self,
+                )
+            return
+
+        try:
+            self._workspace.post_booking(
+                reversal_booking
+            )
+        except (TypeError, ValueError) as exc:
+            messagebox.showerror(
+                "Buchung stornieren",
+                str(exc),
+                parent=self,
+            )
+            return
+
+        self._refresh_journal()
+        self._refresh_balance_sheet()
+
+        messagebox.showinfo(
+            "Buchung storniert",
+            (
+                "Die Stornobuchung wurde erfolgreich "
+                "gebucht.\n\n"
+                "Die ursprüngliche Buchung bleibt "
+                "im Journal erhalten."
+            ),
+            parent=self,
+        )
 
     def _refresh_balance_sheet(self) -> None:
         """Erzeugt und aktualisiert die laufende Bilanz."""

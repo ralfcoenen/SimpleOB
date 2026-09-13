@@ -47,6 +47,7 @@ from openbilanz.domain.accounting_control_accounts import (
     AccountingControlAccounts,
 )
 from openbilanz.domain.booking import Booking
+from openbilanz.domain.booking_line import BookingLine
 from openbilanz.domain.booking_type import BookingType
 from openbilanz.domain.chart_of_accounts_template import (
     ChartOfAccountsTemplate,
@@ -415,6 +416,125 @@ class FiscalYearWorkspace:
         """Gibt an, ob das Geschäftsjahr abgeschlossen ist."""
 
         return self.managed_fiscal_year.status is FiscalYearStatus.CLOSED
+
+    def create_reversal_booking(
+        self,
+        *,
+        booking_id: UUID,
+        reversal_date: date,
+    ) -> Booking:
+        """Erzeugt eine Stornobuchung, ohne sie bereits zu persistieren."""
+
+        if not isinstance(booking_id, UUID):
+            raise TypeError(
+                "booking_id must be a UUID"
+            )
+
+        if not isinstance(reversal_date, date):
+            raise TypeError(
+                "reversal_date muss ein Datum sein."
+            )
+
+        if self.is_closed:
+            raise ValueError(
+                "Ein abgeschlossenes Geschäftsjahr "
+                "kann nicht mehr bebucht werden."
+            )
+
+        if not self._context.fiscal_year.contains(
+            reversal_date
+        ):
+            raise ValueError(
+                "Das Stornodatum liegt außerhalb "
+                "des Geschäftsjahres."
+            )
+
+        bookings = (
+            self._booking_repository
+            .list_for_fiscal_year(
+                company_id=(
+                    self._context.company.company_id
+                ),
+                fiscal_year=(
+                    self._context.fiscal_year
+                ),
+            )
+        )
+
+        original_booking = next(
+            (
+                booking
+                for booking in bookings
+                if booking.booking_id == booking_id
+            ),
+            None,
+        )
+
+        if original_booking is None:
+            raise ValueError(
+                "Die zu stornierende Buchung "
+                "wurde nicht gefunden."
+            )
+
+        if (
+            original_booking.booking_type
+            is not BookingType.REGULAR
+        ):
+            raise ValueError(
+                "Nur reguläre Buchungen können "
+                "über das Journal storniert werden."
+            )
+
+        already_reversed = any(
+            booking.booking_type
+            is BookingType.REVERSAL
+            and booking.reversal_of_booking_id
+            == original_booking.booking_id
+            for booking in bookings
+        )
+
+        if already_reversed:
+            raise ValueError(
+                "Die Buchung wurde bereits storniert."
+            )
+
+        reversed_lines = tuple(
+            BookingLine(
+                account_number=line.account_number,
+                side=(
+                    EntrySide.CREDIT
+                    if line.side is EntrySide.DEBIT
+                    else EntrySide.DEBIT
+                ),
+                amount=line.amount,
+            )
+            for line in original_booking.lines
+        )
+
+        booking_reference = (
+            original_booking.voucher_no
+            or str(original_booking.booking_id)
+        )
+
+        original_description = (
+            f": {original_booking.description}"
+            if original_booking.description
+            else ""
+        )
+
+        return Booking(
+            booking_date=reversal_date,
+            description=(
+                "Storno zu Buchung "
+                f"{booking_reference}"
+                f"{original_description}"
+            ),
+            booking_type=BookingType.REVERSAL,
+            reversal_of_booking_id=(
+                original_booking.booking_id
+            ),
+            lines=reversed_lines,
+        )
 
     def post_booking(
         self,

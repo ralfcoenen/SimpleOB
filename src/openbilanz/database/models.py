@@ -397,6 +397,11 @@ class Buchung(Base):
         server_default="REGULAR",
     )
 
+    reversal_of_booking_id: Mapped[str | None] = mapped_column(
+        String(36),
+        nullable=True,
+    )
+
     wirtschaftsjahr: Mapped[Wirtschaftsjahr] = relationship(
         back_populates="buchungen",
     )

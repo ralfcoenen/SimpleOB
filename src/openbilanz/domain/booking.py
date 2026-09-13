@@ -29,6 +29,7 @@ class Booking:
     description: str | None = None
     booking_id: UUID = field(default_factory=uuid4)
     booking_type: BookingType = BookingType.REGULAR
+    reversal_of_booking_id: UUID | None = None
 
     def __post_init__(self) -> None:
         """Normalisiert und validiert die Buchung."""
@@ -50,7 +51,37 @@ class Booking:
             raise TypeError(
                 "Der Buchungstyp muss ein BookingType sein."
             )
-        
+
+        if (
+            self.reversal_of_booking_id is not None
+            and not isinstance(self.reversal_of_booking_id, UUID)
+        ):
+            raise TypeError(
+                "Die ID der stornierten Buchung muss eine UUID sein."
+            )
+
+        if (
+            self.booking_type is BookingType.REVERSAL
+            and self.reversal_of_booking_id is None
+        ):
+            raise ValueError(
+                "Eine Stornobuchung muss auf die ursprüngliche Buchung verweisen."
+            )
+
+        if (
+            self.booking_type is not BookingType.REVERSAL
+            and self.reversal_of_booking_id is not None
+        ):
+            raise ValueError(
+                "Nur eine Stornobuchung darf auf eine ursprüngliche Buchung verweisen."
+            )
+
+        if self.reversal_of_booking_id == self.booking_id:
+            raise ValueError(
+                "Eine Buchung kann nicht sich selbst stornieren."
+            )
+
+
         if len(lines) < 2:
             raise ValueError(
                 "Eine Buchung muss mindestens zwei Buchungszeilen enthalten."

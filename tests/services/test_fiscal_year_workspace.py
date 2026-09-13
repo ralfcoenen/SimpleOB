@@ -422,6 +422,276 @@ def test_post_booking_does_not_change_workspace_when_persistence_fails(
         fiscal_year=context.fiscal_year,
     )
 
+def test_create_reversal_booking_mirrors_original_booking(
+    context: ApplicationContext,
+) -> None:
+    """Erzeugt eine vollständige Stornobuchung ohne Persistenz."""
+
+    booking_repository = Mock()
+    company_repository = Mock()
+
+    original_booking = Booking(
+        booking_date=date(2026, 8, 8),
+        voucher_no="RE-001",
+        description="Ausgangsrechnung",
+        lines=(
+            BookingLine(
+                account_number="1200",
+                side=EntrySide.DEBIT,
+                amount=Decimal("119.00"),
+            ),
+            BookingLine(
+                account_number="8400",
+                side=EntrySide.CREDIT,
+                amount=Decimal("100.00"),
+            ),
+            BookingLine(
+                account_number="1776",
+                side=EntrySide.CREDIT,
+                amount=Decimal("19.00"),
+            ),
+        ),
+    )
+
+    booking_repository.list_for_fiscal_year.return_value = (
+        original_booking,
+    )
+
+    company_repository.get_managed_fiscal_years.return_value = (
+        ManagedFiscalYear(
+            fiscal_year=context.fiscal_year,
+            status=FiscalYearStatus.OPEN,
+            opening_source=None,
+        ),
+    )
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=company_repository,
+        posting_service=PostingService(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
+        taxonomy_management_service=Mock(),
+        e_bilanz_export_service=Mock(),
+    )
+
+    reversal_booking = workspace.create_reversal_booking(
+        booking_id=original_booking.booking_id,
+        reversal_date=date(2026, 8, 9),
+    )
+
+    assert (
+        reversal_booking.booking_type
+        is BookingType.REVERSAL
+    )
+    assert (
+        reversal_booking.reversal_of_booking_id
+        == original_booking.booking_id
+    )
+    assert reversal_booking.booking_date == date(
+        2026,
+        8,
+        9,
+    )
+    assert reversal_booking.voucher_no is None
+    assert reversal_booking.description == (
+        "Storno zu Buchung RE-001: Ausgangsrechnung"
+    )
+
+    assert reversal_booking.lines == (
+        BookingLine(
+            account_number="1200",
+            side=EntrySide.CREDIT,
+            amount=Decimal("119.00"),
+        ),
+        BookingLine(
+            account_number="8400",
+            side=EntrySide.DEBIT,
+            amount=Decimal("100.00"),
+        ),
+        BookingLine(
+            account_number="1776",
+            side=EntrySide.DEBIT,
+            amount=Decimal("19.00"),
+        ),
+    )
+
+    booking_repository.add.assert_not_called()
+
+@pytest.mark.parametrize(
+    "booking_type",
+    (
+        BookingType.OPENING,
+        BookingType.CLOSING,
+        BookingType.REVERSAL,
+    ),
+)
+def test_create_reversal_booking_rejects_non_regular_booking(
+    context: ApplicationContext,
+    booking_type: BookingType,
+) -> None:
+    """Nur reguläre Buchungen dürfen über das Journal storniert werden."""
+
+    booking_repository = Mock()
+    company_repository = Mock()
+
+    original_booking = Booking(
+        booking_date=date(2026, 8, 8),
+        description="Nicht reguläre Buchung",
+        booking_type=booking_type,
+        reversal_of_booking_id=(
+            uuid4()
+            if booking_type is BookingType.REVERSAL
+            else None
+        ),
+        lines=(
+            BookingLine(
+                account_number="1200",
+                side=EntrySide.DEBIT,
+                amount=Decimal("100.00"),
+            ),
+            BookingLine(
+                account_number="1800",
+                side=EntrySide.CREDIT,
+                amount=Decimal("100.00"),
+            ),
+        ),
+    )
+
+    booking_repository.list_for_fiscal_year.return_value = (
+        original_booking,
+    )
+
+    company_repository.get_managed_fiscal_years.return_value = (
+        ManagedFiscalYear(
+            fiscal_year=context.fiscal_year,
+            status=FiscalYearStatus.OPEN,
+            opening_source=None,
+        ),
+    )
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=company_repository,
+        posting_service=PostingService(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
+        taxonomy_management_service=Mock(),
+        e_bilanz_export_service=Mock(),
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="Nur reguläre Buchungen",
+    ):
+        workspace.create_reversal_booking(
+            booking_id=original_booking.booking_id,
+            reversal_date=date(2026, 8, 9),
+        )
+
+    booking_repository.add.assert_not_called()
+
+def test_create_reversal_booking_rejects_already_reversed_booking(
+    context: ApplicationContext,
+) -> None:
+    """Eine bereits stornierte Buchung darf nicht erneut storniert werden."""
+
+    booking_repository = Mock()
+    company_repository = Mock()
+
+    original_booking = Booking(
+        booking_date=date(2026, 8, 8),
+        voucher_no="RE-002",
+        description="Ausgangsrechnung",
+        lines=(
+            BookingLine(
+                account_number="1200",
+                side=EntrySide.DEBIT,
+                amount=Decimal("119.00"),
+            ),
+            BookingLine(
+                account_number="8400",
+                side=EntrySide.CREDIT,
+                amount=Decimal("100.00"),
+            ),
+            BookingLine(
+                account_number="1776",
+                side=EntrySide.CREDIT,
+                amount=Decimal("19.00"),
+            ),
+        ),
+    )
+
+    existing_reversal = Booking(
+        booking_date=date(2026, 8, 9),
+        description="Storno zu Buchung RE-002",
+        booking_type=BookingType.REVERSAL,
+        reversal_of_booking_id=original_booking.booking_id,
+        lines=(
+            BookingLine(
+                account_number="1200",
+                side=EntrySide.CREDIT,
+                amount=Decimal("119.00"),
+            ),
+            BookingLine(
+                account_number="8400",
+                side=EntrySide.DEBIT,
+                amount=Decimal("100.00"),
+            ),
+            BookingLine(
+                account_number="1776",
+                side=EntrySide.DEBIT,
+                amount=Decimal("19.00"),
+            ),
+        ),
+    )
+
+    booking_repository.list_for_fiscal_year.return_value = (
+        original_booking,
+        existing_reversal,
+    )
+
+    company_repository.get_managed_fiscal_years.return_value = (
+        ManagedFiscalYear(
+            fiscal_year=context.fiscal_year,
+            status=FiscalYearStatus.OPEN,
+            opening_source=None,
+        ),
+    )
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=company_repository,
+        posting_service=PostingService(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
+        taxonomy_management_service=Mock(),
+        e_bilanz_export_service=Mock(),
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="bereits storniert",
+    ):
+        workspace.create_reversal_booking(
+            booking_id=original_booking.booking_id,
+            reversal_date=date(2026, 8, 10),
+        )
+
+    booking_repository.add.assert_not_called()
+
 def test_lists_confirmed_depreciations_for_open_fiscal_year(
     context: ApplicationContext,
 ) -> None:

@@ -9,3 +9,4 @@ class BookingType(str, Enum):
     REGULAR = "REGULAR"
     OPENING = "OPENING"
     CLOSING = "CLOSING"
+    REVERSAL = "REVERSAL"

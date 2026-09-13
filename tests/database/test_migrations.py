@@ -7,7 +7,7 @@ from alembic.config import Config
 from sqlalchemy import create_engine, inspect
 
 BASELINE_REVISION = "7392d6cc6892"
-HEAD_REVISION = "8da4add521ea"
+HEAD_REVISION = "0f8a714038fd"
 
 
 def _alembic_config(
@@ -94,6 +94,8 @@ def test_migrations_upgrade_from_baseline_to_head(
     try:
         inspector = inspect(engine)
 
+
+
         columns_before = {
             column["name"]
             for column in inspector.get_columns(
@@ -122,8 +124,19 @@ def test_migrations_upgrade_from_baseline_to_head(
         database_url
     )
 
+
+
     try:
         inspector = inspect(engine)
+
+        booking_columns = {
+            column["name"]
+            for column in inspector.get_columns(
+                "buchungen"
+            )
+        }
+
+        assert "reversal_of_booking_id" in booking_columns
 
         columns_after = {
             column["name"]

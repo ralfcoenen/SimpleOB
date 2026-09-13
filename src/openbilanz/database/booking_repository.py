@@ -77,6 +77,52 @@ class BookingRepository:
                 "Die Buchung ist bereits vorhanden."
             )
 
+        if booking.booking_type is BookingType.REVERSAL:
+            original_booking = (
+                self._session.query(Buchung)
+                .filter(
+                    Buchung.booking_id
+                    == str(
+                        booking.reversal_of_booking_id
+                    ),
+                    Buchung.wirtschaftsjahr_id
+                    == fiscal_year_model.id,
+                )
+                .one_or_none()
+            )
+
+            if original_booking is None:
+                raise ValueError(
+                    "Die ursprüngliche Buchung "
+                    "ist nicht vorhanden."
+                )
+
+            if (
+                original_booking.booking_type
+                != BookingType.REGULAR.value
+            ):
+                raise ValueError(
+                    "Nur reguläre Buchungen können "
+                    "storniert werden."
+                )
+
+            existing_reversal = (
+                self._session.query(Buchung)
+                .filter(
+                    Buchung.reversal_of_booking_id
+                    == str(
+                        booking.reversal_of_booking_id
+                    )
+                )
+                .one_or_none()
+            )
+
+            if existing_reversal is not None:
+                raise ValueError(
+                    "Die ursprüngliche Buchung wurde "
+                    "bereits storniert."
+                )
+
         model = Buchung(
             booking_id=str(booking.booking_id),
             wirtschaftsjahr_id=fiscal_year_model.id,
@@ -84,6 +130,11 @@ class BookingRepository:
             voucher_no=booking.voucher_no,
             description=booking.description,
             booking_type=booking.booking_type.value,
+            reversal_of_booking_id=(
+                str(booking.reversal_of_booking_id)
+                if booking.reversal_of_booking_id is not None
+                else None
+            ),
         )
 
         model.zeilen = [
@@ -147,6 +198,11 @@ class BookingRepository:
                 )
                 for line in model.zeilen
             ),
+            reversal_of_booking_id=(
+                UUID(model.reversal_of_booking_id)
+                if model.reversal_of_booking_id is not None
+                else None
+            ),
         )
 
     def list_for_fiscal_year(
@@ -196,6 +252,11 @@ class BookingRepository:
                         amount=line.amount,
                     )
                     for line in model.zeilen
+                ),
+                reversal_of_booking_id=(
+                    UUID(model.reversal_of_booking_id)
+                    if model.reversal_of_booking_id is not None
+                    else None
                 ),
             )
             for model in models

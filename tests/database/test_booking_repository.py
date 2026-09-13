@@ -170,6 +170,337 @@ def test_preserves_closing_booking_type() -> None:
     )
     assert loaded_bookings[0] == booking
 
+def test_preserves_reversal_booking_reference() -> None:
+    """Die Referenz einer Stornobuchung bleibt beim Roundtrip erhalten."""
+
+    engine = create_engine(
+        "sqlite:///:memory:"
+    )
+    Base.metadata.create_all(engine)
+
+    Session = sessionmaker(
+        bind=engine
+    )
+
+    company = Company(
+        company_id=uuid4(),
+        name="Muster UG",
+    )
+
+    fiscal_year = FiscalYear(
+        start_date=date(2026, 1, 1),
+        end_date=date(2026, 12, 31),
+    )
+
+    original_booking = Booking(
+        booking_date=date(2026, 6, 1),
+        voucher_no="RE-001",
+        description="Ausgangsrechnung",
+        lines=(
+            BookingLine(
+                account_number="1200",
+                side=EntrySide.DEBIT,
+                amount=Decimal("119.00"),
+            ),
+            BookingLine(
+                account_number="8400",
+                side=EntrySide.CREDIT,
+                amount=Decimal("100.00"),
+            ),
+            BookingLine(
+                account_number="1776",
+                side=EntrySide.CREDIT,
+                amount=Decimal("19.00"),
+            ),
+        ),
+    )
+
+    reversal_booking = Booking(
+        booking_date=date(2026, 6, 2),
+        description="Storno zu Buchung RE-001",
+        booking_type=BookingType.REVERSAL,
+        reversal_of_booking_id=(
+            original_booking.booking_id
+        ),
+        lines=(
+            BookingLine(
+                account_number="1200",
+                side=EntrySide.CREDIT,
+                amount=Decimal("119.00"),
+            ),
+            BookingLine(
+                account_number="8400",
+                side=EntrySide.DEBIT,
+                amount=Decimal("100.00"),
+            ),
+            BookingLine(
+                account_number="1776",
+                side=EntrySide.DEBIT,
+                amount=Decimal("19.00"),
+            ),
+        ),
+    )
+
+    with Session() as session:
+        company_repository = CompanyRepository(
+            session
+        )
+        booking_repository = BookingRepository(
+            session
+        )
+
+        company_repository.add(company)
+        company_repository.add_fiscal_year(
+            company.company_id,
+            fiscal_year,
+        )
+
+        booking_repository.add(
+            company_id=company.company_id,
+            fiscal_year=fiscal_year,
+            booking=original_booking,
+        )
+
+        booking_repository.add(
+            company_id=company.company_id,
+            fiscal_year=fiscal_year,
+            booking=reversal_booking,
+        )
+
+        loaded_booking = booking_repository.get(
+            reversal_booking.booking_id
+        )
+
+    assert loaded_booking == reversal_booking
+    assert (
+        loaded_booking.booking_type
+        is BookingType.REVERSAL
+    )
+    assert (
+        loaded_booking.reversal_of_booking_id
+        == original_booking.booking_id
+    )
+    assert loaded_booking.lines == (
+        BookingLine(
+            account_number="1200",
+            side=EntrySide.CREDIT,
+            amount=Decimal("119.00"),
+        ),
+        BookingLine(
+            account_number="8400",
+            side=EntrySide.DEBIT,
+            amount=Decimal("100.00"),
+        ),
+        BookingLine(
+            account_number="1776",
+            side=EntrySide.DEBIT,
+            amount=Decimal("19.00"),
+        ),
+    )
+
+def test_rejects_second_reversal_for_same_booking() -> None:
+    """Eine reguläre Buchung darf nur einmal storniert werden."""
+
+    engine = create_engine(
+        "sqlite:///:memory:"
+    )
+    Base.metadata.create_all(engine)
+
+    Session = sessionmaker(
+        bind=engine
+    )
+
+    company = Company(
+        company_id=uuid4(),
+        name="Muster UG",
+    )
+
+    fiscal_year = FiscalYear(
+        start_date=date(2026, 1, 1),
+        end_date=date(2026, 12, 31),
+    )
+
+    original_booking = Booking(
+        booking_date=date(2026, 6, 1),
+        voucher_no="RE-001",
+        description="Ausgangsrechnung",
+        lines=(
+            BookingLine(
+                account_number="1200",
+                side=EntrySide.DEBIT,
+                amount=Decimal("119.00"),
+            ),
+            BookingLine(
+                account_number="8400",
+                side=EntrySide.CREDIT,
+                amount=Decimal("100.00"),
+            ),
+            BookingLine(
+                account_number="1776",
+                side=EntrySide.CREDIT,
+                amount=Decimal("19.00"),
+            ),
+        ),
+    )
+
+    first_reversal = Booking(
+        booking_date=date(2026, 6, 2),
+        description="Erstes Storno",
+        booking_type=BookingType.REVERSAL,
+        reversal_of_booking_id=(
+            original_booking.booking_id
+        ),
+        lines=(
+            BookingLine(
+                account_number="1200",
+                side=EntrySide.CREDIT,
+                amount=Decimal("119.00"),
+            ),
+            BookingLine(
+                account_number="8400",
+                side=EntrySide.DEBIT,
+                amount=Decimal("100.00"),
+            ),
+            BookingLine(
+                account_number="1776",
+                side=EntrySide.DEBIT,
+                amount=Decimal("19.00"),
+            ),
+        ),
+    )
+
+    second_reversal = Booking(
+        booking_date=date(2026, 6, 3),
+        description="Zweites Storno",
+        booking_type=BookingType.REVERSAL,
+        reversal_of_booking_id=(
+            original_booking.booking_id
+        ),
+        lines=(
+            BookingLine(
+                account_number="1200",
+                side=EntrySide.CREDIT,
+                amount=Decimal("119.00"),
+            ),
+            BookingLine(
+                account_number="8400",
+                side=EntrySide.DEBIT,
+                amount=Decimal("100.00"),
+            ),
+            BookingLine(
+                account_number="1776",
+                side=EntrySide.DEBIT,
+                amount=Decimal("19.00"),
+            ),
+        ),
+    )
+
+    with Session() as session:
+        company_repository = CompanyRepository(
+            session
+        )
+        booking_repository = BookingRepository(
+            session
+        )
+
+        company_repository.add(company)
+        company_repository.add_fiscal_year(
+            company.company_id,
+            fiscal_year,
+        )
+
+        booking_repository.add(
+            company_id=company.company_id,
+            fiscal_year=fiscal_year,
+            booking=original_booking,
+        )
+
+        booking_repository.add(
+            company_id=company.company_id,
+            fiscal_year=fiscal_year,
+            booking=first_reversal,
+        )
+
+        with pytest.raises(
+            ValueError,
+            match="bereits storniert",
+        ):
+            booking_repository.add(
+                company_id=company.company_id,
+                fiscal_year=fiscal_year,
+                booking=second_reversal,
+            )
+
+def test_rejects_reversal_for_missing_original_booking() -> None:
+    """Eine Stornobuchung benötigt eine vorhandene Originalbuchung."""
+
+    engine = create_engine(
+        "sqlite:///:memory:"
+    )
+    Base.metadata.create_all(engine)
+
+    Session = sessionmaker(
+        bind=engine
+    )
+
+    company = Company(
+        company_id=uuid4(),
+        name="Muster UG",
+    )
+
+    fiscal_year = FiscalYear(
+        start_date=date(2026, 1, 1),
+        end_date=date(2026, 12, 31),
+    )
+
+    reversal_booking = Booking(
+        booking_date=date(2026, 6, 2),
+        description="Storno ohne Original",
+        booking_type=BookingType.REVERSAL,
+        reversal_of_booking_id=uuid4(),
+        lines=(
+            BookingLine(
+                account_number="1200",
+                side=EntrySide.CREDIT,
+                amount=Decimal("119.00"),
+            ),
+            BookingLine(
+                account_number="8400",
+                side=EntrySide.DEBIT,
+                amount=Decimal("100.00"),
+            ),
+            BookingLine(
+                account_number="1776",
+                side=EntrySide.DEBIT,
+                amount=Decimal("19.00"),
+            ),
+        ),
+    )
+
+    with Session() as session:
+        company_repository = CompanyRepository(
+            session
+        )
+        booking_repository = BookingRepository(
+            session
+        )
+
+        company_repository.add(company)
+        company_repository.add_fiscal_year(
+            company.company_id,
+            fiscal_year,
+        )
+
+        with pytest.raises(
+            ValueError,
+            match="nicht vorhanden",
+        ):
+            booking_repository.add(
+                company_id=company.company_id,
+                fiscal_year=fiscal_year,
+                booking=reversal_booking,
+            )
+
 def test_rejects_duplicate_booking_id() -> None:
     engine = create_engine(
         "sqlite:///:memory:"
@@ -589,4 +920,3 @@ def test_add_can_defer_commit() -> None:
         )
 
     assert loaded == ()
-
