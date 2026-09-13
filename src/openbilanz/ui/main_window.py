@@ -25,6 +25,7 @@ from openbilanz.domain.vat_accounts import VatAccounts
 from openbilanz.domain.bvv_annual_data import (
     BvvAnnualData,
 )
+from openbilanz.domain.booking_type import BookingType
 from openbilanz.eric.elster_bilanz_transmission_service import (
     ElsterBilanzTransmissionService,
 )
@@ -2526,6 +2527,35 @@ class MainWindow(tk.Tk):
                 "Buchung stornieren",
                 "Die ausgewählte Buchung konnte "
                 "nicht ermittelt werden.",
+                parent=self,
+            )
+            return
+        original_booking = next(
+            (
+                booking
+                for booking in self._journal
+                if booking.booking_id == booking_id
+            ),
+            None,
+        )
+
+        if original_booking is None:
+            messagebox.showerror(
+                "Buchung stornieren",
+                "Die ausgewählte Buchung konnte "
+                "im Journal nicht gefunden werden.",
+                parent=self,
+            )
+            return
+
+        if (
+            original_booking.booking_type
+            is not BookingType.REGULAR
+        ):
+            messagebox.showerror(
+                "Buchung stornieren",
+                "Nur reguläre Buchungen können "
+                "über das Journal storniert werden.",
                 parent=self,
             )
             return
