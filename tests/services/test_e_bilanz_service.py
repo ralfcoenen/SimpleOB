@@ -6,6 +6,8 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 from uuid import uuid4
 
+import pytest
+
 from openbilanz.accounting.balance_sheet import BalanceSheet
 from openbilanz.accounting.financial_statement_position import (
     FinancialStatementPosition,
@@ -254,6 +256,12 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
     profile = Mock()
     profile.fact_plan = Mock()
 
+    extended_fact_plan = Mock()
+    profile.fact_plan.node_for.return_value = None
+    profile.fact_plan.with_conditional_child.return_value = (
+        extended_fact_plan
+    )
+
     concepts = Mock()
     resolved_fact_plan = Mock()
     resolved_fact_plan.nodes = ()
@@ -295,6 +303,48 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
     )
 
     taxonomy_mapper = Mock()
+
+    account_detail = Mock()
+    account_detail.account_number = "1400"
+    account_detail.position = Mock()
+
+    target_concept = Mock()
+    target_concept.concept_id = "target-concept-id"
+    target_concept.name = (
+        "bs.ass.currAss.receiv.trade.other"
+    )
+
+    parent_concept = Mock()
+    parent_concept.concept_id = "parent-concept-id"
+    parent_concept.name = (
+        "bs.ass.currAss.receiv.trade"
+    )
+
+    taxonomy_mapper.concept_for.return_value = (
+        parent_concept
+    )
+
+    calculation_relation = Mock()
+    calculation_relation.child_concept_id = (
+        target_concept.concept_id
+    )
+    calculation_relation.parent_concept_id = (
+        parent_concept.concept_id
+    )
+    calculation_relation.role_uri = (
+        "http://example.test/calculation-role"
+    )
+
+    gaap_ci_model.concepts.by_name.return_value = (
+        target_concept
+    )
+    gaap_ci_model.calculation.relations = (
+        calculation_relation,
+    )
+    gaap_ci_model.calculation.parents_of.return_value = (
+        calculation_relation,
+    )
+
     account_balance_builder = Mock()
     fixed_asset_schedule_builder = Mock()
     fixed_asset_schedule_builder.build.return_value = Mock(
@@ -410,7 +460,12 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
             entity_scheme=(
                 "http://www.rzf-nrw.de/Steuernummer"
             ),
-            account_details=(),
+            account_details=(account_detail,),
+            account_taxonomy_concepts={
+                "1400": (
+                    "bs.ass.currAss.receiv.trade.other"
+                ),
+            },
             fixed_asset_schedule=(),
             shareholders=(shareholder,),
         )
@@ -451,7 +506,7 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
     )
 
     account_detail_builder.assert_called_once_with(
-        account_details=(),
+        account_details=(account_detail,),
         tax_liability_accounts=(
             "1771",
             "1776",
@@ -469,19 +524,267 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
             "1571",
             "1576",
         ),
+        account_taxonomy_concepts={
+            "1400": (
+                "bs.ass.currAss.receiv.trade.other"
+            ),
+        },
     )
 
     value_builder.assert_called_once()
 
     fact_plan_resolver.assert_called_once()
 
+    taxonomy_mapper.concept_for.assert_called_once_with(
+        account_detail.position
+    )
+
+    gaap_ci_model.concepts.by_name.assert_called_once_with(
+        "bs.ass.currAss.receiv.trade.other"
+    )
+
+    gaap_ci_model.calculation.parents_of.assert_called_once_with(
+        target_concept.concept_id,
+        role_uri=calculation_relation.role_uri,
+    )
+
+    profile.fact_plan.with_conditional_child.assert_called_once_with(
+        parent_concept_name=parent_concept.name,
+        child_concept_name=(
+            "bs.ass.currAss.receiv.trade.other"
+        ),
+    )
+
+    assert (
+        fact_plan_resolver.call_args.kwargs["fact_plan"]
+        is extended_fact_plan
+    )
+
     gcd_fact_builder.shareholder.assert_called_once()
 
     mandatory_completer.build_missing_nil_facts.assert_called_once()
 
-    account_balance_builder.build.assert_not_called()
+    account_balance_builder.build.assert_called_once()
 
     document_builder.build_xml.assert_called_once()
+
+def test_e_bilanz_service_rejects_account_taxonomy_concept_with_wrong_parent(
+) -> None:
+    """Eine explizite Kontenzuordnung muss direkt unter der HGB-Position liegen."""
+
+    fiscal_year = FiscalYear(
+        start_date=date(2026, 1, 1),
+        end_date=date(2026, 12, 31),
+    )
+
+    master_data = CompanyMasterData(
+        company=_company(),
+        legal_form="UG (haftungsbeschränkt)",
+        tax_number="123/4567/8901",
+        federal_state="NW",
+        tax_id="12345678901",
+        tax_economic_id="DE123456789",
+        bf4="1234",
+        street="Musterstraße",
+        house_number="1",
+        postal_code="50667",
+        city="Köln",
+        country="DE",
+        business="Softwareentwicklung",
+    )
+
+    vat_accounts = Mock(spec=VatAccounts)
+    vat_accounts.input_tax_7 = "1571"
+    vat_accounts.input_tax_19 = "1576"
+    vat_accounts.output_tax_7 = "1771"
+    vat_accounts.output_tax_19 = "1776"
+
+    account_roles = Mock(spec=AccountingAccountRoles)
+    account_roles.cash_accounts = frozenset({"1000"})
+    account_roles.bank_accounts = frozenset({"1200"})
+    account_roles.general_rate_sales_accounts = frozenset({"8400"})
+
+    gcd_path = Path("/tmp/gcd.xsd")
+    gaap_ci_path = Path("/tmp/gaap-ci.xsd")
+
+    resolver = FakeResolver(
+        gcd_path=gcd_path,
+        gaap_ci_path=gaap_ci_path,
+    )
+
+    gcd_model = Mock()
+    gcd_model.concepts.concepts = ()
+
+    gaap_ci_model = Mock()
+    gaap_ci_model.concepts.concepts = ()
+
+    adapter = FakeAdapter(
+        gcd_model=gcd_model,
+        gaap_ci_model=gaap_ci_model,
+    )
+
+    assets = Mock(spec=FinancialStatementPosition)
+    liabilities = Mock(spec=FinancialStatementPosition)
+    income_statement_root = Mock(spec=FinancialStatementPosition)
+
+    prepared_income_statement = Mock(spec=IncomeStatement)
+    prepared_income_statement.income_statement = income_statement_root
+
+    prepared_balance_sheet = Mock(spec=BalanceSheet)
+    prepared_balance_sheet.assets = assets
+    prepared_balance_sheet.liabilities = liabilities
+
+    gcd_entry_point = TaxonomyEntryPoint(
+        path=gcd_path,
+        namespace=(
+            "http://www.xbrl.de/taxonomies/"
+            "de-gcd-2025-04-01/shell"
+        ),
+        schema_imports=(),
+    )
+
+    gaap_ci_entry_point = TaxonomyEntryPoint(
+        path=gaap_ci_path,
+        namespace=(
+            "http://www.xbrl.de/taxonomies/"
+            "de-gaap-ci-2025-04-01/shell-fiscal"
+        ),
+        schema_imports=(),
+    )
+
+    service = EBilanzService(
+        resolver=resolver,  # type: ignore[arg-type]
+        adapter=adapter,  # type: ignore[arg-type]
+        company_data_mapper=GcdCompanyDataMapper(),
+        assets=assets,
+        liabilities=liabilities,
+        income_statement=income_statement_root,
+    )
+
+    profile = Mock()
+    profile.fact_plan = Mock()
+
+    closing_service = Mock()
+    closing_service.calculate_net_income.return_value = Decimal("100.00")
+
+    account_detail = Mock()
+    account_detail.account_number = "1400"
+    account_detail.position = Mock()
+
+    target_concept = Mock()
+    target_concept.concept_id = "target-concept-id"
+    target_concept.name = "bs.ass.currAss.receiv.trade.other"
+
+    expected_parent = Mock()
+    expected_parent.concept_id = "expected-parent-id"
+    expected_parent.name = "bs.ass.currAss.receiv.trade"
+
+    wrong_parent = Mock()
+    wrong_parent.concept_id = "wrong-parent-id"
+    wrong_parent.name = "bs.ass.currAss.other"
+
+    relation = Mock()
+    relation.child_concept_id = target_concept.concept_id
+    relation.parent_concept_id = wrong_parent.concept_id
+    relation.role_uri = "http://example.test/calculation-role"
+
+    gaap_ci_model.concepts.by_name.return_value = target_concept
+    gaap_ci_model.calculation.relations = (relation,)
+    gaap_ci_model.calculation.parents_of.return_value = (relation,)
+
+    taxonomy_mapper = Mock()
+    taxonomy_mapper.concept_for.return_value = expected_parent
+
+    with (
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "TaxonomyEntryPoint.from_file",
+            side_effect=(
+                gcd_entry_point,
+                gaap_ci_entry_point,
+            ),
+        ),
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "TaxonomyConceptSet",
+            return_value=Mock(),
+        ),
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "ClosingService",
+            return_value=closing_service,
+        ),
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "GaapCi69ValueCalculator.calculate",
+            return_value=Mock(),
+        ),
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "create_profile_6_9",
+            return_value=profile,
+        ),
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "GaapCi69BalanceSheetValueBuilder.build",
+            return_value={},
+        ),
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "GaapCi69IncomeStatementValueBuilder.build",
+            return_value={},
+        ),
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "GaapCi69AccountDetailValueBuilder.build",
+            return_value={},
+        ),
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "create_hgb_gaap_ci_mapping",
+            return_value=Mock(),
+        ),
+        patch(
+            "openbilanz.services.e_bilanz_service."
+            "TaxonomyMapper",
+            return_value=taxonomy_mapper,
+        ),
+    ):
+        with pytest.raises(
+            ValueError,
+            match=(
+                "account taxonomy concept is not a direct "
+                "calculation child"
+            ),
+        ):
+            service.build(
+                master_data=master_data,
+                fiscal_year=fiscal_year,
+                amounts={},
+                income_statement=prepared_income_statement,
+                balance_sheet=prepared_balance_sheet,
+                vat_accounts=vat_accounts,
+                account_roles=account_roles,
+                entity_identifier="1234567890123",
+                entity_scheme=(
+                    "http://www.rzf-nrw.de/Steuernummer"
+                ),
+                account_details=(account_detail,),
+                account_taxonomy_concepts={
+                    "1400": "bs.ass.currAss.receiv.trade.other",
+                },
+                fixed_asset_schedule=(),
+            )
+
+    taxonomy_mapper.concept_for.assert_called_once_with(
+        account_detail.position
+    )
+    gaap_ci_model.calculation.parents_of.assert_called_once_with(
+        target_concept.concept_id,
+        role_uri=relation.role_uri,
+    )
+    profile.fact_plan.with_conditional_child.assert_not_called()
+
 
 def test_e_bilanz_service_integrates_bvv_for_hgbm(
     monkeypatch,

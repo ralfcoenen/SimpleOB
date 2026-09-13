@@ -147,6 +147,7 @@ class EBilanzService:
         account_roles: AccountingAccountRoles,
         entity_identifier: str,
         entity_scheme: str,
+        account_taxonomy_concepts: dict[str, str] | None = None,
         previous_fiscal_year: FiscalYear | None = None,
         account_details: tuple[
             EBilanzAccountDetail,
@@ -289,6 +290,9 @@ class EBilanzService:
                     vat_accounts.input_tax_7,
                     vat_accounts.input_tax_19,
                 ),
+                account_taxonomy_concepts=(
+                    account_taxonomy_concepts
+                ),
             )
         )
 
@@ -300,6 +304,98 @@ class EBilanzService:
             ),
             gaap_ci_model,
         )
+
+        effective_fact_plan = profile.fact_plan
+
+        explicit_taxonomy_concepts = (
+            account_taxonomy_concepts or {}
+        )
+
+        extended_concepts: set[str] = set()
+
+        for detail in account_details:
+            target_concept_name = (
+                explicit_taxonomy_concepts.get(
+                    detail.account_number
+                )
+            )
+
+            if target_concept_name is None:
+                continue
+
+            if target_concept_name in extended_concepts:
+                continue
+
+            target_concept = (
+                gaap_ci_model.concepts.by_name(
+                    target_concept_name
+                )
+            )
+
+            if target_concept is None:
+                raise ValueError(
+                    "account taxonomy concept not found: "
+                    f"{target_concept_name}"
+                )
+
+            parent_concept = (
+                taxonomy_mapper.concept_for(
+                    detail.position
+                )
+            )
+
+            candidate_roles = {
+                relation.role_uri
+                for relation
+                in gaap_ci_model.calculation.relations
+                if (
+                    relation.child_concept_id
+                    == target_concept.concept_id
+                )
+            }
+
+            has_expected_parent = any(
+                any(
+                    relation.parent_concept_id
+                    == parent_concept.concept_id
+                    for relation
+                    in gaap_ci_model.calculation.parents_of(
+                        target_concept.concept_id,
+                        role_uri=role_uri,
+                    )
+                )
+                for role_uri in candidate_roles
+            )
+
+            if not has_expected_parent:
+                raise ValueError(
+                    "account taxonomy concept is not a direct "
+                    "calculation child of the mapped HGB concept: "
+                    f"account={detail.account_number}, "
+                    f"parent={parent_concept.name}, "
+                    f"child={target_concept_name}"
+                )
+
+            if (
+                effective_fact_plan.node_for(
+                    target_concept_name
+                )
+                is None
+            ):
+                effective_fact_plan = (
+                    effective_fact_plan.with_conditional_child(
+                        parent_concept_name=(
+                            parent_concept.name
+                        ),
+                        child_concept_name=(
+                            target_concept_name
+                        ),
+                    )
+                )
+
+            extended_concepts.add(
+                target_concept_name
+            )
 
         fixed_asset_schedule_xbrl = (
             FixedAssetScheduleBuilder(
@@ -469,7 +565,7 @@ class EBilanzService:
 
         resolved_fact_plan = (
             FactPlanResolver.resolve(
-                fact_plan=profile.fact_plan,
+                fact_plan=effective_fact_plan,
                 concepts=concepts,
                 contexts=contexts_by_period_type,
                 values=values,
