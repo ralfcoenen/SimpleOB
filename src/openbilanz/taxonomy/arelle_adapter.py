@@ -13,6 +13,12 @@ from openbilanz.taxonomy.concept import (
     TaxonomyConcept,
     TaxonomyPeriodType,
 )
+from openbilanz.taxonomy.calculation import (
+    TaxonomyCalculationRelation,
+)
+from openbilanz.taxonomy.calculation_set import (
+    TaxonomyCalculationSet,
+)
 from openbilanz.taxonomy.concept_set import TaxonomyConceptSet
 from openbilanz.taxonomy.label import (
     TaxonomyLabel,
@@ -84,7 +90,7 @@ class ArelleAdapter:
             *,
             internet_connectivity: str = "offline",
         ) -> ArelleValidationResult:
-        
+
             """Validiert eine Taxonomie oder XBRL-Datei über Arelle."""
 
             options = RuntimeOptions(
@@ -93,7 +99,7 @@ class ArelleAdapter:
                 keepOpen=True,
                 validate=True,
                 logFile="logToStructuredMessage",
-            )  
+            )
             self._session.run(options)
 
             models = self._session.get_models()
@@ -239,6 +245,20 @@ class ArelleAdapter:
             model_xbrl
         )
 
+    def calculation(
+        self,
+        entry_point: Path,
+    ) -> TaxonomyCalculationSet:
+        """Lädt Calculation-Beziehungen einer Taxonomie über Arelle."""
+
+        model_xbrl = self._load_model_xbrl(
+            entry_point
+        )
+
+        return self._calculation_from_model(
+            model_xbrl
+        )
+
     def model(
         self,
         entry_point: Path,
@@ -257,6 +277,9 @@ class ArelleAdapter:
                 model_xbrl
             ),
             presentation=self._presentation_from_model(
+                model_xbrl
+            ),
+            calculation=self._calculation_from_model(
                 model_xbrl
             ),
         )
@@ -439,6 +462,48 @@ class ArelleAdapter:
             )
 
         return TaxonomyPresentationSet(
+            relations=tuple(relations)
+        )
+
+    def _calculation_from_model(
+        self,
+        model_xbrl,
+    ) -> TaxonomyCalculationSet:
+        """Überführt Calculation-Beziehungen in ein CalculationSet."""
+
+        relationship_set = model_xbrl.relationshipSet(
+            XbrlConst.summationItem
+        )
+
+        relations: list[
+            TaxonomyCalculationRelation
+        ] = []
+
+        for relationship in relationship_set.modelRelationships:
+            parent = relationship.fromModelObject
+            child = relationship.toModelObject
+
+            if parent is None or child is None:
+                continue
+
+            if parent.id is None or child.id is None:
+                continue
+
+            relations.append(
+                TaxonomyCalculationRelation(
+                    parent_concept_id=parent.id,
+                    child_concept_id=child.id,
+                    order=Decimal(
+                        str(relationship.order)
+                    ),
+                    weight=Decimal(
+                        str(relationship.weight)
+                    ),
+                    role_uri=relationship.linkrole,
+                )
+            )
+
+        return TaxonomyCalculationSet(
             relations=tuple(relations)
         )
 

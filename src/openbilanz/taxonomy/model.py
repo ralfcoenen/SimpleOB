@@ -1,9 +1,12 @@
 """Geladenes Modell einer XBRL-Taxonomie."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from openbilanz.taxonomy.concept import TaxonomyConcept
 from openbilanz.taxonomy.concept_set import TaxonomyConceptSet
+from openbilanz.taxonomy.calculation_set import (
+    TaxonomyCalculationSet,
+)
 from openbilanz.taxonomy.label import (
     TaxonomyLabel,
     TaxonomyLabelRole,
@@ -16,11 +19,16 @@ from openbilanz.taxonomy.presentation_set import (
 
 @dataclass(frozen=True, slots=True)
 class TaxonomyModel:
-    """Verbindet Concepts, Labels und Presentation-Struktur."""
+    """Verbindet Concepts, Labels, Presentation und Calculation."""
 
     concepts: TaxonomyConceptSet
     labels: TaxonomyLabelSet
     presentation: TaxonomyPresentationSet
+    calculation: TaxonomyCalculationSet = field(
+        default_factory=lambda: TaxonomyCalculationSet(
+            relations=()
+        )
+    )
 
     def __post_init__(self) -> None:
         if not isinstance(
@@ -47,6 +55,14 @@ class TaxonomyModel:
                 "presentation must be a TaxonomyPresentationSet"
             )
 
+        if not isinstance(
+            self.calculation,
+            TaxonomyCalculationSet,
+        ):
+            raise TypeError(
+                "calculation must be a TaxonomyCalculationSet"
+            )
+
         for label in self.labels.labels:
             if self.concepts.by_id(
                 label.concept_id
@@ -68,6 +84,21 @@ class TaxonomyModel:
             ) is None:
                 raise ValueError(
                     "presentation references unknown child concept"
+                )
+
+        for relation in self.calculation.relations:
+            if self.concepts.by_id(
+                relation.parent_concept_id
+            ) is None:
+                raise ValueError(
+                    "calculation references unknown parent concept"
+                )
+
+            if self.concepts.by_id(
+                relation.child_concept_id
+            ) is None:
+                raise ValueError(
+                    "calculation references unknown child concept"
                 )
 
     def labels_for(

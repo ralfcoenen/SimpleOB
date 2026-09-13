@@ -5,6 +5,9 @@ from pathlib import Path
 import pytest
 
 from openbilanz.taxonomy.arelle_adapter import ArelleAdapter
+from openbilanz.taxonomy.calculation_set import (
+    TaxonomyCalculationSet,
+)
 from openbilanz.taxonomy.concept import (
     TaxonomyBalance,
     TaxonomyPeriodType,
@@ -202,7 +205,7 @@ def test_arelle_adapter_returns_concept_set() -> None:
 
     finally:
         adapter.close()
-        
+
 def test_arelle_adapter_concept_set_contains_valid_concepts() -> None:
     """Das ConceptSet enthält nur berichtbare XBRL-Items mit ID."""
 
@@ -237,7 +240,7 @@ def test_arelle_adapter_concept_set_contains_valid_concepts() -> None:
 
     finally:
         adapter.close()
-        
+
 def test_arelle_adapter_returns_standard_label() -> None:
     """Der Adapter liefert das deutsche Standardlabel eines Concepts."""
 
@@ -278,7 +281,7 @@ def test_arelle_adapter_returns_standard_label() -> None:
 
     finally:
         adapter.close()
-        
+
 
 def test_arelle_adapter_returns_label_set() -> None:
     """Der Adapter überführt deutsche Standardlabels in ein LabelSet."""
@@ -312,7 +315,7 @@ def test_arelle_adapter_returns_label_set() -> None:
 
     finally:
         adapter.close()
-        
+
 
 def test_arelle_adapter_returns_presentation_set() -> None:
     """Der Adapter überführt Presentation-Beziehungen in ein PresentationSet."""
@@ -357,6 +360,50 @@ def test_arelle_adapter_returns_presentation_set() -> None:
     finally:
         adapter.close()
 
+def test_arelle_adapter_returns_calculation_set() -> None:
+    """Der Adapter überführt Calculation-Beziehungen in ein CalculationSet."""
+
+    require_taxonomy()
+
+    adapter = ArelleAdapter()
+
+    try:
+        calculation = adapter.calculation(
+            ENTRY_POINT
+        )
+
+        assert isinstance(
+            calculation,
+            TaxonomyCalculationSet,
+        )
+
+        assert calculation.relations
+
+        assert all(
+            relation.parent_concept_id
+            for relation in calculation.relations
+        )
+
+        assert all(
+            relation.child_concept_id
+            for relation in calculation.relations
+        )
+
+        assert all(
+            relation.role_uri
+            for relation in calculation.relations
+        )
+
+        print()
+        print(
+            "CALCULATION-BEZIEHUNGEN:",
+            len(calculation.relations),
+        )
+
+    finally:
+        adapter.close()
+
+
 def test_arelle_adapter_returns_taxonomy_model() -> None:
     """Der Adapter baut ein vollständiges TaxonomyModel aus Arelle-Daten."""
 
@@ -389,7 +436,7 @@ def test_arelle_adapter_returns_taxonomy_model() -> None:
         )
 
         assert model.presentation.relations
+        assert model.calculation.relations
 
     finally:
         adapter.close()
-
