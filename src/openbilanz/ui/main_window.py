@@ -57,10 +57,14 @@ from openbilanz.ui.closing_frame import ClosingFrame
 from openbilanz.ui.company_master_data_dialog import (
     CompanyMasterDataDialog,
 )
+from openbilanz.ui.e_bilanz_account_mapping_dialog import (
+    EBilanzAccountMappingDialog,
+)
 from openbilanz.ui.date_input import (
     normalize_german_date,
     parse_german_date,
 )
+
 from openbilanz.ui.fixed_asset_acquisition_link_dialog import (
     AcquisitionBookingCandidate,
     FixedAssetAcquisitionLinkDialog,
@@ -427,6 +431,16 @@ class MainWindow(tk.Tk):
             padx=(8, 0),
         )
 
+        self._e_bilanz_account_mapping_button = ttk.Button(
+            button_frame,
+            text="E-Bilanz-Zuordnung",
+            command=self._open_e_bilanz_account_mapping,
+        )
+        self._e_bilanz_account_mapping_button.pack(
+            side="left",
+            padx=(8, 0),
+        )
+
         self._journal_status = ttk.Label(
             self._accounts_tab,
             text="Journal: noch keine Buchungen",
@@ -442,6 +456,7 @@ class MainWindow(tk.Tk):
             "debit",
             "credit",
             "balance",
+            "e_bilanz",
         )
 
         self._account_table = ttk.Treeview(
@@ -481,6 +496,11 @@ class MainWindow(tk.Tk):
             text="Saldo",
         )
 
+        self._account_table.heading(
+            "e_bilanz",
+            text="E-Bilanz",
+        )
+
         self._account_table.column(
             "account_number",
             width=90,
@@ -509,6 +529,13 @@ class MainWindow(tk.Tk):
             "balance",
             width=140,
             anchor="e",
+        )
+
+        self._account_table.column(
+            "e_bilanz",
+            width=80,
+            anchor="center",
+            stretch=False,
         )
 
         self._account_table.pack(
@@ -560,6 +587,126 @@ class MainWindow(tk.Tk):
 
         self._return_to_start_requested = True
         self.destroy()
+
+    def _open_e_bilanz_account_mapping(self) -> None:
+        """Bearbeitet die E-Bilanz-Zuordnung des ausgewählten Kontos."""
+
+        selection = self._account_table.selection()
+
+        if not selection:
+            messagebox.showinfo(
+                "E-Bilanz-Zuordnung",
+                "Bitte wählen Sie zuerst ein Konto aus.",
+                parent=self,
+            )
+            return
+
+        values = self._account_table.item(
+            selection[0],
+            "values",
+        )
+
+        if not values:
+            return
+
+        account_number = str(
+            values[0]
+        )
+
+        account = next(
+            (
+                item
+                for item in self._accounts
+                if item.number == account_number
+            ),
+            None,
+        )
+
+        if account is None:
+            messagebox.showerror(
+                "E-Bilanz-Zuordnung",
+                "Das ausgewählte Konto wurde nicht gefunden.",
+                parent=self,
+            )
+            return
+
+        try:
+            choices = self._workspace.account_taxonomy_choices(
+                account_number=account_number,
+                chart_of_accounts=self._chart_of_accounts,
+            )
+
+            mappings = (
+                self._workspace
+                .load_account_taxonomy_concepts()
+            )
+        except ValueError as exc:
+            messagebox.showerror(
+                "E-Bilanz-Zuordnung",
+                str(exc),
+                parent=self,
+            )
+            return
+
+        if not choices:
+            messagebox.showinfo(
+                "E-Bilanz-Zuordnung",
+                (
+                    "Für die HGB-Zuordnung dieses Kontos "
+                    "stehen keine feineren "
+                    "E-Bilanz-Taxonomiepositionen zur Auswahl."
+                ),
+                parent=self,
+            )
+            return
+
+        current_concept_name = mappings.get(
+            account_number
+        )
+
+        dialog = EBilanzAccountMappingDialog(
+            self,
+            account_number=account.number,
+            account_name=account.name,
+            choices=choices,
+            current_concept_name=current_concept_name,
+        )
+
+        self.wait_window(
+            dialog
+        )
+
+        if not dialog.saved:
+            return
+
+        try:
+            self._workspace.save_account_taxonomy_concept(
+                account_number=account_number,
+                concept_name=dialog.result,
+            )
+        except ValueError as exc:
+            messagebox.showerror(
+                "E-Bilanz-Zuordnung",
+                str(exc),
+                parent=self,
+            )
+            return
+
+        if dialog.result is None:
+            message = (
+                "Die E-Bilanz-Zuordnung wurde entfernt."
+            )
+        else:
+            message = (
+                "Die E-Bilanz-Zuordnung wurde gespeichert."
+            )
+
+        self._refresh_overview()
+        messagebox.showinfo(
+            "E-Bilanz-Zuordnung",
+            message,
+            parent=self,
+        )
 
     def _open_edit_account(self) -> None:
         """Öffnet den Dialog zum Bearbeiten des ausgewählten Kontos."""
@@ -2386,10 +2533,16 @@ class MainWindow(tk.Tk):
     def _refresh_overview(self) -> None:
         """Aktualisiert die Kontenübersicht."""
 
-        self._journal_status.config(text=(f"Journal: {len(self._journal)} Buchungen"))
+        self._journal_status.config(
+            text=f"Journal: {len(self._journal)} Buchungen"
+        )
 
         for item in self._account_table.get_children():
             self._account_table.delete(item)
+
+        account_taxonomy_concepts = (
+            self._workspace.load_account_taxonomy_concepts()
+        )
 
         for account in self._accounts:
             debit = ZERO
@@ -2398,7 +2551,9 @@ class MainWindow(tk.Tk):
             credit_balance = ZERO
 
             try:
-                ledger_account = self._ledger.get_account(account.number)
+                ledger_account = self._ledger.get_account(
+                    account.number
+                )
             except KeyError:
                 pass
             else:
@@ -2413,6 +2568,12 @@ class MainWindow(tk.Tk):
                 credit_balance=credit_balance,
             )
 
+            e_bilanz_mapping = (
+                "✓"
+                if account.number in account_taxonomy_concepts
+                else ""
+            )
+
             self._account_table.insert(
                 "",
                 "end",
@@ -2422,6 +2583,7 @@ class MainWindow(tk.Tk):
                     self._format_amount(debit),
                     self._format_amount(credit),
                     balance,
+                    e_bilanz_mapping,
                 ),
             )
 

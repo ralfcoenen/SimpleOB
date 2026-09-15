@@ -1788,6 +1788,112 @@ class FiscalYearWorkspace:
 
         return opening_equity
 
+    def load_account_taxonomy_concepts(
+        self,
+    ) -> dict[str, str]:
+        """Lädt die mandantenspezifischen Konten-Taxonomiezuordnungen."""
+
+        if self._chart_of_accounts_repository is None:
+            raise ValueError(
+                "Kontenrahmen-Repository ist nicht verfügbar."
+            )
+
+        return (
+            self._chart_of_accounts_repository
+            .load_account_taxonomy_concepts(
+                self._context.company.company_id,
+                taxonomy_version="6.9",
+            )
+        )
+
+    def save_account_taxonomy_concept(
+        self,
+        *,
+        account_number: str,
+        concept_name: str | None,
+    ) -> None:
+        """Speichert oder entfernt die Taxonomiezuordnung eines Kontos."""
+
+        if self._chart_of_accounts_repository is None:
+            raise ValueError(
+                "Kontenrahmen-Repository ist nicht verfügbar."
+            )
+
+        mappings = self.load_account_taxonomy_concepts()
+
+        if concept_name is None:
+            mappings.pop(
+                account_number,
+                None,
+            )
+        else:
+            mappings[account_number] = concept_name
+
+        (
+            self._chart_of_accounts_repository
+            .save_account_taxonomy_concepts(
+                company_id=(
+                    self._context.company.company_id
+                ),
+                taxonomy_version="6.9",
+                account_taxonomy_concepts=mappings,
+            )
+        )
+
+    def account_taxonomy_choices(
+        self,
+        *,
+        account_number: str,
+        chart_of_accounts: ChartOfAccountsTemplate,
+    ) -> tuple[tuple[str, str], ...]:
+        """Liefert zulässige Taxonomiezuordnungen eines Kontos."""
+
+        mapping_rule = next(
+            (
+                rule
+                for rule in chart_of_accounts.account_mapping_rules
+                if rule.account_number == account_number
+            ),
+            None,
+        )
+
+        if mapping_rule is None:
+            raise ValueError(
+                "Für Konto "
+                f"{account_number} ist keine HGB-Zuordnung "
+                "vorhanden."
+            )
+
+        debit_position = mapping_rule.debit_position
+        credit_position = mapping_rule.credit_position
+
+        if debit_position is None:
+            position = credit_position
+        elif credit_position is None:
+            position = debit_position
+        elif debit_position == credit_position:
+            position = debit_position
+        else:
+            raise ValueError(
+                "Für Konto "
+                f"{account_number} sind unterschiedliche "
+                "HGB-Zuordnungen für Soll und Haben "
+                "hinterlegt. Die E-Bilanz-Zuordnung kann "
+                "deshalb nicht eindeutig bestimmt werden."
+            )
+
+        if position is None:
+            raise ValueError(
+                "Für Konto "
+                f"{account_number} ist keine HGB-Zuordnung "
+                "vorhanden."
+            )
+
+        return self._e_bilanz_service.account_taxonomy_choices(
+            fiscal_year=self._context.fiscal_year,
+            position=position,
+        )
+
     def build_e_bilanz(
         self,
         *,
@@ -1811,11 +1917,7 @@ class FiscalYearWorkspace:
         ) = self.load_account_configuration()
 
         account_taxonomy_concepts = (
-            self._chart_of_accounts_repository
-            .load_account_taxonomy_concepts(
-                self._context.company.company_id,
-                taxonomy_version="6.9",
-            )
+            self.load_account_taxonomy_concepts()
         )
 
         account_details = self._e_bilanz_account_detail_service.build_for_e_bilanz(

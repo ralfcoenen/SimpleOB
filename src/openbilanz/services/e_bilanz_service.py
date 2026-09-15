@@ -135,6 +135,90 @@ class EBilanzService:
         self._liabilities = liabilities
         self._income_statement = income_statement
 
+    def account_taxonomy_choices(
+        self,
+        *,
+        fiscal_year: FiscalYear,
+        position: FinancialStatementPosition,
+    ) -> tuple[tuple[str, str], ...]:
+        """Liefert zulässige Taxonomiezuordnungen für eine HGB-Position."""
+
+        version = taxonomy_version_for(
+            fiscal_year
+        )
+
+        if version is not TaxonomyVersion.V6_9:
+            raise ValueError(
+                "Die Konten-Taxonomiezuordnung unterstützt "
+                "derzeit ausschließlich Taxonomie 6.9."
+            )
+
+        gaap_ci_path = (
+            self._resolver.gaap_ci_fiscal_entry_point(
+                version
+            )
+        )
+
+        gaap_ci_model = self._adapter.model(
+            gaap_ci_path
+        )
+
+        taxonomy_mapper = TaxonomyMapper(
+            create_hgb_gaap_ci_mapping(
+                assets=self._assets,
+                liabilities=self._liabilities,
+                income_statement=self._income_statement,
+            ),
+            gaap_ci_model,
+        )
+
+        parent_concept = taxonomy_mapper.concept_for(
+            position
+        )
+
+        child_concept_ids = {
+            relation.child_concept_id
+            for relation in gaap_ci_model.calculation.relations
+            if (
+                relation.parent_concept_id
+                == parent_concept.concept_id
+            )
+        }
+
+        choices: list[tuple[str, str]] = []
+
+        for concept_id in child_concept_ids:
+            concept = gaap_ci_model.concepts.by_id(
+                concept_id
+            )
+
+            if concept is None:
+                continue
+
+            label = gaap_ci_model.label_for(
+                concept_id
+            )
+
+            if label is None:
+                continue
+
+            choices.append(
+                (
+                    concept.name,
+                    label,
+                )
+            )
+
+        return tuple(
+            sorted(
+                choices,
+                key=lambda choice: (
+                    choice[1].casefold(),
+                    choice[0],
+                ),
+            )
+        )
+
     def build(
         self,
         *,
