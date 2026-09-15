@@ -82,9 +82,16 @@ class FakeEric:
         }
 
         self._buffers[rueckgabeXmlPuffer] = (
-            b"<EricBearbeiteVorgang><Erfolg/>"
-            b"</EricBearbeiteVorgang>"
+            b'<Elster xmlns="http://www.elster.de/'
+            b'elsterxml/schema/v11">'
+            b'<TransferHeader version="11">'
+            b"<TransferTicket>"
+            b"et-test-transfer-ticket"
+            b"</TransferTicket>"
+            b"</TransferHeader>"
+            b"</Elster>"
         )
+
         self._buffers[serverantwortXmlPuffer] = (
             b"<Serverantwort>OK</Serverantwort>"
         )
@@ -145,11 +152,20 @@ def test_send_uses_official_send_flags_and_certificate(
     )
 
     assert result.response_xml == (
-        "<EricBearbeiteVorgang><Erfolg/>"
-        "</EricBearbeiteVorgang>"
+        '<Elster xmlns="http://www.elster.de/'
+        'elsterxml/schema/v11">'
+        '<TransferHeader version="11">'
+        "<TransferTicket>"
+        "et-test-transfer-ticket"
+        "</TransferTicket>"
+        "</TransferHeader>"
+        "</Elster>"
     )
     assert result.server_response_xml == (
         "<Serverantwort>OK</Serverantwort>"
+    )
+    assert result.transfer_ticket == (
+        "et-test-transfer-ticket"
     )
 
     assert fake_eric.closed_certificate_handle == 4711

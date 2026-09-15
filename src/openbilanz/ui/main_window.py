@@ -7,7 +7,7 @@ from urllib.error import URLError
 from zipfile import BadZipFile
 from decimal import Decimal
 from uuid import UUID
-from datetime import date
+from datetime import date, datetime
 
 from openbilanz.accounting.balance_sheet import BalanceSheet
 from openbilanz.accounting.financial_statement_context import (
@@ -2373,10 +2373,13 @@ class MainWindow(tk.Tk):
                 )
             )
 
-            self._elster_bilanz_transmission_service\
+            send_result = (
+                self._elster_bilanz_transmission_service
                 .send_test_transmission(
                     validated=validated,
                 )
+            )
+            transmitted_at = datetime.now()
 
         except (
             ValueError,
@@ -2390,17 +2393,31 @@ class MainWindow(tk.Tk):
             )
             return
 
-        messagebox.showinfo(
+        save_receipt = messagebox.askyesno(
             "ELSTER-Testübermittlung",
             (
                 "Die ELSTER-Testübermittlung wurde "
                 "ohne Fehler abgeschlossen.\n\n"
                 "Testmerker: 700000004\n\n"
+                "TransferTicket:\n"
+                f"{send_result.transfer_ticket}\n\n"
                 "Es wurde keine produktive "
-                "Steuerübermittlung durchgeführt."
+                "Steuerübermittlung durchgeführt.\n\n"
+                "Soll ein Übertragungsnachweis "
+                "gespeichert werden?"
             ),
             parent=self,
         )
+
+        if save_receipt:
+            self._save_elster_transmission_receipt(
+                transfer_ticket=(
+                    send_result.transfer_ticket
+                ),
+                transmission_mode="TEST",
+                test_marker="700000004",
+                transmitted_at=transmitted_at,
+            )
 
     def _send_e_bilanz_production(self) -> None:
         """Übermittelt die E-Bilanz produktiv an ELSTER."""
@@ -2454,21 +2471,36 @@ class MainWindow(tk.Tk):
             return
 
         try:
-            master_data = self._workspace.load_company_master_data()
+            master_data = (
+                self._workspace.load_company_master_data()
+            )
 
             validated = (
                 self._elster_bilanz_transmission_service
                 .validate_production_transmission(
-                    xbrl_xml=self._current_e_bilanz_document.xml,
+                    xbrl_xml=(
+                        self._current_e_bilanz_document.xml
+                    ),
                     master_data=master_data,
-                    balance_sheet_date=self._context.fiscal_year.end_date,
+                    balance_sheet_date=(
+                        self._context.fiscal_year.end_date
+                    ),
                 )
             )
 
-            self._elster_bilanz_transmission_service.send_production_transmission(
-                validated=validated,
+            send_result = (
+                self._elster_bilanz_transmission_service
+                .send_production_transmission(
+                    validated=validated,
+                )
             )
-        except (ValueError, FileNotFoundError, RuntimeError) as exc:
+            transmitted_at = datetime.now()
+
+        except (
+            ValueError,
+            FileNotFoundError,
+            RuntimeError,
+        ) as exc:
             messagebox.showerror(
                 "ELSTER-Produktivübermittlung fehlgeschlagen",
                 str(exc),
@@ -2476,11 +2508,134 @@ class MainWindow(tk.Tk):
             )
             return
 
-        messagebox.showinfo(
+        save_receipt = messagebox.askyesno(
             "ELSTER-Produktivübermittlung",
             (
                 "Die E-Bilanz wurde ohne Fehler produktiv "
-                "an ELSTER übermittelt."
+                "an ELSTER übermittelt.\n\n"
+                "TransferTicket:\n"
+                f"{send_result.transfer_ticket}\n\n"
+                "Soll ein Übertragungsnachweis "
+                "gespeichert werden?"
+            ),
+            parent=self,
+        )
+
+        if save_receipt:
+            self._save_elster_transmission_receipt(
+                transfer_ticket=(
+                    send_result.transfer_ticket
+                ),
+                transmission_mode="PRODUKTIV",
+                test_marker=None,
+                transmitted_at=transmitted_at,
+            )
+
+    def _save_elster_transmission_receipt(
+        self,
+        *,
+        transfer_ticket: str,
+        transmission_mode: str,
+        test_marker: str | None,
+        transmitted_at: datetime,
+    ) -> None:
+        """Speichert einen Nachweis einer erfolgreichen ELSTER-Übermittlung."""
+
+        context = self._workspace.context
+        company_name = context.company.name
+        fiscal_year = context.fiscal_year
+
+        safe_company_name = "".join(
+            character
+            if character.isalnum() or character in "-_"
+            else "_"
+            for character in company_name
+        ).strip("_")
+
+        timestamp = transmitted_at.strftime(
+            "%Y-%m-%d_%H%M%S"
+        )
+
+        default_filename = (
+            "SimpleOB_ELSTER_"
+            f"{safe_company_name}_"
+            f"{fiscal_year.end_date.year}_"
+            f"{transmission_mode}_"
+            f"{timestamp}.txt"
+        )
+
+        filename = filedialog.asksaveasfilename(
+            parent=self,
+            title="ELSTER-Übertragungsnachweis speichern",
+            initialfile=default_filename,
+            defaultextension=".txt",
+            filetypes=(
+                ("Textdateien", "*.txt"),
+                ("Alle Dateien", "*.*"),
+            ),
+        )
+
+        if not filename:
+            return
+
+        lines = [
+            "SimpleOB – ELSTER-Übertragungsnachweis",
+            "",
+            f"Mandant:        {company_name}",
+            (
+                "Geschäftsjahr: "
+                f"{fiscal_year.start_date:%d.%m.%Y} – "
+                f"{fiscal_year.end_date:%d.%m.%Y}"
+            ),
+            f"Übertragung:    {transmission_mode}",
+            (
+                "Zeitpunkt:      "
+                f"{transmitted_at:%d.%m.%Y %H:%M:%S}"
+            ),
+            "Datenart:        Bilanz_6.9",
+        ]
+
+        if test_marker is not None:
+            lines.append(
+                f"Testmerker:     {test_marker}"
+            )
+
+        lines.extend(
+            (
+                f"TransferTicket: {transfer_ticket}",
+                "",
+                "Status:          Übertragung erfolgreich",
+                "",
+            )
+        )
+
+        target = Path(filename)
+
+        try:
+            target.write_text(
+                "\n".join(lines),
+                encoding="utf-8",
+            )
+        except OSError as exc:
+            messagebox.showerror(
+                "Übertragungsnachweis konnte nicht gespeichert werden",
+                (
+                    "Die ELSTER-Übertragung war erfolgreich, "
+                    "aber der Übertragungsnachweis konnte "
+                    "nicht gespeichert werden.\n\n"
+                    f"TransferTicket:\n{transfer_ticket}\n\n"
+                    f"Fehler beim Speichern:\n{exc}"
+                ),
+                parent=self,
+            )
+            return
+
+        messagebox.showinfo(
+            "ELSTER-Übertragungsnachweis",
+            (
+                "Der Übertragungsnachweis wurde "
+                "erfolgreich gespeichert.\n\n"
+                f"{target}"
             ),
             parent=self,
         )

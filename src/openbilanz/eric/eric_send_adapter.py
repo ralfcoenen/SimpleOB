@@ -8,6 +8,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol, cast
+from xml.etree import ElementTree as ET
 
 from openbilanz.eric.eric_create_th_adapter import (
     EricApiProtocol,
@@ -29,6 +30,7 @@ class EricSendResult:
 
     response_xml: str
     server_response_xml: str
+    transfer_ticket: str
 
 
 class EricSendError(RuntimeError):
@@ -286,9 +288,15 @@ class EricSendAdapter:
                         server_response_xml=server_response_xml,
                     )
 
+                transfer_ticket = self._extract_transfer_ticket(
+                    response_xml=response_xml,
+                    server_response_xml=server_response_xml,
+                )
+
                 return EricSendResult(
                     response_xml=response_xml,
                     server_response_xml=server_response_xml,
+                    transfer_ticket=transfer_ticket,
                 )
             finally:
                 eric.PyEricRueckgabepufferFreigeben(
@@ -298,6 +306,52 @@ class EricSendAdapter:
             eric.PyEricRueckgabepufferFreigeben(
                 response_buffer
             )
+
+    @staticmethod
+    def _extract_transfer_ticket(
+        *,
+        response_xml: str,
+        server_response_xml: str,
+    ) -> str:
+        """Liest das von ERiC erzeugte ELSTER-Transferticket."""
+
+        transfer_tickets: list[str] = []
+
+        for xml_text in (
+            response_xml,
+            server_response_xml,
+        ):
+            if not xml_text.strip():
+                continue
+
+            try:
+                root = ET.fromstring(xml_text)
+            except ET.ParseError:
+                continue
+
+            for element in root.iter():
+                local_name = element.tag.rsplit("}", 1)[-1]
+
+                if local_name != "TransferTicket":
+                    continue
+
+                transfer_ticket = (element.text or "").strip()
+
+                if (
+                    transfer_ticket
+                    and transfer_ticket not in transfer_tickets
+                ):
+                    transfer_tickets.append(transfer_ticket)
+
+        if len(transfer_tickets) != 1:
+            raise EricSendError(
+                "Die ELSTER-Übermittlung war erfolgreich, "
+                "aber das von ERiC erzeugte TransferTicket "
+                "konnte nicht eindeutig ermittelt werden. "
+                f"Gefundene TransferTickets: {transfer_tickets!r}"
+            )
+
+        return transfer_tickets[0]
 
     @staticmethod
     def _decode_response(response_bytes: bytes) -> str:
