@@ -1810,6 +1810,14 @@ class FiscalYearWorkspace:
             account_roles,
         ) = self.load_account_configuration()
 
+        account_taxonomy_concepts = (
+            self._chart_of_accounts_repository
+            .load_account_taxonomy_concepts(
+                self._context.company.company_id,
+                taxonomy_version="6.9",
+            )
+        )
+
         account_details = self._e_bilanz_account_detail_service.build_for_e_bilanz(
             pre_closing_ledger=self._pre_closing_ledger,
             closed_ledger=self._ledger,
@@ -1898,6 +1906,9 @@ class FiscalYearWorkspace:
             entity_scheme=entity.scheme,
             previous_fiscal_year=self.previous_fiscal_year,
             account_details=account_details,
+            account_taxonomy_concepts=(
+                account_taxonomy_concepts
+            ),
             fixed_asset_schedule=fixed_asset_schedule,
             shareholders=shareholders,
             current_depreciation_difference=(
@@ -1906,7 +1917,7 @@ class FiscalYearWorkspace:
             previous_depreciation_difference=(
                 previous_depreciation_difference
             ),
-                        previous_hgb_equity=(
+            previous_hgb_equity=(
                 previous_hgb_equity
             ),
             contribution=contribution,

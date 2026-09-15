@@ -10,6 +10,7 @@ from openbilanz.accounting.financial_statement_position_provider import (
 from openbilanz.database.models import (
     KontenrahmenKonfiguration,
     Kontenrolle,
+    KontenTaxonomieZuordnung,
     Konto,
     Mandant,
 )
@@ -810,6 +811,199 @@ class ChartOfAccountsRepository:
             output_tax_7=model.output_tax_7,
             output_tax_19=model.output_tax_19,
         )
+
+    def save_account_taxonomy_concepts(
+        self,
+        *,
+        company_id: UUID,
+        taxonomy_version: str,
+        account_taxonomy_concepts: dict[str, str],
+        commit: bool = True,
+    ) -> None:
+        """Speichert Taxonomiezuordnungen von Mandantenkonten."""
+
+        if not isinstance(company_id, UUID):
+            raise TypeError(
+                "company_id must be a UUID"
+            )
+
+        if not isinstance(taxonomy_version, str):
+            raise TypeError(
+                "taxonomy_version must be a str"
+            )
+
+        taxonomy_version = taxonomy_version.strip()
+
+        if not taxonomy_version:
+            raise ValueError(
+                "taxonomy_version must not be empty"
+            )
+
+        if not isinstance(
+            account_taxonomy_concepts,
+            dict,
+        ):
+            raise TypeError(
+                "account_taxonomy_concepts must be a dict"
+            )
+
+        normalized_concepts: dict[str, str] = {}
+
+        for account_number, concept_name in (
+            account_taxonomy_concepts.items()
+        ):
+            if not isinstance(account_number, str):
+                raise TypeError(
+                    "account numbers must be strings"
+                )
+
+            if not isinstance(concept_name, str):
+                raise TypeError(
+                    "taxonomy concept names must be strings"
+                )
+
+            normalized_account_number = (
+                account_number.strip()
+            )
+            normalized_concept_name = (
+                concept_name.strip()
+            )
+
+            if not normalized_account_number:
+                raise ValueError(
+                    "account numbers must not be empty"
+                )
+
+            if not normalized_concept_name:
+                raise ValueError(
+                    "taxonomy concept names must not be empty"
+                )
+
+            normalized_concepts[
+                normalized_account_number
+            ] = normalized_concept_name
+
+        company_model = self._find_company(
+            company_id
+        )
+
+        if company_model is None:
+            raise ValueError(
+                "Das Unternehmen ist nicht vorhanden."
+            )
+
+        self._session.flush()
+
+        account_numbers = {
+            model.account_number
+            for model in (
+                self._session.query(Konto)
+                .filter(
+                    Konto.mandant_id
+                    == company_model.id
+                )
+                .all()
+            )
+        }
+
+        missing_accounts = (
+            set(normalized_concepts)
+            - account_numbers
+        )
+
+        if missing_accounts:
+            missing = ", ".join(
+                sorted(missing_accounts)
+            )
+
+            raise ValueError(
+                "Konten für Taxonomiezuordnungen "
+                "sind im Kontenrahmen nicht vorhanden: "
+                f"{missing}"
+            )
+
+        (
+            self._session.query(
+                KontenTaxonomieZuordnung
+            )
+            .filter(
+                KontenTaxonomieZuordnung.mandant_id
+                == company_model.id,
+                KontenTaxonomieZuordnung.taxonomy_version
+                == taxonomy_version,
+            )
+            .delete(
+                synchronize_session=False
+            )
+        )
+
+        for account_number, concept_name in (
+            sorted(normalized_concepts.items())
+        ):
+            self._session.add(
+                KontenTaxonomieZuordnung(
+                    mandant_id=company_model.id,
+                    account_number=account_number,
+                    taxonomy_version=taxonomy_version,
+                    concept_name=concept_name,
+                )
+            )
+
+        if commit:
+            self._session.commit()
+
+    def load_account_taxonomy_concepts(
+        self,
+        company_id: UUID,
+        *,
+        taxonomy_version: str,
+    ) -> dict[str, str]:
+        """Lädt Taxonomiezuordnungen von Mandantenkonten."""
+
+        if not isinstance(company_id, UUID):
+            raise TypeError(
+                "company_id must be a UUID"
+            )
+
+        if not isinstance(taxonomy_version, str):
+            raise TypeError(
+                "taxonomy_version must be a str"
+            )
+
+        taxonomy_version = taxonomy_version.strip()
+
+        if not taxonomy_version:
+            raise ValueError(
+                "taxonomy_version must not be empty"
+            )
+
+        company_model = self._find_company(
+            company_id
+        )
+
+        if company_model is None:
+            return {}
+
+        models = (
+            self._session.query(
+                KontenTaxonomieZuordnung
+            )
+            .filter(
+                KontenTaxonomieZuordnung.mandant_id
+                == company_model.id,
+                KontenTaxonomieZuordnung.taxonomy_version
+                == taxonomy_version,
+            )
+            .order_by(
+                KontenTaxonomieZuordnung.account_number
+            )
+            .all()
+        )
+
+        return {
+            model.account_number: model.concept_name
+            for model in models
+        }
 
     def save_account_roles(
         self,

@@ -187,6 +187,49 @@ class Konto(Base):
     )
 
 
+class KontenTaxonomieZuordnung(Base):
+    """Taxonomiezuordnung eines Mandantenkontos."""
+
+    __tablename__ = "konten_taxonomie_zuordnungen"
+
+    __table_args__ = (
+        UniqueConstraint(
+            "mandant_id",
+            "account_number",
+            "taxonomy_version",
+            name=(
+                "uq_konten_taxonomie_"
+                "mandant_account_version"
+            ),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+    )
+
+    mandant_id: Mapped[int] = mapped_column(
+        ForeignKey("mandanten.id"),
+        nullable=False,
+    )
+
+    account_number: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    taxonomy_version: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    concept_name: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+
 class KontenrahmenKonfiguration(Base):
     """Technische Kontenkonfiguration eines Mandanten."""
 
