@@ -23,6 +23,9 @@ from openbilanz.domain.company_master_data import (
 from openbilanz.domain.fiscal_year import FiscalYear
 from openbilanz.domain.shareholder import Shareholder
 from openbilanz.domain.vat_accounts import VatAccounts
+from openbilanz.eric.bilanz_generation.fact_plan import (
+    FactPlanState,
+)
 from openbilanz.services.e_bilanz_service import EBilanzService
 from openbilanz.taxonomy.arelle_adapter import (
     ArelleValidationResult,
@@ -257,6 +260,15 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
     profile.fact_plan = Mock()
 
     extended_fact_plan = Mock()
+    bal_nil_fact_plan = Mock()
+    final_fact_plan = Mock()
+
+    extended_fact_plan.with_state.return_value = (
+        bal_nil_fact_plan
+    )
+    bal_nil_fact_plan.with_state.return_value = (
+        final_fact_plan
+    )
 
     structural_account_detail_path = (
         "bs.ass.currAss.receiv.trade",
@@ -285,8 +297,8 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
 
     balance_sheet_values = {
         ("bs.test",): Decimal("100.00"),
+        ("bs.eqLiab.equity",): Decimal("100.00"),
     }
-
     income_statement_values = {
         ("is.test",): Decimal("100.00"),
     }
@@ -480,6 +492,7 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
             },
             fixed_asset_schedule=(),
             shareholders=(shareholder,),
+            previous_hgb_equity=Decimal("0.00"),
         )
 
     assert isinstance(
@@ -567,9 +580,25 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
         ),
     )
 
+    extended_fact_plan.with_state.assert_called_once_with(
+        concept_name=(
+            "genInfo.report.id.reportElement."
+            "reportElements.BAL"
+        ),
+        state=FactPlanState.NIL,
+    )
+
+    bal_nil_fact_plan.with_state.assert_called_once_with(
+        concept_name=(
+            "genInfo.report.id.reportElement."
+            "reportElements.STU"
+        ),
+        state=FactPlanState.NIL,
+    )
+
     assert (
         fact_plan_resolver.call_args.kwargs["fact_plan"]
-        is extended_fact_plan
+        is final_fact_plan
     )
 
     extended_fact_plan.path_for.assert_called_once_with(
@@ -820,171 +849,11 @@ def test_e_bilanz_service_rejects_account_taxonomy_concept_with_wrong_parent(
     profile.fact_plan.with_conditional_child.assert_not_called()
 
 
-def test_e_bilanz_service_integrates_bvv_for_hgbm(
+
+def test_hgbm_builders_integrate_bvv_book_value_differences(
     monkeypatch,
 ) -> None:
-    """HGBM integriert BVV mit den steuerlichen Buchwertdifferenzen."""
-
-    service = object.__new__(EBilanzService)
-
-    current_hgb_equity = Decimal("13535.02")
-
-    balance_sheet_values = {
-        ("bs.eqLiab.equity",): current_hgb_equity,
-    }
-
-    commercial_schedule = Mock(
-        contexts={"commercial": Mock()},
-        facts=(Mock(),),
-        nil_facts=(),
-    )
-
-    hgbm_schedule = Mock()
-
-    tax_reconciliation = Mock()
-
-    bvv_values = {
-        ("BVV.profitLoss",): Decimal("-250.00"),
-        (
-            "BVV.profitLoss.assetsCurrentYear",
-        ): Decimal("13701.68"),
-        (
-            "BVV.profitLoss.assetsPreviousYear",
-        ): Decimal("13951.68"),
-        (
-            "BVV.profitLoss.assetsPreviousYear",
-            "BVV.profitLoss.assetsPreviousYear.assets",
-        ): Decimal("13951.68"),
-        (
-            "BVV.profitLoss.assetsPreviousYear",
-            (
-                "BVV.profitLoss.assetsPreviousYear."
-                "capAdjustments"
-            ),
-        ): Decimal("0.00"),
-        (
-            "BVV.profitLoss.withdrawalDistrib",
-        ): Decimal("0.00"),
-        (
-            "BVV.profitLoss.contribution",
-        ): Decimal("0.00"),
-    }
-
-    hgbm_builder = Mock(
-        return_value=hgbm_schedule
-    )
-    reconciliation_builder = Mock(
-        return_value=tax_reconciliation
-    )
-    bvv_builder = Mock(
-        return_value=bvv_values
-    )
-
-    monkeypatch.setattr(
-        HgbmFixedAssetScheduleBuilder,
-        "build",
-        hgbm_builder,
-    )
-    monkeypatch.setattr(
-        TaxDepreciationReconciliationBuilder,
-        "build",
-        reconciliation_builder,
-    )
-    monkeypatch.setattr(
-        BvvValueBuilder,
-        "build",
-        bvv_builder,
-    )
-
-    current_depreciation_difference = Decimal("-83.33")
-    previous_depreciation_difference = Decimal("-83.33")
-
-    current_book_value_difference = (
-        -current_depreciation_difference
-    )
-    previous_book_value_difference = (
-        -previous_depreciation_difference
-    )
-
-    hgbm_result = HgbmFixedAssetScheduleBuilder.build(
-        commercial_contexts=commercial_schedule.contexts,
-        commercial_facts=commercial_schedule.facts,
-        commercial_nil_facts=commercial_schedule.nil_facts,
-        current_depreciation_difference=(
-            current_depreciation_difference
-        ),
-        previous_depreciation_difference=(
-            previous_depreciation_difference
-        ),
-    )
-
-    reconciliation_result = (
-        TaxDepreciationReconciliationBuilder.build(
-            current_book_value_difference=(
-                current_book_value_difference
-            ),
-            previous_book_value_difference=(
-                previous_book_value_difference
-            ),
-        )
-    )
-
-    result = BvvValueBuilder.build(
-        current_hgb_equity=(
-            balance_sheet_values[
-                ("bs.eqLiab.equity",)
-            ]
-        ),
-        previous_hgb_equity=Decimal("13868.35"),
-        current_book_value_difference=(
-            current_book_value_difference
-        ),
-        previous_book_value_difference=(
-            previous_book_value_difference
-        ),
-        contribution=Decimal("0.00"),
-        withdrawal_distribution=Decimal("0.00"),
-    )
-
-    assert hgbm_result is hgbm_schedule
-    assert reconciliation_result is tax_reconciliation
-    assert result == bvv_values
-
-    hgbm_builder.assert_called_once_with(
-        commercial_contexts=(
-            commercial_schedule.contexts
-        ),
-        commercial_facts=(
-            commercial_schedule.facts
-        ),
-        commercial_nil_facts=(
-            commercial_schedule.nil_facts
-        ),
-        current_depreciation_difference=(
-            Decimal("-83.33")
-        ),
-        previous_depreciation_difference=(
-            Decimal("-83.33")
-        ),
-    )
-
-    reconciliation_builder.assert_called_once_with(
-        current_book_value_difference=Decimal("83.33"),
-        previous_book_value_difference=Decimal("83.33"),
-    )
-
-    bvv_builder.assert_called_once_with(
-        current_hgb_equity=Decimal("13535.02"),
-        previous_hgb_equity=Decimal("13868.35"),
-        current_book_value_difference=Decimal("83.33"),
-        previous_book_value_difference=Decimal("83.33"),
-        contribution=Decimal("0.00"),
-        withdrawal_distribution=Decimal("0.00"),
-    )
-
-def test_e_bilanz_service_integrates_bvv_for_hgbm() -> None:
-    """HGBM aktiviert BVV und übernimmt die bestätigten BVV-Werte."""
-
+    """HGBM-Builder integrieren BVV mit steuerlichen Buchwertdifferenzen."""
     fiscal_year = FiscalYear(
         start_date=date(2026, 1, 1),
         end_date=date(2026, 12, 31),
@@ -1391,6 +1260,15 @@ def test_e_bilanz_service_integrates_bvv_for_hgbm() -> None:
         "genInfo.report.id.reportElement."
         "reportElements.STU"
         in report_profile.report_elements
+    )
+
+    profile.fact_plan.with_state.assert_not_called()
+
+    assert (
+        fact_plan_resolver.call_args.kwargs[
+            "fact_plan"
+        ]
+        is profile.fact_plan
     )
 
     fact_plan_values = (

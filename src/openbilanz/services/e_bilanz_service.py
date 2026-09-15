@@ -28,6 +28,9 @@ from openbilanz.eric.bilanz_generation.fact_plan_resolver import (
 from openbilanz.eric.bilanz_generation.gaap_ci_6_9_account_detail_values import (
     GaapCi69AccountDetailValueBuilder,
 )
+from openbilanz.eric.bilanz_generation.fact_plan import (
+    FactPlanState,
+)
 from openbilanz.eric.bilanz_generation.gaap_ci_6_9_balance_sheet_values import (
     GaapCi69BalanceSheetValueBuilder,
 )
@@ -410,28 +413,110 @@ class EBilanzService:
             )
         )
 
-        if fixed_asset_schedule_xbrl.facts:
-            report_profile = replace(
-                report_profile,
-                report_elements=(
-                    *report_profile.report_elements,
-                    (
-                        "genInfo.report.id.reportElement."
-                        "reportElements.BAL"
-                    ),
-                ),
+        has_fixed_asset_schedule = bool(
+            fixed_asset_schedule_xbrl.facts
+        )
+
+        if has_fixed_asset_schedule:
+            report_profile = (
+                report_profile.with_report_element(
+                    "genInfo.report.id.reportElement."
+                    "reportElements.BAL"
+                )
             )
 
         hgbm_fixed_asset_schedule_xbrl = None
         tax_reconciliation = None
-        bvv_values = {}
+
+        current_book_value_difference = (
+            -current_depreciation_difference
+        )
+        previous_book_value_difference = (
+            -previous_depreciation_difference
+        )
+
+        has_tax_reconciliation = (
+            current_depreciation_difference != Decimal("0.00")
+            or previous_depreciation_difference != Decimal("0.00")
+        )
+
+        if has_tax_reconciliation:
+            report_profile = (
+                report_profile.with_accounting_standard(
+                    "genInfo.report.id.accountingStandard."
+                    "accountingStandard.HGBM"
+                )
+            )
+        else:
+            report_profile = (
+                report_profile.with_accounting_standard(
+                    "genInfo.report.id.accountingStandard."
+                    "accountingStandard.HAOE"
+                )
+            )
+
+        if previous_hgb_equity is None:
+            raise ValueError(
+                "Für den Betriebsvermögensvergleich fehlt "
+                "das HGB-Vorjahreseigenkapital."
+            )
+
+        current_hgb_equity = (
+            balance_sheet_values.get(
+                ("bs.eqLiab.equity",)
+            )
+        )
+
+        if current_hgb_equity is None:
+            raise ValueError(
+                "Für den Betriebsvermögensvergleich fehlt "
+                "das aktuelle HGB-Eigenkapital."
+            )
+
+        bvv_values = BvvValueBuilder.build(
+            current_hgb_equity=current_hgb_equity,
+            previous_hgb_equity=previous_hgb_equity,
+            current_book_value_difference=(
+                current_book_value_difference
+            ),
+            previous_book_value_difference=(
+                previous_book_value_difference
+            ),
+            contribution=contribution,
+            withdrawal_distribution=(
+                withdrawal_distribution
+            ),
+        )
+
+        report_profile = (
+            report_profile.with_report_element(
+                "genInfo.report.id.reportElement."
+                "reportElements.BVV"
+            )
+        )
+
+        if has_tax_reconciliation:
+            report_profile = (
+                report_profile.with_report_element(
+                    "genInfo.report.id.reportElement."
+                    "reportElements.STU"
+                )
+            )
+
+            tax_reconciliation = (
+                TaxDepreciationReconciliationBuilder.build(
+                    current_book_value_difference=(
+                        current_book_value_difference
+                    ),
+                    previous_book_value_difference=(
+                        previous_book_value_difference
+                    ),
+                )
+            )
 
         if (
-            fixed_asset_schedule_xbrl.facts
-            and (
-                current_depreciation_difference != Decimal("0.00")
-                or previous_depreciation_difference != Decimal("0.00")
-            )
+            has_fixed_asset_schedule
+            and has_tax_reconciliation
         ):
             hgbm_fixed_asset_schedule_xbrl = (
                 HgbmFixedAssetScheduleBuilder.build(
@@ -453,70 +538,6 @@ class EBilanzService:
                 )
             )
 
-            current_book_value_difference = (
-                -current_depreciation_difference
-            )
-            previous_book_value_difference = (
-                -previous_depreciation_difference
-            )
-
-            tax_reconciliation = (
-                TaxDepreciationReconciliationBuilder.build(
-                    current_book_value_difference=(
-                        current_book_value_difference
-                    ),
-                    previous_book_value_difference=(
-                        previous_book_value_difference
-                    ),
-                )
-            )
-
-            if previous_hgb_equity is None:
-                raise ValueError(
-                    "Für den Betriebsvermögensvergleich fehlt "
-                    "das HGB-Vorjahreseigenkapital."
-                )
-
-            current_hgb_equity = (
-                balance_sheet_values.get(
-                    ("bs.eqLiab.equity",)
-                )
-            )
-
-            if current_hgb_equity is None:
-                raise ValueError(
-                    "Für den Betriebsvermögensvergleich fehlt "
-                    "das aktuelle HGB-Eigenkapital."
-                )
-
-            bvv_values = BvvValueBuilder.build(
-                current_hgb_equity=current_hgb_equity,
-                previous_hgb_equity=previous_hgb_equity,
-                current_book_value_difference=(
-                    current_book_value_difference
-                ),
-                previous_book_value_difference=(
-                    previous_book_value_difference
-                ),
-                contribution=contribution,
-                withdrawal_distribution=(
-                    withdrawal_distribution
-                ),
-            )
-
-            report_profile = (
-                report_profile.with_report_element(
-                    "genInfo.report.id.reportElement."
-                    "reportElements.BVV"
-                )
-            )
-
-            report_profile = (
-                report_profile.with_report_element(
-                    "genInfo.report.id.reportElement."
-                    "reportElements.STU"
-                )
-            )
         instant_context = TaxonomyContext(
             entity_identifier=entity_identifier,
             entity_scheme=entity_scheme,
@@ -601,6 +622,28 @@ class EBilanzService:
         values.update(
             bvv_values
         )
+
+        if not has_fixed_asset_schedule:
+            effective_fact_plan = (
+                effective_fact_plan.with_state(
+                    concept_name=(
+                        "genInfo.report.id.reportElement."
+                        "reportElements.BAL"
+                    ),
+                    state=FactPlanState.NIL,
+                )
+            )
+
+        if not has_tax_reconciliation:
+            effective_fact_plan = (
+                effective_fact_plan.with_state(
+                    concept_name=(
+                        "genInfo.report.id.reportElement."
+                        "reportElements.STU"
+                    ),
+                    state=FactPlanState.NIL,
+                )
+            )
 
         resolved_fact_plan = (
             FactPlanResolver.resolve(

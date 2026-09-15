@@ -279,6 +279,43 @@ def test_fact_plan_rejects_invalid_state() -> None:
         )
 
 
+def test_fact_plan_with_state_replaces_nested_node_state() -> None:
+    plan = FactPlan(
+        nodes=(
+            FactPlanNode(
+                concept_name="parent",
+                state=FactPlanState.CONDITIONAL,
+                children=(
+                    FactPlanNode(
+                        concept_name="child",
+                        state=FactPlanState.CONDITIONAL,
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    changed = plan.with_state(
+        concept_name="child",
+        state=FactPlanState.NIL,
+    )
+
+    changed_child = changed.node_for("child")
+    original_child = plan.node_for("child")
+
+    assert changed_child is not None
+    assert changed_child.state is FactPlanState.NIL
+
+    assert original_child is not None
+    assert original_child.state is FactPlanState.CONDITIONAL
+
+    changed_parent = changed.node_for("parent")
+
+    assert changed_parent is not None
+    assert changed_parent.state is FactPlanState.CONDITIONAL
+    assert changed_parent.children == (changed_child,)
+
+
 def test_fact_plan_with_conditional_child_adds_child_to_existing_parent() -> None:
     plan = FactPlan(
         nodes=(

@@ -38,6 +38,10 @@ class Taxonomy69ValueBuilder:
             "Kerntaxonomie"
         ),
         (
+            "genInfo.report.id.accountingStandard."
+            "accountingStandard.HAOE"
+        ): "deutsches Handelsrecht (sog. Einheitsbilanz)",
+        (
             "genInfo.report.id.incomeStatementFormat."
             "incomeStatementFormat.GKV"
         ): "Gesamtkostenverfahren",

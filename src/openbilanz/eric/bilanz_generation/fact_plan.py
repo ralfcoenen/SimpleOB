@@ -199,6 +199,56 @@ class FactPlan:
 
         return matches[0]
 
+    def with_state(
+        self,
+        *,
+        concept_name: str,
+        state: FactPlanState,
+    ) -> "FactPlan":
+        """Ersetzt den Zustand eines eindeutig vorkommenden Knotens."""
+
+        self._validate_concept_name(concept_name)
+
+        if not isinstance(state, FactPlanState):
+            raise TypeError("state must be a FactPlanState")
+
+        if self.node_for(concept_name) is None:
+            raise ValueError(
+                "concept not found in fact plan: "
+                f"{concept_name}"
+            )
+
+        def replace_state(
+            node: FactPlanNode,
+        ) -> FactPlanNode:
+            children = tuple(
+                replace_state(child)
+                for child in node.children
+            )
+
+            if node.concept_name == concept_name:
+                return FactPlanNode(
+                    concept_name=node.concept_name,
+                    state=state,
+                    children=children,
+                )
+
+            if children == node.children:
+                return node
+
+            return FactPlanNode(
+                concept_name=node.concept_name,
+                state=node.state,
+                children=children,
+            )
+
+        return FactPlan(
+            nodes=tuple(
+                replace_state(node)
+                for node in self.nodes
+            )
+        )
+
     def with_conditional_child(
         self,
         *,

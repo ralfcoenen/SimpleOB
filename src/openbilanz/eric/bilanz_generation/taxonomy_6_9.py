@@ -188,7 +188,14 @@ DELTA_6_9 = BilanzProfileDelta(
                             "genInfo.report.id.accountingStandard."
                             "accountingStandard.HGBM"
                         ),
-                        state=FactPlanState.VALUE,
+                        state=FactPlanState.CONDITIONAL,
+                    ),
+                    FactPlanNode(
+                        concept_name=(
+                            "genInfo.report.id.accountingStandard."
+                            "accountingStandard.HAOE"
+                        ),
+                        state=FactPlanState.CONDITIONAL,
                     ),
                 ),
             ),

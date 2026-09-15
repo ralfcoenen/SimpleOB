@@ -11,7 +11,7 @@ from openbilanz.eric.bilanz_generation.taxonomy_6_9 import (
 def test_standard_report_profile_tuples_are_structured() -> None:
     plan = create_profile_6_9().fact_plan
 
-    expected = {
+    expected_single_children = {
         "genInfo.report.id.reportStatus": (
             "genInfo.report.id.reportStatus.reportStatus.E"
         ),
@@ -20,10 +20,6 @@ def test_standard_report_profile_tuples_are_structured() -> None:
         ),
         "genInfo.report.id.statementType": (
             "genInfo.report.id.statementType.statementType.E"
-        ),
-        "genInfo.report.id.accountingStandard": (
-            "genInfo.report.id.accountingStandard."
-            "accountingStandard.HGBM"
         ),
         "genInfo.report.id.specialAccountingStandard": (
             "genInfo.report.id.specialAccountingStandard.K"
@@ -41,7 +37,7 @@ def test_standard_report_profile_tuples_are_structured() -> None:
         ),
     }
 
-    for parent_name, child_name in expected.items():
+    for parent_name, child_name in expected_single_children.items():
         parent = plan.node_for(
             parent_name
         )
@@ -49,12 +45,37 @@ def test_standard_report_profile_tuples_are_structured() -> None:
         assert parent is not None
         assert parent.state is FactPlanState.CONDITIONAL
         assert len(parent.children) == 1
+        assert parent.children[0].concept_name == child_name
+        assert parent.children[0].state is FactPlanState.VALUE
 
-        child = parent.children[0]
+    accounting_standard = plan.node_for(
+        "genInfo.report.id.accountingStandard"
+    )
 
-        assert child.concept_name == child_name
-        assert child.state is FactPlanState.VALUE
+    assert accounting_standard is not None
+    assert (
+        accounting_standard.state
+        is FactPlanState.CONDITIONAL
+    )
 
+    assert {
+        child.concept_name
+        for child in accounting_standard.children
+    } == {
+        (
+            "genInfo.report.id.accountingStandard."
+            "accountingStandard.HGBM"
+        ),
+        (
+            "genInfo.report.id.accountingStandard."
+            "accountingStandard.HAOE"
+        ),
+    }
+
+    assert all(
+        child.state is FactPlanState.CONDITIONAL
+        for child in accounting_standard.children
+    )
 
 def test_supported_legal_forms_are_conditional_children() -> None:
     plan = create_profile_6_9().fact_plan

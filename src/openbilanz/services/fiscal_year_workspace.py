@@ -1849,43 +1849,33 @@ class FiscalYearWorkspace:
         contribution = Decimal("0.00")
         withdrawal_distribution = Decimal("0.00")
 
-        hgbm_required = (
-            bool(fixed_asset_schedule)
-            and (
-                current_depreciation_difference
-                != Decimal("0.00")
-                or previous_depreciation_difference
-                != Decimal("0.00")
+        bvv_annual_data = self.load_bvv_annual_data()
+
+        if bvv_annual_data is None:
+            raise ValueError(
+                "Für den Betriebsvermögensvergleich "
+                "fehlen die BVV-Jahresdaten."
+            )
+
+        previous_hgb_equity = (
+            self.effective_previous_hgb_equity(
+                chart_of_accounts=chart_of_accounts,
             )
         )
 
-        if hgbm_required:
-            bvv_annual_data = self.load_bvv_annual_data()
-
-            if bvv_annual_data is None:
-                raise ValueError(
-                    "Für den Betriebsvermögensvergleich "
-                    "fehlen die BVV-Jahresdaten."
-                )
-
-            previous_hgb_equity = (
-                self.effective_previous_hgb_equity(
-                    chart_of_accounts=chart_of_accounts,
-                )
-            )
-
-            if previous_hgb_equity is None:
+        if previous_hgb_equity is None:
+            if self.previous_fiscal_year is None:
+                previous_hgb_equity = Decimal("0.00")
+            else:
                 raise ValueError(
                     "Für den Betriebsvermögensvergleich "
                     "fehlt das HGB-Vorjahreseigenkapital."
                 )
 
-            contribution = (
-                bvv_annual_data.contribution
-            )
-            withdrawal_distribution = (
-                bvv_annual_data.withdrawal_distribution
-            )
+        contribution = bvv_annual_data.contribution
+        withdrawal_distribution = (
+            bvv_annual_data.withdrawal_distribution
+        )
 
         shareholders = ()
 

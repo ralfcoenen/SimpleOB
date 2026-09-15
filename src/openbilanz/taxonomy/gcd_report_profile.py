@@ -59,6 +59,41 @@ class GcdReportProfile:
             ),
         )
 
+    def with_accounting_standard(
+        self,
+        concept_name: str,
+    ) -> "GcdReportProfile":
+        """Liefert das Profil mit dem angegebenen Rechnungslegungsstandard."""
+
+        if not isinstance(concept_name, str):
+            raise TypeError(
+                "concept_name must be a string"
+            )
+
+        if not concept_name.strip():
+            raise ValueError(
+                "concept_name must not be empty"
+            )
+
+        if concept_name == self.accounting_standard:
+            return self
+
+        return GcdReportProfile(
+            report_status=self.report_status,
+            revision_status=self.revision_status,
+            statement_type=self.statement_type,
+            accounting_standard=concept_name,
+            special_accounting_standard=(
+                self.special_accounting_standard
+            ),
+            income_statement_format=(
+                self.income_statement_format
+            ),
+            consolidation_range=self.consolidation_range,
+            income_classification=self.income_classification,
+            report_elements=self.report_elements,
+        )
+
     def with_report_element(
         self,
         concept_name: str,
