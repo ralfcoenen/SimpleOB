@@ -1520,64 +1520,114 @@ class MainWindow(tk.Tk):
             columnspan=2,
             sticky="w",
         )
-        self._prepare_e_bilanz_button = ttk.Button(
+        e_bilanz_actions_frame = ttk.Frame(
             self._e_bilanz_tab,
+        )
+        e_bilanz_actions_frame.pack(
+            anchor="w",
+            pady=(8, 0),
+        )
+
+        self._prepare_e_bilanz_button = ttk.Button(
+            e_bilanz_actions_frame,
             text="E-Bilanz vorbereiten",
             command=self._prepare_e_bilanz,
             state="disabled",
         )
-        self._prepare_e_bilanz_button.pack(
-            anchor="w",
+        self._prepare_e_bilanz_button.grid(
+            row=0,
+            column=0,
+            sticky="ew",
+            padx=(0, 8),
+            pady=(0, 8),
         )
+
         self._build_e_bilanz_button = ttk.Button(
-            self._e_bilanz_tab,
+            e_bilanz_actions_frame,
             text="E-Bilanz erzeugen",
             command=self._build_e_bilanz,
             state="disabled",
         )
-        self._build_e_bilanz_button.pack(
-            anchor="w",
-            pady=(8, 0),
+        self._build_e_bilanz_button.grid(
+            row=0,
+            column=1,
+            sticky="ew",
+            pady=(0, 8),
         )
+
         self._validate_e_bilanz_button = ttk.Button(
-            self._e_bilanz_tab,
+            e_bilanz_actions_frame,
             text="E-Bilanz validieren",
             command=self._validate_e_bilanz,
             state="disabled",
         )
-        self._validate_e_bilanz_button.pack(
-            anchor="w",
-            pady=(8, 0),
+        self._validate_e_bilanz_button.grid(
+            row=1,
+            column=0,
+            sticky="ew",
+            padx=(0, 8),
+            pady=(0, 8),
         )
+
         self._export_e_bilanz_button = ttk.Button(
-            self._e_bilanz_tab,
-            text="E-Bilanz exportieren",
+            e_bilanz_actions_frame,
+            text="E-Bilanz XBRL exportieren",
             command=self._export_e_bilanz,
             state="disabled",
         )
-        self._export_e_bilanz_button.pack(
-            anchor="w",
-            pady=(8, 0),
+        self._export_e_bilanz_button.grid(
+            row=1,
+            column=1,
+            sticky="ew",
+            pady=(0, 8),
         )
+
+        self._export_e_bilanz_pdf_button = ttk.Button(
+            e_bilanz_actions_frame,
+            text="E-Bilanz PDF exportieren",
+            command=self._export_e_bilanz_pdf,
+            state="disabled",
+        )
+        self._export_e_bilanz_pdf_button.grid(
+            row=2,
+            column=0,
+            sticky="ew",
+            padx=(0, 8),
+            pady=(0, 8),
+        )
+
         self._send_e_bilanz_test_button = ttk.Button(
-            self._e_bilanz_tab,
+            e_bilanz_actions_frame,
             text="ELSTER-Testübermittlung",
             command=self._send_e_bilanz_test,
             state="disabled",
         )
-        self._send_e_bilanz_test_button.pack(
-            anchor="w",
-            pady=(8, 0),
+        self._send_e_bilanz_test_button.grid(
+            row=2,
+            column=1,
+            sticky="ew",
+            pady=(0, 8),
         )
+
         self._send_e_bilanz_production_button = ttk.Button(
-            self._e_bilanz_tab,
+            e_bilanz_actions_frame,
             text="ELSTER-Produktivübermittlung",
             command=self._send_e_bilanz_production,
             state="disabled",
         )
-        self._send_e_bilanz_production_button.pack(
-            anchor="w",
-            pady=(8, 0),
+        self._send_e_bilanz_production_button.grid(
+            row=3,
+            column=1,
+            sticky="ew",
+        )
+
+        e_bilanz_actions_frame.columnconfigure(
+            0,
+            weight=1,
+        )
+        e_bilanz_actions_frame.columnconfigure(
+            1,
+            weight=1,
         )
 
     def _save_bvv_annual_data(self) -> None:
@@ -2085,6 +2135,9 @@ class MainWindow(tk.Tk):
         self._export_e_bilanz_button.config(
             state="disabled",
         )
+        self._export_e_bilanz_pdf_button.config(
+            state="disabled",
+        )
         self._send_e_bilanz_test_button.config(
             state="disabled",
         )
@@ -2159,6 +2212,9 @@ class MainWindow(tk.Tk):
 
             if self._current_e_bilanz_arelle_valid:
                 self._export_e_bilanz_button.config(
+                    state="normal",
+                )
+                self._export_e_bilanz_pdf_button.config(
                     state="normal",
                 )
 
@@ -2636,6 +2692,93 @@ class MainWindow(tk.Tk):
                 "Der Übertragungsnachweis wurde "
                 "erfolgreich gespeichert.\n\n"
                 f"{target}"
+            ),
+            parent=self,
+        )
+
+    def _export_e_bilanz_pdf(self) -> None:
+        """Exportiert die E-Bilanz-Abschlusswerte als PDF."""
+
+        if self._current_e_bilanz_preparation is None:
+            messagebox.showwarning(
+                "E-Bilanz PDF",
+                "Die E-Bilanz wurde noch nicht vorbereitet.",
+                parent=self,
+            )
+            return
+
+        if (
+            self._current_e_bilanz_document is None
+            or not self._current_e_bilanz_arelle_valid
+        ):
+            messagebox.showwarning(
+                "E-Bilanz PDF",
+                (
+                    "Die E-Bilanz muss zuerst erzeugt und "
+                    "erfolgreich mit Arelle validiert werden."
+                ),
+                parent=self,
+            )
+            return
+
+        context = self._workspace.context
+        fiscal_year = context.fiscal_year
+
+        safe_company_name = "".join(
+            character
+            if character.isalnum() or character in "-_"
+            else "_"
+            for character in context.company.name
+        ).strip("_")
+
+        default_filename = (
+            "SimpleOB_E-Bilanz_"
+            f"{safe_company_name}_"
+            f"{fiscal_year.end_date.year}.pdf"
+        )
+
+        filename = filedialog.asksaveasfilename(
+            parent=self,
+            title="E-Bilanz als PDF exportieren",
+            initialfile=default_filename,
+            defaultextension=".pdf",
+            filetypes=(
+                ("PDF-Dateien", "*.pdf"),
+                ("Alle Dateien", "*.*"),
+            ),
+        )
+
+        if not filename:
+            return
+
+        try:
+            exported_path = (
+                self._pdf_reporting_service.export_e_bilanz(
+                    preparation=(
+                        self._current_e_bilanz_preparation
+                    ),
+                    company_name=context.company.name,
+                    fiscal_year_name=(
+                        f"{fiscal_year.start_date:%d.%m.%Y} – "
+                        f"{fiscal_year.end_date:%d.%m.%Y}"
+                    ),
+                    target=Path(filename),
+                )
+            )
+        except (ValueError, OSError) as exc:
+            messagebox.showerror(
+                "E-Bilanz PDF konnte nicht exportiert werden",
+                str(exc),
+                parent=self,
+            )
+            return
+
+        messagebox.showinfo(
+            "E-Bilanz PDF",
+            (
+                "Die E-Bilanz wurde erfolgreich als PDF "
+                "exportiert.\n\n"
+                f"{exported_path}"
             ),
             parent=self,
         )

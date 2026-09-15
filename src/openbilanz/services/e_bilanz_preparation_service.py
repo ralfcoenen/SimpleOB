@@ -24,6 +24,7 @@ class EBilanzPreparationResult:
 
     income_statement: IncomeStatement
     balance_sheet: BalanceSheet
+    net_income: Decimal
 
     amounts: dict[
         FinancialStatementPosition,
@@ -146,6 +147,7 @@ class EBilanzPreparationService:
         return EBilanzPreparationResult(
             income_statement=income_statement,
             balance_sheet=balance_sheet,
+            net_income=net_income,
             amounts=amounts,
             balance_sheet_amounts=balance_sheet_amounts,
             income_statement_amounts=(

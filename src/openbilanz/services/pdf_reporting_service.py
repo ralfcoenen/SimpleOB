@@ -30,6 +30,9 @@ from openbilanz.domain.money import ZERO
 from openbilanz.reporting.account_activity_report import (
     AccountActivityReport,
 )
+from openbilanz.services.e_bilanz_preparation_service import (
+    EBilanzPreparationResult,
+)
 from openbilanz.reporting.journal_report import JournalReport
 from openbilanz.reporting.trial_balance_report import TrialBalanceReport
 
@@ -330,6 +333,313 @@ class PdfReportingService:
             landscape_page=True,
         )
 
+    def export_e_bilanz(
+        self,
+        *,
+        preparation: EBilanzPreparationResult,
+        company_name: str,
+        fiscal_year_name: str,
+        target: Path,
+    ) -> Path:
+        """Exportiert die aufbereiteten E-Bilanz-Abschlusswerte als PDF."""
+
+        target = Path(target)
+
+        if target.suffix.lower() != ".pdf":
+            target = target.with_suffix(".pdf")
+
+        document = BaseDocTemplate(
+            str(target),
+            pagesize=A4,
+            leftMargin=15 * mm,
+            rightMargin=15 * mm,
+            topMargin=18 * mm,
+            bottomMargin=18 * mm,
+            title=(
+                "E-Bilanz – Bilanz und "
+                "Gewinn- und Verlustrechnung"
+            ),
+            author="SimpleOB",
+        )
+
+        frame = Frame(
+            document.leftMargin,
+            document.bottomMargin,
+            document.width,
+            document.height,
+            id="e-bilanz",
+        )
+
+        document.addPageTemplates(
+            [
+                PageTemplate(
+                    id="e-bilanz",
+                    frames=(frame,),
+                    onPage=self._draw_page_footer,
+                )
+            ]
+        )
+
+        styles = getSampleStyleSheet()
+
+        title_style = ParagraphStyle(
+            "EBilanzTitle",
+            parent=styles["Heading1"],
+            alignment=TA_CENTER,
+            spaceAfter=6,
+        )
+
+        section_style = ParagraphStyle(
+            "EBilanzSection",
+            parent=styles["Heading2"],
+            spaceBefore=8,
+            spaceAfter=5,
+        )
+
+        story = [
+            Paragraph(
+                company_name,
+                styles["Heading2"],
+            ),
+            Paragraph(
+                (
+                    "E-Bilanz – Bilanz und "
+                    "Gewinn- und Verlustrechnung"
+                ),
+                title_style,
+            ),
+            Paragraph(
+                "Taxonomie 6.9",
+                title_style,
+            ),
+            Paragraph(
+                f"Geschäftsjahr: {fiscal_year_name}",
+                styles["Normal"],
+            ),
+            Paragraph(
+                f"Erstellt am {date.today():%d.%m.%Y}",
+                styles["Normal"],
+            ),
+            Spacer(
+                1,
+                8 * mm,
+            ),
+        ]
+
+        balance_rows: list[list[str]] = [
+            ["Position", "Aktiva", "Passiva"],
+        ]
+
+        self._append_balance_sheet_rows(
+            rows=balance_rows,
+            position=preparation.balance_sheet.assets,
+            balance_sheet=preparation.balance_sheet,
+            side="assets",
+        )
+
+        self._append_balance_sheet_rows(
+            rows=balance_rows,
+            position=preparation.balance_sheet.liabilities,
+            balance_sheet=preparation.balance_sheet,
+            side="liabilities",
+        )
+
+        balance_rows.append(
+            [
+                "Summe",
+                self._format_amount(
+                    preparation.balance_sheet.amount_for(
+                        preparation.balance_sheet.assets
+                    )
+                ),
+                self._format_amount(
+                    preparation.balance_sheet.amount_for(
+                        preparation.balance_sheet.liabilities
+                    )
+                ),
+            ]
+        )
+
+        story.append(
+            Paragraph(
+                "Bilanz",
+                section_style,
+            )
+        )
+
+        balance_table = Table(
+            balance_rows,
+            colWidths=(
+                110 * mm,
+                35 * mm,
+                35 * mm,
+            ),
+            repeatRows=1,
+            hAlign="LEFT",
+        )
+
+        balance_table.setStyle(
+            TableStyle(
+                [
+                    (
+                        "BACKGROUND",
+                        (0, 0),
+                        (-1, 0),
+                        colors.lightgrey,
+                    ),
+                    (
+                        "FONTNAME",
+                        (0, 0),
+                        (-1, 0),
+                        "Helvetica-Bold",
+                    ),
+                    (
+                        "FONTNAME",
+                        (0, -1),
+                        (-1, -1),
+                        "Helvetica-Bold",
+                    ),
+                    (
+                        "GRID",
+                        (0, 0),
+                        (-1, -1),
+                        0.25,
+                        colors.grey,
+                    ),
+                    (
+                        "VALIGN",
+                        (0, 0),
+                        (-1, -1),
+                        "TOP",
+                    ),
+                    (
+                        "ALIGN",
+                        (1, 1),
+                        (-1, -1),
+                        "RIGHT",
+                    ),
+                    (
+                        "FONTSIZE",
+                        (0, 0),
+                        (-1, -1),
+                        8,
+                    ),
+                ]
+            )
+        )
+
+        story.append(balance_table)
+        story.append(
+            Spacer(
+                1,
+                8 * mm,
+            )
+        )
+
+        income_rows: list[list[str]] = [
+            ["Position", "Betrag"],
+        ]
+
+        for position in (
+            preparation.income_statement
+            .income_statement.children
+        ):
+            self._append_statement_rows(
+                rows=income_rows,
+                position=position,
+                amount_for=(
+                    preparation.income_statement.amount_for
+                ),
+            )
+
+        income_result = preparation.net_income
+
+        income_rows.append(
+            [
+                (
+                    "Jahresüberschuss"
+                    if income_result >= ZERO
+                    else "Jahresfehlbetrag"
+                ),
+                self._format_amount(
+                    abs(income_result)
+                ),
+            ]
+        )
+
+        story.append(
+            Paragraph(
+                "Gewinn- und Verlustrechnung",
+                section_style,
+            )
+        )
+
+        income_table = Table(
+            income_rows,
+            colWidths=(
+                145 * mm,
+                35 * mm,
+            ),
+            repeatRows=1,
+            hAlign="LEFT",
+        )
+
+        income_table.setStyle(
+            TableStyle(
+                [
+                    (
+                        "BACKGROUND",
+                        (0, 0),
+                        (-1, 0),
+                        colors.lightgrey,
+                    ),
+                    (
+                        "FONTNAME",
+                        (0, 0),
+                        (-1, 0),
+                        "Helvetica-Bold",
+                    ),
+                    (
+                        "FONTNAME",
+                        (0, -1),
+                        (-1, -1),
+                        "Helvetica-Bold",
+                    ),
+                    (
+                        "GRID",
+                        (0, 0),
+                        (-1, -1),
+                        0.25,
+                        colors.grey,
+                    ),
+                    (
+                        "VALIGN",
+                        (0, 0),
+                        (-1, -1),
+                        "TOP",
+                    ),
+                    (
+                        "ALIGN",
+                        (1, 1),
+                        (-1, -1),
+                        "RIGHT",
+                    ),
+                    (
+                        "FONTSIZE",
+                        (0, 0),
+                        (-1, -1),
+                        8,
+                    ),
+                ]
+            )
+        )
+
+        story.append(income_table)
+
+        document.build(story)
+
+        return target
+
     def _build_pdf(
         self,
         *,
@@ -614,7 +924,7 @@ class PdfReportingService:
             .replace(".", ",")
             .replace("X", ".")
         )
-    
+
     def export_journal(
         self,
         *,
