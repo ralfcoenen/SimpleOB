@@ -20,6 +20,7 @@ dependencies = [
     "odfpy",
     "lxml",
     "reportlab",
+    "PySide6>=6.11,<6.12",
 ]
 
 [project.optional-dependencies]
