@@ -371,9 +371,10 @@ def main() -> None:
             ),
         )
 
-        window = MainWindow()
-        window.setWindowTitle(
-            f"SimpleOB – {context.company.name}"
+        window = MainWindow(
+            context=context,
+            workspace=workspace,
+            accounts=accounts,
         )
         window.show()
 
