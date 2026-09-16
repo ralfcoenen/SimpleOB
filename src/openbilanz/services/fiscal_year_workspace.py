@@ -1894,6 +1894,18 @@ class FiscalYearWorkspace:
             position=position,
         )
 
+    def build_fixed_asset_schedule(self):
+        """Erzeugt den Anlagenspiegel des geöffneten Geschäftsjahres."""
+
+        if self._fixed_asset_schedule_service is None:
+            return ()
+
+        return self._fixed_asset_schedule_service.build(
+            company_id=self._context.company.company_id,
+            fiscal_year_start=self._context.fiscal_year.start_date,
+            fiscal_year_end=self._context.fiscal_year.end_date,
+        )
+
     def build_e_bilanz(
         self,
         *,
@@ -1925,22 +1937,7 @@ class FiscalYearWorkspace:
             closed_ledger=self._ledger,
         )
 
-        fixed_asset_schedule = ()
-
-        if self._fixed_asset_schedule_service is not None:
-            fixed_asset_schedule = (
-                self._fixed_asset_schedule_service.build(
-                    company_id=(
-                        self._context.company.company_id
-                    ),
-                    fiscal_year_start=(
-                        self._context.fiscal_year.start_date
-                    ),
-                    fiscal_year_end=(
-                        self._context.fiscal_year.end_date
-                    ),
-                )
-            )
+        fixed_asset_schedule = self.build_fixed_asset_schedule()
 
         current_depreciation_difference = Decimal("0.00")
         previous_depreciation_difference = Decimal("0.00")

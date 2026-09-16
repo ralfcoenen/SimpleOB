@@ -1140,6 +1140,21 @@ class MainWindow(tk.Tk):
             side="right",
         )
 
+        report_actions = ttk.Frame(self._fixed_assets_tab)
+        report_actions.pack(
+            fill="x",
+            pady=(0, 12),
+        )
+
+        self._export_fixed_asset_schedule_pdf_button = ttk.Button(
+            report_actions,
+            text="Anlagenspiegel PDF exportieren",
+            command=self._export_fixed_asset_schedule_pdf,
+        )
+        self._export_fixed_asset_schedule_pdf_button.pack(
+            side="right",
+        )
+
         columns = (
             "asset_code",
             "description",
@@ -2696,6 +2711,94 @@ class MainWindow(tk.Tk):
             parent=self,
         )
 
+    def _export_fixed_asset_schedule_pdf(self) -> None:
+        """Exportiert den Anlagenspiegel als PDF."""
+
+        positions = self._workspace.build_fixed_asset_schedule()
+
+        if not positions:
+            messagebox.showinfo(
+                "Anlagenspiegel PDF",
+                (
+                    "Für das ausgewählte Geschäftsjahr "
+                    "ist kein Anlagenspiegel vorhanden."
+                ),
+                parent=self,
+            )
+            return
+
+        position_names: dict[str, str] = {}
+
+        def collect_position_names(position) -> None:
+            position_names[position.code] = position.name
+
+            for child in position.children:
+                collect_position_names(child)
+
+        collect_position_names(self._assets)
+
+        context = self._workspace.context
+        fiscal_year = context.fiscal_year
+
+        safe_company_name = "".join(
+            character
+            if character.isalnum() or character in "-_"
+            else "_"
+            for character in context.company.name
+        ).strip("_")
+
+        default_filename = (
+            "SimpleOB_Anlagenspiegel_"
+            f"{safe_company_name}_"
+            f"{fiscal_year.end_date.year}.pdf"
+        )
+
+        filename = filedialog.asksaveasfilename(
+            parent=self,
+            title="Anlagenspiegel als PDF exportieren",
+            initialfile=default_filename,
+            defaultextension=".pdf",
+            filetypes=(
+                ("PDF-Dateien", "*.pdf"),
+                ("Alle Dateien", "*.*"),
+            ),
+        )
+
+        if not filename:
+            return
+
+        try:
+            exported_path = (
+                self._pdf_reporting_service.export_fixed_asset_schedule(
+                    positions=positions,
+                    position_names=position_names,
+                    company_name=context.company.name,
+                    fiscal_year_name=(
+                        f"{fiscal_year.start_date:%d.%m.%Y} – "
+                        f"{fiscal_year.end_date:%d.%m.%Y}"
+                    ),
+                    target=Path(filename),
+                )
+            )
+        except (ValueError, OSError) as exc:
+            messagebox.showerror(
+                "Anlagenspiegel PDF konnte nicht exportiert werden",
+                str(exc),
+                parent=self,
+            )
+            return
+
+        messagebox.showinfo(
+            "Anlagenspiegel PDF",
+            (
+                "Der Anlagenspiegel wurde erfolgreich als PDF "
+                "exportiert.\n\n"
+                f"{exported_path}"
+            ),
+            parent=self,
+        )
+
+
     def _export_e_bilanz_pdf(self) -> None:
         """Exportiert die E-Bilanz-Abschlusswerte als PDF."""
 
@@ -2723,6 +2826,23 @@ class MainWindow(tk.Tk):
 
         context = self._workspace.context
         fiscal_year = context.fiscal_year
+
+        fixed_asset_schedule = (
+            self._workspace.build_fixed_asset_schedule()
+        )
+
+        fixed_asset_position_names: dict[str, str] = {}
+
+        if fixed_asset_schedule:
+            def collect_position_names(position) -> None:
+                fixed_asset_position_names[
+                    position.code
+                ] = position.name
+
+                for child in position.children:
+                    collect_position_names(child)
+
+            collect_position_names(self._assets)
 
         safe_company_name = "".join(
             character
@@ -2763,6 +2883,12 @@ class MainWindow(tk.Tk):
                         f"{fiscal_year.end_date:%d.%m.%Y}"
                     ),
                     target=Path(filename),
+                    fixed_asset_schedule=(
+                        fixed_asset_schedule
+                    ),
+                    fixed_asset_position_names=(
+                        fixed_asset_position_names
+                    ),
                 )
             )
         except (ValueError, OSError) as exc:

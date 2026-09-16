@@ -13,6 +13,8 @@ from reportlab.lib.units import mm
 from reportlab.platypus import (
     BaseDocTemplate,
     Frame,
+    NextPageTemplate,
+    PageBreak,
     PageTemplate,
     Paragraph,
     Spacer,
@@ -32,6 +34,9 @@ from openbilanz.reporting.account_activity_report import (
 )
 from openbilanz.services.e_bilanz_preparation_service import (
     EBilanzPreparationResult,
+)
+from openbilanz.services.fixed_asset_schedule_service import (
+    FixedAssetSchedulePosition,
 )
 from openbilanz.reporting.journal_report import JournalReport
 from openbilanz.reporting.trial_balance_report import TrialBalanceReport
@@ -333,6 +338,191 @@ class PdfReportingService:
             landscape_page=True,
         )
 
+    def export_fixed_asset_schedule(
+        self,
+        *,
+        positions: Sequence[FixedAssetSchedulePosition],
+        position_names: Mapping[str, str],
+        company_name: str,
+        fiscal_year_name: str,
+        target: Path,
+    ) -> Path:
+        """Exportiert einen Anlagenspiegel als PDF."""
+
+        rows = [
+            [
+                "Position",
+                "AHK Anfang",
+                "Zugänge",
+                "Abgänge",
+                "AHK Ende",
+                "AfA Anfang",
+                "AfA lfd. Jahr",
+                "AfA Abgänge",
+                "AfA Ende",
+                "Buchwert Ende",
+            ],
+        ]
+
+        position_style = ParagraphStyle(
+            "FixedAssetPosition",
+            fontName="Helvetica",
+            fontSize=8,
+            leading=10,
+        )
+
+        for position in positions:
+            position_name = position_names.get(
+                position.position_code,
+                position.position_code,
+            )
+
+            rows.append(
+                [
+                    Paragraph(
+                        position_name,
+                        position_style,
+                    ),
+                    self._format_amount(
+                        position.acquisition_cost_beginning
+                    ),
+                    self._format_amount(
+                        position.additions
+                    ),
+                    self._format_amount(
+                        position.disposals
+                    ),
+                    self._format_amount(
+                        position.acquisition_cost_ending
+                    ),
+                    self._format_amount(
+                        position.accumulated_depreciation_beginning
+                    ),
+                    self._format_amount(
+                        position.depreciation_current_year
+                    ),
+                    self._format_amount(
+                        position.depreciation_disposals
+                    ),
+                    self._format_amount(
+                        position.accumulated_depreciation_ending
+                    ),
+                    self._format_amount(
+                        position.carrying_amount_ending
+                    ),
+                ]
+            )
+
+        rows.append(
+            [
+                "Summe",
+                self._format_amount(
+                    sum(
+                        (
+                            position.acquisition_cost_beginning
+                            for position in positions
+                        ),
+                        ZERO,
+                    )
+                ),
+                self._format_amount(
+                    sum(
+                        (
+                            position.additions
+                            for position in positions
+                        ),
+                        ZERO,
+                    )
+                ),
+                self._format_amount(
+                    sum(
+                        (
+                            position.disposals
+                            for position in positions
+                        ),
+                        ZERO,
+                    )
+                ),
+                self._format_amount(
+                    sum(
+                        (
+                            position.acquisition_cost_ending
+                            for position in positions
+                        ),
+                        ZERO,
+                    )
+                ),
+                self._format_amount(
+                    sum(
+                        (
+                            position.accumulated_depreciation_beginning
+                            for position in positions
+                        ),
+                        ZERO,
+                    )
+                ),
+                self._format_amount(
+                    sum(
+                        (
+                            position.depreciation_current_year
+                            for position in positions
+                        ),
+                        ZERO,
+                    )
+                ),
+                self._format_amount(
+                    sum(
+                        (
+                            position.depreciation_disposals
+                            for position in positions
+                        ),
+                        ZERO,
+                    )
+                ),
+                self._format_amount(
+                    sum(
+                        (
+                            position.accumulated_depreciation_ending
+                            for position in positions
+                        ),
+                        ZERO,
+                    )
+                ),
+                self._format_amount(
+                    sum(
+                        (
+                            position.carrying_amount_ending
+                            for position in positions
+                        ),
+                        ZERO,
+                    )
+                ),
+            ]
+        )
+
+        return self._build_pdf(
+            target=target,
+            title="Anlagenspiegel",
+            company_name=company_name,
+            period_text=(
+                f"Geschäftsjahr: {fiscal_year_name}"
+            ),
+            rows=rows,
+            column_widths=(
+                55 * mm,
+                23.5 * mm,
+                23.5 * mm,
+                23.5 * mm,
+                23.5 * mm,
+                23.5 * mm,
+                23.5 * mm,
+                23.5 * mm,
+                23.5 * mm,
+                23.5 * mm,
+            ),
+            landscape_page=True,
+        )
+
     def export_e_bilanz(
         self,
         *,
@@ -340,6 +530,10 @@ class PdfReportingService:
         company_name: str,
         fiscal_year_name: str,
         target: Path,
+        fixed_asset_schedule: Sequence[
+            FixedAssetSchedulePosition
+        ] = (),
+        fixed_asset_position_names: Mapping[str, str] | None = None,
     ) -> Path:
         """Exportiert die aufbereiteten E-Bilanz-Abschlusswerte als PDF."""
 
@@ -370,13 +564,38 @@ class PdfReportingService:
             id="e-bilanz",
         )
 
+        landscape_page_size = landscape(A4)
+
+        landscape_frame = Frame(
+            document.leftMargin,
+            document.bottomMargin,
+            (
+                landscape_page_size[0]
+                - document.leftMargin
+                - document.rightMargin
+            ),
+            (
+                landscape_page_size[1]
+                - document.topMargin
+                - document.bottomMargin
+            ),
+            id="e-bilanz-anlagenspiegel",
+        )
+
         document.addPageTemplates(
             [
                 PageTemplate(
                     id="e-bilanz",
+                    pagesize=A4,
                     frames=(frame,),
                     onPage=self._draw_page_footer,
-                )
+                ),
+                PageTemplate(
+                    id="e-bilanz-anlagenspiegel",
+                    pagesize=landscape_page_size,
+                    frames=(landscape_frame,),
+                    onPage=self._draw_page_footer,
+                ),
             ]
         )
 
@@ -635,6 +854,258 @@ class PdfReportingService:
         )
 
         story.append(income_table)
+
+        if fixed_asset_schedule:
+            position_names = (
+                fixed_asset_position_names
+                if fixed_asset_position_names is not None
+                else {}
+            )
+
+            position_style = ParagraphStyle(
+                "EBilanzFixedAssetPosition",
+                fontName="Helvetica",
+                fontSize=8,
+                leading=10,
+            )
+
+            fixed_asset_rows = [
+                [
+                    "Position",
+                    "AHK Anfang",
+                    "Zugänge",
+                    "Abgänge",
+                    "AHK Ende",
+                    "AfA Anfang",
+                    "AfA lfd. Jahr",
+                    "AfA Abgänge",
+                    "AfA Ende",
+                    "Buchwert Ende",
+                ],
+            ]
+
+            for position in fixed_asset_schedule:
+                position_name = position_names.get(
+                    position.position_code,
+                    position.position_code,
+                )
+
+                fixed_asset_rows.append(
+                    [
+                        Paragraph(
+                            position_name,
+                            position_style,
+                        ),
+                        self._format_amount(
+                            position.acquisition_cost_beginning
+                        ),
+                        self._format_amount(
+                            position.additions
+                        ),
+                        self._format_amount(
+                            position.disposals
+                        ),
+                        self._format_amount(
+                            position.acquisition_cost_ending
+                        ),
+                        self._format_amount(
+                            position.accumulated_depreciation_beginning
+                        ),
+                        self._format_amount(
+                            position.depreciation_current_year
+                        ),
+                        self._format_amount(
+                            position.depreciation_disposals
+                        ),
+                        self._format_amount(
+                            position.accumulated_depreciation_ending
+                        ),
+                        self._format_amount(
+                            position.carrying_amount_ending
+                        ),
+                    ]
+                )
+
+            fixed_asset_rows.append(
+                [
+                    "Summe",
+                    self._format_amount(
+                        sum(
+                            (
+                                position.acquisition_cost_beginning
+                                for position in fixed_asset_schedule
+                            ),
+                            ZERO,
+                        )
+                    ),
+                    self._format_amount(
+                        sum(
+                            (
+                                position.additions
+                                for position in fixed_asset_schedule
+                            ),
+                            ZERO,
+                        )
+                    ),
+                    self._format_amount(
+                        sum(
+                            (
+                                position.disposals
+                                for position in fixed_asset_schedule
+                            ),
+                            ZERO,
+                        )
+                    ),
+                    self._format_amount(
+                        sum(
+                            (
+                                position.acquisition_cost_ending
+                                for position in fixed_asset_schedule
+                            ),
+                            ZERO,
+                        )
+                    ),
+                    self._format_amount(
+                        sum(
+                            (
+                                position.accumulated_depreciation_beginning
+                                for position in fixed_asset_schedule
+                            ),
+                            ZERO,
+                        )
+                    ),
+                    self._format_amount(
+                        sum(
+                            (
+                                position.depreciation_current_year
+                                for position in fixed_asset_schedule
+                            ),
+                            ZERO,
+                        )
+                    ),
+                    self._format_amount(
+                        sum(
+                            (
+                                position.depreciation_disposals
+                                for position in fixed_asset_schedule
+                            ),
+                            ZERO,
+                        )
+                    ),
+                    self._format_amount(
+                        sum(
+                            (
+                                position.accumulated_depreciation_ending
+                                for position in fixed_asset_schedule
+                            ),
+                            ZERO,
+                        )
+                    ),
+                    self._format_amount(
+                        sum(
+                            (
+                                position.carrying_amount_ending
+                                for position in fixed_asset_schedule
+                            ),
+                            ZERO,
+                        )
+                    ),
+                ]
+            )
+
+            fixed_asset_table = Table(
+                fixed_asset_rows,
+                colWidths=(
+                    55 * mm,
+                    23.5 * mm,
+                    23.5 * mm,
+                    23.5 * mm,
+                    23.5 * mm,
+                    23.5 * mm,
+                    23.5 * mm,
+                    23.5 * mm,
+                    23.5 * mm,
+                    23.5 * mm,
+                ),
+                repeatRows=1,
+                hAlign="LEFT",
+            )
+
+            fixed_asset_table.setStyle(
+                TableStyle(
+                    [
+                        (
+                            "BACKGROUND",
+                            (0, 0),
+                            (-1, 0),
+                            colors.lightgrey,
+                        ),
+                        (
+                            "FONTNAME",
+                            (0, 0),
+                            (-1, 0),
+                            "Helvetica-Bold",
+                        ),
+                        (
+                            "FONTNAME",
+                            (0, -1),
+                            (-1, -1),
+                            "Helvetica-Bold",
+                        ),
+                        (
+                            "GRID",
+                            (0, 0),
+                            (-1, -1),
+                            0.25,
+                            colors.grey,
+                        ),
+                        (
+                            "VALIGN",
+                            (0, 0),
+                            (-1, -1),
+                            "TOP",
+                        ),
+                        (
+                            "ALIGN",
+                            (1, 1),
+                            (-1, -1),
+                            "RIGHT",
+                        ),
+                        (
+                            "FONTSIZE",
+                            (0, 0),
+                            (-1, -1),
+                            8,
+                        ),
+                    ]
+                )
+            )
+
+            story.append(
+                NextPageTemplate(
+                    "e-bilanz-anlagenspiegel"
+                )
+            )
+            story.append(PageBreak())
+            story.append(
+                Paragraph(
+                    "Anlagenspiegel",
+                    title_style,
+                )
+            )
+            story.append(
+                Paragraph(
+                    f"Geschäftsjahr: {fiscal_year_name}",
+                    styles["Normal"],
+                )
+            )
+            story.append(
+                Spacer(
+                    1,
+                    6 * mm,
+                )
+            )
+            story.append(fixed_asset_table)
 
         document.build(story)
 
