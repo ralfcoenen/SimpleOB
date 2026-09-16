@@ -14,6 +14,7 @@ from openbilanz.core.context import ApplicationContext
 from openbilanz.database.company_repository import CompanyRepository
 from openbilanz.domain.company import Company
 from openbilanz.domain.fiscal_year import FiscalYear
+from openbilanz.ui_qt.new_company_dialog import NewCompanyDialog
 
 
 class StartDialog(QDialog):
@@ -90,6 +91,17 @@ class StartDialog(QDialog):
         layout.addStretch()
 
         button_box = QDialogButtonBox()
+
+        new_company_button = QPushButton(
+            "Neue Buchhaltung anlegen"
+        )
+        new_company_button.clicked.connect(
+            self._create_new_company
+        )
+        button_box.addButton(
+            new_company_button,
+            QDialogButtonBox.ButtonRole.ActionRole,
+        )
 
         self._open_button = QPushButton("Öffnen")
         self._open_button.setEnabled(False)
@@ -211,4 +223,21 @@ class StartDialog(QDialog):
             fiscal_year=fiscal_year,
         )
 
+        self.accept()
+
+    def _create_new_company(self) -> None:
+        """Öffnet den Dialog zum Anlegen einer Buchhaltung."""
+
+        dialog = NewCompanyDialog(
+            self,
+            repository=self._repository,
+        )
+
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        if dialog.result is None:
+            return
+
+        self.result = dialog.result
         self.accept()
