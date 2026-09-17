@@ -31,6 +31,9 @@ from openbilanz.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
 from openbilanz.ui_qt.account_editor_dialog import AccountEditorDialog
+from openbilanz.ui_qt.e_bilanz_account_mapping_dialog import (
+    EBilanzAccountMappingDialog,
+)
 
 ZERO = Decimal("0.00")
 
@@ -196,6 +199,17 @@ class MainWindow(QMainWindow):
             self._edit_account_button
         )
 
+        self._e_bilanz_mapping_button = QPushButton(
+            "E-Bilanz-Zuordnung"
+        )
+        self._e_bilanz_mapping_button.clicked.connect(
+            self._open_e_bilanz_account_mapping
+        )
+
+        button_layout.addWidget(
+            self._e_bilanz_mapping_button
+        )
+
         button_layout.addStretch()
 
         layout.addLayout(button_layout)
@@ -299,6 +313,127 @@ class MainWindow(QMainWindow):
                 "öffnen Sie sie erneut, damit der geänderte "
                 "Kontenrahmen vollständig wirksam wird."
             ),
+        )
+
+    def _open_e_bilanz_account_mapping(self) -> None:
+        """Bearbeitet die E-Bilanz-Zuordnung des ausgewählten Kontos."""
+
+        selected_rows = (
+            self._account_table.selectionModel().selectedRows()
+        )
+
+        if not selected_rows:
+            QMessageBox.information(
+                self,
+                "E-Bilanz-Zuordnung",
+                "Bitte wählen Sie zuerst ein Konto aus.",
+            )
+            return
+
+        row = selected_rows[0].row()
+
+        account_number_item = self._account_table.item(
+            row,
+            0,
+        )
+
+        if account_number_item is None:
+            return
+
+        account_number = account_number_item.text()
+
+        account = next(
+            (
+                item
+                for item in self._accounts
+                if item.number == account_number
+            ),
+            None,
+        )
+
+        if account is None:
+            QMessageBox.critical(
+                self,
+                "E-Bilanz-Zuordnung",
+                "Das ausgewählte Konto wurde nicht gefunden.",
+            )
+            return
+
+        try:
+            choices = self._workspace.account_taxonomy_choices(
+                account_number=account_number,
+                chart_of_accounts=self._chart_of_accounts,
+            )
+
+            mappings = (
+                self._workspace
+                .load_account_taxonomy_concepts()
+            )
+        except ValueError as exc:
+            QMessageBox.critical(
+                self,
+                "E-Bilanz-Zuordnung",
+                str(exc),
+            )
+            return
+
+        if not choices:
+            QMessageBox.information(
+                self,
+                "E-Bilanz-Zuordnung",
+                (
+                    "Für die HGB-Zuordnung dieses Kontos "
+                    "stehen keine feineren "
+                    "E-Bilanz-Taxonomiepositionen zur Auswahl."
+                ),
+            )
+            return
+
+        current_concept_name = mappings.get(
+            account_number
+        )
+
+        dialog = EBilanzAccountMappingDialog(
+            self,
+            account_number=account.number,
+            account_name=account.name,
+            choices=choices,
+            current_concept_name=current_concept_name,
+        )
+
+        dialog.exec()
+
+        if not dialog.saved:
+            return
+
+        try:
+            self._workspace.save_account_taxonomy_concept(
+                account_number=account_number,
+                concept_name=dialog.result,
+            )
+        except ValueError as exc:
+            QMessageBox.critical(
+                self,
+                "E-Bilanz-Zuordnung",
+                str(exc),
+            )
+            return
+
+        if dialog.result is None:
+            message = (
+                "Die E-Bilanz-Zuordnung wurde entfernt."
+            )
+        else:
+            message = (
+                "Die E-Bilanz-Zuordnung wurde gespeichert."
+            )
+
+        self._refresh_accounts()
+
+        QMessageBox.information(
+            self,
+            "E-Bilanz-Zuordnung",
+            message,
         )
 
     def _open_edit_account(self) -> None:
