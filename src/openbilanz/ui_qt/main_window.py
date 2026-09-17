@@ -405,6 +405,14 @@ class MainWindow(QMainWindow):
             )
             return
 
+        self._accounts = tuple(
+            dialog.result.account
+            if item.number == account_number
+            else item
+            for item in self._accounts
+        )
+        self._refresh_accounts()
+
         QMessageBox.information(
             self,
             "Konto geändert",
