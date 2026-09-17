@@ -1,12 +1,17 @@
 """PySide6-Hauptfenster von SimpleOB."""
 
+from datetime import date
 from decimal import Decimal
+from uuid import UUID
+
+from openbilanz.ui.date_input import parse_german_date
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QHBoxLayout,
     QHeaderView,
+    QInputDialog,
     QLabel,
     QMainWindow,
     QMessageBox,
@@ -20,6 +25,8 @@ from PySide6.QtWidgets import (
 
 from openbilanz.domain.account import Account
 from openbilanz.domain.account_type import AccountType
+from openbilanz.domain.booking_type import BookingType
+from openbilanz.domain.entry_side import EntrySide
 from openbilanz.domain.chart_of_accounts_template import (
     ChartOfAccountsTemplate,
 )
@@ -155,6 +162,7 @@ class MainWindow(QMainWindow):
         )
 
         self._create_accounts_tab()
+        self._create_journal_tab()
 
         self.setCentralWidget(central_widget)
 
@@ -272,6 +280,389 @@ class MainWindow(QMainWindow):
         layout.addWidget(self._account_table)
 
         self._refresh_accounts()
+
+    def _create_journal_tab(self) -> None:
+        """Erzeugt den Arbeitsbereich Journal."""
+
+        layout = QVBoxLayout(self._journal_tab)
+
+        journal_label = QLabel("Journal")
+        journal_label.setStyleSheet(
+            "font-size: 18px; font-weight: bold;"
+        )
+        layout.addWidget(journal_label)
+
+        self._journal_table = QTableWidget()
+        self._journal_table.setColumnCount(6)
+        self._journal_table.setHorizontalHeaderLabels(
+            (
+                "Datum",
+                "Beleg",
+                "Buchungstext",
+                "Konto",
+                "S/H",
+                "Betrag",
+            )
+        )
+
+        self._journal_table.setEditTriggers(
+            QAbstractItemView.EditTrigger.NoEditTriggers
+        )
+        self._journal_table.setSelectionBehavior(
+            QAbstractItemView.SelectionBehavior.SelectRows
+        )
+        self._journal_table.setSelectionMode(
+            QAbstractItemView.SelectionMode.SingleSelection
+        )
+        self._journal_table.setAlternatingRowColors(True)
+
+        header = self._journal_table.horizontalHeader()
+
+        header.setSectionResizeMode(
+            0,
+            QHeaderView.ResizeMode.ResizeToContents,
+        )
+        header.setSectionResizeMode(
+            1,
+            QHeaderView.ResizeMode.ResizeToContents,
+        )
+        header.setSectionResizeMode(
+            2,
+            QHeaderView.ResizeMode.Stretch,
+        )
+        header.setSectionResizeMode(
+            3,
+            QHeaderView.ResizeMode.Stretch,
+        )
+        header.setSectionResizeMode(
+            4,
+            QHeaderView.ResizeMode.ResizeToContents,
+        )
+        header.setSectionResizeMode(
+            5,
+            QHeaderView.ResizeMode.ResizeToContents,
+        )
+
+        layout.addWidget(self._journal_table)
+
+        self._journal_reversal_button = QPushButton(
+            "Buchung stornieren"
+        )
+        self._journal_reversal_button.clicked.connect(
+            self._reverse_selected_journal_booking
+        )
+        layout.addWidget(
+            self._journal_reversal_button,
+            alignment=Qt.AlignmentFlag.AlignLeft,
+        )
+
+        self._refresh_journal()
+
+    def _refresh_journal(self) -> None:
+        """Aktualisiert die Journalanzeige."""
+
+        self._journal_table.setRowCount(0)
+        self._journal_booking_ids: dict[int, UUID] = {}
+
+        account_names = {
+            account.number: account.name
+            for account in self._accounts
+        }
+
+        for booking in self._workspace.journal:
+            first_line = True
+
+            for line in booking.lines:
+                account_name = account_names.get(
+                    line.account_number,
+                    "Unbekanntes Konto",
+                )
+
+                account_display = (
+                    f"{line.account_number} – "
+                    f"{account_name}"
+                )
+
+                if line.is_debit:
+                    side = "Soll"
+                else:
+                    side = "Haben"
+
+                row = self._journal_table.rowCount()
+                self._journal_table.insertRow(row)
+
+                self._journal_booking_ids[
+                    row
+                ] = booking.booking_id
+
+                values = (
+                    (
+                        booking.booking_date.strftime(
+                            "%d.%m.%Y"
+                        )
+                        if first_line
+                        else ""
+                    ),
+                    (
+                        booking.voucher_no or ""
+                        if first_line
+                        else ""
+                    ),
+                    (
+                        booking.description or ""
+                        if first_line
+                        else ""
+                    ),
+                    account_display,
+                    side,
+                    self._format_amount(
+                        line.amount
+                    ),
+                )
+
+                for column, value in enumerate(values):
+                    item = QTableWidgetItem(
+                        str(value)
+                    )
+
+                    if column == 4:
+                        item.setTextAlignment(
+                            Qt.AlignmentFlag.AlignCenter
+                        )
+
+                    if column == 5:
+                        item.setTextAlignment(
+                            Qt.AlignmentFlag.AlignRight
+                            | Qt.AlignmentFlag.AlignVCenter
+                        )
+
+                    self._journal_table.setItem(
+                        row,
+                        column,
+                        item,
+                    )
+
+                first_line = False
+
+    def _reverse_selected_journal_booking(
+        self,
+    ) -> None:
+        """Storniert die im Journal ausgewählte reguläre Buchung."""
+
+        selected_rows = (
+            self._journal_table.selectionModel().selectedRows()
+        )
+
+        if not selected_rows:
+            QMessageBox.warning(
+                self,
+                "Buchung stornieren",
+                (
+                    "Bitte wählen Sie zuerst eine "
+                    "Buchung im Journal aus."
+                ),
+            )
+            return
+
+        row = selected_rows[0].row()
+
+        booking_id = self._journal_booking_ids.get(
+            row
+        )
+
+        if booking_id is None:
+            QMessageBox.critical(
+                self,
+                "Buchung stornieren",
+                (
+                    "Die ausgewählte Buchung konnte "
+                    "nicht ermittelt werden."
+                ),
+            )
+            return
+
+        original_booking = next(
+            (
+                booking
+                for booking in self._workspace.journal
+                if booking.booking_id == booking_id
+            ),
+            None,
+        )
+
+        if original_booking is None:
+            QMessageBox.critical(
+                self,
+                "Buchung stornieren",
+                (
+                    "Die ausgewählte Buchung konnte "
+                    "im Journal nicht gefunden werden."
+                ),
+            )
+            return
+
+        if (
+            original_booking.booking_type
+            is not BookingType.REGULAR
+        ):
+            QMessageBox.critical(
+                self,
+                "Buchung stornieren",
+                (
+                    "Nur reguläre Buchungen können "
+                    "über das Journal storniert werden."
+                ),
+            )
+            return
+
+        if self._workspace.is_closed:
+            QMessageBox.critical(
+                self,
+                "Buchung stornieren",
+                (
+                    "Das Geschäftsjahr ist abgeschlossen. "
+                    "Eine Stornobuchung ist nicht mehr möglich."
+                ),
+            )
+            return
+
+        default_date = date.today()
+
+        if not self._context.fiscal_year.contains(
+            default_date
+        ):
+            default_date = (
+                self._context.fiscal_year.end_date
+            )
+
+        reversal_date_text, accepted = (
+            QInputDialog.getText(
+                self,
+                "Buchung stornieren",
+                (
+                    "Bitte geben Sie das Stornodatum ein "
+                    "(TT.MM.JJJJ):"
+                ),
+                text=default_date.strftime(
+                    "%d.%m.%Y"
+                ),
+            )
+        )
+
+        if not accepted:
+            return
+
+        try:
+            reversal_date = parse_german_date(
+                reversal_date_text
+            )
+
+            reversal_booking = (
+                self._workspace
+                .create_reversal_booking(
+                    booking_id=booking_id,
+                    reversal_date=reversal_date,
+                )
+            )
+
+        except (TypeError, ValueError) as exc:
+            QMessageBox.critical(
+                self,
+                "Buchung stornieren",
+                str(exc),
+            )
+            return
+
+        account_names = {
+            account.number: account.name
+            for account in self._accounts
+        }
+
+        preview_lines = []
+
+        for line in reversal_booking.lines:
+            account_name = account_names.get(
+                line.account_number,
+                "Unbekanntes Konto",
+            )
+
+            side = (
+                "Soll"
+                if line.side is EntrySide.DEBIT
+                else "Haben"
+            )
+
+            preview_lines.append(
+                (
+                    f"{line.account_number} "
+                    f"{account_name}\n"
+                    f"    {side}: "
+                    f"{self._format_amount(line.amount)}"
+                )
+            )
+
+        preview = "\n\n".join(
+            preview_lines
+        )
+
+        confirmation, accepted = (
+            QInputDialog.getText(
+                self,
+                "Stornobuchung bestätigen",
+                (
+                    "Folgende Stornobuchung wird erzeugt:\n\n"
+                    f"Datum: "
+                    f"{reversal_booking.booking_date.strftime('%d.%m.%Y')}\n"
+                    f"Buchungstext: "
+                    f"{reversal_booking.description or ''}\n\n"
+                    f"{preview}\n\n"
+                    "Die ursprüngliche Buchung bleibt "
+                    "unverändert bestehen.\n\n"
+                    "Zum endgültigen Buchen geben Sie exakt "
+                    "DURCHFÜHREN ein:"
+                ),
+            )
+        )
+
+        if not accepted:
+            return
+
+        if confirmation != "DURCHFÜHREN":
+            QMessageBox.information(
+                self,
+                "Buchung stornieren",
+                (
+                    "Die Stornobuchung wurde nicht "
+                    "durchgeführt."
+                ),
+            )
+            return
+
+        try:
+            self._workspace.post_booking(
+                reversal_booking
+            )
+        except (TypeError, ValueError) as exc:
+            QMessageBox.critical(
+                self,
+                "Buchung stornieren",
+                str(exc),
+            )
+            return
+
+        self._refresh_journal()
+        self._refresh_accounts()
+
+        QMessageBox.information(
+            self,
+            "Buchung storniert",
+            (
+                "Die Stornobuchung wurde erfolgreich "
+                "gebucht.\n\n"
+                "Die ursprüngliche Buchung bleibt "
+                "im Journal erhalten."
+            ),
+        )
 
     def _open_new_account(self) -> None:
         """Öffnet den Dialog zum Anlegen eines Kontos."""
