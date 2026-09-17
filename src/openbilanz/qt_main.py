@@ -375,6 +375,17 @@ def main() -> None:
             context=context,
             workspace=workspace,
             accounts=accounts,
+            assets=financial_statement_context.assets,
+            liabilities=financial_statement_context.liabilities,
+            income_statement=(
+                financial_statement_context.income_statement
+            ),
+            chart_of_accounts=chart_of_accounts,
+            opening_balance_account_number=(
+                control_accounts.opening_balance_account
+            ),
+            closing_accounts=closing_accounts,
+            vat_accounts=vat_accounts,
         )
         window.show()
 

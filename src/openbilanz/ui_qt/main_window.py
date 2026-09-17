@@ -5,9 +5,12 @@ from decimal import Decimal
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QHBoxLayout,
     QHeaderView,
     QLabel,
     QMainWindow,
+    QMessageBox,
+    QPushButton,
     QTabWidget,
     QTableWidget,
     QTableWidgetItem,
@@ -17,9 +20,17 @@ from PySide6.QtWidgets import (
 
 from openbilanz.domain.account import Account
 from openbilanz.domain.account_type import AccountType
+from openbilanz.domain.chart_of_accounts_template import (
+    ChartOfAccountsTemplate,
+)
+from openbilanz.domain.vat_accounts import VatAccounts
+from openbilanz.services.closing_accounts import ClosingAccounts
 from openbilanz.core.context import ApplicationContext
 from openbilanz.services.fiscal_year_workspace import FiscalYearWorkspace
-
+from openbilanz.accounting.financial_statement_position import (
+    FinancialStatementPosition,
+)
+from openbilanz.ui_qt.account_editor_dialog import AccountEditorDialog
 
 ZERO = Decimal("0.00")
 
@@ -33,12 +44,28 @@ class MainWindow(QMainWindow):
         context: ApplicationContext,
         workspace: FiscalYearWorkspace,
         accounts: tuple[Account, ...],
+        assets: FinancialStatementPosition,
+        liabilities: FinancialStatementPosition,
+        income_statement: FinancialStatementPosition,
+        chart_of_accounts: ChartOfAccountsTemplate,
+        opening_balance_account_number: str,
+        closing_accounts: ClosingAccounts,
+        vat_accounts: VatAccounts,
     ) -> None:
         super().__init__()
 
         self._context = context
         self._workspace = workspace
         self._accounts = accounts
+        self._assets = assets
+        self._liabilities = liabilities
+        self._income_statement = income_statement
+        self._chart_of_accounts = chart_of_accounts
+        self._opening_balance_account_number = (
+            opening_balance_account_number
+        )
+        self._closing_accounts = closing_accounts
+        self._vat_accounts = vat_accounts
 
         self.setWindowTitle(
             f"SimpleOB – {self._context.company.name}"
@@ -139,6 +166,40 @@ class MainWindow(QMainWindow):
         )
         layout.addWidget(accounts_label)
 
+        button_layout = QHBoxLayout()
+
+        self._new_account_button = QPushButton(
+            "Neues Konto"
+        )
+        self._new_account_button.clicked.connect(
+            self._open_new_account
+        )
+        self._new_account_button.setEnabled(
+            self._workspace.is_open
+        )
+
+        button_layout.addWidget(
+            self._new_account_button
+        )
+
+        self._edit_account_button = QPushButton(
+            "Konto bearbeiten"
+        )
+        self._edit_account_button.clicked.connect(
+            self._open_edit_account
+        )
+        self._edit_account_button.setEnabled(
+            not self._workspace.is_closed
+        )
+
+        button_layout.addWidget(
+            self._edit_account_button
+        )
+
+        button_layout.addStretch()
+
+        layout.addLayout(button_layout)
+
         self._journal_status = QLabel(
             f"Journal: {len(self._workspace.journal)} Buchungen"
         )
@@ -197,6 +258,163 @@ class MainWindow(QMainWindow):
         layout.addWidget(self._account_table)
 
         self._refresh_accounts()
+
+    def _open_new_account(self) -> None:
+        """Öffnet den Dialog zum Anlegen eines Kontos."""
+
+        if not self._workspace.is_open:
+            return
+
+        dialog = AccountEditorDialog(
+            self,
+            assets=self._assets,
+            liabilities=self._liabilities,
+            income_statement=self._income_statement,
+        )
+
+        dialog.exec()
+
+        if dialog.result is None:
+            return
+
+        try:
+            self._workspace.add_account(
+                account=dialog.result.account,
+                mapping_rule=dialog.result.mapping_rule,
+            )
+        except ValueError as exc:
+            QMessageBox.critical(
+                self,
+                "Konto kann nicht angelegt werden",
+                str(exc),
+            )
+            return
+
+        QMessageBox.information(
+            self,
+            "Konto angelegt",
+            (
+                "Das Konto wurde gespeichert.\n\n"
+                "Bitte schließen Sie die Buchhaltung und "
+                "öffnen Sie sie erneut, damit der geänderte "
+                "Kontenrahmen vollständig wirksam wird."
+            ),
+        )
+
+    def _open_edit_account(self) -> None:
+        """Öffnet den Dialog zum Bearbeiten des ausgewählten Kontos."""
+
+        if self._workspace.is_closed:
+            return
+
+        selected_rows = (
+            self._account_table.selectionModel().selectedRows()
+        )
+
+        if not selected_rows:
+            QMessageBox.information(
+                self,
+                "Konto bearbeiten",
+                "Bitte wählen Sie zuerst ein Konto aus.",
+            )
+            return
+
+        row = selected_rows[0].row()
+
+        account_number_item = self._account_table.item(
+            row,
+            0,
+        )
+
+        if account_number_item is None:
+            return
+
+        account_number = account_number_item.text()
+
+        technical_account_numbers = {
+            self._opening_balance_account_number,
+            self._closing_accounts.income_summary_account,
+            self._closing_accounts.profit_account,
+            self._closing_accounts.loss_account,
+            *self._vat_accounts.account_numbers,
+        }
+
+        if account_number in technical_account_numbers:
+            QMessageBox.information(
+                self,
+                "Konto bearbeiten",
+                (
+                    "Dieses Konto ist als technisches "
+                    "Steuerungskonto konfiguriert und kann "
+                    "hier nicht bearbeitet werden."
+                ),
+            )
+            return
+
+        account = next(
+            (
+                item
+                for item in self._accounts
+                if item.number == account_number
+            ),
+            None,
+        )
+
+        if account is None:
+            QMessageBox.critical(
+                self,
+                "Konto bearbeiten",
+                "Das ausgewählte Konto wurde nicht gefunden.",
+            )
+            return
+
+        mapping_rule = next(
+            (
+                rule
+                for rule
+                in self._chart_of_accounts.account_mapping_rules
+                if rule.account_number == account_number
+            ),
+            None,
+        )
+
+        dialog = AccountEditorDialog(
+            self,
+            assets=self._assets,
+            liabilities=self._liabilities,
+            income_statement=self._income_statement,
+            account=account,
+            mapping_rule=mapping_rule,
+        )
+
+        dialog.exec()
+
+        if dialog.result is None:
+            return
+
+        try:
+            self._workspace.update_account(
+                account=dialog.result.account,
+                mapping_rule=dialog.result.mapping_rule,
+            )
+        except ValueError as exc:
+            QMessageBox.critical(
+                self,
+                "Konto kann nicht geändert werden",
+                str(exc),
+            )
+            return
+
+        QMessageBox.information(
+            self,
+            "Konto geändert",
+            (
+                "Das Konto wurde gespeichert.\n\n"
+                "Bitte schließen Sie die Buchhaltung und "
+                "öffnen Sie sie erneut, damit der geänderte "
+                "Kontenrahmen vollständig wirksam wird."
+            ),
+        )
 
     def _refresh_accounts(self) -> None:
         """Aktualisiert die Kontenübersicht."""
