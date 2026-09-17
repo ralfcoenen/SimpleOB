@@ -9,6 +9,7 @@ from openbilanz.ui.date_input import parse_german_date
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QComboBox,
     QHBoxLayout,
     QHeaderView,
     QInputDialog,
@@ -38,9 +39,11 @@ from openbilanz.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
 from openbilanz.ui_qt.account_editor_dialog import AccountEditorDialog
+from openbilanz.ui_qt.booking_frame import BookingFrame
 from openbilanz.ui_qt.e_bilanz_account_mapping_dialog import (
     EBilanzAccountMappingDialog,
 )
+from openbilanz.ui_qt.vat_booking_frame import VatBookingFrame
 
 ZERO = Decimal("0.00")
 
@@ -163,6 +166,7 @@ class MainWindow(QMainWindow):
 
         self._create_accounts_tab()
         self._create_journal_tab()
+        self._create_booking_tab()
 
         self.setCentralWidget(central_widget)
 
@@ -280,6 +284,141 @@ class MainWindow(QMainWindow):
         layout.addWidget(self._account_table)
 
         self._refresh_accounts()
+
+    def _create_booking_tab(self) -> None:
+        """Erzeugt den Arbeitsbereich Buchen."""
+
+        layout = QVBoxLayout(self._booking_tab)
+
+        booking_label = QLabel("Neue Buchung")
+        booking_label.setStyleSheet(
+            "font-size: 18px; font-weight: bold;"
+        )
+        layout.addWidget(booking_label)
+
+        mode_layout = QHBoxLayout()
+
+        mode_layout.addWidget(
+            QLabel("Buchungsart")
+        )
+
+        self._booking_mode_box = QComboBox()
+        self._booking_mode_box.addItems(
+            (
+                "Einfache Buchung",
+                "Rechnung mit Umsatzsteuer",
+            )
+        )
+        self._booking_mode_box.setCurrentText(
+            "Einfache Buchung"
+        )
+        self._booking_mode_box.setMaximumWidth(280)
+
+        mode_layout.addWidget(
+            self._booking_mode_box
+        )
+        mode_layout.addStretch()
+
+        layout.addLayout(mode_layout)
+
+        technical_account_numbers = {
+            self._opening_balance_account_number,
+            self._closing_accounts.income_summary_account,
+            self._closing_accounts.profit_account,
+            self._closing_accounts.loss_account,
+            *self._vat_accounts.account_numbers,
+        }
+
+        bookable_accounts = tuple(
+            account
+            for account in self._accounts
+            if (
+                account.is_active
+                and account.number
+                not in technical_account_numbers
+            )
+        )
+
+        self._booking_frame_container = QWidget()
+        self._booking_frame_layout = QVBoxLayout(
+            self._booking_frame_container
+        )
+        self._booking_frame_layout.setContentsMargins(
+            0,
+            0,
+            0,
+            0,
+        )
+
+        self._booking_frame = BookingFrame(
+            self._booking_frame_container,
+            accounts=bookable_accounts,
+            on_booking_created=self._post_booking,
+        )
+
+        self._vat_booking_frame = VatBookingFrame(
+            self._booking_frame_container,
+            accounts=bookable_accounts,
+            vat_accounts=self._vat_accounts,
+            on_booking_created=self._post_booking,
+        )
+
+        self._booking_frame_layout.addWidget(
+            self._booking_frame
+        )
+        self._booking_frame_layout.addWidget(
+            self._vat_booking_frame
+        )
+
+        layout.addWidget(
+            self._booking_frame_container
+        )
+
+        self._booking_mode_box.currentTextChanged.connect(
+            self._update_booking_mode
+        )
+
+        enabled = self._workspace.is_open
+
+        self._booking_frame.set_enabled(enabled)
+        self._vat_booking_frame.set_enabled(enabled)
+        self._booking_mode_box.setEnabled(enabled)
+
+        self._update_booking_mode()
+
+    def _update_booking_mode(
+        self,
+        *_args: object,
+    ) -> None:
+        """Schaltet zwischen einfacher und Umsatzsteuerbuchung um."""
+
+        vat_mode = (
+            self._booking_mode_box.currentText()
+            == "Rechnung mit Umsatzsteuer"
+        )
+
+        self._booking_frame.setVisible(
+            not vat_mode
+        )
+        self._vat_booking_frame.setVisible(
+            vat_mode
+        )
+
+    def _post_booking(
+        self,
+        booking,
+    ) -> None:
+        """Verbucht und speichert eine Buchung."""
+
+        if self._workspace.is_closed:
+            return
+
+        self._workspace.post_booking(
+            booking
+        )
+
+        self._refresh_accounts()
+        self._refresh_journal()
 
     def _create_journal_tab(self) -> None:
         """Erzeugt den Arbeitsbereich Journal."""
