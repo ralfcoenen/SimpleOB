@@ -40,10 +40,19 @@ from openbilanz.services.fiscal_year_workspace import FiscalYearWorkspace
 from openbilanz.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
+from openbilanz.ui_qt.account_configuration_dialog import (
+    AccountConfigurationDialog,
+)
 from openbilanz.ui_qt.account_editor_dialog import AccountEditorDialog
 from openbilanz.ui_qt.booking_frame import BookingFrame
+from openbilanz.ui_qt.company_master_data_dialog import (
+    CompanyMasterDataDialog,
+)
 from openbilanz.ui_qt.e_bilanz_account_mapping_dialog import (
     EBilanzAccountMappingDialog,
+)
+from openbilanz.ui_qt.shareholder_dialog import (
+    ShareholdersDialog,
 )
 from openbilanz.ui_qt.fixed_asset_acquisition_link_dialog import (
     AcquisitionBookingCandidate,
@@ -131,6 +140,41 @@ class MainWindow(QMainWindow):
             f"{self._context.fiscal_year.display_name}"
         )
         layout.addWidget(fiscal_year_label)
+
+        administration_layout = QHBoxLayout()
+
+        self._company_master_data_button = QPushButton(
+            "Unternehmensstammdaten"
+        )
+        self._company_master_data_button.clicked.connect(
+            self._open_company_master_data
+        )
+        administration_layout.addWidget(
+            self._company_master_data_button
+        )
+
+        self._shareholders_button = QPushButton(
+            "Gesellschafter"
+        )
+        self._shareholders_button.clicked.connect(
+            self._open_shareholders
+        )
+        administration_layout.addWidget(
+            self._shareholders_button
+        )
+
+        self._account_configuration_button = QPushButton(
+            "Kontenkonfiguration"
+        )
+        self._account_configuration_button.clicked.connect(
+            self._open_account_configuration
+        )
+        administration_layout.addWidget(
+            self._account_configuration_button
+        )
+
+        administration_layout.addStretch()
+        layout.addLayout(administration_layout)
 
         self._notebook = QTabWidget()
         layout.addWidget(self._notebook)
@@ -2065,6 +2109,122 @@ class MainWindow(QMainWindow):
                 "öffnen Sie sie erneut, damit der geänderte "
                 "Kontenrahmen vollständig wirksam wird."
             ),
+        )
+
+    def _open_company_master_data(self) -> None:
+        """Öffnet die Unternehmensstammdaten."""
+
+        try:
+            master_data = (
+                self._workspace.load_company_master_data()
+            )
+        except ValueError as exc:
+            QMessageBox.critical(
+                self,
+                "Unternehmensstammdaten",
+                str(exc),
+            )
+            return
+
+        dialog = CompanyMasterDataDialog(
+            self,
+            master_data=master_data,
+        )
+
+        dialog.exec()
+
+        if dialog.result is None:
+            return
+
+        try:
+            self._workspace.save_company_master_data(
+                dialog.result
+            )
+        except ValueError as exc:
+            QMessageBox.critical(
+                self,
+                "Unternehmensstammdaten",
+                str(exc),
+            )
+            return
+
+        QMessageBox.information(
+            self,
+            "Unternehmensstammdaten",
+            "Die Unternehmensstammdaten wurden gespeichert.",
+        )
+
+    def _open_shareholders(self) -> None:
+        """Öffnet die Gesellschafterverwaltung."""
+
+        dialog = ShareholdersDialog(
+            self,
+            workspace=self._workspace,
+        )
+        dialog.exec()
+
+    def _open_account_configuration(self) -> None:
+        """Öffnet die mandantenspezifische Kontenkonfiguration."""
+
+        try:
+            (
+                control_accounts,
+                vat_accounts,
+                account_roles,
+            ) = self._workspace.load_account_configuration()
+        except (RuntimeError, ValueError) as exc:
+            QMessageBox.critical(
+                self,
+                "Kontenkonfiguration",
+                str(exc),
+            )
+            return
+
+        dialog = AccountConfigurationDialog(
+            self,
+            accounts=self._accounts,
+            control_accounts=control_accounts,
+            vat_accounts=vat_accounts,
+            account_roles=account_roles,
+        )
+
+        dialog.exec()
+
+        if dialog.result is None:
+            return
+
+        (
+            control_accounts,
+            vat_accounts,
+            account_roles,
+        ) = dialog.result
+
+        try:
+            self._workspace.update_account_configuration(
+                control_accounts=control_accounts,
+                vat_accounts=vat_accounts,
+                account_roles=account_roles,
+            )
+        except (RuntimeError, ValueError) as exc:
+            QMessageBox.critical(
+                self,
+                "Kontenkonfiguration",
+                str(exc),
+            )
+            return
+
+        self._opening_balance_account_number = (
+            control_accounts.opening_balance_account
+        )
+        self._depreciation_expense_account_number = (
+            control_accounts.depreciation_expense_account
+        )
+        self._vat_accounts = vat_accounts
+
+        QMessageBox.information(
+            self,
+            "Kontenkonfiguration",
+            "Die Kontenkonfiguration wurde gespeichert.",
         )
 
     def _refresh_accounts(self) -> None:
