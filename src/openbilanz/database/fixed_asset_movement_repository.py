@@ -252,6 +252,75 @@ class FixedAssetMovementRepository:
 
         return self._to_domain(model)
 
+    def list_for_booking(
+        self,
+        booking_id: UUID,
+    ) -> tuple[FixedAssetMovement, ...]:
+        """Lädt alle Anlagenbewegungen einer Buchung."""
+
+        if not isinstance(
+            booking_id,
+            UUID,
+        ):
+            raise TypeError(
+                "booking_id must be a UUID"
+            )
+
+        models = (
+            self._session.query(Anlagebewegung)
+            .join(Anlagebewegung.buchungszeile)
+            .join(Buchungszeile.buchung)
+            .filter(
+                Buchung.booking_id
+                == str(booking_id)
+            )
+            .order_by(
+                Anlagebewegung.id
+            )
+            .all()
+        )
+
+        return tuple(
+            self._to_domain(model)
+            for model in models
+        )
+
+    def list_with_positions_for_booking(
+        self,
+        booking_id: UUID,
+    ) -> tuple[tuple[FixedAssetMovement, int], ...]:
+        """Lädt Anlagenbewegungen samt Buchungszeilenposition."""
+
+        if not isinstance(
+            booking_id,
+            UUID,
+        ):
+            raise TypeError(
+                "booking_id must be a UUID"
+            )
+
+        models = (
+            self._session.query(Anlagebewegung)
+            .join(Anlagebewegung.buchungszeile)
+            .join(Buchungszeile.buchung)
+            .filter(
+                Buchung.booking_id
+                == str(booking_id)
+            )
+            .order_by(
+                Anlagebewegung.id
+            )
+            .all()
+        )
+
+        return tuple(
+            (
+                self._to_domain(model),
+                model.buchungszeile.position,
+            )
+            for model in models
+        )
+
     def list_for_fixed_asset(
         self,
         fixed_asset_id: UUID,

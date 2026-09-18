@@ -10,9 +10,11 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
+    QDialog,
     QHBoxLayout,
     QHeaderView,
     QInputDialog,
+    QMenu,
     QLabel,
     QMainWindow,
     QMessageBox,
@@ -43,7 +45,19 @@ from openbilanz.ui_qt.booking_frame import BookingFrame
 from openbilanz.ui_qt.e_bilanz_account_mapping_dialog import (
     EBilanzAccountMappingDialog,
 )
+from openbilanz.ui_qt.fixed_asset_acquisition_link_dialog import (
+    AcquisitionBookingCandidate,
+    FixedAssetAcquisitionLinkDialog,
+)
+from openbilanz.ui_qt.fixed_asset_disposal_link_dialog import (
+    DisposalBookingCandidate,
+    FixedAssetDisposalLinkDialog,
+)
+from openbilanz.ui_qt.new_fixed_asset_dialog import NewFixedAssetDialog
 from openbilanz.ui_qt.vat_booking_frame import VatBookingFrame
+from openbilanz.ui_qt.tax_depreciation_adjustment_dialog import (
+    TaxDepreciationAdjustmentDialog,
+)
 
 ZERO = Decimal("0.00")
 
@@ -62,6 +76,7 @@ class MainWindow(QMainWindow):
         income_statement: FinancialStatementPosition,
         chart_of_accounts: ChartOfAccountsTemplate,
         opening_balance_account_number: str,
+        depreciation_expense_account_number: str,
         closing_accounts: ClosingAccounts,
         vat_accounts: VatAccounts,
     ) -> None:
@@ -76,6 +91,9 @@ class MainWindow(QMainWindow):
         self._chart_of_accounts = chart_of_accounts
         self._opening_balance_account_number = (
             opening_balance_account_number
+        )
+        self._depreciation_expense_account_number = (
+            depreciation_expense_account_number
         )
         self._closing_accounts = closing_accounts
         self._vat_accounts = vat_accounts
@@ -167,6 +185,7 @@ class MainWindow(QMainWindow):
         self._create_accounts_tab()
         self._create_journal_tab()
         self._create_booking_tab()
+        self._create_fixed_assets_tab()
 
         self.setCentralWidget(central_widget)
 
@@ -419,6 +438,964 @@ class MainWindow(QMainWindow):
 
         self._refresh_accounts()
         self._refresh_journal()
+
+    def _create_fixed_assets_tab(self) -> None:
+        """Erzeugt den Arbeitsbereich Anlagen."""
+
+        layout = QVBoxLayout(self._fixed_assets_tab)
+
+        header_layout = QHBoxLayout()
+
+        fixed_assets_label = QLabel("Anlagegüter")
+        fixed_assets_label.setStyleSheet(
+            "font-size: 18px; font-weight: bold;"
+        )
+        header_layout.addWidget(
+            fixed_assets_label
+        )
+
+        header_layout.addStretch()
+
+        self._add_fixed_asset_button = QPushButton(
+            "Anlagegut hinzufügen"
+        )
+        self._add_fixed_asset_button.clicked.connect(
+            self._open_new_fixed_asset
+        )
+        self._add_fixed_asset_button.setEnabled(
+            self._workspace.is_open
+        )
+        header_layout.addWidget(
+            self._add_fixed_asset_button
+        )
+
+        self._fixed_asset_actions_menu = QMenu(
+            self
+        )
+
+        self._process_depreciations_action = (
+            self._fixed_asset_actions_menu.addAction(
+                "Abschreibungen prüfen/buchen"
+            )
+        )
+        self._process_depreciations_action.triggered.connect(
+            self._process_depreciations
+        )
+        self._process_depreciations_action.setEnabled(
+            self._workspace.is_open
+        )
+
+        self._tax_depreciation_adjustments_action = (
+            self._fixed_asset_actions_menu.addAction(
+                "Steuerliche AfA-Abweichungen"
+            )
+        )
+        self._tax_depreciation_adjustments_action.triggered.connect(
+            self._manage_tax_depreciation_adjustments
+        )
+        self._tax_depreciation_adjustments_action.setEnabled(
+            self._workspace.is_open
+        )
+
+        self._fixed_asset_actions_button = QPushButton(
+            "Aktionen"
+        )
+        self._fixed_asset_actions_button.setMenu(
+            self._fixed_asset_actions_menu
+        )
+        header_layout.addWidget(
+            self._fixed_asset_actions_button
+        )
+
+        layout.addLayout(
+            header_layout
+        )
+
+        self._fixed_asset_table = QTableWidget()
+        self._fixed_asset_table.setColumnCount(9)
+        self._fixed_asset_table.setHorizontalHeaderLabels(
+            (
+                "Anlagen-ID",
+                "Bezeichnung",
+                "Anschaffung",
+                "AK/HK",
+                "ND Monate",
+                "Anlagekonto",
+                "AfA-Konto",
+                "Anschaffungsbuchung",
+                "Status",
+            )
+        )
+
+        self._fixed_asset_table.setEditTriggers(
+            QAbstractItemView.EditTrigger.NoEditTriggers
+        )
+        self._fixed_asset_table.setSelectionBehavior(
+            QAbstractItemView.SelectionBehavior.SelectRows
+        )
+        self._fixed_asset_table.setSelectionMode(
+            QAbstractItemView.SelectionMode.SingleSelection
+        )
+        self._fixed_asset_table.setAlternatingRowColors(
+            True
+        )
+        self._fixed_asset_table.setContextMenuPolicy(
+            Qt.ContextMenuPolicy.CustomContextMenu
+        )
+        self._fixed_asset_table.customContextMenuRequested.connect(
+            self._show_fixed_asset_context_menu
+        )
+
+        header = self._fixed_asset_table.horizontalHeader()
+
+        header.setSectionResizeMode(
+            0,
+            QHeaderView.ResizeMode.ResizeToContents,
+        )
+        header.setSectionResizeMode(
+            1,
+            QHeaderView.ResizeMode.Stretch,
+        )
+
+        for column in range(2, 9):
+            header.setSectionResizeMode(
+                column,
+                QHeaderView.ResizeMode.ResizeToContents,
+            )
+
+        layout.addWidget(
+            self._fixed_asset_table
+        )
+
+        self._refresh_fixed_assets()
+
+    def _refresh_fixed_assets(self) -> None:
+        """Aktualisiert die Liste der Anlagegüter."""
+
+        try:
+            assets = self._workspace.list_fixed_assets()
+        except RuntimeError:
+            self._fixed_assets = ()
+            self._fixed_asset_table.setRowCount(0)
+            return
+
+        self._fixed_assets = tuple(
+            assets
+        )
+
+        self._fixed_asset_table.setRowCount(
+            len(self._fixed_assets)
+        )
+
+        for row, asset in enumerate(
+            self._fixed_assets
+        ):
+            status = (
+                "Aktiv"
+                if asset.status.value == "ACTIVE"
+                else "Abgegangen"
+            )
+
+            try:
+                acquisition_linked = (
+                    self._workspace.has_fixed_asset_acquisition(
+                        asset.fixed_asset_id
+                    )
+                )
+            except RuntimeError:
+                acquisition_linked = False
+
+            acquisition_booking = (
+                "zugeordnet"
+                if acquisition_linked
+                else "nicht zugeordnet"
+            )
+
+            values = (
+                asset.asset_code,
+                asset.description,
+                asset.acquisition_date.strftime(
+                    "%d.%m.%Y"
+                ),
+                self._format_amount(
+                    asset.acquisition_cost
+                ),
+                asset.useful_life_months,
+                asset.asset_account_number,
+                asset.depreciation_expense_account_number,
+                acquisition_booking,
+                status,
+            )
+
+            for column, value in enumerate(
+                values
+            ):
+                item = QTableWidgetItem(
+                    str(value)
+                )
+
+                if column in (3, 4):
+                    item.setTextAlignment(
+                        Qt.AlignmentFlag.AlignRight
+                        | Qt.AlignmentFlag.AlignVCenter
+                    )
+
+                self._fixed_asset_table.setItem(
+                    row,
+                    column,
+                    item,
+                )
+
+        self._fixed_asset_table.resizeRowsToContents()
+
+    def _selected_fixed_asset(self):
+        """Gibt das aktuell ausgewählte Anlagegut zurück."""
+
+        row = self._fixed_asset_table.currentRow()
+
+        if row < 0:
+            return None
+
+        if row >= len(
+            self._fixed_assets
+        ):
+            return None
+
+        return self._fixed_assets[row]
+
+    def _show_fixed_asset_context_menu(
+        self,
+        position,
+    ) -> None:
+        """Zeigt die Aktionen für ein Anlagegut an."""
+
+        item = self._fixed_asset_table.itemAt(
+            position
+        )
+
+        if item is None:
+            return
+
+        self._fixed_asset_table.selectRow(
+            item.row()
+        )
+
+        menu = QMenu(
+            self._fixed_asset_table
+        )
+
+        edit_action = menu.addAction(
+            "Anlagegut bearbeiten"
+        )
+        delete_action = menu.addAction(
+            "Anlagegut löschen"
+        )
+
+        menu.addSeparator()
+
+        acquisition_action = menu.addAction(
+            "Anschaffungsbuchung zuordnen"
+        )
+        disposal_action = menu.addAction(
+            "Abgangsbuchung zuordnen"
+        )
+
+        enabled = self._workspace.is_open
+
+        edit_action.setEnabled(
+            enabled
+        )
+        delete_action.setEnabled(
+            enabled
+        )
+        acquisition_action.setEnabled(
+            enabled
+        )
+        disposal_action.setEnabled(
+            enabled
+        )
+
+        selected_action = menu.exec(
+            self._fixed_asset_table.viewport().mapToGlobal(
+                position
+            )
+        )
+
+        if selected_action is edit_action:
+            self._open_edit_fixed_asset()
+        elif selected_action is delete_action:
+            self._delete_fixed_asset()
+        elif selected_action is acquisition_action:
+            self._open_link_fixed_asset_acquisition()
+        elif selected_action is disposal_action:
+            self._open_link_fixed_asset_disposal()
+
+    def _open_new_fixed_asset(self) -> None:
+        """Öffnet den Dialog für ein neues Anlagegut."""
+
+        if not self._workspace.is_open:
+            return
+
+        dialog = NewFixedAssetDialog(
+            self,
+            company_id=(
+                self._context.company.company_id
+            ),
+            depreciation_expense_account_number=(
+                self._depreciation_expense_account_number
+            ),
+        )
+
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        if dialog.result is None:
+            return
+
+        try:
+            self._workspace.add_fixed_asset(
+                dialog.result
+            )
+        except (
+            ValueError,
+            RuntimeError,
+        ) as exc:
+            QMessageBox.critical(
+                self,
+                "Anlagegut kann nicht angelegt werden",
+                str(exc),
+            )
+            return
+
+        self._refresh_fixed_assets()
+
+        QMessageBox.information(
+            self,
+            "Anlagegut",
+            "Das Anlagegut wurde angelegt.",
+        )
+
+    def _open_edit_fixed_asset(self) -> None:
+        """Öffnet ein Anlagegut zur Bearbeitung."""
+
+        if not self._workspace.is_open:
+            return
+
+        fixed_asset = self._selected_fixed_asset()
+
+        if fixed_asset is None:
+            QMessageBox.information(
+                self,
+                "Anlagegut bearbeiten",
+                "Bitte zuerst ein Anlagegut auswählen.",
+            )
+            return
+
+        try:
+            acquisition_linked = (
+                self._workspace.has_fixed_asset_acquisition(
+                    fixed_asset.fixed_asset_id
+                )
+            )
+        except RuntimeError as exc:
+            QMessageBox.critical(
+                self,
+                "Anlagegut kann nicht bearbeitet werden",
+                str(exc),
+            )
+            return
+
+        dialog = NewFixedAssetDialog(
+            self,
+            company_id=(
+                self._context.company.company_id
+            ),
+            depreciation_expense_account_number=(
+                self._depreciation_expense_account_number
+            ),
+            fixed_asset=fixed_asset,
+            acquisition_linked=acquisition_linked,
+        )
+
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        if dialog.result is None:
+            return
+
+        try:
+            self._workspace.update_fixed_asset(
+                dialog.result
+            )
+        except (
+            ValueError,
+            RuntimeError,
+        ) as exc:
+            QMessageBox.critical(
+                self,
+                "Anlagegut kann nicht bearbeitet werden",
+                str(exc),
+            )
+            return
+
+        self._refresh_fixed_assets()
+
+        QMessageBox.information(
+            self,
+            "Anlagegut",
+            "Das Anlagegut wurde geändert.",
+        )
+
+    def _delete_fixed_asset(self) -> None:
+        """Löscht ein noch nicht buchungswirksames Anlagegut."""
+
+        if not self._workspace.is_open:
+            return
+
+        fixed_asset = self._selected_fixed_asset()
+
+        if fixed_asset is None:
+            QMessageBox.information(
+                self,
+                "Anlagegut löschen",
+                "Bitte zuerst ein Anlagegut auswählen.",
+            )
+            return
+
+        answer = QMessageBox.question(
+            self,
+            "Anlagegut löschen",
+            (
+                f"Soll das Anlagegut "
+                f"„{fixed_asset.asset_code} – "
+                f"{fixed_asset.description}“ "
+                "wirklich gelöscht werden?\n\n"
+                "Dieser Vorgang kann nicht rückgängig "
+                "gemacht werden."
+            ),
+            (
+                QMessageBox.StandardButton.Yes
+                | QMessageBox.StandardButton.No
+            ),
+            QMessageBox.StandardButton.No,
+        )
+
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+
+        try:
+            self._workspace.delete_fixed_asset(
+                fixed_asset.fixed_asset_id
+            )
+        except (
+            ValueError,
+            RuntimeError,
+        ) as exc:
+            QMessageBox.critical(
+                self,
+                "Anlagegut kann nicht gelöscht werden",
+                str(exc),
+            )
+            return
+
+        self._refresh_fixed_assets()
+
+        QMessageBox.information(
+            self,
+            "Anlagegut",
+            "Das Anlagegut wurde gelöscht.",
+        )
+
+    def _open_link_fixed_asset_acquisition(self) -> None:
+        """Ordnet eine vorhandene Buchung einem Anlagegut zu."""
+
+        if not self._workspace.is_open:
+            return
+
+        fixed_asset = self._selected_fixed_asset()
+
+        if fixed_asset is None:
+            QMessageBox.information(
+                self,
+                "Anschaffungsbuchung zuordnen",
+                "Bitte zuerst ein Anlagegut auswählen.",
+            )
+            return
+
+        try:
+            if self._workspace.has_fixed_asset_acquisition(
+                fixed_asset.fixed_asset_id
+            ):
+                QMessageBox.information(
+                    self,
+                    "Anschaffungsbuchung zuordnen",
+                    (
+                        "Dem ausgewählten Anlagegut ist bereits "
+                        "eine Anschaffungsbuchung zugeordnet."
+                    ),
+                )
+                return
+        except RuntimeError as exc:
+            QMessageBox.critical(
+                self,
+                "Anschaffungsbuchung kann nicht zugeordnet werden",
+                str(exc),
+            )
+            return
+
+        candidates: list[AcquisitionBookingCandidate] = []
+
+        reversed_booking_ids = {
+            booking.reversal_of_booking_id
+            for booking in self._workspace.journal.bookings
+            if (
+                booking.booking_type is BookingType.REVERSAL
+                and booking.reversal_of_booking_id is not None
+            )
+        }
+
+        for booking in self._workspace.journal.bookings:
+            if booking.booking_type is not BookingType.REGULAR:
+                continue
+
+            if booking.booking_id in reversed_booking_ids:
+                continue
+
+            for position, line in enumerate(booking.lines):
+                if (
+                    line.account_number
+                    != fixed_asset.asset_account_number
+                ):
+                    continue
+
+                if line.side is not EntrySide.DEBIT:
+                    continue
+
+                if line.amount != fixed_asset.acquisition_cost:
+                    continue
+
+                candidates.append(
+                    AcquisitionBookingCandidate(
+                        booking_id=booking.booking_id,
+                        booking_line_position=position,
+                        booking_date_text=(
+                            booking.booking_date.strftime(
+                                "%d.%m.%Y"
+                            )
+                        ),
+                        voucher_no=booking.voucher_no or "",
+                        description=booking.description or "",
+                        account_number=line.account_number,
+                        amount=line.amount,
+                    )
+                )
+
+        if not candidates:
+            QMessageBox.information(
+                self,
+                "Anschaffungsbuchung zuordnen",
+                (
+                    "Es wurde keine passende "
+                    "Anschaffungsbuchung gefunden."
+                ),
+            )
+            return
+
+        dialog = FixedAssetAcquisitionLinkDialog(
+            self,
+            candidates=tuple(candidates),
+        )
+
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        candidate = dialog.selected_candidate
+
+        if candidate is None:
+            return
+
+        try:
+            self._workspace.link_fixed_asset_acquisition(
+                fixed_asset_id=fixed_asset.fixed_asset_id,
+                booking_id=candidate.booking_id,
+                booking_line_position=(
+                    candidate.booking_line_position
+                ),
+            )
+        except (
+            ValueError,
+            RuntimeError,
+        ) as exc:
+            QMessageBox.critical(
+                self,
+                (
+                    "Anschaffungsbuchung konnte "
+                    "nicht zugeordnet werden"
+                ),
+                str(exc),
+            )
+            return
+
+        QMessageBox.information(
+            self,
+            "Anschaffungsbuchung",
+            (
+                "Die Anschaffungsbuchung wurde "
+                "dem Anlagegut zugeordnet."
+            ),
+        )
+
+        self._refresh_fixed_assets()
+
+    def _open_link_fixed_asset_disposal(self) -> None:
+        """Ordnet eine vorhandene Abgangsbuchung einem Anlagegut zu."""
+
+        if not self._workspace.is_open:
+            return
+
+        fixed_asset = self._selected_fixed_asset()
+
+        if fixed_asset is None:
+            QMessageBox.information(
+                self,
+                "Abgangsbuchung zuordnen",
+                "Bitte zuerst ein Anlagegut auswählen.",
+            )
+            return
+
+        if fixed_asset.status.value != "ACTIVE":
+            QMessageBox.information(
+                self,
+                "Abgangsbuchung zuordnen",
+                "Das ausgewählte Anlagegut ist bereits abgegangen.",
+            )
+            return
+
+        try:
+            acquisition_linked = (
+                self._workspace.has_fixed_asset_acquisition(
+                    fixed_asset.fixed_asset_id
+                )
+            )
+        except RuntimeError as exc:
+            QMessageBox.critical(
+                self,
+                "Abgangsbuchung kann nicht zugeordnet werden",
+                str(exc),
+            )
+            return
+
+        if not acquisition_linked:
+            QMessageBox.information(
+                self,
+                "Abgangsbuchung zuordnen",
+                (
+                    "Dem ausgewählten Anlagegut ist noch keine "
+                    "Anschaffungsbuchung zugeordnet."
+                ),
+            )
+            return
+
+        candidates: list[DisposalBookingCandidate] = []
+
+        for booking in self._workspace.journal.bookings:
+            if (
+                booking.booking_date
+                < fixed_asset.acquisition_date
+            ):
+                continue
+
+            for position, line in enumerate(booking.lines):
+                if (
+                    line.account_number
+                    != fixed_asset.asset_account_number
+                ):
+                    continue
+
+                if line.side is not EntrySide.CREDIT:
+                    continue
+
+                candidates.append(
+                    DisposalBookingCandidate(
+                        booking_id=booking.booking_id,
+                        booking_line_position=position,
+                        booking_date_text=(
+                            booking.booking_date.strftime(
+                                "%d.%m.%Y"
+                            )
+                        ),
+                        voucher_no=booking.voucher_no or "",
+                        description=booking.description or "",
+                        account_number=line.account_number,
+                        amount=line.amount,
+                    )
+                )
+
+        if not candidates:
+            QMessageBox.information(
+                self,
+                "Abgangsbuchung zuordnen",
+                (
+                    "Es wurde keine passende "
+                    "Abgangsbuchung gefunden."
+                ),
+            )
+            return
+
+        dialog = FixedAssetDisposalLinkDialog(
+            self,
+            candidates=tuple(candidates),
+        )
+
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        candidate = dialog.selected_candidate
+
+        if candidate is None:
+            return
+
+        try:
+            self._workspace.link_fixed_asset_disposal(
+                fixed_asset_id=fixed_asset.fixed_asset_id,
+                booking_id=candidate.booking_id,
+                booking_line_position=(
+                    candidate.booking_line_position
+                ),
+            )
+        except (
+            ValueError,
+            RuntimeError,
+        ) as exc:
+            QMessageBox.critical(
+                self,
+                "Abgangsbuchung konnte nicht zugeordnet werden",
+                str(exc),
+            )
+            return
+
+        QMessageBox.information(
+            self,
+            "Abgangsbuchung",
+            (
+                "Die Abgangsbuchung wurde "
+                "dem Anlagegut zugeordnet."
+            ),
+        )
+
+        self._refresh_fixed_assets()
+
+    def _process_depreciations(self) -> None:
+        """Prüft und bucht offene Abschreibungen."""
+
+        try:
+            proposals = (
+                self._workspace.build_depreciation_proposals()
+            )
+        except (
+            ValueError,
+            RuntimeError,
+        ) as exc:
+            QMessageBox.critical(
+                self,
+                "Abschreibungen konnten nicht vorbereitet werden",
+                str(exc),
+            )
+            return
+
+        if not proposals:
+            QMessageBox.information(
+                self,
+                "Abschreibungen",
+                (
+                    "Für dieses Geschäftsjahr sind keine "
+                    "offenen Abschreibungen vorhanden."
+                ),
+            )
+            return
+        fixed_assets = self._workspace.list_fixed_assets()
+
+        fixed_assets_by_id = {
+            fixed_asset.fixed_asset_id: fixed_asset
+            for fixed_asset in fixed_assets
+        }
+
+        for proposal in proposals:
+            fixed_asset = fixed_assets_by_id.get(
+                proposal.fixed_asset_id
+            )
+
+            if fixed_asset is None:
+                QMessageBox.critical(
+                    self,
+                    "Abschreibung bestätigen",
+                    (
+                        "Das Anlagegut zur vorgeschlagenen "
+                        "Abschreibung wurde nicht gefunden.\n\n"
+                        "Anlagen-ID: "
+                        f"{proposal.fixed_asset_id}"
+                    ),
+                )
+                break
+
+            answer = QMessageBox.question(
+                self,
+                "Abschreibung bestätigen",
+                (
+                    "Für folgendes Anlagegut wurde eine lineare "
+                    "Abschreibung ermittelt:\n\n"
+                    "Bezeichnung: "
+                    f"{fixed_asset.description}\n"
+                    "Anlagen-Nummer: "
+                    f"{fixed_asset.asset_code}\n\n"
+                    f"Betrag: {proposal.amount:.2f} €\n"
+                    "Aufwandskonto: "
+                    f"{proposal.expense_account_number}\n"
+                    "Anlagenkonto: "
+                    f"{proposal.asset_account_number}\n"
+                    "Datum: "
+                    f"{proposal.depreciation_date:%d.%m.%Y}\n\n"
+                    "Soll diese Abschreibung gebucht werden?"
+                ),
+                (
+                    QMessageBox.StandardButton.Yes
+                    | QMessageBox.StandardButton.No
+                ),
+                QMessageBox.StandardButton.No,
+            )
+
+            if answer != QMessageBox.StandardButton.Yes:
+                continue
+
+            try:
+                self._workspace.confirm_depreciation(
+                    proposal
+                )
+            except (
+                ValueError,
+                RuntimeError,
+            ) as exc:
+                QMessageBox.critical(
+                    self,
+                    "Abschreibung konnte nicht gebucht werden",
+                    str(exc),
+                )
+                break
+
+        self._refresh_accounts()
+        self._refresh_journal()
+        self._refresh_fixed_assets()
+
+    def _manage_tax_depreciation_adjustments(self) -> None:
+        """Bearbeitet steuerliche AfA-Abweichungen."""
+
+        try:
+            depreciations = (
+                self._workspace.list_confirmed_depreciations()
+            )
+            fixed_assets = (
+                self._workspace.list_fixed_assets()
+            )
+        except (
+            ValueError,
+            RuntimeError,
+        ) as exc:
+            QMessageBox.critical(
+                self,
+                "Steuerliche AfA-Abweichungen",
+                str(exc),
+            )
+            return
+
+        if not depreciations:
+            QMessageBox.information(
+                self,
+                "Steuerliche AfA-Abweichungen",
+                (
+                    "Für dieses Geschäftsjahr sind noch keine "
+                    "bestätigten Abschreibungen vorhanden."
+                ),
+            )
+            return
+
+        fixed_assets_by_id = {
+            fixed_asset.fixed_asset_id: fixed_asset
+            for fixed_asset in fixed_assets
+        }
+
+        for depreciation in depreciations:
+            fixed_asset = fixed_assets_by_id.get(
+                depreciation.fixed_asset_id
+            )
+
+            if fixed_asset is None:
+                QMessageBox.critical(
+                    self,
+                    "Steuerliche AfA-Abweichungen",
+                    (
+                        "Das Anlagegut zu einer bestätigten "
+                        "Abschreibung konnte nicht gefunden werden."
+                    ),
+                )
+                return
+
+            try:
+                adjustment = (
+                    self._workspace
+                    .get_tax_depreciation_adjustment(
+                        depreciation.depreciation_id
+                    )
+                )
+            except (
+                ValueError,
+                RuntimeError,
+            ) as exc:
+                QMessageBox.critical(
+                    self,
+                    "Steuerliche AfA-Abweichungen",
+                    str(exc),
+                )
+                return
+
+            initial_tax_amount = (
+                adjustment.tax_amount
+                if adjustment is not None
+                else depreciation.amount
+            )
+
+            dialog = TaxDepreciationAdjustmentDialog(
+                self,
+                fixed_asset=fixed_asset,
+                depreciation=depreciation,
+                initial_tax_amount=initial_tax_amount,
+            )
+
+            if dialog.exec() != QDialog.DialogCode.Accepted:
+                break
+
+            if dialog.result is None:
+                break
+
+            try:
+                self._workspace.save_tax_depreciation_adjustment(
+                    depreciation_id=(
+                        depreciation.depreciation_id
+                    ),
+                    tax_amount=dialog.result,
+                )
+            except (
+                ValueError,
+                RuntimeError,
+            ) as exc:
+                QMessageBox.critical(
+                    self,
+                    (
+                        "Steuerliche AfA-Abweichung konnte "
+                        "nicht gespeichert werden"
+                    ),
+                    str(exc),
+                )
+                break
 
     def _create_journal_tab(self) -> None:
         """Erzeugt den Arbeitsbereich Journal."""
@@ -791,6 +1768,7 @@ class MainWindow(QMainWindow):
 
         self._refresh_journal()
         self._refresh_accounts()
+        self._refresh_fixed_assets()
 
         QMessageBox.information(
             self,

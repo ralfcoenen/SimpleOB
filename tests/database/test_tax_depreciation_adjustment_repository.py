@@ -115,6 +115,8 @@ def _create_confirmed_depreciation(
         company_id=company.company_id,
         fiscal_year=fiscal_year,
         proposal=proposal,
+        asset_code=asset.asset_code,
+        asset_description=asset.description,
     )
 
 

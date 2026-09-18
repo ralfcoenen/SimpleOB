@@ -159,3 +159,25 @@ def test_build_proposal_uses_depreciation_start_date() -> None:
 
     assert proposal is not None
     assert proposal.amount == Decimal("300.00")
+
+def test_build_proposal_ends_depreciation_at_disposal_month() -> None:
+    asset = _fixed_asset(
+        acquisition_date=date(2026, 9, 17),
+        acquisition_cost=Decimal("1200.00"),
+        useful_life_months=36,
+    )
+
+    proposal = DepreciationService().build_proposal(
+        fixed_asset=asset,
+        fiscal_year=_fiscal_year(2026),
+        previous_depreciation=Decimal("0.00"),
+        expense_account_number="4830",
+        asset_account_number="0690",
+        depreciation_end_date=date(2026, 9, 30),
+    )
+
+    assert proposal is not None
+
+    # Jahres-AfA 400,00 EUR; September = 1 Monat.
+    assert proposal.amount == Decimal("33.33")
+    assert proposal.depreciation_date == date(2026, 9, 30)

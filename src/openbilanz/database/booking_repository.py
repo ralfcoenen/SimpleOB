@@ -154,6 +154,16 @@ class BookingRepository:
         if commit:
             self._session.commit()
 
+    def commit(self) -> None:
+        """Bestätigt die aktuelle Datenbanktransaktion."""
+
+        self._session.commit()
+
+    def rollback(self) -> None:
+        """Verwirft die aktuelle Datenbanktransaktion."""
+
+        self._session.rollback()
+
     def get(
         self,
         booking_id: UUID,

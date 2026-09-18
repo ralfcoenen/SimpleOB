@@ -511,23 +511,30 @@ class FiscalYearWorkspace:
             for line in original_booking.lines
         )
 
-        booking_reference = (
-            original_booking.voucher_no
-            or str(original_booking.booking_id)
-        )
+        if original_booking.voucher_no:
+            booking_reference = (
+                f"Buchung {original_booking.voucher_no}"
+            )
 
-        original_description = (
-            f": {original_booking.description}"
-            if original_booking.description
-            else ""
-        )
+            if original_booking.description:
+                booking_reference += (
+                    f": {original_booking.description}"
+                )
+
+        elif original_booking.description:
+            booking_reference = (
+                original_booking.description
+            )
+
+        else:
+            booking_reference = (
+                f"Buchung {original_booking.booking_id}"
+            )
 
         return Booking(
             booking_date=reversal_date,
             description=(
-                "Storno zu Buchung "
-                f"{booking_reference}"
-                f"{original_description}"
+                f"Storno zu {booking_reference}"
             ),
             booking_type=BookingType.REVERSAL,
             reversal_of_booking_id=(
@@ -542,11 +549,115 @@ class FiscalYearWorkspace:
     ) -> None:
         """Verbucht und persistiert eine laufende Buchung."""
 
-        self._booking_repository.add(
-            company_id=self._context.company.company_id,
-            fiscal_year=self._context.fiscal_year,
-            booking=booking,
+        if (
+            booking.booking_type is not BookingType.REVERSAL
+            or self._fixed_asset_movement_repository is None
+        ):
+            self._booking_repository.add(
+                company_id=self._context.company.company_id,
+                fiscal_year=self._context.fiscal_year,
+                booking=booking,
+            )
+            self.reload()
+            return
+
+        if booking.reversal_of_booking_id is None:
+            raise ValueError(
+                "Die Stornobuchung verweist auf keine "
+                "ursprüngliche Buchung."
+            )
+
+        original_movements_with_positions = (
+            self._fixed_asset_movement_repository
+            .list_with_positions_for_booking(
+                booking.reversal_of_booking_id
+            )
         )
+
+        if not original_movements_with_positions:
+            self._booking_repository.add(
+                company_id=self._context.company.company_id,
+                fiscal_year=self._context.fiscal_year,
+                booking=booking,
+            )
+            self.reload()
+            return
+
+        if self._fixed_asset_repository is None:
+            raise RuntimeError(
+                "Die Anlagenbuchhaltung ist nicht konfiguriert."
+            )
+
+        try:
+            self._booking_repository.add(
+                company_id=self._context.company.company_id,
+                fiscal_year=self._context.fiscal_year,
+                booking=booking,
+                commit=False,
+            )
+
+            for (
+                original_movement,
+                booking_line_position,
+            ) in original_movements_with_positions:
+                reversal_movement = FixedAssetMovement(
+                    fixed_asset_id=(
+                        original_movement.fixed_asset_id
+                    ),
+                    fiscal_year_end=(
+                        self._context.fiscal_year.end_date
+                    ),
+                    movement_date=booking.booking_date,
+                    amount=original_movement.amount,
+                    booking_id=booking.booking_id,
+                    movement_type=(
+                        FixedAssetMovementType.REVERSAL
+                    ),
+                    reversed_movement_id=(
+                        original_movement.movement_id
+                    ),
+                )
+
+                self._fixed_asset_movement_repository.add(
+                    movement=reversal_movement,
+                    booking_line_position=(
+                        booking_line_position
+                    ),
+                    commit=False,
+                )
+
+                if (
+                    original_movement.movement_type
+                    is FixedAssetMovementType.DISPOSAL
+                ):
+                    fixed_asset = (
+                        self._fixed_asset_repository.get(
+                            original_movement.fixed_asset_id
+                        )
+                    )
+
+                    if fixed_asset is None:
+                        raise ValueError(
+                            "Das Anlagegut der zu stornierenden "
+                            "Abgangsbuchung ist nicht vorhanden."
+                        )
+
+                    restored_fixed_asset = replace(
+                        fixed_asset,
+                        status=FixedAssetStatus.ACTIVE,
+                        disposal_date=None,
+                    )
+
+                    self._fixed_asset_repository.update(
+                        fixed_asset=restored_fixed_asset,
+                        commit=False,
+                    )
+
+            self._booking_repository.commit()
+
+        except Exception:
+            self._booking_repository.rollback()
+            raise
 
         self.reload()
 
@@ -753,11 +864,38 @@ class FiscalYearWorkspace:
 
         self._fixed_asset_repository.add(fixed_asset=fixed_asset)
 
+    @staticmethod
+    def _effective_fixed_asset_movements(
+        movements: tuple[FixedAssetMovement, ...],
+    ) -> tuple[FixedAssetMovement, ...]:
+        """Liefert die nicht stornierten Anlagenbewegungen."""
+
+        reversed_movement_ids = {
+            movement.reversed_movement_id
+            for movement in movements
+            if (
+                movement.movement_type
+                is FixedAssetMovementType.REVERSAL
+                and movement.reversed_movement_id is not None
+            )
+        }
+
+        return tuple(
+            movement
+            for movement in movements
+            if (
+                movement.movement_type
+                is not FixedAssetMovementType.REVERSAL
+                and movement.movement_id
+                not in reversed_movement_ids
+            )
+        )
+
     def has_fixed_asset_acquisition(
         self,
         fixed_asset_id: UUID,
     ) -> bool:
-        """Prüft, ob eine Anschaffungsbuchung zugeordnet ist."""
+        """Prüft, ob eine wirksame Anschaffungsbuchung zugeordnet ist."""
 
         if self._fixed_asset_movement_repository is None:
             raise RuntimeError(
@@ -771,10 +909,16 @@ class FiscalYearWorkspace:
             )
         )
 
+        effective_movements = (
+            self._effective_fixed_asset_movements(
+                movements
+            )
+        )
+
         return any(
             movement.movement_type
             is FixedAssetMovementType.ACQUISITION
-            for movement in movements
+            for movement in effective_movements
         )
 
     def update_fixed_asset(
@@ -850,10 +994,16 @@ class FiscalYearWorkspace:
             )
         )
 
+        effective_movements = (
+            self._effective_fixed_asset_movements(
+                movements
+            )
+        )
+
         acquisition_linked = any(
             movement.movement_type
             is FixedAssetMovementType.ACQUISITION
-            for movement in movements
+            for movement in effective_movements
         )
 
         if acquisition_linked:
@@ -1086,10 +1236,16 @@ class FiscalYearWorkspace:
             )
         )
 
+        effective_movements = (
+            self._effective_fixed_asset_movements(
+                existing_movements
+            )
+        )
+
         if any(
             movement.movement_type
             is FixedAssetMovementType.ACQUISITION
-            for movement in existing_movements
+            for movement in effective_movements
         ):
             raise ValueError(
                 "Dem Anlagegut ist bereits eine "
@@ -1241,10 +1397,16 @@ class FiscalYearWorkspace:
             )
         )
 
+        effective_movements = (
+            self._effective_fixed_asset_movements(
+                existing_movements
+            )
+        )
+
         if not any(
             movement.movement_type
             is FixedAssetMovementType.ACQUISITION
-            for movement in existing_movements
+            for movement in effective_movements
         ):
             raise ValueError(
                 "Dem Anlagegut ist noch keine "
@@ -1254,11 +1416,45 @@ class FiscalYearWorkspace:
         if any(
             movement.movement_type
             is FixedAssetMovementType.DISPOSAL
-            for movement in existing_movements
+            for movement in effective_movements
         ):
             raise ValueError(
                 "Dem Anlagegut ist bereits eine "
                 "Abgangsbuchung zugeordnet."
+            )
+
+        if self._fixed_asset_depreciation_repository is None:
+            raise RuntimeError(
+                "Die Anlagenbuchhaltung ist nicht konfiguriert."
+            )
+
+        depreciations = (
+            self._fixed_asset_depreciation_repository
+            .list_for_fixed_asset(
+                fixed_asset.fixed_asset_id
+            )
+        )
+
+        effective_depreciations = (
+            self._effective_fixed_asset_depreciations(
+                depreciations
+            )
+        )
+
+        current_year_depreciations = tuple(
+            depreciation
+            for depreciation in effective_depreciations
+            if depreciation.fiscal_year_end
+            == self._context.fiscal_year.end_date
+        )
+
+        if current_year_depreciations:
+            raise ValueError(
+                "Für das Anlagegut ist bereits eine "
+                "Abschreibung für dieses Geschäftsjahr "
+                "gebucht. Die Abschreibung muss vor "
+                "Zuordnung des Anlagenabgangs storniert "
+                "werden."
             )
 
         movement = FixedAssetMovement(
@@ -1294,6 +1490,32 @@ class FiscalYearWorkspace:
 
         return movement
 
+    def _effective_fixed_asset_depreciations(
+        self,
+        depreciations: tuple[FixedAssetDepreciation, ...],
+    ) -> tuple[FixedAssetDepreciation, ...]:
+        """Liefert die nicht stornierten Anlagenabschreibungen."""
+
+        bookings = self._booking_repository.list_for_fiscal_year(
+            company_id=self._context.company.company_id,
+            fiscal_year=self._context.fiscal_year,
+        )
+
+        reversed_booking_ids = {
+            booking.reversal_of_booking_id
+            for booking in bookings
+            if (
+                booking.booking_type is BookingType.REVERSAL
+                and booking.reversal_of_booking_id is not None
+            )
+        }
+
+        return tuple(
+            depreciation
+            for depreciation in depreciations
+            if depreciation.booking_id not in reversed_booking_ids
+        )
+
     def list_confirmed_depreciations(
         self,
     ) -> tuple[FixedAssetDepreciation, ...]:
@@ -1328,7 +1550,9 @@ class FiscalYearWorkspace:
                 == self._context.fiscal_year.end_date
             )
 
-        return tuple(depreciations)
+        return self._effective_fixed_asset_depreciations(
+            tuple(depreciations)
+        )
 
     def get_tax_depreciation_adjustment(
         self,
@@ -1489,34 +1713,88 @@ class FiscalYearWorkspace:
         proposals: list[DepreciationProposal] = []
 
         for asset in assets:
-            if asset.status is not FixedAssetStatus.ACTIVE:
-                continue
-
-            depreciations = (
-                self._fixed_asset_depreciation_repository.list_for_fixed_asset(
+            movements = (
+                self._fixed_asset_movement_repository
+                .list_for_fixed_asset(
                     asset.fixed_asset_id
                 )
             )
 
+            effective_movements = (
+                self._effective_fixed_asset_movements(
+                    movements
+                )
+            )
+
+            if not any(
+                movement.movement_type
+                is FixedAssetMovementType.ACQUISITION
+                for movement in effective_movements
+            ):
+                continue
+
+            disposal_movement = next(
+                (
+                    movement
+                    for movement in effective_movements
+                    if movement.movement_type
+                    is FixedAssetMovementType.DISPOSAL
+                ),
+                None,
+            )
+
+            depreciation_end_date = (
+                disposal_movement.movement_date
+                if disposal_movement is not None
+                else None
+            )
+
+            depreciations = (
+                self._fixed_asset_depreciation_repository
+                .list_for_fixed_asset(
+                    asset.fixed_asset_id
+                )
+            )
+
+            effective_depreciations = (
+                self._effective_fixed_asset_depreciations(
+                    depreciations
+                )
+            )
+
             already_confirmed = any(
-                depreciation.fiscal_year_end == self._context.fiscal_year.end_date
-                for depreciation in depreciations
+                depreciation.fiscal_year_end
+                == self._context.fiscal_year.end_date
+                for depreciation in effective_depreciations
             )
 
             if already_confirmed:
                 continue
 
             previous_depreciation = sum(
-                (depreciation.amount for depreciation in depreciations),
+                (
+                    depreciation.amount
+                    for depreciation
+                    in effective_depreciations
+                ),
                 start=Decimal("0.00"),
             )
 
             proposal = self._depreciation_service.build_proposal(
                 fixed_asset=asset,
                 fiscal_year=self._context.fiscal_year,
-                previous_depreciation=(previous_depreciation),
-                expense_account_number=(asset.depreciation_expense_account_number),
-                asset_account_number=(asset.asset_account_number),
+                previous_depreciation=(
+                    previous_depreciation
+                ),
+                expense_account_number=(
+                    asset.depreciation_expense_account_number
+                ),
+                asset_account_number=(
+                    asset.asset_account_number
+                ),
+                depreciation_end_date=(
+                    depreciation_end_date
+                ),
             )
 
             if proposal is not None:
@@ -1531,15 +1809,43 @@ class FiscalYearWorkspace:
         """Bucht einen bestätigten AfA-Vorschlag."""
 
         if not self.is_open:
-            raise ValueError("Das Geschäftsjahr ist abgeschlossen.")
+            raise ValueError(
+                "Das Geschäftsjahr ist abgeschlossen."
+            )
 
         if self._fixed_asset_depreciation_workflow is None:
-            raise RuntimeError("Die Anlagenbuchhaltung ist nicht konfiguriert.")
+            raise RuntimeError(
+                "Die Anlagenbuchhaltung ist nicht konfiguriert."
+            )
 
-        depreciation = self._fixed_asset_depreciation_workflow.confirm(
-            company_id=(self._context.company.company_id),
-            fiscal_year=(self._context.fiscal_year),
-            proposal=proposal,
+        if self._fixed_asset_repository is None:
+            raise RuntimeError(
+                "Die Anlagenbuchhaltung ist nicht konfiguriert."
+            )
+
+        fixed_asset = self._fixed_asset_repository.get(
+            proposal.fixed_asset_id
+        )
+
+        if fixed_asset is None:
+            raise ValueError(
+                "Das Anlagegut ist nicht vorhanden."
+            )
+
+        depreciation = (
+            self._fixed_asset_depreciation_workflow.confirm(
+                company_id=(
+                    self._context.company.company_id
+                ),
+                fiscal_year=(
+                    self._context.fiscal_year
+                ),
+                proposal=proposal,
+                asset_code=fixed_asset.asset_code,
+                asset_description=(
+                    fixed_asset.description
+                ),
+            )
         )
 
         self.reload()

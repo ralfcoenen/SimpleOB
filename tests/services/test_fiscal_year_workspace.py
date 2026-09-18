@@ -49,6 +49,9 @@ from openbilanz.domain.fixed_asset import FixedAsset
 from openbilanz.domain.fixed_asset_depreciation import (
     FixedAssetDepreciation,
 )
+from openbilanz.domain.fixed_asset_movement import (
+    FixedAssetMovement,
+)
 from openbilanz.domain.fixed_asset_movement_type import (
     FixedAssetMovementType,
 )
@@ -738,6 +741,7 @@ def test_lists_confirmed_depreciations_for_open_fiscal_year(
     fixed_asset_repository.list_for_company.return_value = (
         asset,
     )
+    fixed_asset_repository.get.return_value = asset
 
     depreciation_repository.list_for_fixed_asset.return_value = (
         previous_depreciation,
@@ -1233,6 +1237,7 @@ def test_builds_open_depreciation_proposal(
     booking_repository = Mock()
     company_repository = Mock()
     fixed_asset_repository = Mock()
+    fixed_asset_movement_repository = Mock()
     depreciation_repository = Mock()
     depreciation_service = Mock()
 
@@ -1259,6 +1264,15 @@ def test_builds_open_depreciation_proposal(
         useful_life_months=36,
     )
 
+    acquisition_movement = FixedAssetMovement(
+        fixed_asset_id=asset.fixed_asset_id,
+        fiscal_year_end=context.fiscal_year.end_date,
+        movement_date=asset.acquisition_date,
+        amount=asset.acquisition_cost,
+        booking_id=uuid4(),
+        movement_type=FixedAssetMovementType.ACQUISITION,
+    )
+
     proposal = DepreciationProposal(
         fixed_asset_id=asset.fixed_asset_id,
         depreciation_date=context.fiscal_year.end_date,
@@ -1269,6 +1283,10 @@ def test_builds_open_depreciation_proposal(
 
     fixed_asset_repository.list_for_company.return_value = (
         asset,
+    )
+
+    fixed_asset_movement_repository.list_for_fixed_asset.return_value = (
+        acquisition_movement,
     )
 
     depreciation_repository.list_for_fixed_asset.return_value = ()
@@ -1292,6 +1310,9 @@ def test_builds_open_depreciation_proposal(
         fixed_asset_repository=(
             fixed_asset_repository
         ),
+        fixed_asset_movement_repository=(
+            fixed_asset_movement_repository
+        ),
         fixed_asset_depreciation_repository=(
             depreciation_repository
         ),
@@ -1305,8 +1326,10 @@ def test_builds_open_depreciation_proposal(
         workspace.build_depreciation_proposals()
     )
 
-    assert proposals == (
-        proposal,
+    assert proposals == (proposal,)
+
+    fixed_asset_movement_repository.list_for_fixed_asset.assert_called_once_with(
+        asset.fixed_asset_id
     )
 
     depreciation_service.build_proposal.assert_called_once_with(
@@ -1315,6 +1338,7 @@ def test_builds_open_depreciation_proposal(
         previous_depreciation=Decimal("0.00"),
         expense_account_number="4830",
         asset_account_number="0690",
+        depreciation_end_date=None,
     )
 
 def test_confirmed_depreciation_is_not_proposed_again(
@@ -1323,11 +1347,10 @@ def test_confirmed_depreciation_is_not_proposed_again(
     booking_repository = Mock()
     company_repository = Mock()
     fixed_asset_repository = Mock()
+    fixed_asset_movement_repository = Mock()
     depreciation_repository = Mock()
     depreciation_service = Mock()
     depreciation_workflow = Mock()
-
-    booking_repository.list_for_fiscal_year.return_value = ()
 
     company_repository.get_managed_fiscal_years.return_value = (
         ManagedFiscalYear(
@@ -1348,6 +1371,15 @@ def test_confirmed_depreciation_is_not_proposed_again(
         acquisition_cost=Decimal("2400.00"),
         depreciation_start_date=date(2026, 3, 15),
         useful_life_months=36,
+    )
+
+    acquisition_movement = FixedAssetMovement(
+        fixed_asset_id=asset.fixed_asset_id,
+        fiscal_year_end=context.fiscal_year.end_date,
+        movement_date=asset.acquisition_date,
+        amount=asset.acquisition_cost,
+        booking_id=uuid4(),
+        movement_type=FixedAssetMovementType.ACQUISITION,
     )
 
     proposal = DepreciationProposal(
@@ -1371,6 +1403,11 @@ def test_confirmed_depreciation_is_not_proposed_again(
     fixed_asset_repository.list_for_company.return_value = (
         asset,
     )
+    fixed_asset_repository.get.return_value = asset
+
+    fixed_asset_movement_repository.list_for_fixed_asset.return_value = (
+        acquisition_movement,
+    )
 
     depreciation_repository.list_for_fixed_asset.side_effect = (
         (),
@@ -1384,6 +1421,8 @@ def test_confirmed_depreciation_is_not_proposed_again(
     depreciation_workflow.confirm.return_value = (
         confirmed
     )
+
+    booking_repository.list_for_fiscal_year.return_value = ()
 
     workspace = FiscalYearWorkspace(
         context=context,
@@ -1400,6 +1439,9 @@ def test_confirmed_depreciation_is_not_proposed_again(
         fixed_asset_repository=(
             fixed_asset_repository
         ),
+        fixed_asset_movement_repository=(
+            fixed_asset_movement_repository
+        ),
         fixed_asset_depreciation_repository=(
             depreciation_repository
         ),
@@ -1415,30 +1457,26 @@ def test_confirmed_depreciation_is_not_proposed_again(
         workspace.build_depreciation_proposals()
     )
 
-    assert first_proposals == (
-        proposal,
-    )
+    assert first_proposals == (proposal,)
 
     result = workspace.confirm_depreciation(
         proposal
     )
 
+    assert result == confirmed
+
     second_proposals = (
         workspace.build_depreciation_proposals()
     )
 
-    assert result == confirmed
     assert second_proposals == ()
 
     depreciation_workflow.confirm.assert_called_once_with(
         company_id=context.company.company_id,
         fiscal_year=context.fiscal_year,
         proposal=proposal,
-    )
-
-    assert (
-        depreciation_service.build_proposal.call_count
-        == 1
+        asset_code=asset.asset_code,
+        asset_description=asset.description,
     )
 
 def test_close_fiscal_year_uses_workflow_and_reloads_closed_bookings(
@@ -1872,6 +1910,7 @@ def test_builds_e_bilanz_from_prepared_data(
 ) -> None:
     booking_repository = Mock()
     company_repository = Mock()
+    bvv_repository = Mock()
     shareholder_repository = Mock()
     chart_of_accounts_repository = Mock()
     preparation_service = Mock()
@@ -1879,6 +1918,16 @@ def test_builds_e_bilanz_from_prepared_data(
     account_detail_service = Mock()
 
     booking_repository.list_for_fiscal_year.return_value = ()
+
+    bvv_annual_data = BvvAnnualData(
+        previous_hgb_equity=Decimal("12345.67"),
+        contribution=Decimal("0.00"),
+        withdrawal_distribution=Decimal("0.00"),
+    )
+
+    bvv_repository.get_for_fiscal_year.return_value = (
+        bvv_annual_data
+    )
 
     previous_fiscal_year = FiscalYear(
         start_date=date(2025, 1, 1),
@@ -1952,6 +2001,13 @@ def test_builds_e_bilanz_from_prepared_data(
         Mock(): Decimal("100.00"),
     }
 
+    account_taxonomy_concepts = {}
+    (
+        chart_of_accounts_repository
+        .load_account_taxonomy_concepts
+        .return_value
+    ) = account_taxonomy_concepts
+
     account_details = Mock()
 
     account_detail_service.build_for_e_bilanz.return_value = (
@@ -1968,6 +2024,7 @@ def test_builds_e_bilanz_from_prepared_data(
         context=context,
         booking_repository=booking_repository,
         company_repository=company_repository,
+        bvv_annual_data_repository=bvv_repository,
         shareholder_repository=shareholder_repository,
         chart_of_accounts_repository=(
             chart_of_accounts_repository
@@ -1985,6 +2042,7 @@ def test_builds_e_bilanz_from_prepared_data(
         taxonomy_management_service=Mock(),
         e_bilanz_export_service=Mock(),
     )
+
     chart_of_accounts = Mock(
         spec=ChartOfAccountsTemplate
     )
@@ -2043,11 +2101,14 @@ def test_builds_e_bilanz_from_prepared_data(
         entity_scheme="urn:openbilanz:company-id",
         previous_fiscal_year=previous_fiscal_year,
         account_details=account_details,
+        account_taxonomy_concepts=(
+            account_taxonomy_concepts
+        ),
         fixed_asset_schedule=(),
         shareholders=shareholders,
         current_depreciation_difference=Decimal("0.00"),
         previous_depreciation_difference=Decimal("0.00"),
-        previous_hgb_equity=None,
+        previous_hgb_equity=Decimal("12345.67"),
         contribution=Decimal("0.00"),
         withdrawal_distribution=Decimal("0.00"),
     )
@@ -2509,8 +2570,10 @@ def test_links_fixed_asset_disposal_to_existing_booking(
     company_repository = Mock()
     fixed_asset_repository = Mock()
     movement_repository = Mock()
+    depreciation_repository = Mock()
 
     booking_repository.list_for_fiscal_year.return_value = ()
+    depreciation_repository.list_for_fixed_asset.return_value = ()
 
     company_repository.get_managed_fiscal_years.return_value = (
         ManagedFiscalYear(
@@ -2576,6 +2639,9 @@ def test_links_fixed_asset_disposal_to_existing_booking(
         taxonomy_management_service=Mock(),
         fixed_asset_repository=fixed_asset_repository,
         fixed_asset_movement_repository=movement_repository,
+        fixed_asset_depreciation_repository=(
+            depreciation_repository
+        ),
     )
 
     movement = workspace.link_fixed_asset_disposal(

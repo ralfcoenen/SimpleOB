@@ -1,5 +1,6 @@
 """Berechnung linearer Anlagenabschreibungen."""
 
+from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 
 from openbilanz.domain.depreciation_proposal import (
@@ -24,6 +25,7 @@ class DepreciationService:
         previous_depreciation: Decimal,
         expense_account_number: str,
         asset_account_number: str,
+        depreciation_end_date: date | None = None,
     ) -> DepreciationProposal | None:
         """Ermittelt die lineare Abschreibung eines Geschäftsjahres."""
 
@@ -41,6 +43,17 @@ class DepreciationService:
         ):
             raise TypeError(
                 "fiscal_year must be a FiscalYear"
+            )
+
+        if (
+            depreciation_end_date is not None
+            and not isinstance(
+                depreciation_end_date,
+                date,
+            )
+        ):
+            raise TypeError(
+                "depreciation_end_date must be a date or None"
             )
 
         previous_depreciation = to_decimal(
@@ -64,6 +77,14 @@ class DepreciationService:
         if fixed_asset.acquisition_date > fiscal_year.end_date:
             return None
 
+        effective_end_date = fiscal_year.end_date
+
+        if depreciation_end_date is not None:
+            effective_end_date = min(
+                depreciation_end_date,
+                fiscal_year.end_date,
+            )
+
         annual_depreciation = (
             fixed_asset.acquisition_cost
             * Decimal("12")
@@ -73,6 +94,7 @@ class DepreciationService:
         months = self._depreciation_months(
             fixed_asset=fixed_asset,
             fiscal_year=fiscal_year,
+            depreciation_end_date=effective_end_date,
         )
 
         if months <= 0:
@@ -102,7 +124,7 @@ class DepreciationService:
 
         return DepreciationProposal(
             fixed_asset_id=fixed_asset.fixed_asset_id,
-            depreciation_date=fiscal_year.end_date,
+            depreciation_date=effective_end_date,
             amount=amount,
             expense_account_number=expense_account_number,
             asset_account_number=asset_account_number,
@@ -113,6 +135,7 @@ class DepreciationService:
         *,
         fixed_asset: FixedAsset,
         fiscal_year: FiscalYear,
+        depreciation_end_date: date,
     ) -> int:
         """Ermittelt die AfA-Monate innerhalb des Geschäftsjahres."""
 
@@ -121,17 +144,21 @@ class DepreciationService:
             fiscal_year.start_date,
         )
 
-        if start_date > fiscal_year.end_date:
+        end_date = min(
+            depreciation_end_date,
+            fiscal_year.end_date,
+        )
+
+        if start_date > end_date:
             return 0
 
         return (
             (
-                fiscal_year.end_date.year
+                end_date.year
                 - start_date.year
             )
             * 12
-            + fiscal_year.end_date.month
+            + end_date.month
             - start_date.month
             + 1
         )
-    

@@ -384,6 +384,9 @@ def main() -> None:
             opening_balance_account_number=(
                 control_accounts.opening_balance_account
             ),
+            depreciation_expense_account_number=(
+                control_accounts.depreciation_expense_account
+            ),
             closing_accounts=closing_accounts,
             vat_accounts=vat_accounts,
         )
@@ -394,7 +397,6 @@ def main() -> None:
                 (
                     context.company.name,
                     context.fiscal_year.display_name,
-                    f"{len(workspace.journal)} Buchungen",
                 )
             )
         )
