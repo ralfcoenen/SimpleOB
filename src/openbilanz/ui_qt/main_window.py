@@ -68,6 +68,7 @@ from openbilanz.ui_qt.company_master_data_dialog import (
 from openbilanz.ui_qt.e_bilanz_account_mapping_dialog import (
     EBilanzAccountMappingDialog,
 )
+from openbilanz.ui_qt.e_bilanz_frame import EBilanzFrame
 from openbilanz.ui_qt.opening_balance_dialog import OpeningBalanceDialog
 from openbilanz.ui_qt.shareholder_dialog import (
     ShareholdersDialog,
@@ -151,6 +152,10 @@ class MainWindow(QMainWindow):
         self._current_closing_result: ClosingResult | None = None
         self._current_balance_sheet: BalanceSheet | None = None
         self._current_closing_balances = ()
+
+        self._current_e_bilanz_preparation = None
+        self._current_e_bilanz_document = None
+        self._current_e_bilanz_arelle_valid = False
 
         self._return_to_start_requested = False
 
@@ -299,17 +304,569 @@ class MainWindow(QMainWindow):
         self._create_income_statement_tab()
         self._create_reports_tab()
         self._create_closing_tab()
+        self._create_e_bilanz_tab()
 
         self.setCentralWidget(central_widget)
 
         self._refresh_balance_sheet()
         self._refresh_closing()
+        self._refresh_taxonomy_status()
+        self._refresh_bvv_annual_data()
+        self._refresh_e_bilanz()
 
     @property
     def return_to_start_requested(self) -> bool:
         """Zeigt an, ob zur Buchhaltungsauswahl zurückgekehrt werden soll."""
 
         return self._return_to_start_requested
+
+    def _create_e_bilanz_tab(self) -> None:
+        """Erzeugt den Arbeitsbereich E-Bilanz."""
+
+        layout = QVBoxLayout(self._e_bilanz_tab)
+
+        self._e_bilanz_frame = EBilanzFrame(
+            on_install_taxonomy=self._install_required_taxonomy,
+            on_save_bvv=self._save_bvv_annual_data,
+            on_prepare=self._prepare_e_bilanz,
+            on_build=self._build_e_bilanz,
+            on_validate=self._validate_e_bilanz,
+            on_export_xbrl=self._export_e_bilanz,
+            on_export_pdf=self._export_e_bilanz_pdf,
+            parent=self._e_bilanz_tab,
+        )
+
+        layout.addWidget(self._e_bilanz_frame)
+
+    def _save_bvv_annual_data(self) -> None:
+        """Speichert die BVV-Jahresdaten des aktuellen Geschäftsjahres."""
+
+        def parse_decimal(
+            value: str,
+            *,
+            allow_empty: bool = False,
+        ) -> Decimal | None:
+            normalized = (
+                value.strip()
+                .replace(".", "")
+                .replace(",", ".")
+            )
+
+            if not normalized:
+                if allow_empty:
+                    return None
+                return Decimal("0.00")
+
+            return Decimal(normalized)
+
+        try:
+            previous_hgb_equity = parse_decimal(
+                self._e_bilanz_frame.previous_hgb_equity_override,
+                allow_empty=True,
+            )
+
+            contribution = parse_decimal(
+                self._e_bilanz_frame.contribution,
+            )
+
+            withdrawal_distribution = parse_decimal(
+                self._e_bilanz_frame.withdrawal_distribution,
+            )
+
+            assert contribution is not None
+            assert withdrawal_distribution is not None
+
+            from openbilanz.domain.bvv_annual_data import BvvAnnualData
+
+            data = BvvAnnualData(
+                previous_hgb_equity=previous_hgb_equity,
+                contribution=contribution,
+                withdrawal_distribution=withdrawal_distribution,
+            )
+
+            self._workspace.save_bvv_annual_data(data)
+            self._refresh_bvv_annual_data()
+
+        except (
+            ValueError,
+            ArithmeticError,
+        ) as exc:
+            QMessageBox.critical(
+                self,
+                "BVV-Daten",
+                (
+                    "Die BVV-Jahresdaten konnten nicht "
+                    "gespeichert werden.\n\n"
+                    f"{exc}"
+                ),
+            )
+            return
+
+        QMessageBox.information(
+            self,
+            "BVV-Daten",
+            "Die BVV-Jahresdaten wurden gespeichert.",
+        )
+
+    def _refresh_taxonomy_status(self) -> None:
+        """Aktualisiert den Taxonomiestatus des Geschäftsjahres."""
+
+        status = self._workspace.taxonomy_status
+
+        if status.complete:
+            status_text = "installiert und vollständig"
+        elif status.installed:
+            status_text = "installiert, aber unvollständig"
+        else:
+            status_text = "nicht installiert"
+
+        self._e_bilanz_frame.set_taxonomy_status(
+            text=(
+                "Benötigte Taxonomie: "
+                f"{status.required_version.value}\n"
+                f"Status: {status_text}"
+            ),
+            install_enabled=not status.usable,
+        )
+
+    def _install_required_taxonomy(self) -> None:
+        """Installiert die benötigte Taxonomie."""
+
+        try:
+            self._workspace.install_required_taxonomy()
+        except Exception as exc:
+            QMessageBox.critical(
+                self,
+                "Taxonomie konnte nicht installiert werden",
+                str(exc),
+            )
+            return
+
+        self._refresh_taxonomy_status()
+        self._refresh_e_bilanz()
+
+        QMessageBox.information(
+            self,
+            "Taxonomie",
+            "Die benötigte Taxonomie wurde erfolgreich installiert.",
+        )
+
+    def _refresh_bvv_annual_data(self) -> None:
+        """Aktualisiert die BVV-Jahresdaten des Geschäftsjahres."""
+
+        data = self._workspace.load_bvv_annual_data()
+
+        effective_previous_hgb_equity = (
+            self._workspace.effective_previous_hgb_equity(
+                chart_of_accounts=self._chart_of_accounts,
+            )
+        )
+
+        if effective_previous_hgb_equity is None:
+            effective_text = "nicht ermittelbar"
+        else:
+            effective_text = (
+                str(effective_previous_hgb_equity)
+                .replace(".", ",")
+                + " €"
+            )
+
+        if data is None:
+            source_text = (
+                "automatisch ermittelt"
+                if effective_previous_hgb_equity is not None
+                else "keine Angabe vorhanden"
+            )
+            override_text = ""
+            contribution_text = "0,00"
+            withdrawal_text = "0,00"
+        else:
+            if data.previous_hgb_equity is None:
+                source_text = (
+                    "automatisch ermittelt"
+                    if effective_previous_hgb_equity is not None
+                    else "keine Angabe vorhanden"
+                )
+                override_text = ""
+            else:
+                source_text = "manuell gespeichert"
+                override_text = str(
+                    data.previous_hgb_equity
+                ).replace(".", ",")
+
+            contribution_text = str(
+                data.contribution
+            ).replace(".", ",")
+
+            withdrawal_text = str(
+                data.withdrawal_distribution
+            ).replace(".", ",")
+
+        self._e_bilanz_frame.set_bvv_values(
+            effective_previous_hgb_equity=effective_text,
+            previous_hgb_equity_source=source_text,
+            previous_hgb_equity_override=override_text,
+            contribution=contribution_text,
+            withdrawal_distribution=withdrawal_text,
+        )
+
+    def _refresh_e_bilanz(self) -> None:
+        """Aktualisiert den Zustand des E-Bilanz-Arbeitsbereichs."""
+
+        if not self._workspace.is_closed:
+            self._e_bilanz_frame.set_workflow_state(
+                status_text=(
+                    "Die E-Bilanz kann erst nach dem "
+                    "Jahresabschluss vorbereitet werden."
+                ),
+                prepare_enabled=False,
+                build_enabled=False,
+                validate_enabled=False,
+                export_enabled=False,
+            )
+            return
+
+        if self._current_e_bilanz_preparation is None:
+            self._e_bilanz_frame.set_workflow_state(
+                status_text=(
+                    "Das Geschäftsjahr ist abgeschlossen. "
+                    "Die E-Bilanz kann vorbereitet werden."
+                ),
+                prepare_enabled=True,
+                build_enabled=False,
+                validate_enabled=False,
+                export_enabled=False,
+            )
+            return
+
+        preparation = self._current_e_bilanz_preparation
+        taxonomy_status = self._workspace.taxonomy_status
+
+        build_enabled = taxonomy_status.usable
+        validate_enabled = (
+            self._current_e_bilanz_document is not None
+        )
+        export_enabled = (
+            validate_enabled
+            and self._current_e_bilanz_arelle_valid
+        )
+
+        status_text = (
+            "Die E-Bilanz wurde vorbereitet.\n"
+            f"Bilanzpositionen: "
+            f"{len(preparation.balance_sheet_amounts)}\n"
+            f"GuV-Positionen: "
+            f"{len(preparation.income_statement_amounts)}"
+        )
+
+        if not taxonomy_status.usable:
+            status_text += (
+                "\n\nDie benötigte Taxonomie ist nicht "
+                "vollständig installiert."
+            )
+
+        self._e_bilanz_frame.set_workflow_state(
+            status_text=status_text,
+            prepare_enabled=True,
+            build_enabled=build_enabled,
+            validate_enabled=validate_enabled,
+            export_enabled=export_enabled,
+        )
+
+    def _prepare_e_bilanz(self) -> None:
+        """Bereitet die Abschlusswerte für die E-Bilanz auf."""
+
+        if not self._workspace.is_closed:
+            QMessageBox.warning(
+                self,
+                "E-Bilanz",
+                "Das Geschäftsjahr ist noch nicht abgeschlossen.",
+            )
+            return
+
+        if self._current_income_statement is None:
+            QMessageBox.warning(
+                self,
+                "E-Bilanz",
+                (
+                    "Es steht keine GuV für die "
+                    "E-Bilanz-Vorbereitung zur Verfügung."
+                ),
+            )
+            return
+
+        try:
+            preparation = self._workspace.prepare_e_bilanz(
+                income_statement=self._current_income_statement,
+            )
+        except ValueError as exc:
+            QMessageBox.critical(
+                self,
+                "E-Bilanz konnte nicht vorbereitet werden",
+                str(exc),
+            )
+            return
+
+        self._current_e_bilanz_preparation = preparation
+        self._current_e_bilanz_document = None
+        self._current_e_bilanz_arelle_valid = False
+
+        self._refresh_e_bilanz()
+
+    def _build_e_bilanz(self) -> None:
+        """Erzeugt die E-Bilanz aus den vorbereiteten Abschlusswerten."""
+
+        if self._current_e_bilanz_preparation is None:
+            QMessageBox.warning(
+                self,
+                "E-Bilanz",
+                "Die E-Bilanz wurde noch nicht vorbereitet.",
+            )
+            return
+
+        try:
+            document = self._workspace.build_e_bilanz(
+                preparation=self._current_e_bilanz_preparation,
+                chart_of_accounts=self._chart_of_accounts,
+            )
+        except (
+            ValueError,
+            FileNotFoundError,
+            RuntimeError,
+        ) as exc:
+            QMessageBox.critical(
+                self,
+                "E-Bilanz konnte nicht erzeugt werden",
+                str(exc),
+            )
+            return
+
+        self._current_e_bilanz_document = document
+        self._current_e_bilanz_arelle_valid = False
+
+        self._refresh_e_bilanz()
+
+        QMessageBox.information(
+            self,
+            "E-Bilanz",
+            "Die E-Bilanz wurde erfolgreich erzeugt.",
+        )
+
+    def _validate_e_bilanz(self) -> None:
+        """Validiert die erzeugte E-Bilanz mit Arelle."""
+
+        if self._current_e_bilanz_document is None:
+            QMessageBox.warning(
+                self,
+                "E-Bilanz",
+                "Die E-Bilanz wurde noch nicht erzeugt.",
+            )
+            return
+
+        try:
+            result = self._workspace.validate_e_bilanz(
+                self._current_e_bilanz_document
+            )
+        except (
+            ValueError,
+            RuntimeError,
+        ) as exc:
+            QMessageBox.critical(
+                self,
+                "E-Bilanz konnte nicht validiert werden",
+                str(exc),
+            )
+            return
+
+        if result.is_valid:
+            self._current_e_bilanz_arelle_valid = True
+            self._refresh_e_bilanz()
+
+            QMessageBox.information(
+                self,
+                "E-Bilanz",
+                (
+                    "Die E-Bilanz wurde von Arelle "
+                    "erfolgreich validiert."
+                ),
+            )
+            return
+
+        self._current_e_bilanz_arelle_valid = False
+        self._refresh_e_bilanz()
+
+        errors = "\n".join(result.errors)
+
+        QMessageBox.critical(
+            self,
+            "E-Bilanz-Validierung fehlgeschlagen",
+            (
+                "Arelle hat Fehler in der E-Bilanz "
+                f"festgestellt.\n\n{errors}"
+            ),
+        )
+
+    def _export_e_bilanz(self) -> None:
+        """Exportiert die erfolgreich validierte E-Bilanz."""
+
+        if self._current_e_bilanz_document is None:
+            QMessageBox.warning(
+                self,
+                "E-Bilanz",
+                "Die E-Bilanz wurde noch nicht erzeugt.",
+            )
+            return
+
+        filename, _ = QFileDialog.getSaveFileName(
+            self,
+            "E-Bilanz exportieren",
+            "",
+            "XBRL-Dateien (*.xbrl);;Alle Dateien (*)",
+        )
+
+        if not filename:
+            return
+
+        target = Path(filename)
+
+        if target.suffix.lower() != ".xbrl":
+            target = target.with_suffix(".xbrl")
+
+        try:
+            exported_path = self._workspace.export_e_bilanz(
+                document=self._current_e_bilanz_document,
+                target=target,
+            )
+        except (
+            ValueError,
+            OSError,
+        ) as exc:
+            QMessageBox.critical(
+                self,
+                "E-Bilanz konnte nicht exportiert werden",
+                str(exc),
+            )
+            return
+
+        QMessageBox.information(
+            self,
+            "E-Bilanz",
+            (
+                "Die E-Bilanz wurde erfolgreich exportiert.\n\n"
+                f"{exported_path}"
+            ),
+        )
+
+    def _export_e_bilanz_pdf(self) -> None:
+        """Exportiert die E-Bilanz-Abschlusswerte als PDF."""
+
+        if self._current_e_bilanz_preparation is None:
+            QMessageBox.warning(
+                self,
+                "E-Bilanz PDF",
+                "Die E-Bilanz wurde noch nicht vorbereitet.",
+            )
+            return
+
+        if (
+            self._current_e_bilanz_document is None
+            or not self._current_e_bilanz_arelle_valid
+        ):
+            QMessageBox.warning(
+                self,
+                "E-Bilanz PDF",
+                (
+                    "Die E-Bilanz muss zuerst erzeugt und "
+                    "erfolgreich mit Arelle validiert werden."
+                ),
+            )
+            return
+
+        context = self._workspace.context
+        fiscal_year = context.fiscal_year
+
+        fixed_asset_schedule = (
+            self._workspace.build_fixed_asset_schedule()
+        )
+
+        fixed_asset_position_names: dict[str, str] = {}
+
+        if fixed_asset_schedule:
+
+            def collect_position_names(position) -> None:
+                fixed_asset_position_names[
+                    position.code
+                ] = position.name
+
+                for child in position.children:
+                    collect_position_names(child)
+
+            collect_position_names(self._assets)
+
+        safe_company_name = "".join(
+            character
+            if character.isalnum() or character in "-_"
+            else "_"
+            for character in context.company.name
+        ).strip("_")
+
+        default_filename = (
+            "SimpleOB_E-Bilanz_"
+            f"{safe_company_name}_"
+            f"{fiscal_year.end_date.year}.pdf"
+        )
+
+        filename, _ = QFileDialog.getSaveFileName(
+            self,
+            "E-Bilanz als PDF exportieren",
+            default_filename,
+            "PDF-Dateien (*.pdf);;Alle Dateien (*)",
+        )
+
+        if not filename:
+            return
+
+        target = Path(filename)
+
+        if target.suffix.lower() != ".pdf":
+            target = target.with_suffix(".pdf")
+
+        try:
+            exported_path = (
+                self._pdf_reporting_service.export_e_bilanz(
+                    preparation=self._current_e_bilanz_preparation,
+                    company_name=context.company.name,
+                    fiscal_year_name=(
+                        f"{fiscal_year.start_date:%d.%m.%Y} – "
+                        f"{fiscal_year.end_date:%d.%m.%Y}"
+                    ),
+                    target=target,
+                    fixed_asset_schedule=fixed_asset_schedule,
+                    fixed_asset_position_names=(
+                        fixed_asset_position_names
+                    ),
+                )
+            )
+        except (
+            ValueError,
+            OSError,
+        ) as exc:
+            QMessageBox.critical(
+                self,
+                "E-Bilanz PDF konnte nicht exportiert werden",
+                str(exc),
+            )
+            return
+
+        QMessageBox.information(
+            self,
+            "E-Bilanz PDF",
+            (
+                "Die E-Bilanz wurde erfolgreich als PDF "
+                "exportiert.\n\n"
+                f"{exported_path}"
+            ),
+        )
 
     def _create_closing_tab(self) -> None:
         """Erzeugt den Arbeitsbereich Jahresabschluss."""
