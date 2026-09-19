@@ -649,14 +649,29 @@ class MainWindow(QMainWindow):
         self._add_fixed_asset_button = QPushButton(
             "Anlagegut hinzufügen"
         )
+
         self._add_fixed_asset_button.clicked.connect(
             self._open_new_fixed_asset
         )
+
         self._add_fixed_asset_button.setEnabled(
             self._workspace.is_open
         )
+
         header_layout.addWidget(
             self._add_fixed_asset_button
+        )
+
+        self._export_fixed_asset_schedule_pdf_button = QPushButton(
+            "Anlagenspiegel PDF exportieren"
+        )
+
+        self._export_fixed_asset_schedule_pdf_button.clicked.connect(
+            self._export_fixed_asset_schedule_pdf
+        )
+
+        header_layout.addWidget(
+            self._export_fixed_asset_schedule_pdf_button
         )
 
         self._fixed_asset_actions_menu = QMenu(
@@ -758,6 +773,94 @@ class MainWindow(QMainWindow):
         )
 
         self._refresh_fixed_assets()
+
+    def _export_fixed_asset_schedule_pdf(self) -> None:
+        """Exportiert den Anlagenspiegel als PDF."""
+
+        positions = self._workspace.build_fixed_asset_schedule()
+
+        if not positions:
+            QMessageBox.information(
+                self,
+                "Anlagenspiegel PDF",
+                (
+                    "Für das ausgewählte Geschäftsjahr "
+                    "ist kein Anlagenspiegel vorhanden."
+                ),
+            )
+            return
+
+        position_names: dict[str, str] = {}
+
+        def collect_position_names(position) -> None:
+            position_names[position.code] = position.name
+
+            for child in position.children:
+                collect_position_names(child)
+
+        collect_position_names(self._assets)
+
+        context = self._workspace.context
+        fiscal_year = context.fiscal_year
+
+        safe_company_name = "".join(
+            character
+            if character.isalnum() or character in "-_"
+            else "_"
+            for character in context.company.name
+        ).strip("_")
+
+        default_filename = (
+            "SimpleOB_Anlagenspiegel_"
+            f"{safe_company_name}_"
+            f"{fiscal_year.end_date.year}.pdf"
+        )
+
+        filename, _ = QFileDialog.getSaveFileName(
+            self,
+            "Anlagenspiegel als PDF exportieren",
+            default_filename,
+            "PDF-Dateien (*.pdf);;Alle Dateien (*)",
+        )
+
+        if not filename:
+            return
+
+        target = Path(filename)
+
+        if target.suffix.lower() != ".pdf":
+            target = target.with_suffix(".pdf")
+
+        try:
+            exported_path = (
+                self._pdf_reporting_service.export_fixed_asset_schedule(
+                    positions=positions,
+                    position_names=position_names,
+                    company_name=context.company.name,
+                    fiscal_year_name=(
+                        f"{fiscal_year.start_date:%d.%m.%Y} – "
+                        f"{fiscal_year.end_date:%d.%m.%Y}"
+                    ),
+                    target=target,
+                )
+            )
+        except (ValueError, OSError) as exc:
+            QMessageBox.critical(
+                self,
+                "Anlagenspiegel PDF konnte nicht exportiert werden",
+                str(exc),
+            )
+            return
+
+        QMessageBox.information(
+            self,
+            "Anlagenspiegel PDF",
+            (
+                "Der Anlagenspiegel wurde erfolgreich als PDF "
+                "exportiert.\n\n"
+                f"{exported_path}"
+            ),
+        )
 
     def _refresh_fixed_assets(self) -> None:
         """Aktualisiert die Liste der Anlagegüter."""
