@@ -112,6 +112,7 @@ class FakeSendAdapter:
         return EricSendResult(
             response_xml="<Erfolg/>",
             server_response_xml="<Code>0</Code>",
+            transfer_ticket="TEST-TRANSFER-TICKET",
         )
 
 

@@ -141,6 +141,10 @@ def test_e_bilanz_69_validates_supported_legal_forms(
         "HGB.266.AKTIVA.B.IV"
     ]
 
+    equity_position = positions[
+        "HGB.266.PASSIVA.A"
+    ]
+
     capital_position = positions[
         "HGB.266.PASSIVA.A.I"
     ]
@@ -149,7 +153,10 @@ def test_e_bilanz_69_validates_supported_legal_forms(
         FinancialStatementPosition,
         Decimal,
     ] = {
+        assets: Decimal("10000.00"),
         cash_position: Decimal("10000.00"),
+        liabilities: Decimal("10000.00"),
+        equity_position: Decimal("10000.00"),
         capital_position: Decimal("10000.00"),
     }
 
@@ -219,6 +226,7 @@ def test_e_bilanz_69_validates_supported_legal_forms(
             entity_identifier="DE123456789",
             entity_scheme=TEST_ENTITY_SCHEME,
             account_details=account_details,
+            previous_hgb_equity=Decimal("10000.00"),
         )
 
         result = service.validate(
