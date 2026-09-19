@@ -1,6 +1,6 @@
 """PySide6-Hauptfenster von SimpleOB."""
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 from pathlib import Path
@@ -42,6 +42,9 @@ from openbilanz.domain.chart_of_accounts_template import (
     ChartOfAccountsTemplate,
 )
 from openbilanz.domain.vat_accounts import VatAccounts
+from openbilanz.eric.elster_bilanz_transmission_service import (
+    ElsterBilanzTransmissionService,
+)
 from openbilanz.services.closing_accounts import ClosingAccounts
 from openbilanz.services.closing_service import (
     ClosingResult,
@@ -119,6 +122,9 @@ class MainWindow(QMainWindow):
         account_mapper,
         vat_accounts: VatAccounts,
         pdf_reporting_service: PdfReportingService,
+        elster_bilanz_transmission_service: (
+            ElsterBilanzTransmissionService | None
+        ) = None,
     ) -> None:
         super().__init__()
 
@@ -147,7 +153,9 @@ class MainWindow(QMainWindow):
         self._closing_service = closing_service
         self._vat_accounts = vat_accounts
         self._pdf_reporting_service = pdf_reporting_service
-
+        self._elster_bilanz_transmission_service = (
+            elster_bilanz_transmission_service
+        )
         self._current_income_statement: IncomeStatement | None = None
         self._current_closing_result: ClosingResult | None = None
         self._current_balance_sheet: BalanceSheet | None = None
@@ -333,6 +341,8 @@ class MainWindow(QMainWindow):
             on_validate=self._validate_e_bilanz,
             on_export_xbrl=self._export_e_bilanz,
             on_export_pdf=self._export_e_bilanz_pdf,
+            on_send_test=self._send_e_bilanz_test,
+            on_send_production=self._send_e_bilanz_production,
             parent=self._e_bilanz_tab,
         )
 
@@ -516,6 +526,7 @@ class MainWindow(QMainWindow):
         if not self._workspace.is_closed:
             self._e_bilanz_frame.set_workflow_state(
                 status_text=(
+                    "Das Geschäftsjahr ist noch nicht abgeschlossen. "
                     "Die E-Bilanz kann erst nach dem "
                     "Jahresabschluss vorbereitet werden."
                 ),
@@ -571,6 +582,11 @@ class MainWindow(QMainWindow):
             build_enabled=build_enabled,
             validate_enabled=validate_enabled,
             export_enabled=export_enabled,
+            transmission_enabled=(
+                export_enabled
+                and self._elster_bilanz_transmission_service
+                is not None
+            ),
         )
 
     def _prepare_e_bilanz(self) -> None:
@@ -703,6 +719,321 @@ class MainWindow(QMainWindow):
             (
                 "Arelle hat Fehler in der E-Bilanz "
                 f"festgestellt.\n\n{errors}"
+            ),
+        )
+
+    def _send_e_bilanz_test(self) -> None:
+        """Übermittelt die E-Bilanz als echte ELSTER-Testsendung."""
+
+        if self._elster_bilanz_transmission_service is None:
+            QMessageBox.critical(
+                self,
+                "ELSTER-Testübermittlung",
+                "Die ERiC-/ELSTER-Konfiguration ist nicht vollständig.",
+            )
+            return
+
+        if self._current_e_bilanz_document is None:
+            QMessageBox.warning(
+                self,
+                "ELSTER-Testübermittlung",
+                "Die E-Bilanz wurde noch nicht erzeugt.",
+            )
+            return
+
+        if not self._current_e_bilanz_arelle_valid:
+            QMessageBox.warning(
+                self,
+                "ELSTER-Testübermittlung",
+                (
+                    "Die E-Bilanz muss zuerst erfolgreich "
+                    "mit Arelle validiert werden."
+                ),
+            )
+            return
+
+        confirmation, accepted = QInputDialog.getText(
+            self,
+            "ELSTER-Testübermittlung",
+            (
+                "ACHTUNG: Diese Funktion stellt eine echte "
+                "Verbindung zum ELSTER-Server her.\n\n"
+                "Der Datensatz wird ausschließlich als "
+                "Testsendung mit dem ELSTER-Testmerker "
+                "700000004 übertragen.\n\n"
+                "Zum Start bitte exakt TESTSENDUNG eingeben:"
+            ),
+        )
+
+        if not accepted or confirmation != "TESTSENDUNG":
+            return
+
+        try:
+            master_data = self._workspace.load_company_master_data()
+
+            validated = (
+                self._elster_bilanz_transmission_service
+                .validate_test_transmission(
+                    xbrl_xml=self._current_e_bilanz_document.xml,
+                    master_data=master_data,
+                    balance_sheet_date=(
+                        self._context.fiscal_year.end_date
+                    ),
+                )
+            )
+
+            send_result = (
+                self._elster_bilanz_transmission_service
+                .send_test_transmission(
+                    validated=validated,
+                )
+            )
+            transmitted_at = datetime.now()
+
+        except (
+            ValueError,
+            FileNotFoundError,
+            RuntimeError,
+        ) as exc:
+            QMessageBox.critical(
+                self,
+                "ELSTER-Testübermittlung fehlgeschlagen",
+                str(exc),
+            )
+            return
+
+        answer = QMessageBox.question(
+            self,
+            "ELSTER-Testübermittlung",
+            (
+                "Die ELSTER-Testübermittlung wurde "
+                "ohne Fehler abgeschlossen.\n\n"
+                "Testmerker: 700000004\n\n"
+                "TransferTicket:\n"
+                f"{send_result.transfer_ticket}\n\n"
+                "Es wurde keine produktive "
+                "Steuerübermittlung durchgeführt.\n\n"
+                "Soll ein Übertragungsnachweis "
+                "gespeichert werden?"
+            ),
+            (
+                QMessageBox.StandardButton.Yes
+                | QMessageBox.StandardButton.No
+            ),
+            QMessageBox.StandardButton.Yes,
+        )
+
+        if answer == QMessageBox.StandardButton.Yes:
+            self._save_elster_transmission_receipt(
+                transfer_ticket=send_result.transfer_ticket,
+                transmission_mode="TEST",
+                test_marker="700000004",
+                transmitted_at=transmitted_at,
+            )
+
+    def _send_e_bilanz_production(self) -> None:
+        """Übermittelt die E-Bilanz produktiv an ELSTER."""
+
+        if self._elster_bilanz_transmission_service is None:
+            QMessageBox.critical(
+                self,
+                "ELSTER-Produktivübermittlung",
+                "Die ERiC-/ELSTER-Konfiguration ist nicht vollständig.",
+            )
+            return
+
+        if self._current_e_bilanz_document is None:
+            QMessageBox.warning(
+                self,
+                "ELSTER-Produktivübermittlung",
+                "Die E-Bilanz wurde noch nicht erzeugt.",
+            )
+            return
+
+        if not self._current_e_bilanz_arelle_valid:
+            QMessageBox.warning(
+                self,
+                "ELSTER-Produktivübermittlung",
+                (
+                    "Die E-Bilanz muss zuerst erfolgreich "
+                    "mit Arelle validiert werden."
+                ),
+            )
+            return
+
+        confirmation, accepted = QInputDialog.getText(
+            self,
+            "ELSTER-Produktivübermittlung",
+            (
+                "ACHTUNG: Dies ist eine PRODUKTIVE "
+                "ELSTER-Übermittlung.\n\n"
+                "Der Datensatz wird ohne Testmerker an ELSTER "
+                "übertragen und ist keine Testsendung.\n\n"
+                "Bitte prüfen Sie vor dem Versand nochmals "
+                "Mandant, Geschäftsjahr und E-Bilanz.\n\n"
+                "Zum endgültigen Start bitte exakt "
+                "PRODUKTIV SENDEN eingeben:"
+            ),
+        )
+
+        if not accepted or confirmation != "PRODUKTIV SENDEN":
+            return
+
+        try:
+            master_data = self._workspace.load_company_master_data()
+
+            validated = (
+                self._elster_bilanz_transmission_service
+                .validate_production_transmission(
+                    xbrl_xml=self._current_e_bilanz_document.xml,
+                    master_data=master_data,
+                    balance_sheet_date=(
+                        self._context.fiscal_year.end_date
+                    ),
+                )
+            )
+
+            send_result = (
+                self._elster_bilanz_transmission_service
+                .send_production_transmission(
+                    validated=validated,
+                )
+            )
+            transmitted_at = datetime.now()
+
+        except (
+            ValueError,
+            FileNotFoundError,
+            RuntimeError,
+        ) as exc:
+            QMessageBox.critical(
+                self,
+                "ELSTER-Produktivübermittlung fehlgeschlagen",
+                str(exc),
+            )
+            return
+
+        answer = QMessageBox.question(
+            self,
+            "ELSTER-Produktivübermittlung",
+            (
+                "Die produktive ELSTER-Übermittlung wurde "
+                "ohne Fehler abgeschlossen.\n\n"
+                "TransferTicket:\n"
+                f"{send_result.transfer_ticket}\n\n"
+                "Soll ein Übertragungsnachweis "
+                "gespeichert werden?"
+            ),
+            (
+                QMessageBox.StandardButton.Yes
+                | QMessageBox.StandardButton.No
+            ),
+            QMessageBox.StandardButton.Yes,
+        )
+
+        if answer == QMessageBox.StandardButton.Yes:
+            self._save_elster_transmission_receipt(
+                transfer_ticket=send_result.transfer_ticket,
+                transmission_mode="PRODUKTIV",
+                test_marker=None,
+                transmitted_at=transmitted_at,
+            )
+
+    def _save_elster_transmission_receipt(
+        self,
+        *,
+        transfer_ticket: str,
+        transmission_mode: str,
+        test_marker: str | None,
+        transmitted_at: datetime,
+    ) -> None:
+        """Speichert einen Nachweis der ELSTER-Übertragung."""
+
+        context = self._workspace.context
+        fiscal_year = context.fiscal_year
+
+        safe_company_name = "".join(
+            character
+            if character.isalnum() or character in "-_"
+            else "_"
+            for character in context.company.name
+        ).strip("_")
+
+        timestamp = transmitted_at.strftime("%Y%m%d_%H%M%S")
+
+        default_filename = (
+            "SimpleOB_ELSTER_"
+            f"{safe_company_name}_"
+            f"{fiscal_year.end_date.year}_"
+            f"{transmission_mode}_"
+            f"{timestamp}.txt"
+        )
+
+        filename, _ = QFileDialog.getSaveFileName(
+            self,
+            "ELSTER-Übertragungsnachweis speichern",
+            default_filename,
+            "Textdateien (*.txt);;Alle Dateien (*)",
+        )
+
+        if not filename:
+            return
+
+        target = Path(filename)
+
+        if target.suffix.lower() != ".txt":
+            target = target.with_suffix(".txt")
+
+        lines = [
+            "SimpleOB – ELSTER-Übertragungsnachweis",
+            "",
+            f"Mandant: {context.company.name}",
+            (
+                "Geschäftsjahr: "
+                f"{fiscal_year.start_date:%d.%m.%Y} – "
+                f"{fiscal_year.end_date:%d.%m.%Y}"
+            ),
+            f"Übertragung: {transmission_mode}",
+            (
+                "Zeitpunkt: "
+                f"{transmitted_at:%d.%m.%Y %H:%M:%S}"
+            ),
+            "Datenart: Bilanz_6.9",
+        ]
+
+        if test_marker is not None:
+            lines.append(f"Testmerker: {test_marker}")
+
+        lines.extend(
+            (
+                f"TransferTicket: {transfer_ticket}",
+                "Status: Übertragung erfolgreich",
+                "",
+            )
+        )
+
+        try:
+            target.write_text(
+                "\n".join(lines),
+                encoding="utf-8",
+            )
+        except OSError as exc:
+            QMessageBox.critical(
+                self,
+                "ELSTER-Übertragungsnachweis",
+                (
+                    "Der Übertragungsnachweis konnte nicht "
+                    f"gespeichert werden.\n\n{exc}"
+                ),
+            )
+            return
+
+        QMessageBox.information(
+            self,
+            "ELSTER-Übertragungsnachweis",
+            (
+                "Der Übertragungsnachweis wurde gespeichert.\n\n"
+                f"{target}"
             ),
         )
 

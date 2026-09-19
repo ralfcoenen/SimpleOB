@@ -28,6 +28,8 @@ class EBilanzFrame(QWidget):
         on_validate: Callable[[], None],
         on_export_xbrl: Callable[[], None],
         on_export_pdf: Callable[[], None],
+        on_send_test: Callable[[], None],
+        on_send_production: Callable[[], None],
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -148,6 +150,24 @@ class EBilanzFrame(QWidget):
         self._export_pdf_button.clicked.connect(on_export_pdf)
         actions_layout.addWidget(self._export_pdf_button, 2, 0)
 
+        self._send_test_button = QPushButton(
+            "ELSTER-Testübermittlung"
+        )
+        self._send_test_button.clicked.connect(on_send_test)
+        actions_layout.addWidget(self._send_test_button, 2, 1)
+
+        self._send_production_button = QPushButton(
+            "ELSTER-Produktivübermittlung"
+        )
+        self._send_production_button.clicked.connect(
+            on_send_production
+        )
+        actions_layout.addWidget(
+            self._send_production_button,
+            3,
+            1,
+        )
+
         layout.addWidget(actions_widget)
         layout.addStretch()
 
@@ -156,6 +176,8 @@ class EBilanzFrame(QWidget):
         self._validate_button.setEnabled(False)
         self._export_xbrl_button.setEnabled(False)
         self._export_pdf_button.setEnabled(False)
+        self._send_test_button.setEnabled(False)
+        self._send_production_button.setEnabled(False)
 
     @staticmethod
     def _left_alignment():
@@ -229,6 +251,7 @@ class EBilanzFrame(QWidget):
         build_enabled: bool,
         validate_enabled: bool,
         export_enabled: bool,
+        transmission_enabled: bool = False,
     ) -> None:
         """Aktualisiert Zustand und Aktionen des E-Bilanz-Workflows."""
 
@@ -238,3 +261,7 @@ class EBilanzFrame(QWidget):
         self._validate_button.setEnabled(validate_enabled)
         self._export_xbrl_button.setEnabled(export_enabled)
         self._export_pdf_button.setEnabled(export_enabled)
+        self._send_test_button.setEnabled(transmission_enabled)
+        self._send_production_button.setEnabled(
+            transmission_enabled
+        )

@@ -32,6 +32,15 @@ from openbilanz.database.shareholder_repository import ShareholderRepository
 from openbilanz.database.tax_depreciation_adjustment_repository import (
     TaxDepreciationAdjustmentRepository,
 )
+from openbilanz.eric.elster_bilanz_payload_service import (
+    ElsterBilanzPayloadService,
+)
+from openbilanz.eric.elster_bilanz_transmission_service import (
+    ElsterBilanzTransmissionService,
+)
+from openbilanz.eric.eric_create_th_adapter import EricCreateThAdapter
+from openbilanz.eric.eric_send_adapter import EricSendAdapter
+from openbilanz.eric.eric_validate_adapter import EricValidateAdapter
 from openbilanz.services.chart_of_accounts_initialization_service import (
     ChartOfAccountsInitializationService,
 )
@@ -87,6 +96,34 @@ def main() -> None:
     app.setQuitOnLastWindowClosed(False)
 
     config = load_config()
+
+    elster_bilanz_transmission_service = None
+
+    if (
+        config.eric_lib_dir is not None
+        and config.eric_manufacturer_id is not None
+        and config.eric_data_supplier is not None
+        and config.eric_certificate_path is not None
+        and config.eric_certificate_pin is not None
+    ):
+        elster_bilanz_transmission_service = (
+            ElsterBilanzTransmissionService(
+                payload_service=ElsterBilanzPayloadService(),
+                create_th_adapter=EricCreateThAdapter(
+                    lib_dir=config.eric_lib_dir,
+                ),
+                validate_adapter=EricValidateAdapter(
+                    lib_dir=config.eric_lib_dir,
+                ),
+                send_adapter=EricSendAdapter(
+                    lib_dir=config.eric_lib_dir,
+                ),
+                manufacturer_id=config.eric_manufacturer_id,
+                data_supplier=config.eric_data_supplier,
+                certificate_path=config.eric_certificate_path,
+                certificate_pin=config.eric_certificate_pin,
+            )
+        )
 
     database = Database(config)
     database.create_database()
@@ -406,6 +443,9 @@ def main() -> None:
                 ),
                 vat_accounts=vat_accounts,
                 pdf_reporting_service=pdf_reporting_service,
+                elster_bilanz_transmission_service=(
+                    elster_bilanz_transmission_service
+                ),
             )
             window.show()
 
