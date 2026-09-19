@@ -398,6 +398,9 @@ def main() -> None:
             ),
             closing_accounts=closing_accounts,
             closing_service=closing_service,
+            account_mapper=(
+                financial_statement_context.account_mapper
+            ),
             vat_accounts=vat_accounts,
             pdf_reporting_service=pdf_reporting_service,
         )

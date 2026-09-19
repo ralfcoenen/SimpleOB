@@ -58,6 +58,7 @@ from openbilanz.ui_qt.account_configuration_dialog import (
 from openbilanz.ui_qt.account_editor_dialog import AccountEditorDialog
 from openbilanz.ui_qt.balance_sheet_frame import BalanceSheetFrame
 from openbilanz.ui_qt.booking_frame import BookingFrame
+from openbilanz.ui_qt.closing_frame import ClosingFrame
 from openbilanz.ui_qt.company_master_data_dialog import (
     CompanyMasterDataDialog,
 )
@@ -110,6 +111,7 @@ class MainWindow(QMainWindow):
         depreciation_expense_account_number: str,
         closing_accounts: ClosingAccounts,
         closing_service: ClosingService,
+        account_mapper,
         vat_accounts: VatAccounts,
         pdf_reporting_service: PdfReportingService,
     ) -> None:
@@ -124,6 +126,7 @@ class MainWindow(QMainWindow):
         self._financial_statement_builder = statement_builder
         self._account_types = account_types
         self._chart_of_accounts = chart_of_accounts
+        self._account_mapper = account_mapper
         self._opening_balance_account_number = (
             opening_balance_account_number
         )
@@ -266,10 +269,25 @@ class MainWindow(QMainWindow):
         self._create_balance_sheet_tab()
         self._create_income_statement_tab()
         self._create_reports_tab()
+        self._create_closing_tab()
 
         self.setCentralWidget(central_widget)
 
         self._refresh_balance_sheet()
+        self._refresh_closing()
+
+    def _create_closing_tab(self) -> None:
+        """Erzeugt den Arbeitsbereich Jahresabschluss."""
+
+        layout = QVBoxLayout(self._closing_tab)
+
+        self._closing_frame = ClosingFrame(
+            on_validate=self._validate_closing,
+            on_close=self._close_fiscal_year,
+            parent=self._closing_tab,
+        )
+
+        layout.addWidget(self._closing_frame)
 
     def _create_balance_sheet_tab(self) -> None:
         """Erzeugt den Arbeitsbereich Bilanz."""
@@ -545,13 +563,17 @@ class MainWindow(QMainWindow):
             self._update_booking_mode
         )
 
+        self._update_editing_state()
+        self._update_booking_mode()
+
+    def _update_editing_state(self) -> None:
+        """Aktualisiert den Bearbeitungszustand des Geschäftsjahres."""
+
         enabled = self._workspace.is_open
 
         self._booking_frame.set_enabled(enabled)
         self._vat_booking_frame.set_enabled(enabled)
         self._booking_mode_box.setEnabled(enabled)
-
-        self._update_booking_mode()
 
     def _update_booking_mode(
         self,
@@ -1930,6 +1952,130 @@ class MainWindow(QMainWindow):
                 "Die ursprüngliche Buchung bleibt "
                 "im Journal erhalten."
             ),
+        )
+
+    def _validate_closing(self) -> None:
+        """Prüft den Jahresabschluss."""
+
+        if (
+            self._current_income_statement is None
+            or self._current_closing_result is None
+            or self._current_balance_sheet is None
+        ):
+            return
+
+        try:
+            depreciation_proposals = (
+                self._workspace.build_depreciation_proposals()
+            )
+        except (ValueError, RuntimeError) as exc:
+            QMessageBox.critical(
+                self,
+                "Abschreibungen konnten nicht geprüft werden",
+                str(exc),
+            )
+            return
+
+        if depreciation_proposals:
+            QMessageBox.warning(
+                self,
+                "Offene Abschreibungen",
+                (
+                    "Für dieses Geschäftsjahr sind noch "
+                    "Abschreibungen zu bearbeiten.\n\n"
+                    "Bitte führen Sie zuerst im Bereich "
+                    '"Anlagen" die Aktion '
+                    '"Abschreibungen prüfen/buchen" aus.'
+                ),
+            )
+            return
+
+        result = self._workspace.validate_closing(
+            balance_sheet=self._current_balance_sheet,
+            income_statement=self._current_income_statement,
+            closing_result=self._current_closing_result,
+            balances=self._current_closing_balances,
+            mapper=self._account_mapper,
+        )
+
+        self._closing_frame.update_consistency(result)
+
+    def _close_fiscal_year(self) -> None:
+        """Schließt das Geschäftsjahr persistent ab."""
+
+        if self._workspace.is_closed:
+            return
+
+        if self._current_income_statement is None:
+            return
+
+        answer = QMessageBox.question(
+            self,
+            "Geschäftsjahr abschließen",
+            (
+                "Das Geschäftsjahr wird nun endgültig "
+                "abgeschlossen.\n\n"
+                "Dabei werden die Erfolgskonten abgeschlossen "
+                "und weitere Buchungen in diesem Geschäftsjahr "
+                "gesperrt.\n\n"
+                "Möchten Sie fortfahren?"
+            ),
+            QMessageBox.StandardButton.Yes
+            | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+
+        try:
+            result = self._workspace.close_fiscal_year(
+                income_statement=self._current_income_statement,
+                chart_of_accounts=self._chart_of_accounts,
+            )
+        except ValueError as exc:
+            QMessageBox.critical(
+                self,
+                "Jahresabschluss fehlgeschlagen",
+                str(exc),
+            )
+            return
+
+        self._refresh_after_closing()
+
+        self._closing_frame.update_net_income(
+            result.net_income
+        )
+        self._closing_frame.mark_closed()
+
+        QMessageBox.information(
+            self,
+            "Jahresabschluss",
+            "Das Geschäftsjahr wurde erfolgreich abgeschlossen.",
+        )
+
+    def _refresh_after_closing(self) -> None:
+        """Aktualisiert die für den Jahresabschluss relevanten Daten."""
+
+        self._refresh_journal()
+        self._refresh_balance_sheet()
+        self._refresh_closing()
+        self._update_editing_state()
+
+    def _refresh_closing(self) -> None:
+        """Aktualisiert den sichtbaren Abschlussstatus."""
+
+        managed_fiscal_year = self._workspace.managed_fiscal_year
+
+        self._closing_frame.update_fiscal_year_status(
+            managed_fiscal_year.status
+        )
+
+        if self._current_closing_result is None:
+            return
+
+        self._closing_frame.update_net_income(
+            self._current_closing_result.net_income
         )
 
     def _refresh_balance_sheet(self) -> None:
