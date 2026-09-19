@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
 from openbilanz.database.company_repository import CompanyRepository
 from openbilanz.domain.company import Company
 from openbilanz.domain.fiscal_year import FiscalYear
-from openbilanz.ui.date_input import (
+from openbilanz.date_input import (
     normalize_german_date,
     parse_german_date,
 )

@@ -2,7 +2,7 @@ from datetime import date
 
 import pytest
 
-from openbilanz.ui.date_input import (
+from openbilanz.date_input import (
     parse_german_date,
 )
 
@@ -31,4 +31,3 @@ def test_parse_german_date_rejects_invalid_date() -> None:
         parse_german_date(
             "31022026"
         )
-    

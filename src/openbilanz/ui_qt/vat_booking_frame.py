@@ -25,7 +25,7 @@ from openbilanz.domain.vat_booking_item import VatBookingItem
 from openbilanz.services.vat_booking_service import (
     VatBookingService,
 )
-from openbilanz.ui.date_input import (
+from openbilanz.date_input import (
     normalize_german_date,
     parse_german_date,
 )

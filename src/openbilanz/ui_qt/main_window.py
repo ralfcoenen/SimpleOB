@@ -5,7 +5,7 @@ from decimal import Decimal
 from uuid import UUID
 from pathlib import Path
 
-from openbilanz.ui.date_input import parse_german_date
+from openbilanz.date_input import parse_german_date
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (

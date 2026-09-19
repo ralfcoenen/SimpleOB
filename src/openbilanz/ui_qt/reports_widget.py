@@ -22,7 +22,7 @@ from openbilanz.domain.account import Account
 from openbilanz.domain.entry_side import EntrySide
 from openbilanz.services.fiscal_year_workspace import FiscalYearWorkspace
 from openbilanz.services.pdf_reporting_service import PdfReportingService
-from openbilanz.ui.date_input import parse_german_date
+from openbilanz.date_input import parse_german_date
 
 
 class ReportsWidget(QWidget):

@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
 )
 
 from openbilanz.domain.fixed_asset import FixedAsset
-from openbilanz.ui.date_input import (
+from openbilanz.date_input import (
     normalize_german_date,
     parse_german_date,
 )
