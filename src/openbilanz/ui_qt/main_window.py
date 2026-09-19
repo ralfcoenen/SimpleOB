@@ -49,6 +49,8 @@ from openbilanz.services.closing_service import (
 from openbilanz.services.pdf_reporting_service import PdfReportingService
 from openbilanz.core.context import ApplicationContext
 from openbilanz.services.fiscal_year_workspace import FiscalYearWorkspace
+from openbilanz.services.opening_balance_service import OpeningBalanceService
+from openbilanz.services.pdf_reporting_service import PdfReportingService
 from openbilanz.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
@@ -65,6 +67,7 @@ from openbilanz.ui_qt.company_master_data_dialog import (
 from openbilanz.ui_qt.e_bilanz_account_mapping_dialog import (
     EBilanzAccountMappingDialog,
 )
+from openbilanz.ui_qt.opening_balance_dialog import OpeningBalanceDialog
 from openbilanz.ui_qt.shareholder_dialog import (
     ShareholdersDialog,
 )
@@ -129,6 +132,11 @@ class MainWindow(QMainWindow):
         self._account_mapper = account_mapper
         self._opening_balance_account_number = (
             opening_balance_account_number
+        )
+        self._opening_balance_service = OpeningBalanceService(
+            opening_balance_account_number=(
+                self._opening_balance_account_number
+            ),
         )
         self._depreciation_expense_account_number = (
             depreciation_expense_account_number
@@ -207,6 +215,16 @@ class MainWindow(QMainWindow):
         )
         administration_layout.addWidget(
             self._account_configuration_button
+        )
+
+        self._opening_balance_button = QPushButton(
+            "Eröffnungsbilanz erfassen"
+        )
+        self._opening_balance_button.clicked.connect(
+            self._open_opening_balance
+        )
+        administration_layout.addWidget(
+            self._opening_balance_button
         )
 
         administration_layout.addStretch()
@@ -574,6 +592,7 @@ class MainWindow(QMainWindow):
         self._booking_frame.set_enabled(enabled)
         self._vat_booking_frame.set_enabled(enabled)
         self._booking_mode_box.setEnabled(enabled)
+        self._opening_balance_button.setEnabled(enabled)
 
     def _update_booking_mode(
         self,
@@ -1954,6 +1973,40 @@ class MainWindow(QMainWindow):
             ),
         )
 
+    def _open_opening_balance(self) -> None:
+        """Erfasst, verbucht und speichert die Eröffnungsbilanz."""
+
+        if self._workspace.is_closed:
+            return
+
+        dialog = OpeningBalanceDialog(
+            self,
+            accounts=self._accounts,
+            excluded_account_numbers={
+                self._opening_balance_account_number,
+                self._closing_accounts.income_summary_account,
+                self._closing_accounts.profit_account,
+                self._closing_accounts.loss_account,
+            },
+        )
+
+        dialog.exec()
+
+        if dialog.result is None:
+            return
+
+        bookings = self._opening_balance_service.create_bookings(
+            opening_balance=dialog.result,
+            booking_date=self._context.fiscal_year.start_date,
+        )
+
+        for booking in bookings:
+            self._workspace.post_booking(booking)
+
+        self._refresh_accounts()
+        self._refresh_journal()
+        self._refresh_balance_sheet()
+
     def _validate_closing(self) -> None:
         """Prüft den Jahresabschluss."""
 
@@ -2698,6 +2751,11 @@ class MainWindow(QMainWindow):
 
         self._opening_balance_account_number = (
             control_accounts.opening_balance_account
+        )
+        self._opening_balance_service = OpeningBalanceService(
+            opening_balance_account_number=(
+                self._opening_balance_account_number
+            ),
         )
         self._depreciation_expense_account_number = (
             control_accounts.depreciation_expense_account
