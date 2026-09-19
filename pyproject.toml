@@ -45,7 +45,7 @@ markers = [
 ]
 
 [project.scripts]
-openbilanz = "openbilanz.main:main"
+openbilanz = "openbilanz.qt_main:main"
 
 
 [tool.ruff]
