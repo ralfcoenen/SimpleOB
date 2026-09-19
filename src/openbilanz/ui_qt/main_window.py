@@ -86,6 +86,7 @@ from openbilanz.ui_qt.vat_booking_frame import VatBookingFrame
 from openbilanz.ui_qt.tax_depreciation_adjustment_dialog import (
     TaxDepreciationAdjustmentDialog,
 )
+from openbilanz.ui_qt.reports_widget import ReportsWidget
 
 ZERO = Decimal("0.00")
 
@@ -264,6 +265,7 @@ class MainWindow(QMainWindow):
         self._create_fixed_assets_tab()
         self._create_balance_sheet_tab()
         self._create_income_statement_tab()
+        self._create_reports_tab()
 
         self.setCentralWidget(central_widget)
 
@@ -314,6 +316,26 @@ class MainWindow(QMainWindow):
             self._income_statement_tab
         )
         layout.addWidget(self._income_statement_frame)
+
+    def _create_reports_tab(self) -> None:
+        """Erzeugt den Arbeitsbereich Auswertungen."""
+
+        layout = QVBoxLayout(self._reports_tab)
+
+        self._reports_widget = ReportsWidget(
+            context=self._context,
+            workspace=self._workspace,
+            accounts=self._accounts,
+            opening_balance_account_number=(
+                self._opening_balance_account_number
+            ),
+            pdf_reporting_service=(
+                self._pdf_reporting_service
+            ),
+            parent=self._reports_tab,
+        )
+
+        layout.addWidget(self._reports_widget)
 
     def _create_accounts_tab(self) -> None:
         """Erzeugt den Arbeitsbereich Konten."""

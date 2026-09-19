@@ -269,7 +269,7 @@ class PdfReportingService:
     ) -> Path:
         """Exportiert eine Kontenauswertung."""
 
-        rows: list[list[str]] = [
+        rows: list[list[object]] = [
             [
                 "Datum",
                 "Beleg",
@@ -280,6 +280,14 @@ class PdfReportingService:
                 "Saldo",
             ],
         ]
+
+        text_style = ParagraphStyle(
+            "AccountActivityText",
+            fontName="Helvetica",
+            fontSize=8,
+            leading=10,
+            wordWrap="LTR",
+        )
 
         for report in reports:
             account_name = account_names.get(
@@ -304,7 +312,10 @@ class PdfReportingService:
                         ),
                         line.voucher_no,
                         report.account_number,
-                        description,
+                        Paragraph(
+                            description,
+                            text_style,
+                        ),
                         self._format_amount(
                             line.debit
                         ),
@@ -1406,7 +1417,7 @@ class PdfReportingService:
     ) -> Path:
         """Exportiert ein Journal als PDF."""
 
-        rows: list[list[str]] = [
+        rows: list[list[object]] = [
             [
                 "Nr.",
                 "Datum",
@@ -1419,17 +1430,31 @@ class PdfReportingService:
             ],
         ]
 
+        text_style = ParagraphStyle(
+            "JournalText",
+            fontName="Helvetica",
+            fontSize=8,
+            leading=10,
+            wordWrap="LTR",
+        )
+
         for line in report.lines:
             rows.append(
                 [
                     str(line.booking_number),
                     line.booking_date.strftime("%d.%m.%Y"),
                     line.voucher_no,
-                    line.description,
+                    Paragraph(
+                        line.description,
+                        text_style,
+                    ),
                     line.account_number,
-                    account_names.get(
-                        line.account_number,
-                        "",
+                    Paragraph(
+                        account_names.get(
+                            line.account_number,
+                            "",
+                        ),
+                        text_style,
                     ),
                     (
                         "S"
