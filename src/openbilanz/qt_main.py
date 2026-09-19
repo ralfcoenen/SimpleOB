@@ -62,7 +62,6 @@ from openbilanz.services.fixed_asset_depreciation_workflow import (
 from openbilanz.services.fixed_asset_schedule_service import (
     FixedAssetScheduleService,
 )
-
 from openbilanz.services.pdf_reporting_service import PdfReportingService
 from openbilanz.services.posting_service import PostingService
 from openbilanz.services.reporting_service import ReportingService
@@ -85,6 +84,7 @@ def main() -> None:
     """Startet die PySide6-Oberfläche von SimpleOB."""
 
     app = QApplication(sys.argv)
+    app.setQuitOnLastWindowClosed(False)
 
     config = load_config()
 
@@ -187,235 +187,241 @@ def main() -> None:
         reporting_service = ReportingService()
         pdf_reporting_service = PdfReportingService()
 
-        dialog = StartDialog(
-            repository=company_repository,
-        )
+        while True:
+            dialog = StartDialog(
+                repository=company_repository,
+            )
 
-        if dialog.exec() != QDialog.DialogCode.Accepted:
-            return
+            if dialog.exec() != QDialog.DialogCode.Accepted:
+                break
 
-        context = dialog.result
+            context = dialog.result
 
-        if context is None:
-            return
+            if context is None:
+                break
 
-        initialized = (
-            chart_of_accounts_initialization_service.initialize(
-                company=context.company,
-                standard_chart_of_accounts=(
-                    standard_financial_statement_context
-                    .chart_of_accounts
+            initialized = (
+                chart_of_accounts_initialization_service.initialize(
+                    company=context.company,
+                    standard_chart_of_accounts=(
+                        standard_financial_statement_context
+                        .chart_of_accounts
+                    ),
+                )
+            )
+
+            if initialized:
+                session.commit()
+
+            loaded_chart_of_accounts = (
+                chart_of_accounts_repository.load_for_company(
+                    company_id=context.company.company_id,
+                    position_provider=position_provider,
+                )
+            )
+
+            if loaded_chart_of_accounts is None:
+                raise RuntimeError(
+                    "Der Kontenrahmen des Unternehmens "
+                    "konnte nicht geladen werden."
+                )
+
+            (
+                chart_of_accounts,
+                accounts,
+            ) = loaded_chart_of_accounts
+
+            control_accounts = (
+                chart_of_accounts_repository.load_control_accounts(
+                    context.company.company_id
+                )
+            )
+
+            vat_accounts = (
+                chart_of_accounts_repository.load_vat_accounts(
+                    context.company.company_id
+                )
+            )
+
+            if vat_accounts is None:
+                raise RuntimeError(
+                    "Die Umsatzsteuerkonten des Unternehmens "
+                    "konnten nicht geladen werden."
+                )
+
+            if control_accounts is None:
+                raise RuntimeError(
+                    "Die technischen Konten des Unternehmens "
+                    "konnten nicht geladen werden."
+                )
+
+            financial_statement_context = (
+                create_financial_statement_context(
+                    assets=(
+                        standard_financial_statement_context.assets
+                    ),
+                    liabilities=(
+                        standard_financial_statement_context.liabilities
+                    ),
+                    income_statement=(
+                        standard_financial_statement_context
+                        .income_statement
+                    ),
+                    chart_of_accounts=chart_of_accounts,
+                    accounts=accounts,
+                )
+            )
+
+            closing_accounts = ClosingAccounts(
+                income_summary_account=(
+                    control_accounts.income_summary_account
+                ),
+                profit_account=control_accounts.profit_account,
+                loss_account=control_accounts.loss_account,
+            )
+
+            closing_service = ClosingService(
+                closing_accounts=closing_accounts,
+            )
+
+            closing_workflow = FiscalYearClosingWorkflow(
+                session=session,
+                booking_repository=booking_repository,
+                company_repository=company_repository,
+                closing_service=closing_service,
+            )
+
+            e_bilanz_preparation_service = EBilanzPreparationService(
+                statement_builder=(
+                    financial_statement_context.statement_builder
+                ),
+                closing_service=closing_service,
+                account_types=(
+                    financial_statement_context.account_types
+                ),
+                assets=financial_statement_context.assets,
+                liabilities=financial_statement_context.liabilities,
+                income_summary_account_number=(
+                    control_accounts.income_summary_account
                 ),
             )
-        )
 
-        if initialized:
-            session.commit()
-
-        loaded_chart_of_accounts = (
-            chart_of_accounts_repository.load_for_company(
-                company_id=context.company.company_id,
-                position_provider=position_provider,
-            )
-        )
-
-        if loaded_chart_of_accounts is None:
-            raise RuntimeError(
-                "Der Kontenrahmen des Unternehmens "
-                "konnte nicht geladen werden."
+            e_bilanz_account_detail_service = (
+                EBilanzAccountDetailService(
+                    account_mapper=(
+                        financial_statement_context.account_mapper
+                    ),
+                    accounts=financial_statement_context.accounts,
+                )
             )
 
-        (
-            chart_of_accounts,
-            accounts,
-        ) = loaded_chart_of_accounts
-
-        control_accounts = (
-            chart_of_accounts_repository.load_control_accounts(
-                context.company.company_id
-            )
-        )
-
-        vat_accounts = (
-            chart_of_accounts_repository.load_vat_accounts(
-                context.company.company_id
-            )
-        )
-
-        if vat_accounts is None:
-            raise RuntimeError(
-                "Die Umsatzsteuerkonten des Unternehmens "
-                "konnten nicht geladen werden."
-            )
-
-        if control_accounts is None:
-            raise RuntimeError(
-                "Die technischen Konten des Unternehmens "
-                "konnten nicht geladen werden."
-            )
-
-        financial_statement_context = (
-            create_financial_statement_context(
-                assets=(
-                    standard_financial_statement_context.assets
-                ),
-                liabilities=(
-                    standard_financial_statement_context.liabilities
-                ),
+            e_bilanz_service = EBilanzService(
+                resolver=resolver,
+                adapter=arelle_adapter,
+                company_data_mapper=GcdCompanyDataMapper(),
+                assets=financial_statement_context.assets,
+                liabilities=financial_statement_context.liabilities,
                 income_statement=(
-                    standard_financial_statement_context
-                    .income_statement
+                    financial_statement_context.income_statement
+                ),
+            )
+
+            bvv_annual_data_repository = BvvAnnualDataRepository(
+                session
+            )
+
+            workspace = FiscalYearWorkspace(
+                context=context,
+                booking_repository=booking_repository,
+                company_repository=company_repository,
+                bvv_annual_data_repository=(
+                    bvv_annual_data_repository
+                ),
+                shareholder_repository=shareholder_repository,
+                chart_of_accounts_repository=(
+                    chart_of_accounts_repository
+                ),
+                posting_service=posting_service,
+                reporting_service=reporting_service,
+                closing_workflow=closing_workflow,
+                closing_consistency_service=(
+                    closing_consistency_service
+                ),
+                e_bilanz_preparation_service=(
+                    e_bilanz_preparation_service
+                ),
+                e_bilanz_account_detail_service=(
+                    e_bilanz_account_detail_service
+                ),
+                e_bilanz_service=e_bilanz_service,
+                e_bilanz_export_service=e_bilanz_export_service,
+                taxonomy_management_service=(
+                    taxonomy_management_service
+                ),
+                fixed_asset_repository=fixed_asset_repository,
+                fixed_asset_depreciation_repository=(
+                    fixed_asset_depreciation_repository
+                ),
+                tax_depreciation_adjustment_repository=(
+                    tax_depreciation_adjustment_repository
+                ),
+                fixed_asset_movement_repository=(
+                    fixed_asset_movement_repository
+                ),
+                fixed_asset_schedule_service=(
+                    fixed_asset_schedule_service
+                ),
+                depreciation_service=depreciation_service,
+                fixed_asset_depreciation_workflow=(
+                    fixed_asset_depreciation_workflow
+                ),
+            )
+
+            window = MainWindow(
+                context=context,
+                workspace=workspace,
+                accounts=accounts,
+                assets=financial_statement_context.assets,
+                liabilities=financial_statement_context.liabilities,
+                income_statement=(
+                    financial_statement_context.income_statement
+                ),
+                statement_builder=(
+                    financial_statement_context.statement_builder
+                ),
+                account_types=(
+                    financial_statement_context.account_types
                 ),
                 chart_of_accounts=chart_of_accounts,
-                accounts=accounts,
-            )
-        )
-
-        closing_accounts = ClosingAccounts(
-            income_summary_account=(
-                control_accounts.income_summary_account
-            ),
-            profit_account=control_accounts.profit_account,
-            loss_account=control_accounts.loss_account,
-        )
-
-        closing_service = ClosingService(
-            closing_accounts=closing_accounts,
-        )
-
-        closing_workflow = FiscalYearClosingWorkflow(
-            session=session,
-            booking_repository=booking_repository,
-            company_repository=company_repository,
-            closing_service=closing_service,
-        )
-
-        e_bilanz_preparation_service = EBilanzPreparationService(
-            statement_builder=(
-                financial_statement_context.statement_builder
-            ),
-            closing_service=closing_service,
-            account_types=financial_statement_context.account_types,
-            assets=financial_statement_context.assets,
-            liabilities=financial_statement_context.liabilities,
-            income_summary_account_number=(
-                control_accounts.income_summary_account
-            ),
-        )
-
-        e_bilanz_account_detail_service = (
-            EBilanzAccountDetailService(
+                opening_balance_account_number=(
+                    control_accounts.opening_balance_account
+                ),
+                depreciation_expense_account_number=(
+                    control_accounts.depreciation_expense_account
+                ),
+                closing_accounts=closing_accounts,
+                closing_service=closing_service,
                 account_mapper=(
                     financial_statement_context.account_mapper
                 ),
-                accounts=financial_statement_context.accounts,
+                vat_accounts=vat_accounts,
+                pdf_reporting_service=pdf_reporting_service,
             )
-        )
+            window.show()
 
-        e_bilanz_service = EBilanzService(
-            resolver=resolver,
-            adapter=arelle_adapter,
-            company_data_mapper=GcdCompanyDataMapper(),
-            assets=financial_statement_context.assets,
-            liabilities=financial_statement_context.liabilities,
-            income_statement=(
-                financial_statement_context.income_statement
-            ),
-        )
-
-        bvv_annual_data_repository = BvvAnnualDataRepository(
-            session
-        )
-
-        workspace = FiscalYearWorkspace(
-            context=context,
-            booking_repository=booking_repository,
-            company_repository=company_repository,
-            bvv_annual_data_repository=(
-                bvv_annual_data_repository
-            ),
-            shareholder_repository=shareholder_repository,
-            chart_of_accounts_repository=(
-                chart_of_accounts_repository
-            ),
-            posting_service=posting_service,
-            reporting_service=reporting_service,
-            closing_workflow=closing_workflow,
-            closing_consistency_service=(
-                closing_consistency_service
-            ),
-            e_bilanz_preparation_service=(
-                e_bilanz_preparation_service
-            ),
-            e_bilanz_account_detail_service=(
-                e_bilanz_account_detail_service
-            ),
-            e_bilanz_service=e_bilanz_service,
-            e_bilanz_export_service=e_bilanz_export_service,
-            taxonomy_management_service=(
-                taxonomy_management_service
-            ),
-            fixed_asset_repository=fixed_asset_repository,
-            fixed_asset_depreciation_repository=(
-                fixed_asset_depreciation_repository
-            ),
-            tax_depreciation_adjustment_repository=(
-                tax_depreciation_adjustment_repository
-            ),
-            fixed_asset_movement_repository=(
-                fixed_asset_movement_repository
-            ),
-            fixed_asset_schedule_service=(
-                fixed_asset_schedule_service
-            ),
-            depreciation_service=depreciation_service,
-            fixed_asset_depreciation_workflow=(
-                fixed_asset_depreciation_workflow
-            ),
-        )
-
-        window = MainWindow(
-            context=context,
-            workspace=workspace,
-            accounts=accounts,
-            assets=financial_statement_context.assets,
-            liabilities=financial_statement_context.liabilities,
-            income_statement=(
-                financial_statement_context.income_statement
-            ),
-            statement_builder=(
-                financial_statement_context.statement_builder
-            ),
-            account_types=(
-                financial_statement_context.account_types
-            ),
-            chart_of_accounts=chart_of_accounts,
-            opening_balance_account_number=(
-                control_accounts.opening_balance_account
-            ),
-            depreciation_expense_account_number=(
-                control_accounts.depreciation_expense_account
-            ),
-            closing_accounts=closing_accounts,
-            closing_service=closing_service,
-            account_mapper=(
-                financial_statement_context.account_mapper
-            ),
-            vat_accounts=vat_accounts,
-            pdf_reporting_service=pdf_reporting_service,
-        )
-        window.show()
-
-        window.statusBar().showMessage(
-            " | ".join(
-                (
-                    context.company.name,
-                    context.fiscal_year.display_name,
+            window.statusBar().showMessage(
+                " | ".join(
+                    (
+                        context.company.name,
+                        context.fiscal_year.display_name,
+                    )
                 )
             )
-        )
 
-        app.exec()
+            app.exec()
+
+            if not window.return_to_start_requested:
+                break
 
     finally:
         session.close()

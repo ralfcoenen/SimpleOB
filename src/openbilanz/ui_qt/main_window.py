@@ -9,6 +9,7 @@ from openbilanz.ui.date_input import parse_german_date
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QApplication,
     QAbstractItemView,
     QComboBox,
     QDialog,
@@ -151,6 +152,8 @@ class MainWindow(QMainWindow):
         self._current_balance_sheet: BalanceSheet | None = None
         self._current_closing_balances = ()
 
+        self._return_to_start_requested = False
+
         self.setWindowTitle(
             f"SimpleOB – {self._context.company.name}"
         )
@@ -216,7 +219,15 @@ class MainWindow(QMainWindow):
         administration_layout.addWidget(
             self._account_configuration_button
         )
-
+        self._return_to_start_button = QPushButton(
+            "Buchhaltung wechseln"
+        )
+        self._return_to_start_button.clicked.connect(
+            self._return_to_start
+        )
+        administration_layout.addWidget(
+            self._return_to_start_button
+        )
         self._opening_balance_button = QPushButton(
             "Eröffnungsbilanz erfassen"
         )
@@ -293,6 +304,12 @@ class MainWindow(QMainWindow):
 
         self._refresh_balance_sheet()
         self._refresh_closing()
+
+    @property
+    def return_to_start_requested(self) -> bool:
+        """Zeigt an, ob zur Buchhaltungsauswahl zurückgekehrt werden soll."""
+
+        return self._return_to_start_requested
 
     def _create_closing_tab(self) -> None:
         """Erzeugt den Arbeitsbereich Jahresabschluss."""
@@ -2075,6 +2092,33 @@ class MainWindow(QMainWindow):
                 "im Journal erhalten."
             ),
         )
+
+    def _return_to_start(self) -> None:
+        """Schließt die aktuelle Buchhaltung und kehrt zur Auswahl zurück."""
+
+        answer = QMessageBox.question(
+            self,
+            "Buchhaltung wechseln",
+            (
+                "Möchten Sie die aktuelle Buchhaltung schließen "
+                "und zur Buchhaltungsauswahl zurückkehren?"
+            ),
+            (
+                QMessageBox.StandardButton.Yes
+                | QMessageBox.StandardButton.No
+            ),
+            QMessageBox.StandardButton.No,
+        )
+
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+
+        self._return_to_start_requested = True
+        self.close()
+
+        app = QApplication.instance()
+        if app is not None:
+            app.quit()
 
     def _open_opening_balance(self) -> None:
         """Erfasst, verbucht und speichert die Eröffnungsbilanz."""
