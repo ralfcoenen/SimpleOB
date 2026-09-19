@@ -322,6 +322,16 @@ class MainWindow(QMainWindow):
         self._refresh_bvv_annual_data()
         self._refresh_e_bilanz()
 
+    def closeEvent(self, event) -> None:
+        """Kehrt beim Schließen des Hauptfensters zur Buchhaltungsauswahl zurück."""
+
+        self._return_to_start_requested = True
+        event.accept()
+
+        app = QApplication.instance()
+        if app is not None:
+            app.quit()
+
     @property
     def return_to_start_requested(self) -> bool:
         """Zeigt an, ob zur Buchhaltungsauswahl zurückgekehrt werden soll."""
