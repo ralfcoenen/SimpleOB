@@ -62,6 +62,8 @@ from openbilanz.services.fixed_asset_depreciation_workflow import (
 from openbilanz.services.fixed_asset_schedule_service import (
     FixedAssetScheduleService,
 )
+
+from openbilanz.services.pdf_reporting_service import PdfReportingService
 from openbilanz.services.posting_service import PostingService
 from openbilanz.services.reporting_service import ReportingService
 from openbilanz.services.taxonomy_management_service import (
@@ -183,6 +185,7 @@ def main() -> None:
         closing_consistency_service = ClosingConsistencyService()
         e_bilanz_export_service = EBilanzExportService()
         reporting_service = ReportingService()
+        pdf_reporting_service = PdfReportingService()
 
         dialog = StartDialog(
             repository=company_repository,
@@ -380,6 +383,12 @@ def main() -> None:
             income_statement=(
                 financial_statement_context.income_statement
             ),
+            statement_builder=(
+                financial_statement_context.statement_builder
+            ),
+            account_types=(
+                financial_statement_context.account_types
+            ),
             chart_of_accounts=chart_of_accounts,
             opening_balance_account_number=(
                 control_accounts.opening_balance_account
@@ -388,7 +397,9 @@ def main() -> None:
                 control_accounts.depreciation_expense_account
             ),
             closing_accounts=closing_accounts,
+            closing_service=closing_service,
             vat_accounts=vat_accounts,
+            pdf_reporting_service=pdf_reporting_service,
         )
         window.show()
 

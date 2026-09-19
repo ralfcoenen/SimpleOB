@@ -3,6 +3,7 @@
 from datetime import date
 from decimal import Decimal
 from uuid import UUID
+from pathlib import Path
 
 from openbilanz.ui.date_input import parse_german_date
 
@@ -11,6 +12,7 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
     QDialog,
+    QFileDialog,
     QHBoxLayout,
     QHeaderView,
     QInputDialog,
@@ -26,6 +28,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from openbilanz.accounting.balance_sheet import BalanceSheet
+from openbilanz.accounting.financial_statement_builder import (
+    FinancialStatementBuilder,
+)
+from openbilanz.accounting.income_statement import IncomeStatement
 from openbilanz.domain.account import Account
 from openbilanz.domain.account_type import AccountType
 from openbilanz.domain.booking_type import BookingType
@@ -35,6 +42,11 @@ from openbilanz.domain.chart_of_accounts_template import (
 )
 from openbilanz.domain.vat_accounts import VatAccounts
 from openbilanz.services.closing_accounts import ClosingAccounts
+from openbilanz.services.closing_service import (
+    ClosingResult,
+    ClosingService,
+)
+from openbilanz.services.pdf_reporting_service import PdfReportingService
 from openbilanz.core.context import ApplicationContext
 from openbilanz.services.fiscal_year_workspace import FiscalYearWorkspace
 from openbilanz.accounting.financial_statement_position import (
@@ -44,6 +56,7 @@ from openbilanz.ui_qt.account_configuration_dialog import (
     AccountConfigurationDialog,
 )
 from openbilanz.ui_qt.account_editor_dialog import AccountEditorDialog
+from openbilanz.ui_qt.balance_sheet_frame import BalanceSheetFrame
 from openbilanz.ui_qt.booking_frame import BookingFrame
 from openbilanz.ui_qt.company_master_data_dialog import (
     CompanyMasterDataDialog,
@@ -61,6 +74,12 @@ from openbilanz.ui_qt.fixed_asset_acquisition_link_dialog import (
 from openbilanz.ui_qt.fixed_asset_disposal_link_dialog import (
     DisposalBookingCandidate,
     FixedAssetDisposalLinkDialog,
+)
+from openbilanz.ui_qt.income_statement_frame import (
+    IncomeStatementFrame,
+)
+from openbilanz.ui_qt.income_statement_frame import (
+    IncomeStatementFrame,
 )
 from openbilanz.ui_qt.new_fixed_asset_dialog import NewFixedAssetDialog
 from openbilanz.ui_qt.vat_booking_frame import VatBookingFrame
@@ -83,11 +102,15 @@ class MainWindow(QMainWindow):
         assets: FinancialStatementPosition,
         liabilities: FinancialStatementPosition,
         income_statement: FinancialStatementPosition,
+        statement_builder: FinancialStatementBuilder,
+        account_types: dict[str, AccountType],
         chart_of_accounts: ChartOfAccountsTemplate,
         opening_balance_account_number: str,
         depreciation_expense_account_number: str,
         closing_accounts: ClosingAccounts,
+        closing_service: ClosingService,
         vat_accounts: VatAccounts,
+        pdf_reporting_service: PdfReportingService,
     ) -> None:
         super().__init__()
 
@@ -97,6 +120,8 @@ class MainWindow(QMainWindow):
         self._assets = assets
         self._liabilities = liabilities
         self._income_statement = income_statement
+        self._financial_statement_builder = statement_builder
+        self._account_types = account_types
         self._chart_of_accounts = chart_of_accounts
         self._opening_balance_account_number = (
             opening_balance_account_number
@@ -105,7 +130,14 @@ class MainWindow(QMainWindow):
             depreciation_expense_account_number
         )
         self._closing_accounts = closing_accounts
+        self._closing_service = closing_service
         self._vat_accounts = vat_accounts
+        self._pdf_reporting_service = pdf_reporting_service
+
+        self._current_income_statement: IncomeStatement | None = None
+        self._current_closing_result: ClosingResult | None = None
+        self._current_balance_sheet: BalanceSheet | None = None
+        self._current_closing_balances = ()
 
         self.setWindowTitle(
             f"SimpleOB – {self._context.company.name}"
@@ -230,8 +262,58 @@ class MainWindow(QMainWindow):
         self._create_journal_tab()
         self._create_booking_tab()
         self._create_fixed_assets_tab()
+        self._create_balance_sheet_tab()
+        self._create_income_statement_tab()
 
         self.setCentralWidget(central_widget)
+
+        self._refresh_balance_sheet()
+
+    def _create_balance_sheet_tab(self) -> None:
+        """Erzeugt den Arbeitsbereich Bilanz."""
+
+        layout = QVBoxLayout(self._balance_sheet_tab)
+
+        title_label = QLabel("Bilanz nach § 266 HGB")
+        title_label.setStyleSheet(
+            "font-size: 18px; font-weight: bold;"
+        )
+        layout.addWidget(title_label)
+
+        export_button = QPushButton("PDF exportieren")
+        export_button.clicked.connect(
+            self._export_balance_sheet_pdf
+        )
+        layout.addWidget(export_button)
+
+        self._balance_sheet_frame = BalanceSheetFrame(
+            self._balance_sheet_tab
+        )
+        layout.addWidget(self._balance_sheet_frame)
+
+    def _create_income_statement_tab(self) -> None:
+        """Erzeugt den Arbeitsbereich GuV."""
+
+        layout = QVBoxLayout(self._income_statement_tab)
+
+        title_label = QLabel(
+            "Gewinn- und Verlustrechnung nach § 275 HGB"
+        )
+        title_label.setStyleSheet(
+            "font-size: 18px; font-weight: bold;"
+        )
+        layout.addWidget(title_label)
+
+        export_button = QPushButton("PDF exportieren")
+        export_button.clicked.connect(
+            self._export_income_statement_pdf
+        )
+        layout.addWidget(export_button)
+
+        self._income_statement_frame = IncomeStatementFrame(
+            self._income_statement_tab
+        )
+        layout.addWidget(self._income_statement_frame)
 
     def _create_accounts_tab(self) -> None:
         """Erzeugt den Arbeitsbereich Konten."""
@@ -482,6 +564,7 @@ class MainWindow(QMainWindow):
 
         self._refresh_accounts()
         self._refresh_journal()
+        self._refresh_balance_sheet()
 
     def _create_fixed_assets_tab(self) -> None:
         """Erzeugt den Arbeitsbereich Anlagen."""
@@ -1329,6 +1412,7 @@ class MainWindow(QMainWindow):
         self._refresh_accounts()
         self._refresh_journal()
         self._refresh_fixed_assets()
+        self._refresh_balance_sheet()
 
     def _manage_tax_depreciation_adjustments(self) -> None:
         """Bearbeitet steuerliche AfA-Abweichungen."""
@@ -1813,6 +1897,7 @@ class MainWindow(QMainWindow):
         self._refresh_journal()
         self._refresh_accounts()
         self._refresh_fixed_assets()
+        self._refresh_balance_sheet()
 
         QMessageBox.information(
             self,
@@ -1823,6 +1908,236 @@ class MainWindow(QMainWindow):
                 "Die ursprüngliche Buchung bleibt "
                 "im Journal erhalten."
             ),
+        )
+
+    def _refresh_balance_sheet(self) -> None:
+        """Erzeugt und aktualisiert GuV und laufende Bilanz."""
+
+        self._current_balance_sheet = None
+
+        balance_sheet_account_types = (
+            AccountType.ASSET,
+            AccountType.LIABILITY,
+            AccountType.EQUITY,
+        )
+
+        income_statement_account_types = (
+            AccountType.REVENUE,
+            AccountType.EXPENSE,
+        )
+
+        balance_sheet_balances = tuple(
+            balance
+            for balance in self._workspace.ledger.balances()
+            if self._account_types.get(balance.account_number)
+            in balance_sheet_account_types
+            and (
+                balance.debit_balance > ZERO
+                or balance.credit_balance > ZERO
+            )
+        )
+
+        income_statement_ledger = (
+            self._workspace.pre_closing_ledger
+            if self._workspace.is_closed
+            else self._workspace.ledger
+        )
+
+        income_statement_balances = tuple(
+            balance
+            for balance in income_statement_ledger.balances()
+            if self._account_types.get(balance.account_number)
+            in income_statement_account_types
+            and (
+                balance.debit_balance > ZERO
+                or balance.credit_balance > ZERO
+            )
+        )
+
+        self._current_closing_balances = (
+            balance_sheet_balances
+            + income_statement_balances
+        )
+
+        income_statement_amounts = (
+            self._financial_statement_builder.build(
+                balances=income_statement_balances,
+                root_positions=(self._income_statement,),
+            )
+        )
+
+        income_statement = IncomeStatement(
+            income_statement=self._income_statement,
+            amounts=income_statement_amounts,
+        )
+
+        self._current_income_statement = income_statement
+
+        net_income = self._closing_service.calculate_net_income(
+            income_statement=income_statement,
+        )
+
+        self._income_statement_frame.update_income_statement(
+            income_statement=income_statement,
+            net_income=net_income,
+        )
+
+        closing_result = ClosingResult(
+            net_income=net_income,
+        )
+
+        self._current_closing_result = closing_result
+
+        equity = next(
+            position
+            for position in self._liabilities.children
+            if position.code == "HGB.266.PASSIVA.A"
+        )
+
+        result_position = next(
+            position
+            for position in equity.children
+            if position.code == "HGB.266.PASSIVA.A.V"
+        )
+
+        try:
+            amounts = self._financial_statement_builder.build(
+                balances=balance_sheet_balances,
+                root_positions=(
+                    self._assets,
+                    self._liabilities,
+                ),
+                closing_result=closing_result,
+                result_position=result_position,
+            )
+        except ValueError as exc:
+            message = str(exc)
+
+            if (
+                "no debit position defined for account"
+                not in message
+                and "no credit position defined for account"
+                not in message
+            ):
+                raise
+
+            self._balance_sheet_frame.show_mapping_error(
+                message
+            )
+            return
+
+        balance_sheet = BalanceSheet(
+            assets=self._assets,
+            liabilities=self._liabilities,
+            amounts=amounts,
+        )
+
+        self._current_balance_sheet = balance_sheet
+
+        self._balance_sheet_frame.update_balance_sheet(
+            balance_sheet
+        )
+
+    def _export_balance_sheet_pdf(self) -> None:
+        """Exportiert die aktuelle Bilanz als PDF."""
+
+        if self._current_balance_sheet is None:
+            QMessageBox.warning(
+                self,
+                "Bilanz",
+                "Es steht keine Bilanz für den PDF-Export zur Verfügung.",
+            )
+            return
+
+        filename, _ = QFileDialog.getSaveFileName(
+            self,
+            "Bilanz als PDF exportieren",
+            "Bilanz.pdf",
+            "PDF-Dateien (*.pdf);;Alle Dateien (*)",
+        )
+
+        if not filename:
+            return
+
+        try:
+            exported_path = (
+                self._pdf_reporting_service.export_balance_sheet(
+                    balance_sheet=self._current_balance_sheet,
+                    company_name=self._context.company.name,
+                    fiscal_year_name=(
+                        self._context.fiscal_year.display_name
+                    ),
+                    target=Path(filename),
+                )
+            )
+        except OSError as exc:
+            QMessageBox.critical(
+                self,
+                "Bilanz konnte nicht exportiert werden",
+                str(exc),
+            )
+            return
+
+        QMessageBox.information(
+            self,
+            "Bilanz",
+            "PDF erfolgreich exportiert.\n\n"
+            f"{exported_path}",
+        )
+
+    def _export_income_statement_pdf(self) -> None:
+        """Exportiert die aktuelle GuV als PDF."""
+
+        if (
+            self._current_income_statement is None
+            or self._current_closing_result is None
+        ):
+            QMessageBox.warning(
+                self,
+                "Gewinn- und Verlustrechnung",
+                "Es steht keine GuV für den PDF-Export zur Verfügung.",
+            )
+            return
+
+        filename, _ = QFileDialog.getSaveFileName(
+            self,
+            "GuV als PDF exportieren",
+            "GuV.pdf",
+            "PDF-Dateien (*.pdf);;Alle Dateien (*)",
+        )
+
+        if not filename:
+            return
+
+        try:
+            exported_path = (
+                self._pdf_reporting_service.export_income_statement(
+                    income_statement=(
+                        self._current_income_statement
+                    ),
+                    net_income=(
+                        self._current_closing_result.net_income
+                    ),
+                    company_name=self._context.company.name,
+                    fiscal_year_name=(
+                        self._context.fiscal_year.display_name
+                    ),
+                    target=Path(filename),
+                )
+            )
+        except OSError as exc:
+            QMessageBox.critical(
+                self,
+                "GuV konnte nicht exportiert werden",
+                str(exc),
+            )
+            return
+
+        QMessageBox.information(
+            self,
+            "Gewinn- und Verlustrechnung",
+            "PDF erfolgreich exportiert.\n\n"
+            f"{exported_path}",
         )
 
     def _open_new_account(self) -> None:
