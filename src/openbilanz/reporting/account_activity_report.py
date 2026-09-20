@@ -24,3 +24,4 @@ class AccountActivityReport:
 
     account_number: str
     lines: tuple[AccountActivityReportLine, ...]
+    ending_balance: Decimal

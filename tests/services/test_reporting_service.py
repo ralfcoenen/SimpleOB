@@ -235,6 +235,82 @@ def test_account_statement_contains_only_requested_account() -> None:
     assert len(statement.lines) == 1
     assert statement.lines[0].entry is entry_1200
 
+def test_account_activity_report_can_exclude_opening_balance() -> None:
+    """Der Zeitraumsaldo beginnt im Gegensatz zum Kontoverlauf bei null."""
+
+    journal = Journal()
+
+    prior_booking = Booking(
+        booking_id=uuid4(),
+        booking_date=date(2026, 6, 30),
+        voucher_no="B-001",
+        description="Buchung vor Zeitraum",
+        lines=(
+            BookingLine(
+                account_number="1200",
+                side=EntrySide.DEBIT,
+                amount=Decimal("100.00"),
+            ),
+            BookingLine(
+                account_number="8400",
+                side=EntrySide.CREDIT,
+                amount=Decimal("100.00"),
+            ),
+        ),
+    )
+
+    period_booking = Booking(
+        booking_id=uuid4(),
+        booking_date=date(2026, 7, 15),
+        voucher_no="B-002",
+        description="Buchung im Zeitraum",
+        lines=(
+            BookingLine(
+                account_number="1200",
+                side=EntrySide.DEBIT,
+                amount=Decimal("40.00"),
+            ),
+            BookingLine(
+                account_number="8400",
+                side=EntrySide.CREDIT,
+                amount=Decimal("40.00"),
+            ),
+        ),
+    )
+
+    journal.add(prior_booking)
+    journal.add(period_booking)
+
+    service = ReportingService()
+
+    account_history = service.account_activity_report(
+        journal=journal,
+        account_number="1200",
+        start_date=date(2026, 7, 1),
+        end_date=date(2026, 7, 31),
+    )
+
+    period_activity = service.account_activity_report(
+        journal=journal,
+        account_number="1200",
+        start_date=date(2026, 7, 1),
+        end_date=date(2026, 7, 31),
+        include_opening_balance=False,
+    )
+
+    assert len(account_history.lines) == 1
+    assert (
+        account_history.lines[0].running_balance
+        == Decimal("140.00")
+    )
+    assert account_history.ending_balance == Decimal("140.00")
+
+    assert len(period_activity.lines) == 1
+    assert (
+        period_activity.lines[0].running_balance
+        == Decimal("40.00")
+    )
+    assert period_activity.ending_balance == Decimal("40.00")
 
 def test_trial_balance_report_separates_opening_and_turnover() -> None:
     """Eröffnungswerte werden nicht als laufender Umsatz ausgewiesen."""

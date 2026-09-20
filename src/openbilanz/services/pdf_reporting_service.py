@@ -266,6 +266,7 @@ class PdfReportingService:
         start_date: date,
         end_date: date,
         target: Path,
+        include_opening_balance: bool = True,
     ) -> Path:
         """Exportiert eine Kontenauswertung."""
 
@@ -328,13 +329,43 @@ class PdfReportingService:
                     ]
                 )
 
+        balance_title = (
+            "Endsaldo"
+            if include_opening_balance
+            else "Zeitraumssaldo"
+        )
+
+        balance_lines = tuple(
+            (
+                f"{balance_title} "
+                f"{report.account_number}"
+                + (
+                    f" – {account_names[report.account_number]}"
+                    if account_names.get(report.account_number)
+                    else ""
+                )
+                + ": "
+                + self._format_amount(
+                    report.ending_balance
+                )
+            )
+            for report in reports
+        )
+
         return self._build_pdf(
             target=target,
             title="Kontenauswertung",
             company_name=company_name,
-            period_text=self._format_period(
-                start_date,
-                end_date,
+            period_text=(
+                self._format_period(
+                    start_date,
+                    end_date,
+                )
+                + (
+                    " · Kontoverlauf"
+                    if include_opening_balance
+                    else " · Zeitraumsaldo"
+                )
             ),
             rows=rows,
             column_widths=(
@@ -347,6 +378,8 @@ class PdfReportingService:
                 30 * mm,
             ),
             landscape_page=True,
+            summary_lines=balance_lines,
+            bold_last_row=False,
         )
 
     def export_fixed_asset_schedule(
@@ -1132,6 +1165,8 @@ class PdfReportingService:
         rows: list[list[str]],
         column_widths: tuple[float, ...],
         landscape_page: bool = False,
+        summary_lines: tuple[str, ...] = (),
+        bold_last_row: bool = True,
     ) -> Path:
         """Schreibt einen tabellarischen Bericht als PDF."""
 
@@ -1230,12 +1265,6 @@ class PdfReportingService:
                         "Helvetica-Bold",
                     ),
                     (
-                        "FONTNAME",
-                        (0, -1),
-                        (-1, -1),
-                        "Helvetica-Bold",
-                    ),
-                    (
                         "GRID",
                         (0, 0),
                         (-1, -1),
@@ -1270,7 +1299,45 @@ class PdfReportingService:
             )
         )
 
+        if bold_last_row:
+            table.setStyle(
+                TableStyle(
+                    [
+                        (
+                            "FONTNAME",
+                            (0, -1),
+                            (-1, -1),
+                            "Helvetica-Bold",
+                        ),
+                    ]
+                )
+            )
+
         story.append(table)
+
+        if summary_lines:
+            summary_style = ParagraphStyle(
+                "ReportSummary",
+                parent=styles["Normal"],
+                fontName="Helvetica-Bold",
+                spaceBefore=2,
+                spaceAfter=2,
+            )
+
+            story.append(
+                Spacer(
+                    1,
+                    5 * mm,
+                )
+            )
+
+            for summary_line in summary_lines:
+                story.append(
+                    Paragraph(
+                        summary_line,
+                        summary_style,
+                    )
+                )
 
         document.build(story)
 

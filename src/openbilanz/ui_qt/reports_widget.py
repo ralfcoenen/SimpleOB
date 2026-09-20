@@ -3,11 +3,15 @@
 from datetime import date
 from pathlib import Path
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QComboBox,
     QFileDialog,
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QListWidget,
+    QListWidgetItem,
     QMessageBox,
     QPushButton,
     QTabWidget,
@@ -22,7 +26,10 @@ from openbilanz.domain.account import Account
 from openbilanz.domain.entry_side import EntrySide
 from openbilanz.services.fiscal_year_workspace import FiscalYearWorkspace
 from openbilanz.services.pdf_reporting_service import PdfReportingService
-from openbilanz.date_input import parse_german_date
+from openbilanz.date_input import (
+    normalize_german_date,
+    parse_german_date,
+)
 
 
 class ReportsWidget(QWidget):
@@ -52,6 +59,7 @@ class ReportsWidget(QWidget):
         self._current_account_activity_reports = ()
         self._current_account_activity_start_date: date | None = None
         self._current_account_activity_end_date: date | None = None
+        self._current_account_activity_include_opening_balance = True
         self._current_journal_report = None
 
         self._account_names = {
@@ -265,6 +273,11 @@ class ReportsWidget(QWidget):
             )
         )
         self._account_activity_start_date.setMaximumWidth(110)
+        self._account_activity_start_date.editingFinished.connect(
+            lambda: self._normalize_date_entry(
+                self._account_activity_start_date
+            )
+        )
         filter_layout.addWidget(
             self._account_activity_start_date
         )
@@ -276,19 +289,31 @@ class ReportsWidget(QWidget):
             )
         )
         self._account_activity_end_date.setMaximumWidth(110)
+        self._account_activity_end_date.editingFinished.connect(
+            lambda: self._normalize_date_entry(
+                self._account_activity_end_date
+            )
+        )
         filter_layout.addWidget(
             self._account_activity_end_date
         )
 
-        filter_layout.addWidget(QLabel("Konto von:"))
-        self._account_from = QLineEdit()
-        self._account_from.setMaximumWidth(90)
-        filter_layout.addWidget(self._account_from)
+        filter_layout.addWidget(QLabel("Darstellung:"))
 
-        filter_layout.addWidget(QLabel("Konto bis:"))
-        self._account_to = QLineEdit()
-        self._account_to.setMaximumWidth(90)
-        filter_layout.addWidget(self._account_to)
+        self._account_activity_mode = QComboBox()
+        self._account_activity_mode.addItems(
+            (
+                "Kontoverlauf",
+                "Zeitraumsaldo",
+            )
+        )
+        self._account_activity_mode.setCurrentText(
+            "Kontoverlauf"
+        )
+        self._account_activity_mode.setMaximumWidth(160)
+        filter_layout.addWidget(
+            self._account_activity_mode
+        )
 
         refresh_button = QPushButton("Aktualisieren")
         refresh_button.clicked.connect(
@@ -304,6 +329,43 @@ class ReportsWidget(QWidget):
 
         filter_layout.addStretch()
         layout.addLayout(filter_layout)
+
+        account_label = QLabel(
+            "Konten auswählen:"
+        )
+        account_label.setStyleSheet(
+            "font-weight: bold;"
+        )
+        layout.addWidget(account_label)
+
+        self._account_activity_account_list = QListWidget()
+        self._account_activity_account_list.setMaximumHeight(180)
+
+        for account in sorted(
+            (
+                account
+                for account in self._accounts
+                if account.is_active
+            ),
+            key=lambda account: account.number,
+        ):
+            item = QListWidgetItem(str(account))
+            item.setData(
+                Qt.ItemDataRole.UserRole,
+                account.number,
+            )
+            item.setFlags(
+                item.flags()
+                | Qt.ItemFlag.ItemIsUserCheckable
+            )
+            item.setCheckState(
+                Qt.CheckState.Unchecked
+            )
+            self._account_activity_account_list.addItem(item)
+
+        layout.addWidget(
+            self._account_activity_account_list
+        )
 
         self._account_activity_table = QTableWidget()
         self._account_activity_table.setColumnCount(8)
@@ -327,6 +389,62 @@ class ReportsWidget(QWidget):
         )
         layout.addWidget(self._account_activity_table)
 
+        self._account_activity_balance_label = QLabel()
+        self._account_activity_balance_label.setStyleSheet(
+            "font-weight: bold;"
+        )
+        self._account_activity_balance_label.setAlignment(
+            Qt.AlignmentFlag.AlignRight
+        )
+        layout.addWidget(
+            self._account_activity_balance_label
+        )
+
+    @staticmethod
+    def _normalize_date_entry(
+        entry: QLineEdit,
+    ) -> None:
+        """Normalisiert eine gültige deutsche Datumseingabe."""
+
+        value = entry.text().strip()
+
+        if not value:
+            return
+
+        try:
+            normalized = normalize_german_date(value)
+        except ValueError:
+            return
+
+        entry.setText(normalized)
+
+    def _selected_account_activity_numbers(
+        self,
+    ) -> tuple[str, ...]:
+        """Liefert die angehakten Konten der Kontenauswertung."""
+
+        account_numbers = []
+
+        for index in range(
+            self._account_activity_account_list.count()
+        ):
+            item = self._account_activity_account_list.item(index)
+
+            if (
+                item.checkState()
+                != Qt.CheckState.Checked
+            ):
+                continue
+
+            account_number = item.data(
+                Qt.ItemDataRole.UserRole
+            )
+
+            if isinstance(account_number, str):
+                account_numbers.append(account_number)
+
+        return tuple(account_numbers)
+
     def _refresh_account_activity(self) -> None:
         """Aktualisiert die gefilterte Kontenauswertung."""
 
@@ -338,41 +456,23 @@ class ReportsWidget(QWidget):
                 self._account_activity_end_date.text()
             )
 
-            from_account = self._account_from.text().strip()
-            to_account = self._account_to.text().strip()
-
-            if not from_account:
+            if end_date < start_date:
                 raise ValueError(
-                    "Bitte geben Sie mindestens "
-                    "'Konto von' ein."
+                    "'Bis' darf nicht vor 'Von' liegen."
                 )
 
-            if not to_account:
-                to_account = from_account
-                self._account_to.setText(to_account)
+            account_numbers = (
+                self._selected_account_activity_numbers()
+            )
 
-            if (
-                not from_account.isdigit()
-                or not to_account.isdigit()
-            ):
+            if not account_numbers:
                 raise ValueError(
-                    "Die Kontonummern müssen numerisch sein."
+                    "Bitte wählen Sie mindestens ein Konto aus."
                 )
 
-            if int(to_account) < int(from_account):
-                raise ValueError(
-                    "'Konto bis' darf nicht kleiner "
-                    "als 'Konto von' sein."
-                )
-
-            account_numbers = tuple(
-                account.number
-                for account in self._accounts
-                if (
-                    int(from_account)
-                    <= int(account.number)
-                    <= int(to_account)
-                )
+            include_opening_balance = (
+                self._account_activity_mode.currentText()
+                == "Kontoverlauf"
             )
 
             statements = tuple(
@@ -380,9 +480,13 @@ class ReportsWidget(QWidget):
                     account_number=account_number,
                     start_date=start_date,
                     end_date=end_date,
+                    include_opening_balance=(
+                        include_opening_balance
+                    ),
                 )
                 for account_number in account_numbers
             )
+
         except ValueError as exc:
             QMessageBox.critical(
                 self,
@@ -394,6 +498,9 @@ class ReportsWidget(QWidget):
         self._current_account_activity_reports = statements
         self._current_account_activity_start_date = start_date
         self._current_account_activity_end_date = end_date
+        self._current_account_activity_include_opening_balance = (
+            include_opening_balance
+        )
 
         self._account_activity_start_date.setText(
             start_date.strftime("%d.%m.%Y")
@@ -437,6 +544,31 @@ class ReportsWidget(QWidget):
                 )
 
         self._account_activity_table.resizeColumnsToContents()
+
+        balances = []
+
+        for statement in statements:
+            account_name = self._account_names.get(
+                statement.account_number,
+                "Unbekanntes Konto",
+            )
+
+            balances.append(
+                f"{statement.account_number} "
+                f"{account_name}: "
+                f"{statement.ending_balance:.2f}"
+            )
+
+        balance_title = (
+            "Endsalden: "
+            if include_opening_balance
+            else "Zeitraumssalden: "
+        )
+
+        self._account_activity_balance_label.setText(
+            balance_title
+            + " · ".join(balances)
+        )
 
     def _create_journal_tab(self) -> None:
         """Erzeugt die Journalauswertung."""
@@ -668,6 +800,9 @@ class ReportsWidget(QWidget):
                         self._current_account_activity_end_date
                     ),
                     target=target,
+                    include_opening_balance=(
+                        self._current_account_activity_include_opening_balance
+                    ),
                 )
             )
         except OSError as exc:

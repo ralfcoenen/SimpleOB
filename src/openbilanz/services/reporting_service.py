@@ -269,6 +269,7 @@ class ReportingService:
         account_number: str,
         start_date: date,
         end_date: date,
+        include_opening_balance: bool = True,
     ) -> AccountActivityReport:
         """Erzeugt eine gefilterte Kontenauswertung aus dem Journal."""
 
@@ -282,12 +283,16 @@ class ReportingService:
             raise TypeError("end_date muss ein Datum sein.")
 
         if end_date < start_date:
-            raise ValueError("Das Enddatum darf nicht vor dem Startdatum liegen.")
+            raise ValueError(
+                "Das Enddatum darf nicht vor dem Startdatum liegen."
+            )
 
         normalized_account_number = account_number.strip()
 
         if not normalized_account_number:
-            raise ValueError("Die Kontonummer darf nicht leer sein.")
+            raise ValueError(
+                "Die Kontonummer darf nicht leer sein."
+            )
 
         running_balance = ZERO
         lines: list[AccountActivityReportLine] = []
@@ -297,7 +302,10 @@ class ReportingService:
                 continue
 
             for booking_line in booking.lines:
-                if booking_line.account_number != normalized_account_number:
+                if (
+                    booking_line.account_number
+                    != normalized_account_number
+                ):
                     continue
 
                 signed_amount = (
@@ -307,7 +315,8 @@ class ReportingService:
                 )
 
                 if booking.booking_date < start_date:
-                    running_balance += signed_amount
+                    if include_opening_balance:
+                        running_balance += signed_amount
                     continue
 
                 if booking.booking_date > end_date:
@@ -342,6 +351,7 @@ class ReportingService:
         return AccountActivityReport(
             account_number=normalized_account_number,
             lines=tuple(lines),
+            ending_balance=running_balance,
         )
 
     def journal_report(

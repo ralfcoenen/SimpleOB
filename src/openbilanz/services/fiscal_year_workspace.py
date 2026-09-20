@@ -686,6 +686,7 @@ class FiscalYearWorkspace:
         account_number: str,
         start_date: date,
         end_date: date,
+        include_opening_balance: bool = True,
     ) -> AccountActivityReport:
         """Erzeugt eine Kontenauswertung für das geöffnete Geschäftsjahr."""
 
@@ -694,6 +695,7 @@ class FiscalYearWorkspace:
             account_number=account_number,
             start_date=start_date,
             end_date=end_date,
+            include_opening_balance=include_opening_balance,
         )
 
     def build_journal_report(
