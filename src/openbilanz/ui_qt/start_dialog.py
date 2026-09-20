@@ -15,6 +15,9 @@ from openbilanz.database.company_repository import CompanyRepository
 from openbilanz.domain.company import Company
 from openbilanz.domain.fiscal_year import FiscalYear
 from openbilanz.ui_qt.new_company_dialog import NewCompanyDialog
+from openbilanz.ui_qt.new_fiscal_year_dialog import (
+    NewFiscalYearDialog,
+)
 
 
 class StartDialog(QDialog):
@@ -103,6 +106,17 @@ class StartDialog(QDialog):
             QDialogButtonBox.ButtonRole.ActionRole,
         )
 
+        self._new_fiscal_year_button = QPushButton(
+            "Neues Geschäftsjahr"
+        )
+        self._new_fiscal_year_button.clicked.connect(
+            self._create_new_fiscal_year
+        )
+        button_box.addButton(
+            self._new_fiscal_year_button,
+            QDialogButtonBox.ButtonRole.ActionRole,
+        )
+
         self._open_button = QPushButton("Öffnen")
         self._open_button.setEnabled(False)
         self._open_button.clicked.connect(self._open)
@@ -142,9 +156,11 @@ class StartDialog(QDialog):
                 "Es ist noch keine Buchhaltung vorhanden."
             )
             self._fiscal_year_box.clear()
+            self._new_fiscal_year_button.setEnabled(False)
             self._open_button.setEnabled(False)
             return
 
+        self._new_fiscal_year_button.setEnabled(True)
         self._load_fiscal_years(self._companies[0])
 
     def _on_company_selected(
@@ -240,4 +256,39 @@ class StartDialog(QDialog):
             return
 
         self.result = dialog.result
+        self.accept()
+
+    def _create_new_fiscal_year(self) -> None:
+        """Legt für das ausgewählte Unternehmen ein Geschäftsjahr an."""
+
+        company = self._selected_company()
+
+        if company is None:
+            return
+
+        dialog = NewFiscalYearDialog(
+            self,
+            repository=self._repository,
+            company=company,
+        )
+
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        if dialog.result is None:
+            return
+
+        fiscal_year = dialog.result
+
+        if dialog.requested_opening_source is not None:
+            self.opening_transfer_request = (
+                fiscal_year,
+                dialog.requested_opening_source,
+            )
+
+        self.result = ApplicationContext(
+            company=company,
+            fiscal_year=fiscal_year,
+        )
+
         self.accept()

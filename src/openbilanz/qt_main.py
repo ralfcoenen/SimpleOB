@@ -64,6 +64,12 @@ from openbilanz.services.e_bilanz_service import EBilanzService
 from openbilanz.services.fiscal_year_closing_workflow import (
     FiscalYearClosingWorkflow,
 )
+from openbilanz.services.fiscal_year_opening_workflow import (
+    FiscalYearOpeningWorkflow,
+)
+from openbilanz.services.fiscal_year_transfer_service import (
+    FiscalYearTransferService,
+)
 from openbilanz.services.fiscal_year_workspace import FiscalYearWorkspace
 from openbilanz.services.fixed_asset_depreciation_workflow import (
     FixedAssetDepreciationWorkflow,
@@ -237,6 +243,10 @@ def main() -> None:
             if context is None:
                 break
 
+            opening_transfer_request = (
+                dialog.opening_transfer_request
+            )
+
             initialized = (
                 chart_of_accounts_initialization_service.initialize(
                     company=context.company,
@@ -308,6 +318,53 @@ def main() -> None:
                     accounts=accounts,
                 )
             )
+
+            if opening_transfer_request is not None:
+                (
+                    target_fiscal_year,
+                    source_fiscal_year,
+                ) = opening_transfer_request
+
+                if target_fiscal_year != context.fiscal_year:
+                    raise RuntimeError(
+                        "Das für die Saldenübernahme "
+                        "vorgesehene Geschäftsjahr stimmt "
+                        "nicht mit dem ausgewählten "
+                        "Geschäftsjahr überein."
+                    )
+
+                transfer_service = FiscalYearTransferService(
+                    opening_balance_account_number=(
+                        control_accounts.opening_balance_account
+                    ),
+                    profit_account_number=(
+                        control_accounts.profit_account
+                    ),
+                    loss_account_number=(
+                        control_accounts.loss_account
+                    ),
+                    profit_loss_carryforward_account_number=(
+                        control_accounts
+                        .profit_loss_carryforward_account
+                    ),
+                )
+
+                opening_workflow = FiscalYearOpeningWorkflow(
+                    session=session,
+                    booking_repository=booking_repository,
+                    company_repository=company_repository,
+                    transfer_service=transfer_service,
+                    posting_service=posting_service,
+                )
+
+                opening_workflow.open(
+                    company_id=context.company.company_id,
+                    source_fiscal_year=source_fiscal_year,
+                    target_fiscal_year=target_fiscal_year,
+                    account_types=(
+                        financial_statement_context.account_types
+                    ),
+                )
 
             closing_accounts = ClosingAccounts(
                 income_summary_account=(
