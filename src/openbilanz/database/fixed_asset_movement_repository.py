@@ -120,15 +120,6 @@ class FixedAssetMovementRepository:
                 "Die Buchungszeile ist nicht vorhanden."
             )
 
-        if (
-            booking_line_model.amount
-            != movement.amount
-        ):
-            raise ValueError(
-                "Der Betrag der Buchungszeile stimmt "
-                "nicht mit der Anlagenbewegung überein."
-            )
-
         existing_movement = (
             self._session.query(Anlagebewegung)
             .filter(
@@ -201,6 +192,30 @@ class FixedAssetMovementRepository:
                     "Die Anlagenbewegung wurde bereits "
                     "storniert."
                 )
+
+        amount_may_differ = (
+            movement.movement_type
+            is FixedAssetMovementType.DISPOSAL
+        )
+
+        if (
+            movement.movement_type
+            is FixedAssetMovementType.REVERSAL
+            and reversed_movement_model is not None
+            and reversed_movement_model.movement_type
+            == FixedAssetMovementType.DISPOSAL.value
+        ):
+            amount_may_differ = True
+
+        if (
+            not amount_may_differ
+            and booking_line_model.amount
+            != movement.amount
+        ):
+            raise ValueError(
+                "Der Betrag der Buchungszeile stimmt "
+                "nicht mit der Anlagenbewegung überein."
+            )
 
         model = Anlagebewegung(
             movement_id=str(

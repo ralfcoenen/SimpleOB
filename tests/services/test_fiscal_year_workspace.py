@@ -1341,6 +1341,186 @@ def test_builds_open_depreciation_proposal(
         depreciation_end_date=None,
     )
 
+def test_builds_fixed_asset_disposal_preview(
+    context: ApplicationContext,
+) -> None:
+    booking_repository = Mock()
+    company_repository = Mock()
+    chart_of_accounts_repository = Mock()
+    fixed_asset_repository = Mock()
+    fixed_asset_movement_repository = Mock()
+    depreciation_repository = Mock()
+    depreciation_service = Mock()
+    disposal_service = Mock()
+
+    company_repository.get_managed_fiscal_years.return_value = (
+        ManagedFiscalYear(
+            fiscal_year=context.fiscal_year,
+            status=FiscalYearStatus.OPEN,
+            opening_source=None,
+        ),
+    )
+
+    asset = FixedAsset(
+        company_id=context.company.company_id,
+        asset_code="A-0001",
+        description="MacBook Pro",
+        position_code="HGB.266.AKTIVA.A.II.3",
+        asset_account_number="0690",
+        depreciation_expense_account_number="4830",
+        acquisition_date=date(2026, 3, 15),
+        acquisition_cost=Decimal("2400.00"),
+        depreciation_start_date=date(2026, 3, 15),
+        useful_life_months=36,
+    )
+
+    acquisition_movement = FixedAssetMovement(
+        fixed_asset_id=asset.fixed_asset_id,
+        fiscal_year_end=context.fiscal_year.end_date,
+        movement_date=asset.acquisition_date,
+        amount=asset.acquisition_cost,
+        booking_id=uuid4(),
+        movement_type=FixedAssetMovementType.ACQUISITION,
+    )
+
+    proposal = DepreciationProposal(
+        fixed_asset_id=asset.fixed_asset_id,
+        depreciation_date=date(2026, 8, 15),
+        amount=Decimal("400.00"),
+        expense_account_number="4830",
+        asset_account_number="0690",
+    )
+
+    control_accounts = Mock(
+        spec=AccountingControlAccounts
+    )
+    vat_accounts = Mock(
+        spec=VatAccounts
+    )
+    account_roles = Mock(
+        spec=AccountingAccountRoles
+    )
+    disposal_calculation = Mock()
+
+    fixed_asset_repository.get.return_value = asset
+
+    (
+        fixed_asset_movement_repository
+        .list_for_fixed_asset
+        .return_value
+    ) = (
+        acquisition_movement,
+    )
+
+    depreciation_repository.list_for_fixed_asset.return_value = ()
+
+    depreciation_service.build_proposal.return_value = (
+        proposal
+    )
+
+    (
+        chart_of_accounts_repository
+        .load_control_accounts
+        .return_value
+    ) = control_accounts
+    (
+        chart_of_accounts_repository
+        .load_vat_accounts
+        .return_value
+    ) = vat_accounts
+    (
+        chart_of_accounts_repository
+        .load_account_roles
+        .return_value
+    ) = account_roles
+
+    disposal_service.calculate.return_value = (
+        disposal_calculation
+    )
+
+    booking_repository.list_for_fiscal_year.return_value = ()
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=company_repository,
+        chart_of_accounts_repository=(
+            chart_of_accounts_repository
+        ),
+        posting_service=Mock(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
+        e_bilanz_export_service=Mock(),
+        taxonomy_management_service=Mock(),
+        fixed_asset_repository=(
+            fixed_asset_repository
+        ),
+        fixed_asset_movement_repository=(
+            fixed_asset_movement_repository
+        ),
+        fixed_asset_depreciation_repository=(
+            depreciation_repository
+        ),
+        depreciation_service=(
+            depreciation_service
+        ),
+        fixed_asset_depreciation_workflow=Mock(),
+        fixed_asset_disposal_service=(
+            disposal_service
+        ),
+    )
+
+    preview = workspace.build_fixed_asset_disposal_preview(
+        fixed_asset_id=asset.fixed_asset_id,
+        disposal_date=date(2026, 8, 15),
+        gross_proceeds=Decimal("2380.00"),
+        tax_rate=19,
+        counter_account_number="1200",
+        voucher_no="V-001",
+        description="Verkauf MacBook Pro",
+    )
+
+    assert preview.fixed_asset == asset
+    assert (
+        preview.previous_depreciation
+        == Decimal("0.00")
+    )
+    assert preview.depreciation_proposal == proposal
+    assert (
+        preview.accumulated_depreciation
+        == Decimal("400.00")
+    )
+    assert (
+        preview.disposal_calculation
+        is disposal_calculation
+    )
+
+    depreciation_service.build_proposal.assert_called_once_with(
+        fixed_asset=asset,
+        fiscal_year=context.fiscal_year,
+        previous_depreciation=Decimal("0.00"),
+        expense_account_number="4830",
+        asset_account_number="0690",
+        depreciation_end_date=date(2026, 8, 15),
+    )
+
+    disposal_service.calculate.assert_called_once_with(
+        booking_date=date(2026, 8, 15),
+        acquisition_cost=Decimal("2400.00"),
+        accumulated_depreciation=Decimal("400.00"),
+        gross_proceeds=Decimal("2380.00"),
+        tax_rate=19,
+        asset_account_number="0690",
+        counter_account_number="1200",
+        control_accounts=control_accounts,
+        vat_accounts=vat_accounts,
+        voucher_no="V-001",
+        description="Verkauf MacBook Pro",
+    )
+
 def test_confirmed_depreciation_is_not_proposed_again(
     context: ApplicationContext,
 ) -> None:
@@ -2487,6 +2667,8 @@ def test_loads_and_updates_account_configuration(
         loss_account="8021",
         profit_loss_carryforward_account="2970",
         depreciation_expense_account="4830",
+        fixed_asset_disposal_gain_account="8500",
+        fixed_asset_disposal_loss_account="4900",
     )
 
     vat_accounts = VatAccounts(

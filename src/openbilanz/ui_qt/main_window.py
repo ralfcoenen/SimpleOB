@@ -72,13 +72,12 @@ from openbilanz.ui_qt.e_bilanz_account_mapping_dialog import (
     EBilanzAccountMappingDialog,
 )
 from openbilanz.ui_qt.e_bilanz_frame import EBilanzFrame
-from openbilanz.ui_qt.opening_balance_dialog import OpeningBalanceDialog
-from openbilanz.ui_qt.shareholder_dialog import (
-    ShareholdersDialog,
-)
 from openbilanz.ui_qt.fixed_asset_acquisition_link_dialog import (
     AcquisitionBookingCandidate,
     FixedAssetAcquisitionLinkDialog,
+)
+from openbilanz.ui_qt.fixed_asset_disposal_dialog import (
+    FixedAssetDisposalDialog,
 )
 from openbilanz.ui_qt.fixed_asset_disposal_link_dialog import (
     DisposalBookingCandidate,
@@ -1646,13 +1645,15 @@ class MainWindow(QMainWindow):
         )
 
         self._fixed_asset_table = QTableWidget()
-        self._fixed_asset_table.setColumnCount(9)
+        self._fixed_asset_table.setColumnCount(11)
         self._fixed_asset_table.setHorizontalHeaderLabels(
             (
                 "Anlagen-ID",
                 "Bezeichnung",
                 "Anschaffung",
                 "AK/HK",
+                "kum. AfA",
+                "Buchwert",
                 "ND Monate",
                 "Anlagekonto",
                 "AfA-Konto",
@@ -1691,7 +1692,7 @@ class MainWindow(QMainWindow):
             QHeaderView.ResizeMode.Stretch,
         )
 
-        for column in range(2, 9):
+        for column in range(2, 11):
             header.setSectionResizeMode(
                 column,
                 QHeaderView.ResizeMode.ResizeToContents,
@@ -1812,6 +1813,17 @@ class MainWindow(QMainWindow):
         for row, asset in enumerate(
             self._fixed_assets
         ):
+            accumulated_depreciation = (
+                self._workspace
+                .fixed_asset_accumulated_depreciation(
+                    asset.fixed_asset_id
+                )
+            )
+
+            carrying_amount = (
+                asset.acquisition_cost
+                - accumulated_depreciation
+            )
             status = (
                 "Aktiv"
                 if asset.status.value == "ACTIVE"
@@ -1842,6 +1854,12 @@ class MainWindow(QMainWindow):
                 self._format_amount(
                     asset.acquisition_cost
                 ),
+                self._format_amount(
+                    accumulated_depreciation
+                ),
+                self._format_amount(
+                    carrying_amount
+                ),
                 asset.useful_life_months,
                 asset.asset_account_number,
                 asset.depreciation_expense_account_number,
@@ -1856,7 +1874,7 @@ class MainWindow(QMainWindow):
                     str(value)
                 )
 
-                if column in (3, 4):
+                if column in (3, 4, 5, 6):
                     item.setTextAlignment(
                         Qt.AlignmentFlag.AlignRight
                         | Qt.AlignmentFlag.AlignVCenter
@@ -1918,6 +1936,11 @@ class MainWindow(QMainWindow):
         acquisition_action = menu.addAction(
             "Anschaffungsbuchung zuordnen"
         )
+
+        sale_action = menu.addAction(
+            "Anlagegut verkaufen …"
+        )
+
         disposal_action = menu.addAction(
             "Abgangsbuchung zuordnen"
         )
@@ -1931,6 +1954,9 @@ class MainWindow(QMainWindow):
             enabled
         )
         acquisition_action.setEnabled(
+            enabled
+        )
+        sale_action.setEnabled(
             enabled
         )
         disposal_action.setEnabled(
@@ -1949,6 +1975,8 @@ class MainWindow(QMainWindow):
             self._delete_fixed_asset()
         elif selected_action is acquisition_action:
             self._open_link_fixed_asset_acquisition()
+        elif selected_action is sale_action:
+            self._open_fixed_asset_disposal()
         elif selected_action is disposal_action:
             self._open_link_fixed_asset_disposal()
 
@@ -2268,6 +2296,251 @@ class MainWindow(QMainWindow):
         )
 
         self._refresh_fixed_assets()
+
+    def _open_fixed_asset_disposal(self) -> None:
+        """Erfasst und bucht den Verkauf eines Anlageguts."""
+
+        if not self._workspace.is_open:
+            return
+
+        fixed_asset = self._selected_fixed_asset()
+
+        if fixed_asset is None:
+            QMessageBox.information(
+                self,
+                "Anlagegut verkaufen",
+                "Bitte zuerst ein Anlagegut auswählen.",
+            )
+            return
+
+        if fixed_asset.status.value != "ACTIVE":
+            QMessageBox.information(
+                self,
+                "Anlagegut verkaufen",
+                "Das ausgewählte Anlagegut ist bereits abgegangen.",
+            )
+            return
+
+        try:
+            acquisition_linked = (
+                self._workspace.has_fixed_asset_acquisition(
+                    fixed_asset.fixed_asset_id
+                )
+            )
+        except RuntimeError as exc:
+            QMessageBox.critical(
+                self,
+                "Anlagenverkauf kann nicht vorbereitet werden",
+                str(exc),
+            )
+            return
+
+        if not acquisition_linked:
+            QMessageBox.information(
+                self,
+                "Anlagegut verkaufen",
+                (
+                    "Dem ausgewählten Anlagegut ist noch keine "
+                    "Anschaffungsbuchung zugeordnet."
+                ),
+            )
+            return
+
+        dialog = FixedAssetDisposalDialog(
+            self,
+            fixed_asset=fixed_asset,
+            accounts=self._accounts,
+        )
+
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        disposal_input = dialog.result
+
+        if disposal_input is None:
+            return
+
+        try:
+            preview = (
+                self._workspace.build_fixed_asset_disposal_preview(
+                    fixed_asset_id=fixed_asset.fixed_asset_id,
+                    disposal_date=disposal_input.disposal_date,
+                    gross_proceeds=disposal_input.gross_proceeds,
+                    tax_rate=disposal_input.tax_rate,
+                    counter_account_number=(
+                        disposal_input.counter_account_number
+                    ),
+                    voucher_no=disposal_input.voucher_no,
+                    description=(
+                        "Verkauf Anlagegut "
+                        f"{fixed_asset.asset_code} – "
+                        f"{fixed_asset.description}"
+                    ),
+                )
+            )
+        except (
+            ValueError,
+            RuntimeError,
+        ) as exc:
+            QMessageBox.critical(
+                self,
+                "Anlagenverkauf kann nicht vorbereitet werden",
+                str(exc),
+            )
+            return
+
+        if preview.depreciation_proposal is not None:
+            proposal = preview.depreciation_proposal
+
+            answer = QMessageBox.question(
+                self,
+                "Abschreibung vor Anlagenverkauf",
+                (
+                    "Vor dem Anlagenverkauf ist noch eine "
+                    "Abschreibung zu buchen.\n\n"
+                    f"Betrag: {proposal.amount:.2f} €\n"
+                    "Aufwandskonto: "
+                    f"{proposal.expense_account_number}\n"
+                    "Anlagenkonto: "
+                    f"{proposal.asset_account_number}\n"
+                    "Datum: "
+                    f"{proposal.depreciation_date:%d.%m.%Y}\n\n"
+                    "Soll diese Abschreibung jetzt gebucht werden?"
+                ),
+                (
+                    QMessageBox.StandardButton.Yes
+                    | QMessageBox.StandardButton.No
+                ),
+                QMessageBox.StandardButton.No,
+            )
+
+            if answer != QMessageBox.StandardButton.Yes:
+                return
+
+            try:
+                self._workspace.confirm_depreciation(
+                    proposal
+                )
+
+                preview = (
+                    self._workspace.build_fixed_asset_disposal_preview(
+                        fixed_asset_id=fixed_asset.fixed_asset_id,
+                        disposal_date=disposal_input.disposal_date,
+                        gross_proceeds=disposal_input.gross_proceeds,
+                        tax_rate=disposal_input.tax_rate,
+                        counter_account_number=(
+                            disposal_input.counter_account_number
+                        ),
+                        voucher_no=disposal_input.voucher_no,
+                        description=(
+                            "Verkauf Anlagegut "
+                            f"{fixed_asset.asset_code} – "
+                            f"{fixed_asset.description}"
+                        ),
+                    )
+                )
+
+            except (
+                ValueError,
+                RuntimeError,
+            ) as exc:
+                QMessageBox.critical(
+                    self,
+                    "Anlagenverkauf kann nicht vorbereitet werden",
+                    str(exc),
+                )
+                return
+
+        calculation = preview.disposal_calculation
+
+        booking_lines = []
+
+        for line in calculation.booking.lines:
+            side = (
+                "Soll"
+                if line.side is EntrySide.DEBIT
+                else "Haben"
+            )
+
+            booking_lines.append(
+                f"{line.account_number}  "
+                f"{side}  {line.amount:.2f} €"
+            )
+
+        booking_preview = "\n".join(
+            booking_lines
+        )
+
+        result_label = (
+            f"Gewinn: {calculation.gain:.2f} €"
+            if calculation.gain > ZERO
+            else (
+                f"Verlust: {calculation.loss:.2f} €"
+                if calculation.loss > ZERO
+                else "Gewinn/Verlust: 0,00 €"
+            )
+        )
+
+        answer = QMessageBox.question(
+            self,
+            "Anlagenverkauf bestätigen",
+            (
+                f"Anlagegut: {fixed_asset.asset_code} – "
+                f"{fixed_asset.description}\n"
+                "Abgangsdatum: "
+                f"{disposal_input.disposal_date:%d.%m.%Y}\n\n"
+                "Anschaffungskosten: "
+                f"{calculation.acquisition_cost:.2f} €\n"
+                "Kumulierte AfA: "
+                f"{calculation.accumulated_depreciation:.2f} €\n"
+                "Restbuchwert: "
+                f"{calculation.carrying_amount:.2f} €\n\n"
+                "Verkaufspreis brutto: "
+                f"{calculation.gross_proceeds:.2f} €\n"
+                "Nettoerlös: "
+                f"{calculation.net_proceeds:.2f} €\n"
+                "Umsatzsteuer: "
+                f"{calculation.tax_amount:.2f} €\n"
+                f"{result_label}\n\n"
+                "Buchung:\n"
+                f"{booking_preview}\n\n"
+                "Soll der Anlagenverkauf gebucht werden?"
+            ),
+            (
+                QMessageBox.StandardButton.Yes
+                | QMessageBox.StandardButton.No
+            ),
+            QMessageBox.StandardButton.No,
+        )
+
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+
+        try:
+            self._workspace.confirm_fixed_asset_disposal(
+                preview
+            )
+        except (
+            ValueError,
+            RuntimeError,
+        ) as exc:
+            QMessageBox.critical(
+                self,
+                "Anlagenverkauf konnte nicht gebucht werden",
+                str(exc),
+            )
+            return
+
+        QMessageBox.information(
+            self,
+            "Anlagenverkauf",
+            "Der Anlagenverkauf wurde erfolgreich gebucht.",
+        )
+
+        self._refresh_accounts()
+        self._refresh_journal()
+        self._refresh_fixed_assets()
+        self._refresh_balance_sheet()
 
     def _open_link_fixed_asset_disposal(self) -> None:
         """Ordnet eine vorhandene Abgangsbuchung einem Anlagegut zu."""

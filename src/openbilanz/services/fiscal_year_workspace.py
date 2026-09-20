@@ -68,6 +68,9 @@ from openbilanz.domain.fixed_asset import FixedAsset
 from openbilanz.domain.fixed_asset_depreciation import (
     FixedAssetDepreciation,
 )
+from openbilanz.domain.fixed_asset_disposal_preview import (
+    FixedAssetDisposalPreview,
+)
 from openbilanz.domain.fixed_asset_movement import (
     FixedAssetMovement,
 )
@@ -117,6 +120,12 @@ from openbilanz.services.fiscal_year_closing_workflow import (
 )
 from openbilanz.services.fixed_asset_depreciation_workflow import (
     FixedAssetDepreciationWorkflow,
+)
+from openbilanz.services.fixed_asset_disposal_service import (
+    FixedAssetDisposalService,
+)
+from openbilanz.services.fixed_asset_disposal_workflow import (
+    FixedAssetDisposalWorkflow,
 )
 from openbilanz.services.fixed_asset_schedule_service import (
     FixedAssetScheduleService,
@@ -178,6 +187,12 @@ class FiscalYearWorkspace:
         fixed_asset_schedule_service: (
             FixedAssetScheduleService | None
         ) = None,
+        fixed_asset_disposal_service: (
+            FixedAssetDisposalService | None
+        ) = None,
+        fixed_asset_disposal_workflow: (
+            FixedAssetDisposalWorkflow | None
+        ) = None,
     ) -> None:
         self._context = context
         self._booking_repository = booking_repository
@@ -218,6 +233,14 @@ class FiscalYearWorkspace:
         )
         self._fixed_asset_schedule_service = (
             fixed_asset_schedule_service
+        )
+        self._fixed_asset_disposal_service = (
+            fixed_asset_disposal_service
+            if fixed_asset_disposal_service is not None
+            else FixedAssetDisposalService()
+        )
+        self._fixed_asset_disposal_workflow = (
+            fixed_asset_disposal_workflow
         )
         self._tax_depreciation_adjustment_repository = (
             tax_depreciation_adjustment_repository
@@ -847,6 +870,38 @@ class FiscalYearWorkspace:
 
         return self._fixed_asset_repository.list_for_company(
             self._context.company.company_id
+        )
+
+    def fixed_asset_accumulated_depreciation(
+        self,
+        fixed_asset_id: UUID,
+    ) -> Decimal:
+        """Liefert die wirksame kumulierte AfA eines Anlageguts."""
+
+        if self._fixed_asset_depreciation_repository is None:
+            raise RuntimeError(
+                "Die Anlagenbuchhaltung ist nicht konfiguriert."
+            )
+
+        depreciations = (
+            self._fixed_asset_depreciation_repository
+            .list_for_fixed_asset(
+                fixed_asset_id
+            )
+        )
+
+        effective_depreciations = (
+            self._effective_fixed_asset_depreciations(
+                depreciations
+            )
+        )
+
+        return sum(
+            (
+                depreciation.amount
+                for depreciation in effective_depreciations
+            ),
+            start=Decimal("0.00"),
         )
 
     def add_fixed_asset(
@@ -1489,6 +1544,269 @@ class FiscalYearWorkspace:
         self._fixed_asset_repository.update(
             fixed_asset=disposed_fixed_asset,
         )
+
+        return movement
+
+    def build_fixed_asset_disposal_preview(
+        self,
+        *,
+        fixed_asset_id: UUID,
+        disposal_date: date,
+        gross_proceeds: Decimal,
+        tax_rate: int,
+        counter_account_number: str,
+        voucher_no: str | None = None,
+        description: str | None = None,
+    ) -> FixedAssetDisposalPreview:
+        """Erstellt die Vorschau eines Anlagenverkaufs."""
+
+        if not self.is_open:
+            raise ValueError(
+                "Das Geschäftsjahr ist abgeschlossen."
+            )
+
+        if (
+            self._fixed_asset_repository is None
+            or self._fixed_asset_depreciation_repository is None
+            or self._fixed_asset_movement_repository is None
+            or self._depreciation_service is None
+        ):
+            raise RuntimeError(
+                "Die Anlagenbuchhaltung ist nicht konfiguriert."
+            )
+
+        fixed_asset = self._fixed_asset_repository.get(
+            fixed_asset_id
+        )
+
+        if fixed_asset is None:
+            raise ValueError(
+                "Das Anlagegut ist nicht vorhanden."
+            )
+
+        if (
+            fixed_asset.company_id
+            != self._context.company.company_id
+        ):
+            raise ValueError(
+                "Das Anlagegut gehört nicht zum "
+                "geöffneten Unternehmen."
+            )
+
+        if fixed_asset.status is not FixedAssetStatus.ACTIVE:
+            raise ValueError(
+                "Das Anlagegut ist nicht aktiv."
+            )
+
+        if not self._context.fiscal_year.contains(
+            disposal_date
+        ):
+            raise ValueError(
+                "Das Abgangsdatum liegt außerhalb "
+                "des Geschäftsjahres."
+            )
+
+        if disposal_date < fixed_asset.acquisition_date:
+            raise ValueError(
+                "Das Abgangsdatum liegt vor dem "
+                "Anschaffungsdatum."
+            )
+
+        movements = (
+            self._fixed_asset_movement_repository
+            .list_for_fixed_asset(
+                fixed_asset.fixed_asset_id
+            )
+        )
+
+        effective_movements = (
+            self._effective_fixed_asset_movements(
+                movements
+            )
+        )
+
+        has_acquisition = any(
+            movement.movement_type
+            is FixedAssetMovementType.ACQUISITION
+            for movement in effective_movements
+        )
+
+        if not has_acquisition:
+            raise ValueError(
+                "Dem Anlagegut ist keine wirksame "
+                "Anschaffungsbuchung zugeordnet."
+            )
+
+        has_disposal = any(
+            movement.movement_type
+            is FixedAssetMovementType.DISPOSAL
+            for movement in effective_movements
+        )
+
+        if has_disposal:
+            raise ValueError(
+                "Dem Anlagegut ist bereits ein "
+                "wirksamer Anlagenabgang zugeordnet."
+            )
+
+        depreciations = (
+            self._fixed_asset_depreciation_repository
+            .list_for_fixed_asset(
+                fixed_asset.fixed_asset_id
+            )
+        )
+
+        effective_depreciations = (
+            self._effective_fixed_asset_depreciations(
+                depreciations
+            )
+        )
+
+        current_year_depreciations = tuple(
+            depreciation
+            for depreciation in effective_depreciations
+            if (
+                self._context.fiscal_year.contains(
+                    depreciation.depreciation_date
+                )
+            )
+        )
+
+        previous_depreciation = sum(
+            (
+                depreciation.amount
+                for depreciation in effective_depreciations
+                if depreciation
+                not in current_year_depreciations
+            ),
+            Decimal("0.00"),
+        )
+
+        depreciation_proposal = None
+
+        if current_year_depreciations:
+            if len(current_year_depreciations) != 1:
+                raise ValueError(
+                    "Für das Anlagegut sind mehrere "
+                    "wirksame Abschreibungen im aktuellen "
+                    "Geschäftsjahr vorhanden."
+                )
+
+            current_depreciation = (
+                current_year_depreciations[0]
+            )
+
+            if (
+                current_depreciation.depreciation_date
+                != disposal_date
+            ):
+                raise ValueError(
+                    "Für das Anlagegut ist bereits eine "
+                    "Abschreibung mit einem anderen "
+                    "Abschreibungsdatum gebucht."
+                )
+
+            accumulated_depreciation = sum(
+                (
+                    depreciation.amount
+                    for depreciation
+                    in effective_depreciations
+                ),
+                Decimal("0.00"),
+            )
+
+        else:
+            depreciation_proposal = (
+                self._depreciation_service.build_proposal(
+                    fixed_asset=fixed_asset,
+                    fiscal_year=self._context.fiscal_year,
+                    previous_depreciation=(
+                        previous_depreciation
+                    ),
+                    expense_account_number=(
+                        fixed_asset
+                        .depreciation_expense_account_number
+                    ),
+                    asset_account_number=(
+                        fixed_asset.asset_account_number
+                    ),
+                    depreciation_end_date=disposal_date,
+                )
+            )
+
+            accumulated_depreciation = (
+                previous_depreciation
+                + (
+                    depreciation_proposal.amount
+                    if depreciation_proposal is not None
+                    else Decimal("0.00")
+                )
+            )
+
+        (
+            control_accounts,
+            vat_accounts,
+            _account_roles,
+        ) = self.load_account_configuration()
+
+        disposal_calculation = (
+            self._fixed_asset_disposal_service.calculate(
+                booking_date=disposal_date,
+                acquisition_cost=(
+                    fixed_asset.acquisition_cost
+                ),
+                accumulated_depreciation=(
+                    accumulated_depreciation
+                ),
+                gross_proceeds=gross_proceeds,
+                tax_rate=tax_rate,
+                asset_account_number=(
+                    fixed_asset.asset_account_number
+                ),
+                counter_account_number=(
+                    counter_account_number
+                ),
+                control_accounts=control_accounts,
+                vat_accounts=vat_accounts,
+                voucher_no=voucher_no,
+                description=description,
+            )
+        )
+
+        return FixedAssetDisposalPreview(
+            fixed_asset=fixed_asset,
+            previous_depreciation=previous_depreciation,
+            depreciation_proposal=depreciation_proposal,
+            accumulated_depreciation=(
+                accumulated_depreciation
+            ),
+            disposal_calculation=disposal_calculation,
+        )
+
+    def confirm_fixed_asset_disposal(
+        self,
+        preview: FixedAssetDisposalPreview,
+    ) -> FixedAssetMovement:
+        """Bestätigt einen zuvor berechneten Anlagenverkauf."""
+
+        if not self.is_open:
+            raise ValueError(
+                "Das Geschäftsjahr ist abgeschlossen."
+            )
+
+        if self._fixed_asset_disposal_workflow is None:
+            raise RuntimeError(
+                "Der Anlagenabgang ist nicht konfiguriert."
+            )
+
+        movement = self._fixed_asset_disposal_workflow.confirm(
+            company_id=self._context.company.company_id,
+            fiscal_year=self._context.fiscal_year,
+            fixed_asset=preview.fixed_asset,
+            calculation=preview.disposal_calculation,
+        )
+
+        self.reload()
 
         return movement
 

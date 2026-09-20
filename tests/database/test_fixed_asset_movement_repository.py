@@ -262,7 +262,7 @@ def test_lists_movements_for_fixed_asset_chronologically() -> None:
     )
 
 
-def test_preserves_reversal_reference() -> None:
+def test_preserves_disposal_reversal_with_different_amount() -> None:
     Session, company, fiscal_year, asset = (
         _prepare_database()
     )
@@ -275,44 +275,44 @@ def test_preserves_reversal_reference() -> None:
             asset=asset,
         )
 
-        acquisition_booking = _add_booking(
+        disposal_booking = _add_booking(
             session=session,
             company=company,
             fiscal_year=fiscal_year,
-            booking_date=date(2026, 3, 15),
-            amount=Decimal("10000.00"),
+            booking_date=date(2026, 10, 1),
+            amount=Decimal("7500.00"),
         )
 
         reversal_booking = _add_booking(
             session=session,
             company=company,
             fiscal_year=fiscal_year,
-            booking_date=date(2026, 4, 1),
-            amount=Decimal("10000.00"),
+            booking_date=date(2026, 10, 2),
+            amount=Decimal("7500.00"),
         )
 
-        acquisition = FixedAssetMovement(
+        disposal = FixedAssetMovement(
             fixed_asset_id=asset.fixed_asset_id,
             fiscal_year_end=fiscal_year.end_date,
-            movement_date=date(2026, 3, 15),
+            movement_date=date(2026, 10, 1),
             amount=Decimal("10000.00"),
-            booking_id=acquisition_booking.booking_id,
+            booking_id=disposal_booking.booking_id,
             movement_type=(
-                FixedAssetMovementType.ACQUISITION
+                FixedAssetMovementType.DISPOSAL
             ),
         )
 
         reversal = FixedAssetMovement(
             fixed_asset_id=asset.fixed_asset_id,
             fiscal_year_end=fiscal_year.end_date,
-            movement_date=date(2026, 4, 1),
+            movement_date=date(2026, 10, 2),
             amount=Decimal("10000.00"),
             booking_id=reversal_booking.booking_id,
             movement_type=(
                 FixedAssetMovementType.REVERSAL
             ),
             reversed_movement_id=(
-                acquisition.movement_id
+                disposal.movement_id
             ),
         )
 
@@ -321,7 +321,7 @@ def test_preserves_reversal_reference() -> None:
         )
 
         repository.add(
-            movement=acquisition,
+            movement=disposal,
             booking_line_position=0,
         )
 
@@ -330,12 +330,16 @@ def test_preserves_reversal_reference() -> None:
             booking_line_position=0,
         )
 
-        loaded = repository.get(
+        loaded_disposal = repository.get(
+            disposal.movement_id
+        )
+        loaded_reversal = repository.get(
             reversal.movement_id
         )
 
-    assert loaded == reversal
+    assert loaded_disposal == disposal
+    assert loaded_reversal == reversal
     assert (
-        loaded.reversed_movement_id
-        == acquisition.movement_id
+        loaded_reversal.reversed_movement_id
+        == disposal.movement_id
     )

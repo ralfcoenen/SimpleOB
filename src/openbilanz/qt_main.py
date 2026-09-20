@@ -74,6 +74,9 @@ from openbilanz.services.fiscal_year_workspace import FiscalYearWorkspace
 from openbilanz.services.fixed_asset_depreciation_workflow import (
     FixedAssetDepreciationWorkflow,
 )
+from openbilanz.services.fixed_asset_disposal_workflow import (
+    FixedAssetDisposalWorkflow,
+)
 from openbilanz.services.fixed_asset_schedule_service import (
     FixedAssetScheduleService,
 )
@@ -222,6 +225,17 @@ def main() -> None:
                     fixed_asset_depreciation_repository
                 ),
                 booking_service=depreciation_booking_service,
+            )
+        )
+
+        fixed_asset_disposal_workflow = (
+            FixedAssetDisposalWorkflow(
+                session=session,
+                booking_repository=booking_repository,
+                movement_repository=(
+                    fixed_asset_movement_repository
+                ),
+                fixed_asset_repository=fixed_asset_repository,
             )
         )
 
@@ -468,6 +482,9 @@ def main() -> None:
                 depreciation_service=depreciation_service,
                 fixed_asset_depreciation_workflow=(
                     fixed_asset_depreciation_workflow
+                ),
+                fixed_asset_disposal_workflow=(
+                    fixed_asset_disposal_workflow
                 ),
             )
 
