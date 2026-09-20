@@ -245,6 +245,16 @@ def test_saves_and_validates_control_accounts() -> None:
             account_type=AccountType.EXPENSE,
         ),
         TemplateAccount(
+            account_number="4900",
+            name="Sonstige betriebliche Aufwendungen",
+            account_type=AccountType.EXPENSE,
+        ),
+        TemplateAccount(
+            account_number="8500",
+            name="Sonstige betriebliche Erträge",
+            account_type=AccountType.REVENUE,
+        ),
+        TemplateAccount(
             account_number="1571",
             name="Abziehbare Vorsteuer 7 %",
             account_type=AccountType.ASSET,
@@ -306,6 +316,8 @@ def test_saves_and_validates_control_accounts() -> None:
         loss_account="8021",
         profit_loss_carryforward_account="2970",
         depreciation_expense_account="4830",
+        fixed_asset_disposal_gain_account="8500",
+        fixed_asset_disposal_loss_account="4900",
     )
 
     vat_accounts = VatAccounts(
@@ -377,6 +389,8 @@ def test_saves_and_validates_control_accounts() -> None:
             loss_account="8021",
             profit_loss_carryforward_account="2970",
             depreciation_expense_account="4830",
+            fixed_asset_disposal_gain_account="8500",
+            fixed_asset_disposal_loss_account="4900",
         )
 
         with pytest.raises(
@@ -474,6 +488,16 @@ def test_saves_account_configuration_atomically() -> None:
                 account_type=AccountType.EXPENSE,
             ),
             TemplateAccount(
+                account_number="4900",
+                name="Sonstige betriebliche Aufwendungen",
+                account_type=AccountType.EXPENSE,
+            ),
+            TemplateAccount(
+                account_number="8500",
+                name="Sonstige betriebliche Erträge",
+                account_type=AccountType.REVENUE,
+            ),
+            TemplateAccount(
                 account_number="8020",
                 name="Jahresüberschuss",
                 account_type=AccountType.EQUITY,
@@ -514,6 +538,8 @@ def test_saves_account_configuration_atomically() -> None:
         loss_account="8021",
         profit_loss_carryforward_account="2970",
         depreciation_expense_account="4830",
+        fixed_asset_disposal_gain_account="8500",
+        fixed_asset_disposal_loss_account="4900",
     )
 
     original_vat_accounts = VatAccounts(
@@ -536,6 +562,8 @@ def test_saves_account_configuration_atomically() -> None:
         loss_account="8021",
         profit_loss_carryforward_account="2970",
         depreciation_expense_account="4830",
+        fixed_asset_disposal_gain_account="8500",
+        fixed_asset_disposal_loss_account="4900",
     )
 
     invalid_account_roles = AccountingAccountRoles(

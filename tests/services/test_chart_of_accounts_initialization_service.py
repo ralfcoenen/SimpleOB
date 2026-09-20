@@ -103,6 +103,16 @@ def _standard_chart_of_accounts() -> ChartOfAccountsTemplate:
                 name="Abschreibungen auf Sachanlagen",
                 account_type=AccountType.EXPENSE,
             ),
+            TemplateAccount(
+                account_number="4900",
+                name="Sonstige betriebliche Aufwendungen",
+                account_type=AccountType.EXPENSE,
+            ),
+            TemplateAccount(
+                account_number="8500",
+                name="Sonstige betriebliche Erträge",
+                account_type=AccountType.REVENUE,
+            ),
         ),
     )
 
@@ -271,18 +281,20 @@ def test_does_not_replace_existing_chart_of_accounts() -> None:
     assert {
         account.account_number
         for account in chart_of_accounts.accounts
-    } == {
-        "1000",
-        "1200",
-        "1571",
-        "1576",
-        "1771",
-        "1776",
-        "2970",
-        "4830",
-        "8020",
-        "8021",
-        "8400",
-        "8990",
-        "9000",
-    }
+            } == {
+                "1000",
+                "1200",
+                "1571",
+                "1576",
+                "1771",
+                "1776",
+                "2970",
+                "4830",
+                "4900",
+                "8020",
+                "8021",
+                "8400",
+                "8500",
+                "8990",
+                "9000",
+            }

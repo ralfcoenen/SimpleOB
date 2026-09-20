@@ -161,6 +161,12 @@ class AccountConfigurationDialog(QDialog):
         self._depreciation_expense_box = (
             self._create_account_combobox()
         )
+        self._fixed_asset_disposal_gain_box = (
+            self._create_account_combobox()
+        )
+        self._fixed_asset_disposal_loss_box = (
+            self._create_account_combobox()
+        )
 
         form.addRow(
             "Eröffnungsbilanzkonto",
@@ -185,6 +191,14 @@ class AccountConfigurationDialog(QDialog):
         form.addRow(
             "Abschreibungsaufwand",
             self._depreciation_expense_box,
+        )
+        form.addRow(
+            "Gewinn aus Anlagenabgang",
+            self._fixed_asset_disposal_gain_box,
+        )
+        form.addRow(
+            "Verlust aus Anlagenabgang",
+            self._fixed_asset_disposal_loss_box,
         )
 
     def _create_vat_accounts_ui(
@@ -344,7 +358,20 @@ class AccountConfigurationDialog(QDialog):
                 .depreciation_expense_account
             ),
         )
-
+        self._select_account(
+            self._fixed_asset_disposal_gain_box,
+            (
+                self._control_accounts
+                .fixed_asset_disposal_gain_account
+            ),
+        )
+        self._select_account(
+            self._fixed_asset_disposal_loss_box,
+            (
+                self._control_accounts
+                .fixed_asset_disposal_loss_account
+            ),
+        )
         self._select_account(
             self._input_tax_7_box,
             self._vat_accounts.input_tax_7,
@@ -465,6 +492,16 @@ class AccountConfigurationDialog(QDialog):
                 depreciation_expense_account=(
                     self._selected_account_number(
                         self._depreciation_expense_box
+                    )
+                ),
+                fixed_asset_disposal_gain_account=(
+                    self._selected_account_number(
+                        self._fixed_asset_disposal_gain_box
+                    )
+                ),
+                fixed_asset_disposal_loss_account=(
+                    self._selected_account_number(
+                        self._fixed_asset_disposal_loss_box
                     )
                 ),
             )

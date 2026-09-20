@@ -13,6 +13,8 @@ class AccountingControlAccounts:
     loss_account: str
     profit_loss_carryforward_account: str
     depreciation_expense_account: str
+    fixed_asset_disposal_gain_account: str
+    fixed_asset_disposal_loss_account: str
 
     def __post_init__(self) -> None:
         for field_name, account_number in (
@@ -39,6 +41,14 @@ class AccountingControlAccounts:
             (
                 "depreciation_expense_account",
                 self.depreciation_expense_account,
+            ),
+            (
+                "fixed_asset_disposal_gain_account",
+                self.fixed_asset_disposal_gain_account,
+            ),
+            (
+                "fixed_asset_disposal_loss_account",
+                self.fixed_asset_disposal_loss_account,
             ),
         ):
             if not isinstance(account_number, str):
@@ -76,5 +86,7 @@ class AccountingControlAccounts:
                 self.loss_account,
                 self.profit_loss_carryforward_account,
                 self.depreciation_expense_account,
+                self.fixed_asset_disposal_gain_account,
+                self.fixed_asset_disposal_loss_account,
             )
         )

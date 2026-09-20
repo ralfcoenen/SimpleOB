@@ -67,6 +67,8 @@ class ChartOfAccountsInitializationService:
             loss_account="8021",
             profit_loss_carryforward_account="2970",
             depreciation_expense_account="4830",
+            fixed_asset_disposal_gain_account="8500",
+            fixed_asset_disposal_loss_account="4900",
         )
 
         vat_accounts = VatAccounts(

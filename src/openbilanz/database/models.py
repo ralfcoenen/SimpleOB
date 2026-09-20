@@ -278,6 +278,16 @@ class KontenrahmenKonfiguration(Base):
         nullable=False,
     )
 
+    fixed_asset_disposal_gain_account: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    fixed_asset_disposal_loss_account: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
     input_tax_7: Mapped[str] = mapped_column(
         String,
         nullable=False,

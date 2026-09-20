@@ -599,6 +599,14 @@ class ChartOfAccountsRepository:
                     control_accounts
                     .depreciation_expense_account
                 ),
+                fixed_asset_disposal_gain_account=(
+                    control_accounts
+                    .fixed_asset_disposal_gain_account
+                ),
+                fixed_asset_disposal_loss_account=(
+                    control_accounts
+                    .fixed_asset_disposal_loss_account
+                ),
                 input_tax_7="1571",
                 input_tax_19="1576",
                 output_tax_7="1771",
@@ -628,6 +636,14 @@ class ChartOfAccountsRepository:
             model.depreciation_expense_account = (
                 control_accounts
                 .depreciation_expense_account
+            )
+            model.fixed_asset_disposal_gain_account = (
+                control_accounts
+                .fixed_asset_disposal_gain_account
+            )
+            model.fixed_asset_disposal_loss_account = (
+                control_accounts
+                .fixed_asset_disposal_loss_account
             )
 
         if commit:
@@ -770,6 +786,12 @@ class ChartOfAccountsRepository:
             ),
             depreciation_expense_account=(
                 model.depreciation_expense_account
+            ),
+            fixed_asset_disposal_gain_account=(
+                model.fixed_asset_disposal_gain_account
+            ),
+            fixed_asset_disposal_loss_account=(
+                model.fixed_asset_disposal_loss_account
             ),
         )
 
