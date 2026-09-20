@@ -1444,16 +1444,30 @@ class MainWindow(QMainWindow):
             self._closing_accounts.income_summary_account,
             self._closing_accounts.profit_account,
             self._closing_accounts.loss_account,
-            *self._vat_accounts.account_numbers,
         }
 
-        bookable_accounts = tuple(
+        manual_bookable_accounts = tuple(
             account
             for account in self._accounts
             if (
                 account.is_active
                 and account.number
                 not in technical_account_numbers
+            )
+        )
+
+        vat_booking_account_numbers = {
+            *technical_account_numbers,
+            *self._vat_accounts.account_numbers,
+        }
+
+        vat_bookable_accounts = tuple(
+            account
+            for account in self._accounts
+            if (
+                account.is_active
+                and account.number
+                not in vat_booking_account_numbers
             )
         )
 
@@ -1470,13 +1484,13 @@ class MainWindow(QMainWindow):
 
         self._booking_frame = BookingFrame(
             self._booking_frame_container,
-            accounts=bookable_accounts,
+            accounts=manual_bookable_accounts,
             on_booking_created=self._post_booking,
         )
 
         self._vat_booking_frame = VatBookingFrame(
             self._booking_frame_container,
-            accounts=bookable_accounts,
+            accounts=vat_bookable_accounts,
             vat_accounts=self._vat_accounts,
             on_booking_created=self._post_booking,
         )
