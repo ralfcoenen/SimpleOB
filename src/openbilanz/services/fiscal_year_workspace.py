@@ -2526,10 +2526,25 @@ class FiscalYearWorkspace:
         if self._fixed_asset_schedule_service is None:
             return ()
 
+        bookings = self._booking_repository.list_for_fiscal_year(
+            company_id=self._context.company.company_id,
+            fiscal_year=self._context.fiscal_year,
+        )
+
+        reversed_booking_ids = frozenset(
+            booking.reversal_of_booking_id
+            for booking in bookings
+            if (
+                booking.booking_type is BookingType.REVERSAL
+                and booking.reversal_of_booking_id is not None
+            )
+        )
+
         return self._fixed_asset_schedule_service.build(
             company_id=self._context.company.company_id,
             fiscal_year_start=self._context.fiscal_year.start_date,
             fiscal_year_end=self._context.fiscal_year.end_date,
+            reversed_booking_ids=reversed_booking_ids,
         )
 
     def build_e_bilanz(

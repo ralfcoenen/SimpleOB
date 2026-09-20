@@ -158,6 +158,7 @@ class FixedAssetScheduleBuilder:
         entity_scheme: str,
         fiscal_year_start: date,
         fiscal_year_end: date,
+        tax_trans_member: str = "de-gaap-ci:dim_comBal",
     ) -> FixedAssetScheduleXbrl:
         """Erzeugt Kontexte und Facts für den Anlagenspiegel."""
 
@@ -245,6 +246,7 @@ class FixedAssetScheduleBuilder:
                 fiscal_year_start=fiscal_year_start,
                 fiscal_year_end=fiscal_year_end,
                 asset_concept_name=asset_concept_name,
+                tax_trans_member=tax_trans_member,
                 period_type=(
                     fact_concepts[
                         "grossCost.beginning"
@@ -378,6 +380,7 @@ class FixedAssetScheduleBuilder:
         fiscal_year_start: date,
         fiscal_year_end: date,
         asset_concept_name: str,
+        tax_trans_member: str,
         period_type,
     ) -> TaxonomyContext:
         return TaxonomyContext(
@@ -391,9 +394,7 @@ class FixedAssetScheduleBuilder:
                     dimension_name=(
                         "de-gaap-ci:dim_taxTrans"
                     ),
-                    member_name=(
-                        "de-gaap-ci:dim_comBal"
-                    ),
+                    member_name=tax_trans_member,
                 ),
                 TaxonomyDimension(
                     dimension_name=(

@@ -68,6 +68,7 @@ class FixedAssetScheduleService:
         company_id: UUID,
         fiscal_year_start: date,
         fiscal_year_end: date,
+        reversed_booking_ids: frozenset[UUID] = frozenset(),
     ) -> tuple[FixedAssetSchedulePosition, ...]:
         """Ermittelt die Werte des Anlagenspiegels."""
 
@@ -119,6 +120,12 @@ class FixedAssetScheduleService:
                 .list_for_fixed_asset(
                     fixed_asset.fixed_asset_id
                 )
+            )
+
+            depreciations = tuple(
+                depreciation
+                for depreciation in depreciations
+                if depreciation.booking_id not in reversed_booking_ids
             )
 
             acquisition_cost_beginning = ZERO

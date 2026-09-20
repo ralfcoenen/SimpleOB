@@ -484,6 +484,17 @@ class EBilanzService:
                 target_concept_name
             )
 
+        has_tax_reconciliation = (
+            current_depreciation_difference != Decimal("0.00")
+            or previous_depreciation_difference != Decimal("0.00")
+        )
+
+        fixed_asset_schedule_tax_trans_member = (
+            "de-gaap-ci:dim_comBal"
+            if has_tax_reconciliation
+            else "de-gaap-ci:dim_taxBal"
+        )
+
         fixed_asset_schedule_xbrl = (
             FixedAssetScheduleBuilder(
                 taxonomy_model=gaap_ci_model,
@@ -494,6 +505,9 @@ class EBilanzService:
                 entity_scheme=entity_scheme,
                 fiscal_year_start=fiscal_year.start_date,
                 fiscal_year_end=fiscal_year.end_date,
+                tax_trans_member=(
+                    fixed_asset_schedule_tax_trans_member
+                ),
             )
         )
 
@@ -517,11 +531,6 @@ class EBilanzService:
         )
         previous_book_value_difference = (
             -previous_depreciation_difference
-        )
-
-        has_tax_reconciliation = (
-            current_depreciation_difference != Decimal("0.00")
-            or previous_depreciation_difference != Decimal("0.00")
         )
 
         if has_tax_reconciliation:
