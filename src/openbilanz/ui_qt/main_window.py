@@ -1359,6 +1359,14 @@ class MainWindow(QMainWindow):
             self._e_bilanz_mapping_button
         )
 
+        self._e_bilanz_mapping_label = QLabel(
+            "Zuordnung: –"
+        )
+        button_layout.addWidget(
+            self._e_bilanz_mapping_label,
+            1,
+        )
+
         button_layout.addStretch()
 
         layout.addLayout(button_layout)
@@ -1391,6 +1399,9 @@ class MainWindow(QMainWindow):
             QAbstractItemView.SelectionMode.SingleSelection
         )
         self._account_table.setAlternatingRowColors(True)
+        self._account_table.itemSelectionChanged.connect(
+            self._refresh_e_bilanz_mapping_label
+        )
 
         header = self._account_table.horizontalHeader()
         header.setSectionResizeMode(
@@ -4120,6 +4131,70 @@ class MainWindow(QMainWindow):
             "Die Kontenkonfiguration wurde gespeichert.",
         )
 
+    def _refresh_e_bilanz_mapping_label(self) -> None:
+        """Zeigt die E-Bilanz-Zuordnung des ausgewählten Kontos."""
+
+        selected_rows = (
+            self._account_table.selectionModel().selectedRows()
+        )
+
+        if not selected_rows:
+            self._e_bilanz_mapping_label.setText(
+                "Zuordnung: –"
+            )
+            return
+
+        row = selected_rows[0].row()
+
+        account_number_item = self._account_table.item(
+            row,
+            0,
+        )
+
+        if account_number_item is None:
+            self._e_bilanz_mapping_label.setText(
+                "Zuordnung: –"
+            )
+            return
+
+        account_number = account_number_item.text()
+
+        mappings = (
+            self._workspace.load_account_taxonomy_concepts()
+        )
+        concept_name = mappings.get(account_number)
+
+        if concept_name is None:
+            self._e_bilanz_mapping_label.setText(
+                "Zuordnung: keine spezielle Zuordnung"
+            )
+            return
+
+        try:
+            choices = self._workspace.account_taxonomy_choices(
+                account_number=account_number,
+                chart_of_accounts=self._chart_of_accounts,
+            )
+        except ValueError:
+            self._e_bilanz_mapping_label.setText(
+                "Zuordnung: nicht verfügbar"
+            )
+            return
+
+        label_by_concept = {
+            choice_concept_name: label
+            for choice_concept_name, label in choices
+        }
+
+        label = label_by_concept.get(
+            concept_name,
+            concept_name,
+        )
+
+        self._e_bilanz_mapping_label.setText(
+            f"Zuordnung: {label}"
+        )
+
     def _refresh_accounts(self) -> None:
         """Aktualisiert die Kontenübersicht."""
 
@@ -4190,6 +4265,7 @@ class MainWindow(QMainWindow):
                 )
 
         self._account_table.resizeRowsToContents()
+        self._refresh_e_bilanz_mapping_label()
 
     @staticmethod
     def _format_amount(amount: object) -> str:
