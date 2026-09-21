@@ -116,6 +116,17 @@ def _standard_chart_of_accounts() -> ChartOfAccountsTemplate:
         ),
     )
 
+def _standard_account_taxonomy_concepts() -> dict[str, str]:
+    """Erzeugt eine minimale Standard-Taxonomiezuordnung."""
+
+    return {
+        "4900": (
+            "is.netIncome.regular.operatingTC."
+            "otherCost.disposFixAss"
+        ),
+    }
+
+
 def _position_provider() -> HgbFinancialStatementPositionProvider:
     assets, liabilities = (
         create_hgb_balance_sheet_structure()
@@ -173,6 +184,9 @@ def test_initializes_chart_of_accounts_for_company() -> None:
             standard_chart_of_accounts=(
                 _standard_chart_of_accounts()
             ),
+            standard_account_taxonomy_concepts=(
+                _standard_account_taxonomy_concepts()
+            ),
         )
 
         session.commit()
@@ -188,6 +202,12 @@ def test_initializes_chart_of_accounts_for_company() -> None:
     loaded_account_roles = (
         repository.load_account_roles(
             company.company_id
+        )
+    )
+    loaded_account_taxonomy_concepts = (
+        repository.load_account_taxonomy_concepts(
+            company.company_id,
+            taxonomy_version="6.9",
         )
     )
 
@@ -213,6 +233,12 @@ def test_initializes_chart_of_accounts_for_company() -> None:
         loaded_account_roles.general_rate_sales_accounts
         == frozenset({"8400"})
     )
+    assert loaded_account_taxonomy_concepts == {
+        "4900": (
+            "is.netIncome.regular.operatingTC."
+            "otherCost.disposFixAss"
+        ),
+    }
 
 
 def test_does_not_replace_existing_chart_of_accounts() -> None:
@@ -256,6 +282,9 @@ def test_does_not_replace_existing_chart_of_accounts() -> None:
             standard_chart_of_accounts=(
                 _standard_chart_of_accounts()
             ),
+            standard_account_taxonomy_concepts=(
+                _standard_account_taxonomy_concepts()
+            ),
         )
 
         session.commit()
@@ -264,6 +293,9 @@ def test_does_not_replace_existing_chart_of_accounts() -> None:
             company=company,
             standard_chart_of_accounts=(
                 _standard_chart_of_accounts()
+            ),
+            standard_account_taxonomy_concepts=(
+                _standard_account_taxonomy_concepts()
             ),
         )
 

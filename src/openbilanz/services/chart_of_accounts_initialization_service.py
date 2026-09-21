@@ -37,6 +37,7 @@ class ChartOfAccountsInitializationService:
         *,
         company: Company,
         standard_chart_of_accounts: ChartOfAccountsTemplate,
+        standard_account_taxonomy_concepts: dict[str, str],
     ) -> bool:
         """Initialisiert einen noch nicht vorhandenen Mandantenkontenrahmen.
 
@@ -106,6 +107,15 @@ class ChartOfAccountsInitializationService:
         self._repository.save_account_roles(
             company_id=company.company_id,
             account_roles=account_roles,
+            commit=False,
+        )
+
+        self._repository.save_account_taxonomy_concepts(
+            company_id=company.company_id,
+            taxonomy_version="6.9",
+            account_taxonomy_concepts=(
+                standard_account_taxonomy_concepts
+            ),
             commit=False,
         )
 

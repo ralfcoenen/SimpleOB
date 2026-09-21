@@ -1,6 +1,7 @@
 """Startpunkt der PySide6-Oberfläche von SimpleOB."""
 
 import sys
+from pathlib import Path
 
 from PySide6.QtWidgets import QApplication, QDialog
 
@@ -41,6 +42,9 @@ from openbilanz.eric.elster_bilanz_transmission_service import (
 from openbilanz.eric.eric_create_th_adapter import EricCreateThAdapter
 from openbilanz.eric.eric_send_adapter import EricSendAdapter
 from openbilanz.eric.eric_validate_adapter import EricValidateAdapter
+from openbilanz.importers.csv_account_taxonomy_mapping_importer import (
+    CsvAccountTaxonomyMappingImporter,
+)
 from openbilanz.services.chart_of_accounts_initialization_service import (
     ChartOfAccountsInitializationService,
 )
@@ -139,6 +143,17 @@ def main() -> None:
 
     standard_financial_statement_context = (
         create_standard_financial_statement_context()
+    )
+
+    standard_account_taxonomy_concepts = (
+        CsvAccountTaxonomyMappingImporter().load(
+            Path(__file__).resolve().parent
+            / "resources"
+            / "e_bilanz"
+            / "account_mappings"
+            / "6.9"
+            / "openbilanz_standard.csv"
+        )
     )
 
     position_provider = HgbFinancialStatementPositionProvider(
@@ -267,6 +282,9 @@ def main() -> None:
                     standard_chart_of_accounts=(
                         standard_financial_statement_context
                         .chart_of_accounts
+                    ),
+                    standard_account_taxonomy_concepts=(
+                        standard_account_taxonomy_concepts
                     ),
                 )
             )
