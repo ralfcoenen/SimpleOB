@@ -1,4 +1,17 @@
 account_number;concept_name
 1400;bs.ass.currAss.receiv.trade.other
 1600;bs.eqLiab.liab.trade.genOther
+4210;is.netIncome.regular.operatingTC.otherCost.leaseFix
+4220;is.netIncome.regular.operatingTC.otherCost.leaseMovable
+4230;is.netIncome.regular.operatingTC.otherCost.leasingAll
+4360;is.netIncome.regular.operatingTC.otherCost.insurance
+4380;is.netIncome.regular.operatingTC.otherCost.insurance
+4500;is.netIncome.regular.operatingTC.otherCost.vehicles
+4600;is.netIncome.regular.operatingTC.otherCost.marketing
+4660;is.netIncome.regular.operatingTC.otherCost.employee
+4800;is.netIncome.regular.operatingTC.otherCost.fixing
+4810;is.netIncome.regular.operatingTC.otherCost.fixingLandBuildings
 4900;is.netIncome.regular.operatingTC.otherCost.disposFixAss
+4920;is.netIncome.regular.operatingTC.otherCost.communication
+4945;is.netIncome.regular.operatingTC.otherCost.training
+8500;is.netIncome.regular.operatingTC.otherOpRevenue.disposFixAss

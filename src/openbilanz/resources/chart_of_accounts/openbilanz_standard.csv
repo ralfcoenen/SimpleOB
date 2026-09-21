@@ -13,15 +13,18 @@ account_number;name;account_type;statement_type;debit_position_code;credit_posit
 1776;Umsatzsteuer 19 %;LIABILITY;BALANCE_SHEET;;HGB.266.PASSIVA.C.8
 2970;Gewinnvortrag / Verlustvortrag;EQUITY;BALANCE_SHEET;;HGB.266.PASSIVA.A.IV
 3100;Fremdleistungen;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.5.b;
-4210;Miete;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+4210;Miete/Pacht unbewegliche Wirtschaftsgüter;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+4220;Miete/Pacht bewegliche Wirtschaftsgüter;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+4230;Leasing;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
 4360;Versicherungen;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
-4380;Beiträge;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+4380;Gebühren und Beiträge;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
 4500;Fahrzeugkosten;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
 4600;Werbekosten;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
-4660;Reisekosten;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
-4800;Reparaturen und Instandhaltung;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+4660;Reisekosten Arbeitnehmer;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+4800;Reparaturen und Instandhaltung ohne Grundstücke/Gebäude;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+4810;Reparaturen und Instandhaltung Grundstücke/Gebäude;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
 4830;Abschreibungen auf Sachanlagen;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.7.a;
-4900;Sonstige betriebliche Aufwendungen;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+4900;Verluste aus Abgängen des Anlagevermögens;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
 4920;Telefon und Internet;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
 4930;Bürobedarf;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
 4945;Fortbildungskosten;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
@@ -31,5 +34,6 @@ account_number;name;account_type;statement_type;debit_position_code;credit_posit
 8020;Jahresüberschuss;EQUITY;BALANCE_SHEET;;HGB.266.PASSIVA.A.V
 8021;Jahresfehlbetrag;EQUITY;BALANCE_SHEET;HGB.266.PASSIVA.A.V;
 8400;Umsatzerlöse 19 %;REVENUE;INCOME_STATEMENT;;HGB.275.GKV.1
-8500;Sonstige betriebliche Erträge;REVENUE;INCOME_STATEMENT;;HGB.275.GKV.4
+8500;Erträge aus Abgängen des Anlagevermögens;REVENUE;INCOME_STATEMENT;;HGB.275.GKV.4
+8590;Sonstige betriebliche Erträge;REVENUE;INCOME_STATEMENT;;HGB.275.GKV.4
 9000;Eröffnungsbilanzkonto;EQUITY;;;
