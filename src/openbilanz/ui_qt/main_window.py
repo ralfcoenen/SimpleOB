@@ -45,6 +45,7 @@ from openbilanz.domain.vat_accounts import VatAccounts
 from openbilanz.eric.elster_bilanz_transmission_service import (
     ElsterBilanzTransmissionService,
 )
+from openbilanz.eric.eric_validate_adapter import EricValidateError
 from openbilanz.services.closing_accounts import ClosingAccounts
 from openbilanz.services.closing_service import (
     ClosingResult,
@@ -90,12 +91,13 @@ from openbilanz.ui_qt.income_statement_frame import (
     IncomeStatementFrame,
 )
 from openbilanz.ui_qt.new_fixed_asset_dialog import NewFixedAssetDialog
+from openbilanz.ui_qt.opening_balance_dialog import OpeningBalanceDialog
 from openbilanz.ui_qt.vat_booking_frame import VatBookingFrame
 from openbilanz.ui_qt.tax_depreciation_adjustment_dialog import (
     TaxDepreciationAdjustmentDialog,
 )
 from openbilanz.ui_qt.reports_widget import ReportsWidget
-
+from openbilanz.ui_qt.shareholder_dialog import ShareholdersDialog
 ZERO = Decimal("0.00")
 
 
@@ -798,6 +800,24 @@ class MainWindow(QMainWindow):
                 )
             )
             transmitted_at = datetime.now()
+
+        except EricValidateError as exc:
+            message_box = QMessageBox(self)
+            message_box.setIcon(
+                QMessageBox.Icon.Critical
+            )
+            message_box.setWindowTitle(
+                "ELSTER-Testübermittlung fehlgeschlagen"
+            )
+            message_box.setText(str(exc))
+
+            if exc.response_xml:
+                message_box.setDetailedText(
+                    exc.response_xml
+                )
+
+            message_box.exec()
+            return
 
         except (
             ValueError,
