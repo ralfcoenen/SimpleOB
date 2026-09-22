@@ -2285,6 +2285,7 @@ def test_builds_e_bilanz_from_prepared_data(
             account_taxonomy_concepts
         ),
         fixed_asset_schedule=(),
+        fixed_asset_disposal_details=(),
         shareholders=shareholders,
         current_depreciation_difference=Decimal("0.00"),
         previous_depreciation_difference=Decimal("0.00"),

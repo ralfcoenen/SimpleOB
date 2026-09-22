@@ -19,6 +19,9 @@ from openbilanz.domain.company_master_data import (
 from openbilanz.domain.e_bilanz_account_detail import (
     EBilanzAccountDetail,
 )
+from openbilanz.domain.fixed_asset_disposal_detail import (
+    FixedAssetDisposalDetail,
+)
 from openbilanz.domain.fiscal_year import FiscalYear
 from openbilanz.domain.shareholder import Shareholder
 from openbilanz.domain.vat_accounts import VatAccounts
@@ -244,6 +247,10 @@ class EBilanzService:
             FixedAssetSchedulePosition,
             ...
         ] = (),
+        fixed_asset_disposal_details: tuple[
+            FixedAssetDisposalDetail,
+            ...
+        ] = (),
         shareholders: tuple[
             Shareholder,
             ...
@@ -354,6 +361,9 @@ class EBilanzService:
                 assets=balance_sheet.assets,
                 liabilities=balance_sheet.liabilities,
                 fixed_asset_schedule=fixed_asset_schedule,
+                fixed_asset_disposal_details=(
+                    fixed_asset_disposal_details
+                ),
             )
         )
 

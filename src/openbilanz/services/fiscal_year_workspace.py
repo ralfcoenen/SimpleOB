@@ -74,6 +74,9 @@ from openbilanz.domain.fixed_asset_disposal_preview import (
 from openbilanz.domain.fixed_asset_movement import (
     FixedAssetMovement,
 )
+from openbilanz.domain.fixed_asset_disposal_detail import (
+    FixedAssetDisposalDetail,
+)
 from openbilanz.domain.fixed_asset_movement_type import (
     FixedAssetMovementType,
 )
@@ -947,6 +950,142 @@ class FiscalYearWorkspace:
                 not in reversed_movement_ids
             )
         )
+
+    def build_fixed_asset_disposal_details(
+        self,
+        *,
+        control_accounts: AccountingControlAccounts,
+    ) -> tuple[FixedAssetDisposalDetail, ...]:
+        """Ermittelt die wirksamen Anlagenabgänge des Geschäftsjahres."""
+
+        if self._fixed_asset_repository is None:
+            return ()
+
+        if self._fixed_asset_movement_repository is None:
+            return ()
+
+        details: list[FixedAssetDisposalDetail] = []
+
+        for fixed_asset in self.list_fixed_assets():
+            movements = (
+                self._fixed_asset_movement_repository
+                .list_for_fixed_asset(
+                    fixed_asset.fixed_asset_id
+                )
+            )
+
+            effective_movements = (
+                self._effective_fixed_asset_movements(
+                    movements
+                )
+            )
+
+            for movement in effective_movements:
+                if (
+                    movement.movement_type
+                    is not FixedAssetMovementType.DISPOSAL
+                ):
+                    continue
+
+                if (
+                    movement.fiscal_year_end
+                    != self._context.fiscal_year.end_date
+                ):
+                    continue
+
+                booking = self._booking_repository.get(
+                    movement.booking_id
+                )
+
+                if booking is None:
+                    raise ValueError(
+                        "Die Buchung des Anlagenabgangs "
+                        "ist nicht vorhanden."
+                    )
+
+                movement_positions = (
+                    self._fixed_asset_movement_repository
+                    .list_with_positions_for_booking(
+                        movement.booking_id
+                    )
+                )
+
+                asset_line_position = next(
+                    (
+                        position
+                        for (
+                            linked_movement,
+                            position,
+                        ) in movement_positions
+                        if (
+                            linked_movement.movement_id
+                            == movement.movement_id
+                        )
+                    ),
+                    None,
+                )
+
+                if asset_line_position is None:
+                    raise ValueError(
+                        "Die Buchungszeile des Anlagenabgangs "
+                        "ist nicht vorhanden."
+                    )
+
+                try:
+                    asset_line = booking.lines[
+                        asset_line_position
+                    ]
+                except IndexError as exc:
+                    raise ValueError(
+                        "Die Buchungszeile des Anlagenabgangs "
+                        "ist nicht vorhanden."
+                    ) from exc
+
+                carrying_amount = asset_line.amount
+
+                gain = sum(
+                    (
+                        line.amount
+                        for line in booking.lines
+                        if (
+                            line.account_number
+                            == control_accounts
+                            .fixed_asset_disposal_gain_account
+                            and line.side is EntrySide.CREDIT
+                        )
+                    ),
+                    start=Decimal("0.00"),
+                )
+
+                loss = sum(
+                    (
+                        line.amount
+                        for line in booking.lines
+                        if (
+                            line.account_number
+                            == control_accounts
+                            .fixed_asset_disposal_loss_account
+                            and line.side is EntrySide.DEBIT
+                        )
+                    ),
+                    start=Decimal("0.00"),
+                )
+
+                net_proceeds = (
+                    carrying_amount
+                    + gain
+                    - loss
+                )
+
+                details.append(
+                    FixedAssetDisposalDetail(
+                        position_code=fixed_asset.position_code,
+                        carrying_amount=carrying_amount,
+                        net_proceeds=net_proceeds,
+                    )
+                )
+
+        return tuple(details)
 
     def has_fixed_asset_acquisition(
         self,
@@ -2564,7 +2703,7 @@ class FiscalYearWorkspace:
         entity = EntityIdentifier.from_company(self._context.company)
 
         (
-            _control_accounts,
+            control_accounts,
             vat_accounts,
             account_roles,
         ) = self.load_account_configuration()
@@ -2579,6 +2718,12 @@ class FiscalYearWorkspace:
         )
 
         fixed_asset_schedule = self.build_fixed_asset_schedule()
+
+        fixed_asset_disposal_details = (
+            self.build_fixed_asset_disposal_details(
+                control_accounts=control_accounts,
+            )
+        )
 
         current_depreciation_difference = Decimal("0.00")
         previous_depreciation_difference = Decimal("0.00")
@@ -2650,6 +2795,9 @@ class FiscalYearWorkspace:
                 account_taxonomy_concepts
             ),
             fixed_asset_schedule=fixed_asset_schedule,
+            fixed_asset_disposal_details=(
+                fixed_asset_disposal_details
+            ),
             shareholders=shareholders,
             current_depreciation_difference=(
                 current_depreciation_difference

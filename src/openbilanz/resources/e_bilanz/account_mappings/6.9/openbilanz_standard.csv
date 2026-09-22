@@ -11,7 +11,5 @@ account_number;concept_name
 4660;is.netIncome.regular.operatingTC.otherCost.employee
 4800;is.netIncome.regular.operatingTC.otherCost.fixing
 4810;is.netIncome.regular.operatingTC.otherCost.fixingLandBuildings
-4900;is.netIncome.regular.operatingTC.otherCost.disposFixAss
 4920;is.netIncome.regular.operatingTC.otherCost.communication
 4945;is.netIncome.regular.operatingTC.otherCost.training
-8500;is.netIncome.regular.operatingTC.otherOpRevenue.disposFixAss

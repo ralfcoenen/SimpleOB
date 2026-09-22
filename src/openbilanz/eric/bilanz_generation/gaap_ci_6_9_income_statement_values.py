@@ -8,6 +8,9 @@ from openbilanz.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
 from openbilanz.accounting.income_statement import IncomeStatement
+from openbilanz.domain.fixed_asset_disposal_detail import (
+    FixedAssetDisposalDetail,
+)
 from openbilanz.domain.money import ZERO
 from openbilanz.eric.bilanz_generation.fact_plan_resolver import (
     FactPlanPath,
@@ -35,6 +38,51 @@ _TANGIBLE_FIXED_ASSET_OTHER_DEPRECIATION_CONCEPT = (
     "deprAmort.fixAss.tan.other"
 )
 
+_FIXED_ASSET_DISPOSAL_LOSS_CONCEPT = (
+    "is.netIncome.regular.operatingTC."
+    "otherCost.disposFixAss"
+)
+
+_FIXED_ASSET_DISPOSAL_LOSS_SALE_CONCEPT = (
+    "is.netIncome.regular.operatingTC."
+    "otherCost.disposFixAss.sale"
+)
+
+_FIXED_ASSET_DISPOSAL_LOSS_BOOK_VALUE_CONCEPT = (
+    "is.netIncome.regular.operatingTC."
+    "otherCost.disposFixAss.bookValue"
+)
+
+_FIXED_ASSET_DISPOSAL_GAIN_CONCEPT = (
+    "is.netIncome.regular.operatingTC."
+    "otherOpRevenue.disposFixAss"
+)
+
+_FIXED_ASSET_DISPOSAL_GAIN_SALE_CONCEPT = (
+    "is.netIncome.regular.operatingTC."
+    "otherOpRevenue.disposFixAss.sale"
+)
+
+_FIXED_ASSET_DISPOSAL_GAIN_BOOK_VALUE_CONCEPT = (
+    "is.netIncome.regular.operatingTC."
+    "otherOpRevenue.disposFixAss.bookValue"
+)
+
+_FIXED_ASSET_TAXONOMY_SUFFIXES = (
+    (
+        "HGB.266.AKTIVA.A.I",
+        "intan",
+    ),
+    (
+        "HGB.266.AKTIVA.A.II",
+        "tan",
+    ),
+    (
+        "HGB.266.AKTIVA.A.III",
+        "fin",
+    ),
+)
+
 class GaapCi69IncomeStatementValueBuilder:
     """Übersetzt eine SimpleOB-GuV in GAAP-CI-FactPlan-Werte."""
 
@@ -47,6 +95,10 @@ class GaapCi69IncomeStatementValueBuilder:
         liabilities: FinancialStatementPosition,
         fixed_asset_schedule: tuple[
             FixedAssetSchedulePosition,
+            ...
+        ] = (),
+        fixed_asset_disposal_details: tuple[
+            FixedAssetDisposalDetail,
             ...
         ] = (),
     ) -> dict[FactPlanPath, FactPlanValue]:
@@ -95,6 +147,25 @@ class GaapCi69IncomeStatementValueBuilder:
                 "fixed_asset_schedule must contain only "
                 "FixedAssetSchedulePosition objects"
             )
+        if not isinstance(
+            fixed_asset_disposal_details,
+            tuple,
+        ):
+            raise TypeError(
+                "fixed_asset_disposal_details must be a tuple"
+            )
+
+        if not all(
+            isinstance(
+                detail,
+                FixedAssetDisposalDetail,
+            )
+            for detail in fixed_asset_disposal_details
+        ):
+            raise TypeError(
+                "fixed_asset_disposal_details must contain only "
+                "FixedAssetDisposalDetail objects"
+            )
 
         mappings = create_hgb_gaap_ci_mapping(
             assets=assets,
@@ -120,6 +191,13 @@ class GaapCi69IncomeStatementValueBuilder:
         cls._add_fixed_asset_depreciation_values(
             values=values,
             fixed_asset_schedule=fixed_asset_schedule,
+        )
+
+        cls._add_fixed_asset_disposal_values(
+            values=values,
+            fixed_asset_disposal_details=(
+                fixed_asset_disposal_details
+            ),
         )
 
         return values
@@ -176,3 +254,143 @@ class GaapCi69IncomeStatementValueBuilder:
                 _TANGIBLE_FIXED_ASSET_OTHER_DEPRECIATION_CONCEPT,
             )
         ] = tangible_depreciation
+
+    @classmethod
+    def _add_fixed_asset_disposal_values(
+        cls,
+        *,
+        values: dict[FactPlanPath, FactPlanValue],
+        fixed_asset_disposal_details: tuple[
+            FixedAssetDisposalDetail,
+            ...
+        ],
+    ) -> None:
+        loss_sale = ZERO
+        loss_book_value = ZERO
+        gain_sale = ZERO
+        gain_book_value = ZERO
+
+        loss_sale_by_suffix: dict[str, Decimal] = {}
+        loss_book_value_by_suffix: dict[str, Decimal] = {}
+        gain_sale_by_suffix: dict[str, Decimal] = {}
+        gain_book_value_by_suffix: dict[str, Decimal] = {}
+
+        for detail in fixed_asset_disposal_details:
+            suffix = cls._fixed_asset_taxonomy_suffix(
+                detail.position_code
+            )
+
+            if detail.carrying_amount > detail.net_proceeds:
+                loss_sale += detail.net_proceeds
+                loss_book_value += detail.carrying_amount
+
+                loss_sale_by_suffix[suffix] = (
+                    loss_sale_by_suffix.get(suffix, ZERO)
+                    + detail.net_proceeds
+                )
+                loss_book_value_by_suffix[suffix] = (
+                    loss_book_value_by_suffix.get(suffix, ZERO)
+                    + detail.carrying_amount
+                )
+
+            elif detail.net_proceeds > detail.carrying_amount:
+                gain_sale += detail.net_proceeds
+                gain_book_value += detail.carrying_amount
+
+                gain_sale_by_suffix[suffix] = (
+                    gain_sale_by_suffix.get(suffix, ZERO)
+                    + detail.net_proceeds
+                )
+                gain_book_value_by_suffix[suffix] = (
+                    gain_book_value_by_suffix.get(suffix, ZERO)
+                    + detail.carrying_amount
+                )
+
+        loss = loss_book_value - loss_sale
+
+        if loss > ZERO:
+            values[
+                (_FIXED_ASSET_DISPOSAL_LOSS_CONCEPT,)
+            ] = loss
+
+            values[
+                (_FIXED_ASSET_DISPOSAL_LOSS_SALE_CONCEPT,)
+            ] = loss_sale
+
+            values[
+                (
+                    _FIXED_ASSET_DISPOSAL_LOSS_BOOK_VALUE_CONCEPT,
+                )
+            ] = loss_book_value
+
+            for suffix, amount in loss_sale_by_suffix.items():
+                values[
+                    (
+                        f"{_FIXED_ASSET_DISPOSAL_LOSS_SALE_CONCEPT}."
+                        f"{suffix}",
+                    )
+                ] = amount
+
+            for suffix, amount in (
+                loss_book_value_by_suffix.items()
+            ):
+                values[
+                    (
+                        f"{_FIXED_ASSET_DISPOSAL_LOSS_BOOK_VALUE_CONCEPT}."
+                        f"{suffix}",
+                    )
+                ] = amount
+
+        gain = gain_sale - gain_book_value
+
+        if gain > ZERO:
+            values[
+                (_FIXED_ASSET_DISPOSAL_GAIN_CONCEPT,)
+            ] = gain
+
+            values[
+                (_FIXED_ASSET_DISPOSAL_GAIN_SALE_CONCEPT,)
+            ] = gain_sale
+
+            values[
+                (
+                    _FIXED_ASSET_DISPOSAL_GAIN_BOOK_VALUE_CONCEPT,
+                )
+            ] = gain_book_value
+
+            for suffix, amount in gain_sale_by_suffix.items():
+                values[
+                    (
+                        f"{_FIXED_ASSET_DISPOSAL_GAIN_SALE_CONCEPT}."
+                        f"{suffix}",
+                    )
+                ] = amount
+
+            for suffix, amount in (
+                gain_book_value_by_suffix.items()
+            ):
+                values[
+                    (
+                        f"{_FIXED_ASSET_DISPOSAL_GAIN_BOOK_VALUE_CONCEPT}."
+                        f"{suffix}",
+                    )
+                ] = amount
+
+    @staticmethod
+    def _fixed_asset_taxonomy_suffix(
+        position_code: str,
+    ) -> str:
+        for prefix, suffix in _FIXED_ASSET_TAXONOMY_SUFFIXES:
+            if (
+                position_code == prefix
+                or position_code.startswith(
+                    f"{prefix}."
+                )
+            ):
+                return suffix
+
+        raise ValueError(
+            "unsupported fixed asset position for "
+            "Taxonomy 6.9 disposal details: "
+            f"{position_code}"
+        )

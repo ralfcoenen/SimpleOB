@@ -528,6 +528,7 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
         assets=assets,
         liabilities=liabilities,
         fixed_asset_schedule=(),
+        fixed_asset_disposal_details=(),
     )
 
     account_detail_builder.assert_called_once_with(
