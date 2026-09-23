@@ -10,15 +10,25 @@ from openbilanz.domain.money import to_decimal
 class ProfitAppropriationAnnualData:
     """Jahresbezogene Angaben zur Ergebnisverwendung."""
 
-    statutory_reserve: Decimal
-    other_revenue_reserves: Decimal
+    statutory_reserve_addition: Decimal
+    other_revenue_reserves_addition: Decimal
+    statutory_reserve_release: Decimal
+    other_revenue_reserves_release: Decimal
     distribution: Decimal
     profit_loss_carryforward: Decimal
 
     def __post_init__(self) -> None:
-        statutory_reserve = to_decimal(self.statutory_reserve)
-        other_revenue_reserves = to_decimal(
-            self.other_revenue_reserves
+        statutory_reserve_addition = to_decimal(
+            self.statutory_reserve_addition
+        )
+        other_revenue_reserves_addition = to_decimal(
+            self.other_revenue_reserves_addition
+        )
+        statutory_reserve_release = to_decimal(
+            self.statutory_reserve_release
+        )
+        other_revenue_reserves_release = to_decimal(
+            self.other_revenue_reserves_release
         )
         distribution = to_decimal(self.distribution)
         profit_loss_carryforward = to_decimal(
@@ -26,8 +36,22 @@ class ProfitAppropriationAnnualData:
         )
 
         nonnegative_values = (
-            ("statutory_reserve", statutory_reserve),
-            ("other_revenue_reserves", other_revenue_reserves),
+            (
+                "statutory_reserve_addition",
+                statutory_reserve_addition,
+            ),
+            (
+                "other_revenue_reserves_addition",
+                other_revenue_reserves_addition,
+            ),
+            (
+                "statutory_reserve_release",
+                statutory_reserve_release,
+            ),
+            (
+                "other_revenue_reserves_release",
+                other_revenue_reserves_release,
+            ),
             ("distribution", distribution),
         )
 
@@ -39,13 +63,23 @@ class ProfitAppropriationAnnualData:
 
         object.__setattr__(
             self,
-            "statutory_reserve",
-            statutory_reserve,
+            "statutory_reserve_addition",
+            statutory_reserve_addition,
         )
         object.__setattr__(
             self,
-            "other_revenue_reserves",
-            other_revenue_reserves,
+            "other_revenue_reserves_addition",
+            other_revenue_reserves_addition,
+        )
+        object.__setattr__(
+            self,
+            "statutory_reserve_release",
+            statutory_reserve_release,
+        )
+        object.__setattr__(
+            self,
+            "other_revenue_reserves_release",
+            other_revenue_reserves_release,
         )
         object.__setattr__(
             self,

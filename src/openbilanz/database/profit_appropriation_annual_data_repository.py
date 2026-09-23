@@ -77,9 +77,17 @@ class ProfitAppropriationAnnualDataRepository:
         if model is None:
             model = GewinnverwendungsJahresdaten(
                 wirtschaftsjahr_id=fiscal_year_model.id,
-                statutory_reserve=data.statutory_reserve,
-                other_revenue_reserves=(
-                    data.other_revenue_reserves
+                statutory_reserve_addition=(
+                    data.statutory_reserve_addition
+                ),
+                other_revenue_reserves_addition=(
+                    data.other_revenue_reserves_addition
+                ),
+                statutory_reserve_release=(
+                    data.statutory_reserve_release
+                ),
+                other_revenue_reserves_release=(
+                    data.other_revenue_reserves_release
                 ),
                 distribution=data.distribution,
                 profit_loss_carryforward=(
@@ -88,9 +96,17 @@ class ProfitAppropriationAnnualDataRepository:
             )
             self._session.add(model)
         else:
-            model.statutory_reserve = data.statutory_reserve
-            model.other_revenue_reserves = (
-                data.other_revenue_reserves
+            model.statutory_reserve_addition = (
+                data.statutory_reserve_addition
+            )
+            model.other_revenue_reserves_addition = (
+                data.other_revenue_reserves_addition
+            )
+            model.statutory_reserve_release = (
+                data.statutory_reserve_release
+            )
+            model.other_revenue_reserves_release = (
+                data.other_revenue_reserves_release
             )
             model.distribution = data.distribution
             model.profit_loss_carryforward = (
@@ -189,9 +205,17 @@ class ProfitAppropriationAnnualDataRepository:
         """Überführt das Persistenzmodell ins Domainmodell."""
 
         return ProfitAppropriationAnnualData(
-            statutory_reserve=model.statutory_reserve,
-            other_revenue_reserves=(
-                model.other_revenue_reserves
+            statutory_reserve_addition=(
+                model.statutory_reserve_addition
+            ),
+            other_revenue_reserves_addition=(
+                model.other_revenue_reserves_addition
+            ),
+            statutory_reserve_release=(
+                model.statutory_reserve_release
+            ),
+            other_revenue_reserves_release=(
+                model.other_revenue_reserves_release
             ),
             distribution=model.distribution,
             profit_loss_carryforward=(

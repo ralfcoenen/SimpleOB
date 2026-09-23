@@ -931,11 +931,19 @@ class GewinnverwendungsJahresdaten(Base):
         nullable=False,
     )
 
-    statutory_reserve: Mapped[Decimal] = mapped_column(
+    statutory_reserve_addition: Mapped[Decimal] = mapped_column(
         Numeric(18, 2),
         nullable=False,
     )
-    other_revenue_reserves: Mapped[Decimal] = mapped_column(
+    other_revenue_reserves_addition: Mapped[Decimal] = mapped_column(
+        Numeric(18, 2),
+        nullable=False,
+    )
+    statutory_reserve_release: Mapped[Decimal] = mapped_column(
+        Numeric(18, 2),
+        nullable=False,
+    )
+    other_revenue_reserves_release: Mapped[Decimal] = mapped_column(
         Numeric(18, 2),
         nullable=False,
     )

@@ -75,8 +75,10 @@ def test_saves_loads_and_updates_profit_appropriation_annual_data(
     )
 
     initial_data = ProfitAppropriationAnnualData(
-        statutory_reserve=Decimal("2500.00"),
-        other_revenue_reserves=Decimal("0.00"),
+        statutory_reserve_addition=Decimal("2500.00"),
+        other_revenue_reserves_addition=Decimal("1000.00"),
+        statutory_reserve_release=Decimal("0.00"),
+        other_revenue_reserves_release=Decimal("0.00"),
         distribution=Decimal("3000.00"),
         profit_loss_carryforward=Decimal("4500.00"),
     )
@@ -95,10 +97,12 @@ def test_saves_loads_and_updates_profit_appropriation_annual_data(
     assert loaded == initial_data
 
     updated_data = ProfitAppropriationAnnualData(
-        statutory_reserve=Decimal("0.00"),
-        other_revenue_reserves=Decimal("0.00"),
+        statutory_reserve_addition=Decimal("0.00"),
+        other_revenue_reserves_addition=Decimal("0.00"),
+        statutory_reserve_release=Decimal("1000.00"),
+        other_revenue_reserves_release=Decimal("2000.00"),
         distribution=Decimal("0.00"),
-        profit_loss_carryforward=Decimal("-8000.00"),
+        profit_loss_carryforward=Decimal("-5000.00"),
     )
 
     repository.save_for_fiscal_year(
