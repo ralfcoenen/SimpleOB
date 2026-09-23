@@ -107,6 +107,23 @@ BVV_CONCEPTS = (
     "BVV.profitLoss.contribution",
 )
 
+PROFIT_APPROPRIATION_CONCEPTS = (
+    "incomeUse.gainLoss",
+    "incomeUse.gainLoss.netIncome",
+    "incomeUse.gainLoss.retainedEarningsPrevYear",
+    "incomeUse.gainLoss.accumLossPrevYear",
+    "incomeUse.gainLoss.releaseRevenReserves",
+    "incomeUse.gainLoss.releaseRevenReserves.legalRes",
+    "incomeUse.gainLoss.releaseOtherRes",
+    "incomeUse.gainLoss.additionRevenReserves",
+    "incomeUse.gainLoss.additionRevenReserves.legalRes",
+    "incomeUse.gainLoss.additionOtherRes",
+    "incomeUse.gainLoss.dividensPlanned",
+    "incomeUse.gainLoss.additionRetainedEarnings",
+    "incomeUse.gainLoss.additionCummLoss",
+)
+
+
 def _balance_sheet_changes(
     concept_names: tuple[str, ...],
 ) -> tuple[ProfileChange, ...]:
@@ -688,6 +705,7 @@ DELTA_6_9 = BilanzProfileDelta(
         *_balance_sheet_changes(BALANCE_SHEET_CONCEPTS),
         *_conditional_changes(INCOME_STATEMENT_CONCEPTS),
         *_conditional_changes(BVV_CONCEPTS),
+        *_conditional_changes(PROFIT_APPROPRIATION_CONCEPTS),
     ),
 )
 

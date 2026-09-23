@@ -584,6 +584,30 @@ def _state_for_path(
     return node.state
 
 
+def test_profit_appropriation_concepts_are_conditional() -> None:
+    concept_names = (
+        "incomeUse.gainLoss",
+        "incomeUse.gainLoss.netIncome",
+        "incomeUse.gainLoss.retainedEarningsPrevYear",
+        "incomeUse.gainLoss.accumLossPrevYear",
+        "incomeUse.gainLoss.releaseRevenReserves",
+        "incomeUse.gainLoss.releaseRevenReserves.legalRes",
+        "incomeUse.gainLoss.releaseOtherRes",
+        "incomeUse.gainLoss.additionRevenReserves",
+        "incomeUse.gainLoss.additionRevenReserves.legalRes",
+        "incomeUse.gainLoss.additionOtherRes",
+        "incomeUse.gainLoss.dividensPlanned",
+        "incomeUse.gainLoss.additionRetainedEarnings",
+        "incomeUse.gainLoss.additionCummLoss",
+    )
+
+    for concept_name in concept_names:
+        assert (
+            _state_for(concept_name)
+            is FactPlanState.CONDITIONAL
+        )
+
+
 def test_profile_has_taxonomy_version_6_9() -> None:
     profile = create_profile_6_9()
 
