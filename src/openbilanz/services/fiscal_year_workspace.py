@@ -88,6 +88,9 @@ from openbilanz.domain.fixed_asset_status import (
 )
 from openbilanz.domain.journal import Journal
 from openbilanz.domain.managed_fiscal_year import ManagedFiscalYear
+from openbilanz.domain.profit_appropriation_annual_data import (
+    ProfitAppropriationAnnualData,
+)
 from openbilanz.domain.shareholder import Shareholder
 from openbilanz.domain.tax_depreciation_adjustment import (
     TaxDepreciationAdjustment,
@@ -2539,6 +2542,26 @@ class FiscalYearWorkspace:
                     .profit_loss_carryforward_account
                 ),
             )
+        )
+
+    def validate_profit_appropriation(
+        self,
+        *,
+        net_income: Decimal,
+        data: ProfitAppropriationAnnualData,
+    ) -> ClosingConsistencyResult:
+        """Prüft die Ergebnisverwendung des Geschäftsjahres."""
+
+        previous_profit_loss_carryforward = (
+            self.previous_profit_loss_carryforward()
+        )
+
+        return self._profit_appropriation_service.validate(
+            net_income=net_income,
+            previous_profit_loss_carryforward=(
+                previous_profit_loss_carryforward
+            ),
+            data=data,
         )
 
     def effective_previous_hgb_equity(

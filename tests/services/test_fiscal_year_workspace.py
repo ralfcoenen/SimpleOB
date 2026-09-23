@@ -60,6 +60,9 @@ from openbilanz.domain.fixed_asset_status import (
 )
 from openbilanz.domain.journal import Journal
 from openbilanz.domain.managed_fiscal_year import ManagedFiscalYear
+from openbilanz.domain.profit_appropriation_annual_data import (
+    ProfitAppropriationAnnualData,
+)
 from openbilanz.domain.shareholder import Shareholder
 from openbilanz.domain.tax_depreciation_adjustment import (
     TaxDepreciationAdjustment,
@@ -3485,6 +3488,70 @@ def test_previous_profit_loss_carryforward_uses_account_configuration(
             trial_balance_report=report,
             profit_loss_carryforward_account="2970",
         )
+    )
+
+
+def test_validate_profit_appropriation_uses_previous_carryforward(
+    context: ApplicationContext,
+) -> None:
+    booking_repository = Mock()
+    company_repository = Mock()
+    profit_appropriation_service = Mock()
+
+    booking_repository.list_for_fiscal_year.return_value = ()
+
+    expected_result = ClosingConsistencyResult()
+
+    profit_appropriation_service.validate.return_value = (
+        expected_result
+    )
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=company_repository,
+        profit_appropriation_service=(
+            profit_appropriation_service
+        ),
+        posting_service=Mock(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
+        e_bilanz_export_service=Mock(),
+        taxonomy_management_service=Mock(),
+    )
+
+    workspace.previous_profit_loss_carryforward = Mock(
+        return_value=Decimal("2000.00")
+    )
+
+    data = ProfitAppropriationAnnualData(
+        statutory_reserve_addition=Decimal("500.00"),
+        other_revenue_reserves_addition=Decimal("1000.00"),
+        statutory_reserve_release=Decimal("0.00"),
+        other_revenue_reserves_release=Decimal("0.00"),
+        distribution=Decimal("3500.00"),
+        profit_loss_carryforward=Decimal("7000.00"),
+    )
+
+    result = workspace.validate_profit_appropriation(
+        net_income=Decimal("10000.00"),
+        data=data,
+    )
+
+    assert result is expected_result
+
+    (
+        workspace.previous_profit_loss_carryforward
+        .assert_called_once_with()
+    )
+
+    profit_appropriation_service.validate.assert_called_once_with(
+        net_income=Decimal("10000.00"),
+        previous_profit_loss_carryforward=Decimal("2000.00"),
+        data=data,
     )
 
 
