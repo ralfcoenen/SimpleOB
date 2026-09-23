@@ -3396,6 +3396,98 @@ def test_does_not_infer_previous_hgb_equity_without_opening_source(
 
     workspace.opening_hgb_equity.assert_not_called()
 
+
+def test_previous_profit_loss_carryforward_uses_account_configuration(
+    context: ApplicationContext,
+) -> None:
+    booking_repository = Mock()
+    company_repository = Mock()
+    chart_of_accounts_repository = Mock()
+    profit_appropriation_service = Mock()
+
+    booking_repository.list_for_fiscal_year.return_value = ()
+
+    control_accounts = Mock(
+        spec=AccountingControlAccounts
+    )
+    control_accounts.opening_balance_account = "9000"
+    control_accounts.profit_loss_carryforward_account = "2970"
+
+    vat_accounts = Mock(
+        spec=VatAccounts
+    )
+    account_roles = Mock(
+        spec=AccountingAccountRoles
+    )
+
+    (
+        chart_of_accounts_repository
+        .load_control_accounts
+        .return_value
+    ) = control_accounts
+    (
+        chart_of_accounts_repository
+        .load_vat_accounts
+        .return_value
+    ) = vat_accounts
+    (
+        chart_of_accounts_repository
+        .load_account_roles
+        .return_value
+    ) = account_roles
+
+    profit_appropriation_service.previous_profit_loss_carryforward.return_value = (
+        Decimal("1234.56")
+    )
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=company_repository,
+        chart_of_accounts_repository=(
+            chart_of_accounts_repository
+        ),
+        profit_appropriation_service=(
+            profit_appropriation_service
+        ),
+        posting_service=Mock(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
+        e_bilanz_export_service=Mock(),
+        taxonomy_management_service=Mock(),
+    )
+
+    report = Mock()
+
+    workspace.build_trial_balance_report = Mock(
+        return_value=report
+    )
+
+    result = (
+        workspace.previous_profit_loss_carryforward()
+    )
+
+    assert result == Decimal("1234.56")
+
+    workspace.build_trial_balance_report.assert_called_once_with(
+        start_date=context.fiscal_year.start_date,
+        end_date=context.fiscal_year.end_date,
+        opening_balance_account_number="9000",
+    )
+
+    (
+        profit_appropriation_service
+        .previous_profit_loss_carryforward
+        .assert_called_once_with(
+            trial_balance_report=report,
+            profit_loss_carryforward_account="2970",
+        )
+    )
+
+
 def test_build_e_bilanz_passes_bvv_data_for_hgbm(
     context: ApplicationContext,
 ) -> None:
@@ -3584,6 +3676,7 @@ def test_build_e_bilanz_passes_bvv_data_for_hgbm(
         build_kwargs["withdrawal_distribution"]
         == Decimal("0.00")
     )
+
 
 def test_build_e_bilanz_passes_bvv_data_without_tax_difference(
     context: ApplicationContext,

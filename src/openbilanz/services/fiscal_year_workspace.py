@@ -141,6 +141,9 @@ from openbilanz.services.fixed_asset_schedule_service import (
 )
 from openbilanz.services.posting_service import PostingService
 from openbilanz.services.reporting_service import ReportingService
+from openbilanz.services.profit_appropriation_service import (
+    ProfitAppropriationService,
+)
 from openbilanz.services.taxonomy_management_service import (
     TaxonomyManagementService,
     TaxonomyStatus,
@@ -170,6 +173,9 @@ class FiscalYearWorkspace:
         ) = None,
         profit_appropriation_annual_data_repository: (
             ProfitAppropriationAnnualDataRepository | None
+        ) = None,
+        profit_appropriation_service: (
+            ProfitAppropriationService | None
         ) = None,
         shareholder_repository: ShareholderRepository | None = None,
         chart_of_accounts_repository: ChartOfAccountsRepository | None = None,
@@ -214,6 +220,11 @@ class FiscalYearWorkspace:
         )
         self._profit_appropriation_annual_data_repository = (
             profit_appropriation_annual_data_repository
+        )
+        self._profit_appropriation_service = (
+            profit_appropriation_service
+            if profit_appropriation_service is not None
+            else ProfitAppropriationService()
         )
         self._shareholder_repository = (
             shareholder_repository
@@ -2500,6 +2511,34 @@ class FiscalYearWorkspace:
                 self._context.fiscal_year
             ),
             data=data,
+        )
+
+    def previous_profit_loss_carryforward(
+        self,
+    ) -> Decimal:
+        """Ermittelt den Gewinn-/Verlustvortrag zu Jahresbeginn."""
+
+        control_accounts, _, _ = (
+            self.load_account_configuration()
+        )
+
+        report = self.build_trial_balance_report(
+            start_date=self._context.fiscal_year.start_date,
+            end_date=self._context.fiscal_year.end_date,
+            opening_balance_account_number=(
+                control_accounts.opening_balance_account
+            ),
+        )
+
+        return (
+            self._profit_appropriation_service
+            .previous_profit_loss_carryforward(
+                trial_balance_report=report,
+                profit_loss_carryforward_account=(
+                    control_accounts
+                    .profit_loss_carryforward_account
+                ),
+            )
         )
 
     def effective_previous_hgb_equity(
