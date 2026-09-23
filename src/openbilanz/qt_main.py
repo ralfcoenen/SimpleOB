@@ -17,6 +17,9 @@ from openbilanz.database.booking_repository import BookingRepository
 from openbilanz.database.bvv_annual_data_repository import (
     BvvAnnualDataRepository,
 )
+from openbilanz.database.profit_appropriation_annual_data_repository import (
+    ProfitAppropriationAnnualDataRepository,
+)
 from openbilanz.database.chart_of_accounts_repository import (
     ChartOfAccountsRepository,
 )
@@ -456,12 +459,21 @@ def main() -> None:
                 session
             )
 
+            profit_appropriation_annual_data_repository = (
+                ProfitAppropriationAnnualDataRepository(
+                    session
+                )
+            )
+
             workspace = FiscalYearWorkspace(
                 context=context,
                 booking_repository=booking_repository,
                 company_repository=company_repository,
                 bvv_annual_data_repository=(
                     bvv_annual_data_repository
+                ),
+                profit_appropriation_annual_data_repository=(
+                    profit_appropriation_annual_data_repository
                 ),
                 shareholder_repository=shareholder_repository,
                 chart_of_accounts_repository=(

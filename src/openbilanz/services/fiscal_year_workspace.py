@@ -36,6 +36,9 @@ from openbilanz.database.tax_depreciation_adjustment_repository import (
 from openbilanz.database.bvv_annual_data_repository import (
     BvvAnnualDataRepository,
 )
+from openbilanz.database.profit_appropriation_annual_data_repository import (
+    ProfitAppropriationAnnualDataRepository,
+)
 from openbilanz.domain.account import Account
 from openbilanz.domain.account_mapping_rule import (
     AccountMappingRule,
@@ -92,6 +95,9 @@ from openbilanz.domain.tax_depreciation_adjustment import (
 from openbilanz.domain.vat_accounts import VatAccounts
 from openbilanz.domain.bvv_annual_data import (
     BvvAnnualData,
+)
+from openbilanz.domain.profit_appropriation_annual_data import (
+    ProfitAppropriationAnnualData,
 )
 from openbilanz.reporting.account_activity_report import (
     AccountActivityReport,
@@ -162,6 +168,9 @@ class FiscalYearWorkspace:
         bvv_annual_data_repository: (
             BvvAnnualDataRepository | None
         ) = None,
+        profit_appropriation_annual_data_repository: (
+            ProfitAppropriationAnnualDataRepository | None
+        ) = None,
         shareholder_repository: ShareholderRepository | None = None,
         chart_of_accounts_repository: ChartOfAccountsRepository | None = None,
         posting_service: PostingService,
@@ -202,6 +211,9 @@ class FiscalYearWorkspace:
         self._company_repository = company_repository
         self._bvv_annual_data_repository = (
             bvv_annual_data_repository
+        )
+        self._profit_appropriation_annual_data_repository = (
+            profit_appropriation_annual_data_repository
         )
         self._shareholder_repository = (
             shareholder_repository
@@ -2447,6 +2459,48 @@ class FiscalYearWorkspace:
             data=data,
         )
 
+    def load_profit_appropriation_annual_data(
+        self,
+    ) -> ProfitAppropriationAnnualData | None:
+        """Lädt die Ergebnisverwendung des geöffneten Geschäftsjahres."""
+
+        if self._profit_appropriation_annual_data_repository is None:
+            raise RuntimeError(
+                "Die Ergebnisverwendungsverwaltung ist nicht konfiguriert."
+            )
+
+        return (
+            self._profit_appropriation_annual_data_repository
+            .get_for_fiscal_year(
+                company_id=(
+                    self._context.company.company_id
+                ),
+                fiscal_year=(
+                    self._context.fiscal_year
+                ),
+            )
+        )
+
+    def save_profit_appropriation_annual_data(
+        self,
+        data: ProfitAppropriationAnnualData,
+    ) -> None:
+        """Speichert die Ergebnisverwendung des geöffneten Geschäftsjahres."""
+
+        if self._profit_appropriation_annual_data_repository is None:
+            raise RuntimeError(
+                "Die Ergebnisverwendungsverwaltung ist nicht konfiguriert."
+            )
+
+        self._profit_appropriation_annual_data_repository.save_for_fiscal_year(
+            company_id=(
+                self._context.company.company_id
+            ),
+            fiscal_year=(
+                self._context.fiscal_year
+            ),
+            data=data,
+        )
 
     def effective_previous_hgb_equity(
         self,

@@ -916,3 +916,36 @@ class BvvJahresdaten(Base):
     )
 
     wirtschaftsjahr: Mapped[Wirtschaftsjahr] = relationship()
+
+
+class GewinnverwendungsJahresdaten(Base):
+    """Persistierte Jahresdaten zur Ergebnisverwendung."""
+
+    __tablename__ = "gewinnverwendungs_jahresdaten"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    wirtschaftsjahr_id: Mapped[int] = mapped_column(
+        ForeignKey("wirtschaftsjahre.id"),
+        unique=True,
+        nullable=False,
+    )
+
+    statutory_reserve: Mapped[Decimal] = mapped_column(
+        Numeric(18, 2),
+        nullable=False,
+    )
+    other_revenue_reserves: Mapped[Decimal] = mapped_column(
+        Numeric(18, 2),
+        nullable=False,
+    )
+    distribution: Mapped[Decimal] = mapped_column(
+        Numeric(18, 2),
+        nullable=False,
+    )
+    profit_loss_carryforward: Mapped[Decimal] = mapped_column(
+        Numeric(18, 2),
+        nullable=False,
+    )
+
+    wirtschaftsjahr: Mapped[Wirtschaftsjahr] = relationship()
