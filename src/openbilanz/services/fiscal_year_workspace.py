@@ -2886,6 +2886,22 @@ class FiscalYearWorkspace:
             bvv_annual_data.withdrawal_distribution
         )
 
+        profit_appropriation_data = None
+        previous_profit_loss_carryforward = Decimal("0.00")
+
+        if (
+            self._profit_appropriation_annual_data_repository
+            is not None
+        ):
+            profit_appropriation_data = (
+                self.load_profit_appropriation_annual_data()
+            )
+
+            if profit_appropriation_data is not None:
+                previous_profit_loss_carryforward = (
+                    self.previous_profit_loss_carryforward()
+                )
+
         shareholders = ()
 
         if self._shareholder_repository is not None:
@@ -2927,6 +2943,12 @@ class FiscalYearWorkspace:
             contribution=contribution,
             withdrawal_distribution=(
                 withdrawal_distribution
+            ),
+            profit_appropriation_data=(
+                profit_appropriation_data
+            ),
+            previous_profit_loss_carryforward=(
+                previous_profit_loss_carryforward
             ),
         )
 

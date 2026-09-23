@@ -21,6 +21,9 @@ from openbilanz.domain.company_master_data import (
     CompanyMasterData,
 )
 from openbilanz.domain.fiscal_year import FiscalYear
+from openbilanz.domain.profit_appropriation_annual_data import (
+    ProfitAppropriationAnnualData,
+)
 from openbilanz.domain.shareholder import Shareholder
 from openbilanz.domain.vat_accounts import VatAccounts
 from openbilanz.eric.bilanz_generation.fact_plan import (
@@ -303,6 +306,39 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
         ("is.test",): Decimal("100.00"),
     }
 
+    profit_appropriation_data = ProfitAppropriationAnnualData(
+        statutory_reserve_addition=Decimal("10.00"),
+        other_revenue_reserves_addition=Decimal("20.00"),
+        statutory_reserve_release=Decimal("0.00"),
+        other_revenue_reserves_release=Decimal("0.00"),
+        distribution=Decimal("30.00"),
+        profit_loss_carryforward=Decimal("140.00"),
+    )
+
+    profit_appropriation_values = {
+        (
+            "incomeUse.gainLoss.netIncome",
+        ): Decimal("100.00"),
+        (
+            "incomeUse.gainLoss.retainedEarningsPrevYear",
+        ): Decimal("100.00"),
+        (
+            "incomeUse.gainLoss.additionRevenReserves",
+        ): Decimal("30.00"),
+        (
+            "incomeUse.gainLoss.additionRevenReserves.legalRes",
+        ): Decimal("10.00"),
+        (
+            "incomeUse.gainLoss.additionOtherRes",
+        ): Decimal("20.00"),
+        (
+            "incomeUse.gainLoss.dividensPlanned",
+        ): Decimal("30.00"),
+        (
+            "incomeUse.gainLoss.additionRetainedEarnings",
+        ): Decimal("140.00"),
+    }
+
     account_detail_values = {
         (
             "bs.ass.currAss.receiv.trade.other",
@@ -418,6 +454,11 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
         ) as income_statement_builder,
         patch(
             "openbilanz.services.e_bilanz_service."
+            "GaapCi69ProfitAppropriationValueBuilder.build",
+            return_value=profit_appropriation_values,
+        ) as profit_appropriation_builder,
+        patch(
+            "openbilanz.services.e_bilanz_service."
             "GaapCi69AccountDetailValueBuilder.build",
             return_value=account_detail_values,
         ) as account_detail_builder,
@@ -493,6 +534,10 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
             fixed_asset_schedule=(),
             shareholders=(shareholder,),
             previous_hgb_equity=Decimal("0.00"),
+            profit_appropriation_data=(
+                profit_appropriation_data
+            ),
+            previous_profit_loss_carryforward=Decimal("100.00"),
         )
 
     assert isinstance(
@@ -529,6 +574,12 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
         liabilities=liabilities,
         fixed_asset_schedule=(),
         fixed_asset_disposal_details=(),
+    )
+
+    profit_appropriation_builder.assert_called_once_with(
+        net_income=Decimal("100.00"),
+        previous_profit_loss_carryforward=Decimal("100.00"),
+        data=profit_appropriation_data,
     )
 
     account_detail_builder.assert_called_once_with(
@@ -609,6 +660,9 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
     resolver_values = (
         fact_plan_resolver.call_args.kwargs["values"]
     )
+
+    for path, value in profit_appropriation_values.items():
+        assert resolver_values[path] == value
 
     assert (
         resolver_values[

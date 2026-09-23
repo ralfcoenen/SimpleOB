@@ -2295,7 +2295,176 @@ def test_builds_e_bilanz_from_prepared_data(
         previous_hgb_equity=Decimal("12345.67"),
         contribution=Decimal("0.00"),
         withdrawal_distribution=Decimal("0.00"),
+        profit_appropriation_data=None,
+        previous_profit_loss_carryforward=Decimal("0.00"),
+        )
+
+
+def test_build_e_bilanz_passes_profit_appropriation_data(
+    context: ApplicationContext,
+) -> None:
+    """Reicht Ergebnisverwendung und Vortrag an den E-Bilanz-Service weiter."""
+
+    booking_repository = Mock()
+    company_repository = Mock()
+    bvv_repository = Mock()
+    profit_appropriation_repository = Mock()
+    chart_of_accounts_repository = Mock()
+    preparation_service = Mock()
+    e_bilanz_service = Mock()
+    account_detail_service = Mock()
+
+    booking_repository.list_for_fiscal_year.return_value = ()
+
+    company_repository.get_managed_fiscal_years.return_value = (
+        ManagedFiscalYear(
+            fiscal_year=context.fiscal_year,
+            status=FiscalYearStatus.CLOSED,
+            opening_source=None,
+        ),
     )
+
+    master_data = CompanyMasterData(
+        company=context.company,
+        legal_form="UG (haftungsbeschränkt)",
+        tax_number="1234567890123",
+    )
+
+    company_repository.get_master_data.return_value = master_data
+
+    control_accounts = Mock(
+        spec=AccountingControlAccounts
+    )
+    vat_accounts = Mock(
+        spec=VatAccounts
+    )
+    account_roles = Mock(
+        spec=AccountingAccountRoles
+    )
+
+    (
+        chart_of_accounts_repository
+        .load_control_accounts
+        .return_value
+    ) = control_accounts
+
+    (
+        chart_of_accounts_repository
+        .load_vat_accounts
+        .return_value
+    ) = vat_accounts
+
+    (
+        chart_of_accounts_repository
+        .load_account_roles
+        .return_value
+    ) = account_roles
+
+    (
+        chart_of_accounts_repository
+        .load_account_taxonomy_concepts
+        .return_value
+    ) = {}
+
+    bvv_annual_data = BvvAnnualData(
+        previous_hgb_equity=Decimal("0.00"),
+        contribution=Decimal("0.00"),
+        withdrawal_distribution=Decimal("0.00"),
+    )
+
+    bvv_repository.get_for_fiscal_year.return_value = (
+        bvv_annual_data
+    )
+
+    profit_appropriation_data = ProfitAppropriationAnnualData(
+        statutory_reserve_addition=Decimal("500.00"),
+        other_revenue_reserves_addition=Decimal("1000.00"),
+        statutory_reserve_release=Decimal("0.00"),
+        other_revenue_reserves_release=Decimal("0.00"),
+        distribution=Decimal("3500.00"),
+        profit_loss_carryforward=Decimal("7000.00"),
+    )
+
+    (
+        profit_appropriation_repository
+        .get_for_fiscal_year
+        .return_value
+    ) = profit_appropriation_data
+
+    preparation = Mock()
+    preparation.amounts = {}
+
+    account_detail_service.build_for_e_bilanz.return_value = ()
+
+    expected_document = Mock()
+    e_bilanz_service.build.return_value = expected_document
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=company_repository,
+        bvv_annual_data_repository=bvv_repository,
+        profit_appropriation_annual_data_repository=(
+            profit_appropriation_repository
+        ),
+        chart_of_accounts_repository=(
+            chart_of_accounts_repository
+        ),
+        posting_service=PostingService(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=(
+            preparation_service
+        ),
+        e_bilanz_service=e_bilanz_service,
+        e_bilanz_account_detail_service=(
+            account_detail_service
+        ),
+        taxonomy_management_service=Mock(),
+        e_bilanz_export_service=Mock(),
+    )
+
+    chart_of_accounts = Mock(
+        spec=ChartOfAccountsTemplate
+    )
+
+    with patch.object(
+        workspace,
+        "previous_profit_loss_carryforward",
+        return_value=Decimal("2000.00"),
+    ) as previous_profit_loss_carryforward:
+        result = workspace.build_e_bilanz(
+            preparation=preparation,
+            chart_of_accounts=chart_of_accounts,
+        )
+
+    assert result is expected_document
+
+    (
+        profit_appropriation_repository
+        .get_for_fiscal_year
+        .assert_called_once_with(
+            company_id=context.company.company_id,
+            fiscal_year=context.fiscal_year,
+        )
+    )
+
+    previous_profit_loss_carryforward.assert_called_once_with()
+
+    assert (
+        e_bilanz_service.build.call_args.kwargs[
+            "profit_appropriation_data"
+        ]
+        is profit_appropriation_data
+    )
+
+    assert (
+        e_bilanz_service.build.call_args.kwargs[
+            "previous_profit_loss_carryforward"
+        ]
+        == Decimal("2000.00")
+    )
+
 
 def test_rejects_e_bilanz_build_for_open_fiscal_year(
     context: ApplicationContext,

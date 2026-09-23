@@ -23,6 +23,9 @@ from openbilanz.domain.fixed_asset_disposal_detail import (
     FixedAssetDisposalDetail,
 )
 from openbilanz.domain.fiscal_year import FiscalYear
+from openbilanz.domain.profit_appropriation_annual_data import (
+    ProfitAppropriationAnnualData,
+)
 from openbilanz.domain.shareholder import Shareholder
 from openbilanz.domain.vat_accounts import VatAccounts
 from openbilanz.eric.bilanz_generation.fact_plan_resolver import (
@@ -34,8 +37,12 @@ from openbilanz.eric.bilanz_generation.gaap_ci_6_9_account_detail_values import 
 from openbilanz.eric.bilanz_generation.fact_plan import (
     FactPlanState,
 )
+
 from openbilanz.eric.bilanz_generation.gaap_ci_6_9_balance_sheet_values import (
     GaapCi69BalanceSheetValueBuilder,
+)
+from openbilanz.eric.bilanz_generation.gaap_ci_6_9_profit_appropriation_values import (
+    GaapCi69ProfitAppropriationValueBuilder,
 )
 from openbilanz.eric.bilanz_generation.gaap_ci_6_9_income_statement_values import (
     GaapCi69IncomeStatementValueBuilder,
@@ -260,6 +267,10 @@ class EBilanzService:
         previous_hgb_equity: Decimal | None = None,
         contribution: Decimal = Decimal("0.00"),
         withdrawal_distribution: Decimal = Decimal("0.00"),
+        profit_appropriation_data: (
+            ProfitAppropriationAnnualData | None
+        ) = None,
+        previous_profit_loss_carryforward: Decimal = Decimal("0.00"),
     ) -> EBilanzDocument:
         """Erzeugt die E-Bilanz-XBRL-Instanz über den Taxonomie-6.9-FactPlan."""
 
@@ -366,6 +377,19 @@ class EBilanzService:
                 ),
             )
         )
+
+        profit_appropriation_values = {}
+
+        if profit_appropriation_data is not None:
+            profit_appropriation_values = (
+                GaapCi69ProfitAppropriationValueBuilder.build(
+                    net_income=net_income,
+                    previous_profit_loss_carryforward=(
+                        previous_profit_loss_carryforward
+                    ),
+                    data=profit_appropriation_data,
+                )
+            )
 
         account_detail_values = (
             GaapCi69AccountDetailValueBuilder.build(
@@ -716,6 +740,10 @@ class EBilanzService:
 
         values.update(
             income_statement_values
+        )
+
+        values.update(
+            profit_appropriation_values
         )
 
         values.update(
