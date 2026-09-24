@@ -29,7 +29,12 @@ from openbilanz.domain.vat_accounts import VatAccounts
 from openbilanz.eric.bilanz_generation.fact_plan import (
     FactPlanState,
 )
-from openbilanz.services.e_bilanz_service import EBilanzService
+from openbilanz.services.e_bilanz_service import (
+    APPROPRIATION_PROFITS_ROLE,
+    BALANCE_SHEET_ROLE,
+    EBilanzService,
+    INCOME_STATEMENT_ROLE,
+)
 from openbilanz.taxonomy.arelle_adapter import (
     ArelleValidationResult,
 )
@@ -316,6 +321,9 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
     )
 
     profit_appropriation_values = {
+        (
+            "incomeUse.gainLoss",
+        ): Decimal("0.00"),
         (
             "incomeUse.gainLoss.netIncome",
         ): Decimal("100.00"),
@@ -610,6 +618,16 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
 
     value_builder.assert_called_once()
 
+    report_profile = (
+        value_builder.call_args.kwargs["report_profile"]
+    )
+
+    assert (
+        "genInfo.report.id.reportElement."
+        "reportElements.EV"
+        in report_profile.report_elements
+    )
+
     fact_plan_resolver.assert_called_once()
 
     taxonomy_mapper.concept_for.assert_called_once_with(
@@ -681,6 +699,23 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
     gcd_fact_builder.shareholder.assert_called_once()
 
     mandatory_completer.build_missing_nil_facts.assert_called_once()
+
+    mandatory_completer_call = (
+        mandatory_completer
+        .build_missing_nil_facts
+        .call_args
+    )
+
+    assert (
+        mandatory_completer_call.kwargs[
+            "active_report_element_roles"
+        ]
+        == (
+            BALANCE_SHEET_ROLE,
+            INCOME_STATEMENT_ROLE,
+            APPROPRIATION_PROFITS_ROLE,
+        )
+    )
 
     account_balance_builder.build.assert_called_once()
 

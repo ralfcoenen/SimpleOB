@@ -124,6 +124,10 @@ INCOME_STATEMENT_ROLE = (
     "http://www.xbrl.de/taxonomies/de-gaap-ci/role/incomeStatement"
 )
 
+APPROPRIATION_PROFITS_ROLE = (
+    "http://www.xbrl.de/taxonomies/de-gaap-ci/role/"
+    "appropriationProfits"
+)
 
 class EBilanzService:
     """Erzeugt eine E-Bilanz aus produktiven Anwendungsdaten."""
@@ -353,6 +357,18 @@ class EBilanzService:
                     (
                         "genInfo.report.id.reportElement."
                         "reportElements.KS"
+                    ),
+                ),
+            )
+
+        if profit_appropriation_data is not None:
+            report_profile = replace(
+                report_profile,
+                report_elements=(
+                    *report_profile.report_elements,
+                    (
+                        "genInfo.report.id.reportElement."
+                        "reportElements.EV"
                     ),
                 ),
             )
@@ -817,6 +833,16 @@ class EBilanzService:
             gaap_ci_entry_point
         ).requirements()
 
+        active_report_element_roles = [
+            BALANCE_SHEET_ROLE,
+            INCOME_STATEMENT_ROLE,
+        ]
+
+        if profit_appropriation_data is not None:
+            active_report_element_roles.append(
+                APPROPRIATION_PROFITS_ROLE
+            )
+
         mandatory_nil_facts = (
             GaapCiMandatoryFactCompleter(
                 taxonomy_model=gaap_ci_model
@@ -828,9 +854,8 @@ class EBilanzService:
                 instant_context=instant_context,
                 duration_context=duration_context,
                 unit=TaxonomyUnit.eur(),
-                active_report_element_roles=(
-                    BALANCE_SHEET_ROLE,
-                    INCOME_STATEMENT_ROLE,
+                active_report_element_roles=tuple(
+                    active_report_element_roles
                 ),
                 excluded_concept_prefixes=(
                     "is.netIncome.regular.operatingCOGS",

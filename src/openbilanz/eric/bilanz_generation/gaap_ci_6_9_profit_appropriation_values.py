@@ -45,6 +45,19 @@ class GaapCi69ProfitAppropriationValueBuilder:
 
         values: dict[FactPlanPath, FactPlanValue] = {}
 
+        gain_loss = (
+            net_income
+            + previous_profit_loss_carryforward
+            + data.statutory_reserve_release
+            + data.other_revenue_reserves_release
+            - data.statutory_reserve_addition
+            - data.other_revenue_reserves_addition
+            - data.distribution
+            - data.profit_loss_carryforward
+        )
+
+        values[("incomeUse.gainLoss",)] = gain_loss
+
         GaapCi69ProfitAppropriationValueBuilder._add_value(
             values=values,
             concept_name="incomeUse.gainLoss.netIncome",

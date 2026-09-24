@@ -272,6 +272,34 @@ def test_report_profile_with_stu_builds_stu_value() -> None:
     ] == "Steuerliche Überleitungsrechnung"
 
 
+def test_report_profile_with_ev_builds_ev_value() -> None:
+    report_profile = (
+        GcdReportProfile.standard()
+        .with_report_element(
+            "genInfo.report.id.reportElement."
+            "reportElements.EV"
+        )
+    )
+
+    values = Taxonomy69ValueBuilder.build(
+        company_data=_company_data(),
+        identifiers=_identifiers(),
+        fiscal_year=_fiscal_year(),
+        report_profile=report_profile,
+        gaap_ci_values=_gaap_ci_values(),
+    )
+
+    assert values[
+        (
+            "genInfo.report.id.reportElement",
+            (
+                "genInfo.report.id.reportElement."
+                "reportElements.EV"
+            ),
+        )
+    ] == "Ergebnisverwendung"
+
+
 def test_optional_identifiers_are_omitted() -> None:
     identifiers = GcdCompanyIdentifiers(
         tax_number_13="5123045678901",

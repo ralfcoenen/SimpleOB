@@ -65,6 +65,10 @@ class Taxonomy69ValueBuilder:
         ): "GuV",
         (
             "genInfo.report.id.reportElement."
+            "reportElements.EV"
+        ): "Ergebnisverwendung",
+        (
+            "genInfo.report.id.reportElement."
             "reportElements.KS"
         ): "Kontennachweis",
         (

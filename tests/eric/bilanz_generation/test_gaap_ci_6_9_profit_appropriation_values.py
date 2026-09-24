@@ -28,6 +28,9 @@ def test_builds_profit_appropriation_values() -> None:
 
     assert values == {
         (
+            "incomeUse.gainLoss",
+        ): Decimal("0.00"),
+        (
             "incomeUse.gainLoss.netIncome",
         ): Decimal("10000.00"),
         (
@@ -70,6 +73,9 @@ def test_builds_loss_appropriation_with_reserve_release() -> None:
 
     assert values == {
         (
+            "incomeUse.gainLoss",
+        ): Decimal("0.00"),
+        (
             "incomeUse.gainLoss.netIncome",
         ): Decimal("-8000.00"),
         (
@@ -105,6 +111,9 @@ def test_splits_previous_loss_carryforward() -> None:
     )
 
     assert values == {
+        (
+            "incomeUse.gainLoss",
+        ): Decimal("0.00"),
         (
             "incomeUse.gainLoss.netIncome",
         ): Decimal("2000.00"),

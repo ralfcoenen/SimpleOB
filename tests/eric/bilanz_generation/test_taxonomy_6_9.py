@@ -784,18 +784,23 @@ def test_report_element_ks_is_conditional() -> None:
     )
 
 
-def test_unused_report_elements_are_nil() -> None:
-    for suffix in (
-        "EV",
-        "EB",
-    ):
-        assert (
-            _state_for(
-                "genInfo.report.id.reportElement."
-                f"reportElements.{suffix}"
-            )
-            is FactPlanState.NIL
+def test_report_element_ev_is_conditional() -> None:
+    assert (
+        _state_for(
+            "genInfo.report.id.reportElement.reportElements.EV"
         )
+        is FactPlanState.CONDITIONAL
+    )
+
+
+def test_unused_report_elements_are_nil() -> None:
+    assert (
+        _state_for(
+            "genInfo.report.id.reportElement."
+            "reportElements.EB"
+        )
+        is FactPlanState.NIL
+    )
 
     assert (
         _state_for(
@@ -804,6 +809,7 @@ def test_unused_report_elements_are_nil() -> None:
         )
         is FactPlanState.NIL
     )
+
 
 def test_report_element_bvv_is_conditional() -> None:
     assert (
