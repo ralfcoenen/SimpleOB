@@ -7,7 +7,7 @@ from alembic.config import Config
 from sqlalchemy import create_engine, inspect
 
 BASELINE_REVISION = "7392d6cc6892"
-HEAD_REVISION = "d6043facfad4"
+HEAD_REVISION = "36fe523b87a4"
 
 
 def _alembic_config(
@@ -292,5 +292,219 @@ def test_migrations_downgrade_from_head_to_baseline(
     assert (
         _current_revision(database_path)
         == BASELINE_REVISION
+    )
+    assert _foreign_key_check(database_path) == []
+
+
+def test_profit_appropriation_control_accounts_migration(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """Die Ergebnisverwendungskonten werden kollisionsschonend ergänzt."""
+
+    database_path = tmp_path / "openbilanz.db"
+    database_url = f"sqlite:///{database_path}"
+
+    monkeypatch.setenv(
+        "OPENBILANZ_DATABASE_URL",
+        database_url,
+    )
+
+    config = _alembic_config(
+        database_path
+    )
+
+    command.upgrade(
+        config,
+        "d6043facfad4",
+    )
+
+    engine = create_engine(
+        database_url
+    )
+
+    try:
+        with engine.begin() as connection:
+            result = connection.exec_driver_sql(
+                """
+                INSERT INTO mandanten (
+                    company_id,
+                    name
+                )
+                VALUES (
+                    'migration-test-company',
+                    'Migration Test UG'
+                )
+                """
+            )
+
+            mandant_id = result.lastrowid
+
+            connection.exec_driver_sql(
+                """
+                INSERT INTO konten (
+                    mandant_id,
+                    account_number,
+                    name,
+                    account_type,
+                    is_active,
+                    debit_position_code,
+                    credit_position_code
+                )
+                VALUES (
+                    ?,
+                    '0846',
+                    'Individuelles bestehendes Konto',
+                    'LIABILITY',
+                    0,
+                    'INDIVIDUAL.DEBIT',
+                    'INDIVIDUAL.CREDIT'
+                )
+                """,
+                (mandant_id,),
+            )
+
+            connection.exec_driver_sql(
+                """
+                INSERT INTO kontenrahmen_konfiguration (
+                    mandant_id,
+                    opening_balance_account,
+                    income_summary_account,
+                    profit_account,
+                    loss_account,
+                    profit_loss_carryforward_account,
+                    depreciation_expense_account,
+                    fixed_asset_disposal_gain_account,
+                    fixed_asset_disposal_loss_account,
+                    input_tax_7,
+                    input_tax_19,
+                    output_tax_7,
+                    output_tax_19
+                )
+                VALUES (
+                    ?,
+                    '9000',
+                    '8990',
+                    '8020',
+                    '8021',
+                    '2970',
+                    '4830',
+                    '8500',
+                    '4900',
+                    '1571',
+                    '1576',
+                    '1771',
+                    '1776'
+                )
+                """,
+                (mandant_id,),
+            )
+    finally:
+        engine.dispose()
+
+    command.upgrade(
+        config,
+        "36fe523b87a4",
+    )
+
+    engine = create_engine(
+        database_url
+    )
+
+    try:
+        inspector = inspect(engine)
+
+        configuration_columns = {
+            column["name"]
+            for column in inspector.get_columns(
+                "kontenrahmen_konfiguration"
+            )
+        }
+
+        assert "statutory_reserve_account" in configuration_columns
+        assert (
+            "other_revenue_reserves_account"
+            in configuration_columns
+        )
+        assert (
+            "distribution_liability_account"
+            in configuration_columns
+        )
+
+        with engine.connect() as connection:
+            configuration = connection.exec_driver_sql(
+                """
+                SELECT
+                    statutory_reserve_account,
+                    other_revenue_reserves_account,
+                    distribution_liability_account
+                FROM kontenrahmen_konfiguration
+                WHERE mandant_id = ?
+                """,
+                (mandant_id,),
+            ).one()
+
+            assert configuration == (
+                "0846",
+                "0855",
+                "0755",
+            )
+
+            accounts = connection.exec_driver_sql(
+                """
+                SELECT
+                    account_number,
+                    name,
+                    account_type,
+                    is_active,
+                    debit_position_code,
+                    credit_position_code
+                FROM konten
+                WHERE mandant_id = ?
+                  AND account_number IN (
+                      '0755',
+                      '0846',
+                      '0855'
+                  )
+                ORDER BY account_number
+                """,
+                (mandant_id,),
+            ).all()
+
+            assert accounts == [
+                (
+                    "0755",
+                    (
+                        "Verbindlichkeiten gegenüber Gesellschaftern "
+                        "für offene Ausschüttungen"
+                    ),
+                    "LIABILITY",
+                    1,
+                    None,
+                    "HGB.266.PASSIVA.C.8",
+                ),
+                (
+                    "0846",
+                    "Individuelles bestehendes Konto",
+                    "LIABILITY",
+                    0,
+                    "INDIVIDUAL.DEBIT",
+                    "INDIVIDUAL.CREDIT",
+                ),
+                (
+                    "0855",
+                    "Andere Gewinnrücklagen",
+                    "EQUITY",
+                    1,
+                    None,
+                    "HGB.266.PASSIVA.A.III.4",
+                ),
+            ]
+    finally:
+        engine.dispose()
+
+    assert (
+        _current_revision(database_path)
+        == "36fe523b87a4"
     )
     assert _foreign_key_check(database_path) == []

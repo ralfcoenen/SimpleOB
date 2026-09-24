@@ -240,6 +240,24 @@ def test_saves_and_validates_control_accounts() -> None:
             account_type=AccountType.EQUITY,
         ),
         TemplateAccount(
+            account_number="0846",
+            name="Gesetzliche Rücklage",
+            account_type=AccountType.EQUITY,
+        ),
+        TemplateAccount(
+            account_number="0855",
+            name="Andere Gewinnrücklagen",
+            account_type=AccountType.EQUITY,
+        ),
+        TemplateAccount(
+            account_number="0755",
+            name=(
+                "Verbindlichkeiten gegenüber Gesellschaftern "
+                "für offene Ausschüttungen"
+            ),
+    account_type=AccountType.LIABILITY,
+),
+        TemplateAccount(
             account_number="4830",
             name="Abschreibungen auf Sachanlagen",
             account_type=AccountType.EXPENSE,
@@ -315,6 +333,9 @@ def test_saves_and_validates_control_accounts() -> None:
         profit_account="8020",
         loss_account="8021",
         profit_loss_carryforward_account="2970",
+        statutory_reserve_account="0846",
+        other_revenue_reserves_account="0855",
+        distribution_liability_account="0755",
         depreciation_expense_account="4830",
         fixed_asset_disposal_gain_account="8500",
         fixed_asset_disposal_loss_account="4900",
@@ -388,6 +409,9 @@ def test_saves_and_validates_control_accounts() -> None:
             profit_account="8020",
             loss_account="8021",
             profit_loss_carryforward_account="2970",
+            statutory_reserve_account="0846",
+            other_revenue_reserves_account="0855",
+            distribution_liability_account="0755",
             depreciation_expense_account="4830",
             fixed_asset_disposal_gain_account="8500",
             fixed_asset_disposal_loss_account="4900",
@@ -483,6 +507,24 @@ def test_saves_account_configuration_atomically() -> None:
                 account_type=AccountType.EQUITY,
             ),
             TemplateAccount(
+                account_number="0846",
+                name="Gesetzliche Rücklage",
+                account_type=AccountType.EQUITY,
+            ),
+            TemplateAccount(
+                account_number="0855",
+                name="Andere Gewinnrücklagen",
+                account_type=AccountType.EQUITY,
+            ),
+            TemplateAccount(
+                account_number="0755",
+                name=(
+                    "Verbindlichkeiten gegenüber Gesellschaftern "
+                    "für offene Ausschüttungen"
+                ),
+                account_type=AccountType.LIABILITY,
+            ),
+            TemplateAccount(
                 account_number="4830",
                 name="Abschreibungen",
                 account_type=AccountType.EXPENSE,
@@ -537,6 +579,9 @@ def test_saves_account_configuration_atomically() -> None:
         profit_account="8020",
         loss_account="8021",
         profit_loss_carryforward_account="2970",
+        statutory_reserve_account="0846",
+        other_revenue_reserves_account="0855",
+        distribution_liability_account="0755",
         depreciation_expense_account="4830",
         fixed_asset_disposal_gain_account="8500",
         fixed_asset_disposal_loss_account="4900",
@@ -561,6 +606,9 @@ def test_saves_account_configuration_atomically() -> None:
         profit_account="8020",
         loss_account="8021",
         profit_loss_carryforward_account="2970",
+        statutory_reserve_account="0846",
+        other_revenue_reserves_account="0855",
+        distribution_liability_account="0755",
         depreciation_expense_account="4830",
         fixed_asset_disposal_gain_account="8500",
         fixed_asset_disposal_loss_account="4900",

@@ -64,6 +64,24 @@ def _standard_chart_of_accounts() -> ChartOfAccountsTemplate:
                 account_type=AccountType.EQUITY,
             ),
             TemplateAccount(
+                account_number="0846",
+                name="Gesetzliche Rücklage",
+                account_type=AccountType.EQUITY,
+            ),
+            TemplateAccount(
+                account_number="0855",
+                name="Andere Gewinnrücklagen",
+                account_type=AccountType.EQUITY,
+            ),
+            TemplateAccount(
+                account_number="0755",
+                name=(
+                    "Verbindlichkeiten gegenüber Gesellschaftern "
+                    "für offene Ausschüttungen"
+                ),
+                account_type=AccountType.LIABILITY,
+            ),
+            TemplateAccount(
                 account_number="1000",
                 name="Kasse",
                 account_type=AccountType.ASSET,
@@ -314,6 +332,9 @@ def test_does_not_replace_existing_chart_of_accounts() -> None:
         account.account_number
         for account in chart_of_accounts.accounts
             } == {
+                "0755",
+                "0855",
+                "0846",
                 "1000",
                 "1200",
                 "1571",

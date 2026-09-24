@@ -273,6 +273,21 @@ class KontenrahmenKonfiguration(Base):
         )
     )
 
+    statutory_reserve_account: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    other_revenue_reserves_account: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    distribution_liability_account: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
     depreciation_expense_account: Mapped[str] = mapped_column(
         String,
         nullable=False,

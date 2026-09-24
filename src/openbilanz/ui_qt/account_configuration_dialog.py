@@ -158,6 +158,15 @@ class AccountConfigurationDialog(QDialog):
         self._profit_loss_carryforward_box = (
             self._create_account_combobox()
         )
+        self._statutory_reserve_box = (
+            self._create_account_combobox()
+        )
+        self._other_revenue_reserves_box = (
+            self._create_account_combobox()
+        )
+        self._distribution_liability_box = (
+            self._create_account_combobox()
+        )
         self._depreciation_expense_box = (
             self._create_account_combobox()
         )
@@ -187,6 +196,18 @@ class AccountConfigurationDialog(QDialog):
         form.addRow(
             "Gewinn-/Verlustvortrag",
             self._profit_loss_carryforward_box,
+        )
+        form.addRow(
+            "Gesetzliche Rücklage",
+            self._statutory_reserve_box,
+        )
+        form.addRow(
+            "Andere Gewinnrücklagen",
+            self._other_revenue_reserves_box,
+        )
+        form.addRow(
+            "Verbindlichkeiten für offene Ausschüttungen",
+            self._distribution_liability_box,
         )
         form.addRow(
             "Abschreibungsaufwand",
@@ -352,6 +373,24 @@ class AccountConfigurationDialog(QDialog):
             ),
         )
         self._select_account(
+            self._statutory_reserve_box,
+            self._control_accounts.statutory_reserve_account,
+        )
+        self._select_account(
+            self._other_revenue_reserves_box,
+            (
+                self._control_accounts
+                .other_revenue_reserves_account
+            ),
+        )
+        self._select_account(
+            self._distribution_liability_box,
+            (
+                self._control_accounts
+                .distribution_liability_account
+            ),
+        )
+        self._select_account(
             self._depreciation_expense_box,
             (
                 self._control_accounts
@@ -487,6 +526,21 @@ class AccountConfigurationDialog(QDialog):
                 profit_loss_carryforward_account=(
                     self._selected_account_number(
                         self._profit_loss_carryforward_box
+                    )
+                ),
+                statutory_reserve_account=(
+                    self._selected_account_number(
+                        self._statutory_reserve_box
+                    )
+                ),
+                other_revenue_reserves_account=(
+                    self._selected_account_number(
+                        self._other_revenue_reserves_box
+                    )
+                ),
+                distribution_liability_account=(
+                    self._selected_account_number(
+                        self._distribution_liability_box
                     )
                 ),
                 depreciation_expense_account=(

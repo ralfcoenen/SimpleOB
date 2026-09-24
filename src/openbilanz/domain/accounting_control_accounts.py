@@ -12,6 +12,9 @@ class AccountingControlAccounts:
     profit_account: str
     loss_account: str
     profit_loss_carryforward_account: str
+    statutory_reserve_account: str
+    other_revenue_reserves_account: str
+    distribution_liability_account: str
     depreciation_expense_account: str
     fixed_asset_disposal_gain_account: str
     fixed_asset_disposal_loss_account: str
@@ -37,6 +40,18 @@ class AccountingControlAccounts:
             (
                 "profit_loss_carryforward_account",
                 self.profit_loss_carryforward_account,
+            ),
+            (
+                "statutory_reserve_account",
+                self.statutory_reserve_account,
+            ),
+            (
+                "other_revenue_reserves_account",
+                self.other_revenue_reserves_account,
+            ),
+            (
+                "distribution_liability_account",
+                self.distribution_liability_account,
             ),
             (
                 "depreciation_expense_account",
@@ -85,6 +100,9 @@ class AccountingControlAccounts:
                 self.profit_account,
                 self.loss_account,
                 self.profit_loss_carryforward_account,
+                self.statutory_reserve_account,
+                self.other_revenue_reserves_account,
+                self.distribution_liability_account,
                 self.depreciation_expense_account,
                 self.fixed_asset_disposal_gain_account,
                 self.fixed_asset_disposal_loss_account,

@@ -1,7 +1,10 @@
 account_number;name;account_type;statement_type;debit_position_code;credit_position_code
 0200;Technische Anlagen und Maschinen;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.A.II.2;
 0400;Betriebs- und Geschäftsausstattung;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.A.II.3;
+0755;Verbindlichkeiten gegenüber Gesellschaftern für offene Ausschüttungen;LIABILITY;BALANCE_SHEET;;HGB.266.PASSIVA.C.8
 0800;Gezeichnetes Kapital;EQUITY;BALANCE_SHEET;;HGB.266.PASSIVA.A.I
+0846;Gesetzliche Rücklage;EQUITY;BALANCE_SHEET;;HGB.266.PASSIVA.A.III.1
+0855;Andere Gewinnrücklagen;EQUITY;BALANCE_SHEET;;HGB.266.PASSIVA.A.III.4
 1000;Kasse;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.IV;
 1200;Bank;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.IV;
 1400;Forderungen aus Lieferungen und Leistungen;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.II.1;
