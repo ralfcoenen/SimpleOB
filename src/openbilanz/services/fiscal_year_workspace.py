@@ -39,6 +39,9 @@ from openbilanz.database.bvv_annual_data_repository import (
 from openbilanz.database.profit_appropriation_annual_data_repository import (
     ProfitAppropriationAnnualDataRepository,
 )
+from openbilanz.database.profit_appropriation_posting_repository import (
+    ProfitAppropriationPostingRepository,
+)
 from openbilanz.domain.account import Account
 from openbilanz.domain.account_mapping_rule import (
     AccountMappingRule,
@@ -102,6 +105,12 @@ from openbilanz.domain.bvv_annual_data import (
 from openbilanz.domain.profit_appropriation_annual_data import (
     ProfitAppropriationAnnualData,
 )
+from openbilanz.domain.profit_appropriation_posting import (
+    ProfitAppropriationPosting,
+)
+from openbilanz.domain.profit_appropriation_posting_proposal import (
+    ProfitAppropriationPostingProposal,
+)
 from openbilanz.reporting.account_activity_report import (
     AccountActivityReport,
 )
@@ -151,6 +160,12 @@ from openbilanz.services.taxonomy_management_service import (
     TaxonomyManagementService,
     TaxonomyStatus,
 )
+from openbilanz.services.profit_appropriation_posting_service import (
+    ProfitAppropriationPostingService,
+)
+from openbilanz.services.profit_appropriation_posting_workflow import (
+    ProfitAppropriationPostingWorkflow,
+)
 from openbilanz.taxonomy.arelle_adapter import (
     ArelleValidationResult,
 )
@@ -179,6 +194,15 @@ class FiscalYearWorkspace:
         ) = None,
         profit_appropriation_service: (
             ProfitAppropriationService | None
+        ) = None,
+        profit_appropriation_posting_repository: (
+            ProfitAppropriationPostingRepository | None
+        ) = None,
+        profit_appropriation_posting_service: (
+            ProfitAppropriationPostingService | None
+        ) = None,
+        profit_appropriation_posting_workflow: (
+            ProfitAppropriationPostingWorkflow | None
         ) = None,
         shareholder_repository: ShareholderRepository | None = None,
         chart_of_accounts_repository: ChartOfAccountsRepository | None = None,
@@ -228,6 +252,17 @@ class FiscalYearWorkspace:
             profit_appropriation_service
             if profit_appropriation_service is not None
             else ProfitAppropriationService()
+        )
+        self._profit_appropriation_posting_repository = (
+            profit_appropriation_posting_repository
+        )
+        self._profit_appropriation_posting_service = (
+            profit_appropriation_posting_service
+            if profit_appropriation_posting_service is not None
+            else ProfitAppropriationPostingService()
+        )
+        self._profit_appropriation_posting_workflow = (
+            profit_appropriation_posting_workflow
         )
         self._shareholder_repository = (
             shareholder_repository
@@ -2472,6 +2507,162 @@ class FiscalYearWorkspace:
             ),
             data=data,
         )
+
+    def _effective_profit_appropriation_postings(
+        self,
+        postings: tuple[ProfitAppropriationPosting, ...],
+    ) -> tuple[ProfitAppropriationPosting, ...]:
+        """Liefert die nicht stornierten Ergebnisverwendungsbuchungen."""
+
+        bookings = self._booking_repository.list_for_fiscal_year(
+            company_id=self._context.company.company_id,
+            fiscal_year=self._context.fiscal_year,
+        )
+
+        reversed_booking_ids = {
+            booking.reversal_of_booking_id
+            for booking in bookings
+            if (
+                booking.booking_type is BookingType.REVERSAL
+                and booking.reversal_of_booking_id is not None
+            )
+        }
+
+        return tuple(
+            posting
+            for posting in postings
+            if posting.booking_id not in reversed_booking_ids
+        )
+
+    def build_profit_appropriation_posting_proposals(
+        self,
+        *,
+        booking_date: date,
+    ) -> tuple[ProfitAppropriationPostingProposal, ...]:
+        """Ermittelt offene Buchungsvorschläge zur Ergebnisverwendung des Vorjahres."""
+
+        if not self.is_open:
+            raise ValueError(
+                "Das Geschäftsjahr ist abgeschlossen."
+            )
+
+        if (
+            self._profit_appropriation_annual_data_repository is None
+            or self._profit_appropriation_posting_repository is None
+            or self._chart_of_accounts_repository is None
+        ):
+            raise RuntimeError(
+                "Die Ergebnisverwendungsbuchungen sind nicht konfiguriert."
+            )
+
+        if not isinstance(booking_date, date):
+            raise TypeError(
+                "booking_date muss ein Datum sein."
+            )
+
+        if not self._context.fiscal_year.contains(
+            booking_date
+        ):
+            raise ValueError(
+                "Das Buchungsdatum liegt außerhalb "
+                "des Geschäftsjahres."
+            )
+
+        source_fiscal_year = (
+            self.managed_fiscal_year.opening_source
+        )
+
+        if source_fiscal_year is None:
+            return ()
+
+        annual_data = (
+            self._profit_appropriation_annual_data_repository
+            .get_for_fiscal_year(
+                company_id=self._context.company.company_id,
+                fiscal_year=source_fiscal_year,
+            )
+        )
+
+        if annual_data is None:
+            return ()
+
+        control_accounts, _, _ = (
+            self.load_account_configuration()
+        )
+
+        proposals = (
+            self._profit_appropriation_posting_service
+            .build_proposals(
+                data=annual_data,
+                booking_date=booking_date,
+                control_accounts=control_accounts,
+            )
+        )
+
+        postings = (
+            self._profit_appropriation_posting_repository
+            .list_for_source_fiscal_year(
+                company_id=self._context.company.company_id,
+                source_fiscal_year_end=(
+                    source_fiscal_year.end_date
+                ),
+            )
+        )
+
+        effective_postings = (
+            self._effective_profit_appropriation_postings(
+                postings
+            )
+        )
+
+        confirmed_types = {
+            posting.posting_type
+            for posting in effective_postings
+        }
+
+        return tuple(
+            proposal
+            for proposal in proposals
+            if proposal.posting_type not in confirmed_types
+        )
+
+    def confirm_profit_appropriation_posting(
+        self,
+        proposal: ProfitAppropriationPostingProposal,
+    ) -> ProfitAppropriationPosting:
+        """Bucht einen bestätigten Vorschlag zur Ergebnisverwendung."""
+
+        if not self.is_open:
+            raise ValueError(
+                "Das Geschäftsjahr ist abgeschlossen."
+            )
+
+        if self._profit_appropriation_posting_workflow is None:
+            raise RuntimeError(
+                "Die Ergebnisverwendungsbuchungen sind nicht konfiguriert."
+            )
+
+        source_fiscal_year = (
+            self.managed_fiscal_year.opening_source
+        )
+
+        if source_fiscal_year is None:
+            raise ValueError(
+                "Das Geschäftsjahr hat kein Eröffnungsquelljahr."
+            )
+
+        posting = (
+            self._profit_appropriation_posting_workflow.confirm(
+                company_id=self._context.company.company_id,
+                source_fiscal_year=source_fiscal_year,
+                target_fiscal_year=self._context.fiscal_year,
+                proposal=proposal,
+            )
+        )
+
+        self.reload()
+
+        return posting
 
     def load_profit_appropriation_annual_data(
         self,

@@ -406,6 +406,12 @@ class Wirtschaftsjahr(Base):
             back_populates="wirtschaftsjahr",
         )
 
+    gewinnverwendungsbuchungen: Mapped[
+        list["Gewinnverwendungsbuchung"]
+    ] = relationship(
+        back_populates="quell_wirtschaftsjahr",
+    )
+
     anlagebewegungen: Mapped[
         list["Anlagebewegung"]
     ] = relationship(
@@ -972,3 +978,52 @@ class GewinnverwendungsJahresdaten(Base):
     )
 
     wirtschaftsjahr: Mapped[Wirtschaftsjahr] = relationship()
+
+
+class Gewinnverwendungsbuchung(Base):
+    """Persistierte bestätigte Umsetzung einer Ergebnisverwendung."""
+
+    __tablename__ = "gewinnverwendungsbuchungen"
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+    )
+
+    posting_id: Mapped[str] = mapped_column(
+        String(36),
+        unique=True,
+        nullable=False,
+    )
+
+    quell_wirtschaftsjahr_id: Mapped[int] = mapped_column(
+        ForeignKey("wirtschaftsjahre.id"),
+        nullable=False,
+    )
+
+    buchungszeile_id: Mapped[int] = mapped_column(
+        ForeignKey("buchungszeilen.id"),
+        unique=True,
+        nullable=False,
+    )
+
+    posting_date: Mapped[date] = mapped_column(
+        Date,
+        nullable=False,
+    )
+
+    amount: Mapped[Decimal] = mapped_column(
+        Numeric(18, 2),
+        nullable=False,
+    )
+
+    posting_type: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    quell_wirtschaftsjahr: Mapped[Wirtschaftsjahr] = relationship(
+        back_populates="gewinnverwendungsbuchungen",
+    )
+
+    buchungszeile: Mapped[Buchungszeile] = relationship()

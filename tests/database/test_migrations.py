@@ -7,7 +7,7 @@ from alembic.config import Config
 from sqlalchemy import create_engine, inspect
 
 BASELINE_REVISION = "7392d6cc6892"
-HEAD_REVISION = "36fe523b87a4"
+HEAD_REVISION = "eccb0d66e425"
 
 
 def _alembic_config(
@@ -506,5 +506,136 @@ def test_profit_appropriation_control_accounts_migration(
     assert (
         _current_revision(database_path)
         == "36fe523b87a4"
+    )
+    assert _foreign_key_check(database_path) == []
+
+
+def test_profit_appropriation_postings_migration(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """Die Tabelle für bestätigte Ergebnisverwendungsbuchungen wird angelegt."""
+
+    database_path = tmp_path / "openbilanz.db"
+    database_url = f"sqlite:///{database_path}"
+
+    monkeypatch.setenv(
+        "OPENBILANZ_DATABASE_URL",
+        database_url,
+    )
+
+    config = _alembic_config(
+        database_path
+    )
+
+    command.upgrade(
+        config,
+        "36fe523b87a4",
+    )
+
+    engine = create_engine(
+        database_url
+    )
+
+    try:
+        inspector = inspect(engine)
+
+        assert (
+            "gewinnverwendungsbuchungen"
+            not in inspector.get_table_names()
+        )
+    finally:
+        engine.dispose()
+
+    command.upgrade(
+        config,
+        "eccb0d66e425",
+    )
+
+    engine = create_engine(
+        database_url
+    )
+
+    try:
+        inspector = inspect(engine)
+
+        assert (
+            "gewinnverwendungsbuchungen"
+            in inspector.get_table_names()
+        )
+
+        columns = {
+            column["name"]
+            for column in inspector.get_columns(
+                "gewinnverwendungsbuchungen"
+            )
+        }
+
+        assert columns == {
+            "id",
+            "posting_id",
+            "quell_wirtschaftsjahr_id",
+            "buchungszeile_id",
+            "posting_date",
+            "amount",
+            "posting_type",
+        }
+
+        foreign_keys = inspector.get_foreign_keys(
+            "gewinnverwendungsbuchungen"
+        )
+
+        assert any(
+            foreign_key["constrained_columns"]
+            == ["quell_wirtschaftsjahr_id"]
+            and foreign_key["referred_table"]
+            == "wirtschaftsjahre"
+            and foreign_key["referred_columns"]
+            == ["id"]
+            for foreign_key in foreign_keys
+        )
+
+        assert any(
+            foreign_key["constrained_columns"]
+            == ["buchungszeile_id"]
+            and foreign_key["referred_table"]
+            == "buchungszeilen"
+            and foreign_key["referred_columns"]
+            == ["id"]
+            for foreign_key in foreign_keys
+        )
+
+        unique_constraints = (
+            inspector.get_unique_constraints(
+                "gewinnverwendungsbuchungen"
+            )
+        )
+
+        assert any(
+            constraint["column_names"]
+            == ["posting_id"]
+            for constraint in unique_constraints
+        )
+
+        assert any(
+            constraint["column_names"]
+            == ["buchungszeile_id"]
+            for constraint in unique_constraints
+        )
+
+        assert not any(
+            set(constraint["column_names"])
+            == {
+                "quell_wirtschaftsjahr_id",
+                "posting_type",
+            }
+            for constraint in unique_constraints
+        )
+    finally:
+        engine.dispose()
+
+    assert (
+        _current_revision(database_path)
+        == "eccb0d66e425"
     )
     assert _foreign_key_check(database_path) == []

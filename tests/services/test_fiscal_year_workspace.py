@@ -63,6 +63,15 @@ from openbilanz.domain.managed_fiscal_year import ManagedFiscalYear
 from openbilanz.domain.profit_appropriation_annual_data import (
     ProfitAppropriationAnnualData,
 )
+from openbilanz.domain.profit_appropriation_posting import (
+    ProfitAppropriationPosting,
+)
+from openbilanz.domain.profit_appropriation_posting_proposal import (
+    ProfitAppropriationPostingProposal,
+)
+from openbilanz.domain.profit_appropriation_posting_type import (
+    ProfitAppropriationPostingType,
+)
 from openbilanz.domain.shareholder import Shareholder
 from openbilanz.domain.tax_depreciation_adjustment import (
     TaxDepreciationAdjustment,
@@ -3725,6 +3734,309 @@ def test_validate_profit_appropriation_uses_previous_carryforward(
         previous_profit_loss_carryforward=Decimal("2000.00"),
         data=data,
     )
+
+
+def test_profit_appropriation_posting_proposals_respect_effective_postings(
+    company: Company,
+) -> None:
+    """Nur noch nicht wirksam gebuchte Ergebnisverwendung wird vorgeschlagen."""
+
+    source_fiscal_year = FiscalYear(
+        start_date=date(2026, 1, 1),
+        end_date=date(2026, 12, 31),
+    )
+    target_fiscal_year = FiscalYear(
+        start_date=date(2027, 1, 1),
+        end_date=date(2027, 12, 31),
+    )
+    context = ApplicationContext(
+        company=company,
+        fiscal_year=target_fiscal_year,
+    )
+
+    booking_repository = Mock()
+    company_repository = Mock()
+    annual_data_repository = Mock()
+    appropriation_posting_repository = Mock()
+    appropriation_posting_service = Mock()
+    chart_of_accounts_repository = Mock()
+
+    company_repository.get_managed_fiscal_years.return_value = (
+        ManagedFiscalYear(
+            fiscal_year=source_fiscal_year,
+            status=FiscalYearStatus.CLOSED,
+            opening_source=None,
+        ),
+        ManagedFiscalYear(
+            fiscal_year=target_fiscal_year,
+            status=FiscalYearStatus.OPEN,
+            opening_source=source_fiscal_year,
+        ),
+    )
+
+    annual_data = ProfitAppropriationAnnualData(
+        statutory_reserve_addition=Decimal("1000.00"),
+        other_revenue_reserves_addition=Decimal("0.00"),
+        statutory_reserve_release=Decimal("0.00"),
+        other_revenue_reserves_release=Decimal("0.00"),
+        distribution=Decimal("5000.00"),
+        profit_loss_carryforward=Decimal("9007.01"),
+    )
+
+    annual_data_repository.get_for_fiscal_year.return_value = (
+        annual_data
+    )
+
+    control_accounts = Mock(
+        spec=AccountingControlAccounts
+    )
+    vat_accounts = Mock(
+        spec=VatAccounts
+    )
+    account_roles = Mock(
+        spec=AccountingAccountRoles
+    )
+
+    (
+        chart_of_accounts_repository
+        .load_control_accounts
+        .return_value
+    ) = control_accounts
+    (
+        chart_of_accounts_repository
+        .load_vat_accounts
+        .return_value
+    ) = vat_accounts
+    (
+        chart_of_accounts_repository
+        .load_account_roles
+        .return_value
+    ) = account_roles
+
+    statutory_reserve_proposal = (
+        ProfitAppropriationPostingProposal(
+            posting_type=(
+                ProfitAppropriationPostingType
+                .STATUTORY_RESERVE_ADDITION
+            ),
+            booking_date=date(2027, 3, 15),
+            amount=Decimal("1000.00"),
+            debit_account_number="2970",
+            credit_account_number="0846",
+        )
+    )
+    distribution_proposal = (
+        ProfitAppropriationPostingProposal(
+            posting_type=(
+                ProfitAppropriationPostingType.DISTRIBUTION
+            ),
+            booking_date=date(2027, 3, 15),
+            amount=Decimal("5000.00"),
+            debit_account_number="2970",
+            credit_account_number="0755",
+        )
+    )
+
+    appropriation_posting_service.build_proposals.return_value = (
+        statutory_reserve_proposal,
+        distribution_proposal,
+    )
+
+    distribution_booking_id = uuid4()
+
+    confirmed_distribution = ProfitAppropriationPosting(
+        source_fiscal_year_end=source_fiscal_year.end_date,
+        posting_date=date(2027, 3, 15),
+        amount=Decimal("5000.00"),
+        booking_id=distribution_booking_id,
+        posting_type=(
+            ProfitAppropriationPostingType.DISTRIBUTION
+        ),
+    )
+
+    appropriation_posting_repository.list_for_source_fiscal_year.return_value = (
+        confirmed_distribution,
+    )
+
+    booking_repository.list_for_fiscal_year.return_value = ()
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=company_repository,
+        profit_appropriation_annual_data_repository=(
+            annual_data_repository
+        ),
+        profit_appropriation_posting_repository=(
+            appropriation_posting_repository
+        ),
+        profit_appropriation_posting_service=(
+            appropriation_posting_service
+        ),
+        chart_of_accounts_repository=(
+            chart_of_accounts_repository
+        ),
+        posting_service=Mock(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
+        e_bilanz_export_service=Mock(),
+        taxonomy_management_service=Mock(),
+    )
+
+    proposals = (
+        workspace.build_profit_appropriation_posting_proposals(
+            booking_date=date(2027, 3, 15)
+        )
+    )
+
+    assert proposals == (
+        statutory_reserve_proposal,
+    )
+
+    annual_data_repository.get_for_fiscal_year.assert_called_once_with(
+        company_id=company.company_id,
+        fiscal_year=source_fiscal_year,
+    )
+
+    appropriation_posting_repository.list_for_source_fiscal_year.assert_called_once_with(
+        company_id=company.company_id,
+        source_fiscal_year_end=source_fiscal_year.end_date,
+    )
+
+    reversal_booking = Booking(
+        booking_date=date(2027, 3, 20),
+        description="Storno Ergebnisverwendung",
+        booking_type=BookingType.REVERSAL,
+        reversal_of_booking_id=distribution_booking_id,
+        lines=(
+            BookingLine(
+                account_number="2970",
+                side=EntrySide.CREDIT,
+                amount=Decimal("5000.00"),
+            ),
+            BookingLine(
+                account_number="0755",
+                side=EntrySide.DEBIT,
+                amount=Decimal("5000.00"),
+            ),
+        ),
+    )
+
+    booking_repository.list_for_fiscal_year.return_value = (
+        reversal_booking,
+    )
+
+    proposals_after_reversal = (
+        workspace.build_profit_appropriation_posting_proposals(
+            booking_date=date(2027, 3, 21)
+        )
+    )
+
+    assert proposals_after_reversal == (
+        statutory_reserve_proposal,
+        distribution_proposal,
+    )
+
+
+def test_confirm_profit_appropriation_posting_delegates_to_workflow(
+    company: Company,
+) -> None:
+    """Bestätigt Ergebnisverwendung über den N+1-Workflow."""
+
+    source_fiscal_year = FiscalYear(
+        start_date=date(2026, 1, 1),
+        end_date=date(2026, 12, 31),
+    )
+    target_fiscal_year = FiscalYear(
+        start_date=date(2027, 1, 1),
+        end_date=date(2027, 12, 31),
+    )
+    context = ApplicationContext(
+        company=company,
+        fiscal_year=target_fiscal_year,
+    )
+
+    booking_repository = Mock()
+    company_repository = Mock()
+    posting_workflow = Mock()
+
+    booking_repository.list_for_fiscal_year.return_value = ()
+
+    company_repository.get_managed_fiscal_years.return_value = (
+        ManagedFiscalYear(
+            fiscal_year=source_fiscal_year,
+            status=FiscalYearStatus.CLOSED,
+            opening_source=None,
+        ),
+        ManagedFiscalYear(
+            fiscal_year=target_fiscal_year,
+            status=FiscalYearStatus.OPEN,
+            opening_source=source_fiscal_year,
+        ),
+    )
+
+    proposal = ProfitAppropriationPostingProposal(
+        posting_type=(
+            ProfitAppropriationPostingType.DISTRIBUTION
+        ),
+        booking_date=date(2027, 3, 15),
+        amount=Decimal("5000.00"),
+        debit_account_number="2970",
+        credit_account_number="0755",
+    )
+
+    expected_posting = ProfitAppropriationPosting(
+        source_fiscal_year_end=source_fiscal_year.end_date,
+        posting_date=proposal.booking_date,
+        amount=proposal.amount,
+        booking_id=uuid4(),
+        posting_type=proposal.posting_type,
+    )
+
+    posting_workflow.confirm.return_value = (
+        expected_posting
+    )
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=company_repository,
+        profit_appropriation_posting_workflow=(
+            posting_workflow
+        ),
+        posting_service=Mock(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
+        e_bilanz_export_service=Mock(),
+        taxonomy_management_service=Mock(),
+    )
+
+    with patch.object(
+        workspace,
+        "reload",
+    ) as reload_workspace:
+        result = (
+            workspace.confirm_profit_appropriation_posting(
+                proposal
+            )
+        )
+
+    assert result is expected_posting
+
+    posting_workflow.confirm.assert_called_once_with(
+        company_id=company.company_id,
+        source_fiscal_year=source_fiscal_year,
+        target_fiscal_year=target_fiscal_year,
+        proposal=proposal,
+    )
+
+    reload_workspace.assert_called_once_with()
 
 
 def test_build_e_bilanz_passes_bvv_data_for_hgbm(

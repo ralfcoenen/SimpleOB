@@ -20,6 +20,9 @@ from openbilanz.database.bvv_annual_data_repository import (
 from openbilanz.database.profit_appropriation_annual_data_repository import (
     ProfitAppropriationAnnualDataRepository,
 )
+from openbilanz.database.profit_appropriation_posting_repository import (
+    ProfitAppropriationPostingRepository,
+)
 from openbilanz.database.chart_of_accounts_repository import (
     ChartOfAccountsRepository,
 )
@@ -89,6 +92,12 @@ from openbilanz.services.fixed_asset_schedule_service import (
 )
 from openbilanz.services.pdf_reporting_service import PdfReportingService
 from openbilanz.services.posting_service import PostingService
+from openbilanz.services.profit_appropriation_booking_service import (
+    ProfitAppropriationBookingService,
+)
+from openbilanz.services.profit_appropriation_posting_workflow import (
+    ProfitAppropriationPostingWorkflow,
+)
 from openbilanz.services.reporting_service import ReportingService
 from openbilanz.services.taxonomy_management_service import (
     TaxonomyManagementService,
@@ -465,6 +474,26 @@ def main() -> None:
                 )
             )
 
+            profit_appropriation_posting_repository = (
+                ProfitAppropriationPostingRepository(
+                    session
+                )
+            )
+
+            profit_appropriation_posting_workflow = (
+                ProfitAppropriationPostingWorkflow(
+                    session=session,
+                    company_repository=company_repository,
+                    booking_repository=booking_repository,
+                    posting_repository=(
+                        profit_appropriation_posting_repository
+                    ),
+                    booking_service=(
+                        ProfitAppropriationBookingService()
+                    ),
+                )
+            )
+
             workspace = FiscalYearWorkspace(
                 context=context,
                 booking_repository=booking_repository,
@@ -474,6 +503,12 @@ def main() -> None:
                 ),
                 profit_appropriation_annual_data_repository=(
                     profit_appropriation_annual_data_repository
+                ),
+                profit_appropriation_posting_repository=(
+                    profit_appropriation_posting_repository
+                ),
+                profit_appropriation_posting_workflow=(
+                    profit_appropriation_posting_workflow
                 ),
                 shareholder_repository=shareholder_repository,
                 chart_of_accounts_repository=(
