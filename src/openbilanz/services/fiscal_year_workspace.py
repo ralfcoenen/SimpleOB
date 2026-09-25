@@ -2514,24 +2514,38 @@ class FiscalYearWorkspace:
     ) -> tuple[ProfitAppropriationPosting, ...]:
         """Liefert die nicht stornierten Ergebnisverwendungsbuchungen."""
 
-        bookings = self._booking_repository.list_for_fiscal_year(
-            company_id=self._context.company.company_id,
-            fiscal_year=self._context.fiscal_year,
-        )
-
-        reversed_booking_ids = {
-            booking.reversal_of_booking_id
-            for booking in bookings
-            if (
-                booking.booking_type is BookingType.REVERSAL
-                and booking.reversal_of_booking_id is not None
-            )
-        }
-
         return tuple(
             posting
             for posting in postings
-            if posting.booking_id not in reversed_booking_ids
+            if not self._booking_repository.is_reversed(
+                posting.booking_id
+            )
+        )
+
+    def has_effective_profit_appropriation_postings(
+        self,
+    ) -> bool:
+        """Prüft auf wirksame Umsetzungsbuchungen des aktuellen Geschäftsjahres."""
+
+        if self._profit_appropriation_posting_repository is None:
+            raise RuntimeError(
+                "Die Ergebnisverwendungsbuchungen sind nicht konfiguriert."
+            )
+
+        postings = (
+            self._profit_appropriation_posting_repository
+            .list_for_source_fiscal_year(
+                company_id=self._context.company.company_id,
+                source_fiscal_year_end=(
+                    self._context.fiscal_year.end_date
+                ),
+            )
+        )
+
+        return bool(
+            self._effective_profit_appropriation_postings(
+                postings
+            )
         )
 
     def build_profit_appropriation_posting_proposals(
@@ -2695,6 +2709,13 @@ class FiscalYearWorkspace:
         if self._profit_appropriation_annual_data_repository is None:
             raise RuntimeError(
                 "Die Ergebnisverwendungsverwaltung ist nicht konfiguriert."
+            )
+
+        if self.has_effective_profit_appropriation_postings():
+            raise ValueError(
+                "Der Ergebnisverwendungsbeschluss kann nicht geändert "
+                "werden, solange wirksame Umsetzungsbuchungen vorhanden "
+                "sind. Stornieren Sie diese Buchungen zunächst."
             )
 
         self._profit_appropriation_annual_data_repository.save_for_fiscal_year(

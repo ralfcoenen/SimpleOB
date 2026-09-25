@@ -298,6 +298,106 @@ def test_preserves_reversal_booking_reference() -> None:
         ),
     )
 
+def test_is_reversed_detects_reversal() -> None:
+    """Erkennt, ob eine reguläre Buchung storniert wurde."""
+
+    engine = create_engine(
+        "sqlite:///:memory:"
+    )
+    Base.metadata.create_all(engine)
+
+    Session = sessionmaker(
+        bind=engine
+    )
+
+    company = Company(
+        company_id=uuid4(),
+        name="Muster UG",
+    )
+
+    fiscal_year = FiscalYear(
+        start_date=date(2026, 1, 1),
+        end_date=date(2026, 12, 31),
+    )
+
+    original_booking = Booking(
+        booking_date=date(2026, 6, 1),
+        description="Ausgangsrechnung",
+        lines=(
+            BookingLine(
+                account_number="1200",
+                side=EntrySide.DEBIT,
+                amount=Decimal("119.00"),
+            ),
+            BookingLine(
+                account_number="8400",
+                side=EntrySide.CREDIT,
+                amount=Decimal("119.00"),
+            ),
+        ),
+    )
+
+    reversal_booking = Booking(
+        booking_date=date(2026, 6, 2),
+        description="Storno Ausgangsrechnung",
+        booking_type=BookingType.REVERSAL,
+        reversal_of_booking_id=(
+            original_booking.booking_id
+        ),
+        lines=(
+            BookingLine(
+                account_number="1200",
+                side=EntrySide.CREDIT,
+                amount=Decimal("119.00"),
+            ),
+            BookingLine(
+                account_number="8400",
+                side=EntrySide.DEBIT,
+                amount=Decimal("119.00"),
+            ),
+        ),
+    )
+
+    with Session() as session:
+        company_repository = CompanyRepository(
+            session
+        )
+        booking_repository = BookingRepository(
+            session
+        )
+
+        company_repository.add(company)
+        company_repository.add_fiscal_year(
+            company.company_id,
+            fiscal_year,
+        )
+
+        booking_repository.add(
+            company_id=company.company_id,
+            fiscal_year=fiscal_year,
+            booking=original_booking,
+        )
+
+        assert (
+            booking_repository.is_reversed(
+                original_booking.booking_id
+            )
+            is False
+        )
+
+        booking_repository.add(
+            company_id=company.company_id,
+            fiscal_year=fiscal_year,
+            booking=reversal_booking,
+        )
+
+        assert (
+            booking_repository.is_reversed(
+                original_booking.booking_id
+            )
+            is True
+        )
+
 def test_rejects_second_reversal_for_same_booking() -> None:
     """Eine reguläre Buchung darf nur einmal storniert werden."""
 

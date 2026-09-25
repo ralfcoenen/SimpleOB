@@ -215,6 +215,31 @@ class BookingRepository:
             ),
         )
 
+    def is_reversed(
+        self,
+        booking_id: UUID,
+    ) -> bool:
+        """Prüft, ob eine Buchung storniert wurde."""
+
+        if not isinstance(
+            booking_id,
+            UUID,
+        ):
+            raise TypeError(
+                "booking_id must be a UUID"
+            )
+
+        reversal = (
+            self._session.query(Buchung)
+            .filter(
+                Buchung.reversal_of_booking_id
+                == str(booking_id)
+            )
+            .one_or_none()
+        )
+
+        return reversal is not None
+
     def list_for_fiscal_year(
         self,
         *,
