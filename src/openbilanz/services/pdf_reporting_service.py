@@ -28,6 +28,7 @@ from openbilanz.accounting.financial_statement_position import (
 )
 from openbilanz.accounting.income_statement import IncomeStatement
 from openbilanz.domain.entry_side import EntrySide
+from openbilanz.domain.bvv_evaluation import BvvEvaluation
 from openbilanz.domain.money import ZERO
 from openbilanz.reporting.account_activity_report import (
     AccountActivityReport,
@@ -565,6 +566,100 @@ class PdfReportingService:
                 23.5 * mm,
             ),
             landscape_page=True,
+        )
+
+    def export_bvv(
+        self,
+        *,
+        evaluation: BvvEvaluation,
+        company_name: str,
+        fiscal_year_name: str,
+        target: Path,
+    ) -> Path:
+        """Exportiert den Betriebsvermögensvergleich als PDF."""
+
+        rows = [
+            [
+                "Position",
+                "Betrag",
+            ],
+            [
+                "HGB-Eigenkapital",
+                self._format_amount(
+                    evaluation.current_hgb_equity
+                ),
+            ],
+            [
+                "Buchwertabweichung aus steuerlicher AfA",
+                self._format_amount(
+                    evaluation.current_book_value_difference
+                ),
+            ],
+            [
+                "Steuerliches Betriebsvermögen Ende",
+                self._format_amount(
+                    evaluation.current_tax_equity
+                ),
+            ],
+            [
+                "HGB-Eigenkapital zu Jahresbeginn",
+                self._format_amount(
+                    evaluation.previous_hgb_equity
+                ),
+            ],
+            [
+                "Buchwertabweichung zu Jahresbeginn",
+                self._format_amount(
+                    evaluation.previous_book_value_difference
+                ),
+            ],
+            [
+                "Steuerliches Betriebsvermögen Vorjahr",
+                self._format_amount(
+                    evaluation.previous_tax_equity
+                ),
+            ],
+            [
+                "Veränderung des Betriebsvermögens",
+                self._format_amount(
+                    evaluation.change_in_tax_equity
+                ),
+            ],
+            [
+                "− gebuchte Einlagen",
+                self._format_amount(
+                    evaluation.contribution
+                ),
+            ],
+            [
+                "+ gebuchte Entnahmen / Ausschüttungen",
+                self._format_amount(
+                    evaluation.withdrawal_distribution
+                ),
+            ],
+            [
+                "Steuerlicher Gewinn / Verlust",
+                self._format_amount(
+                    evaluation.profit_loss
+                ),
+            ],
+        ]
+
+        return self._build_pdf(
+            target=target,
+            title="Betriebsvermögensvergleich",
+            company_name=company_name,
+            period_text=(
+                f"Geschäftsjahr: {fiscal_year_name}"
+            ),
+            rows=rows,
+            column_widths=(
+                145 * mm,
+                35 * mm,
+            ),
+            summary_lines=(
+                "Alle Werte wurden aus der Buchführung ermittelt.",
+            ),
         )
 
     def export_e_bilanz(

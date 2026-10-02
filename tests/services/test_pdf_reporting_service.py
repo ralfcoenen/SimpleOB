@@ -4,6 +4,7 @@ from openbilanz.accounting.balance_sheet import BalanceSheet
 from openbilanz.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
+from openbilanz.domain.bvv_evaluation import BvvEvaluation
 from openbilanz.services.pdf_reporting_service import (
     PdfReportingService,
 )
@@ -54,4 +55,33 @@ def test_exports_balance_sheet_as_pdf(tmp_path) -> None:
     assert target.exists()
     assert target.stat().st_size > 0
     assert target.read_bytes().startswith(b"%PDF-")
-    
+
+
+def test_exports_bvv_as_pdf(tmp_path) -> None:
+    evaluation = BvvEvaluation(
+        current_hgb_equity=Decimal("10000.00"),
+        previous_hgb_equity=Decimal("0.00"),
+        current_depreciation_difference=Decimal("0.00"),
+        previous_depreciation_difference=Decimal("0.00"),
+        current_book_value_difference=Decimal("0.00"),
+        previous_book_value_difference=Decimal("0.00"),
+        current_tax_equity=Decimal("10000.00"),
+        previous_tax_equity=Decimal("0.00"),
+        contribution=Decimal("10000.00"),
+        withdrawal_distribution=Decimal("0.00"),
+        profit_loss=Decimal("0.00"),
+    )
+
+    target = tmp_path / "bvv.pdf"
+
+    exported_path = PdfReportingService().export_bvv(
+        evaluation=evaluation,
+        company_name="Beispiel UG",
+        fiscal_year_name="01.01.2026 – 31.12.2026",
+        target=target,
+    )
+
+    assert exported_path == target
+    assert target.exists()
+    assert target.stat().st_size > 0
+    assert target.read_bytes().startswith(b"%PDF-")

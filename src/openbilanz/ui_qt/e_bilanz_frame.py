@@ -2,14 +2,14 @@
 
 from collections.abc import Callable
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QFormLayout,
-    QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
-    QLineEdit,
     QPushButton,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -22,7 +22,6 @@ class EBilanzFrame(QWidget):
         self,
         *,
         on_install_taxonomy: Callable[[], None],
-        on_save_bvv: Callable[[], None],
         on_prepare: Callable[[], None],
         on_build: Callable[[], None],
         on_validate: Callable[[], None],
@@ -30,6 +29,7 @@ class EBilanzFrame(QWidget):
         on_export_pdf: Callable[[], None],
         on_send_test: Callable[[], None],
         on_send_production: Callable[[], None],
+        on_export_bvv_pdf: Callable[[], None],
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -48,6 +48,52 @@ class EBilanzFrame(QWidget):
         )
         layout.addWidget(description_label)
 
+        columns_layout = QHBoxLayout()
+        columns_layout.setAlignment(
+            Qt.AlignmentFlag.AlignTop
+        )
+
+        taxonomy_group = self._create_taxonomy_group(
+            on_install_taxonomy=on_install_taxonomy,
+        )
+        bvv_group = self._create_bvv_group(
+            on_export_bvv_pdf=on_export_bvv_pdf,
+        )
+        actions_group = self._create_actions_group(
+            on_prepare=on_prepare,
+            on_build=on_build,
+            on_validate=on_validate,
+            on_export_xbrl=on_export_xbrl,
+            on_export_pdf=on_export_pdf,
+            on_send_test=on_send_test,
+            on_send_production=on_send_production,
+        )
+
+        columns_layout.addWidget(taxonomy_group, 2)
+        columns_layout.addWidget(bvv_group, 3)
+        columns_layout.addWidget(actions_group, 2)
+
+        layout.addLayout(columns_layout)
+        layout.addStretch()
+
+        self._prepare_button.setEnabled(False)
+        self._build_button.setEnabled(False)
+        self._validate_button.setEnabled(False)
+        self._export_xbrl_button.setEnabled(False)
+        self._export_pdf_button.setEnabled(False)
+        self._send_test_button.setEnabled(False)
+        self._send_production_button.setEnabled(False)
+
+    def _create_taxonomy_group(
+        self,
+        *,
+        on_install_taxonomy: Callable[[], None],
+    ) -> QGroupBox:
+        """Erzeugt den Bereich für Taxonomie und Workflowstatus."""
+
+        group = QGroupBox("Taxonomie und Status")
+        layout = QVBoxLayout(group)
+
         self._taxonomy_status_label = QLabel("")
         self._taxonomy_status_label.setWordWrap(True)
         layout.addWidget(self._taxonomy_status_label)
@@ -59,102 +105,170 @@ class EBilanzFrame(QWidget):
             on_install_taxonomy
         )
         self._install_taxonomy_button.setEnabled(False)
+        self._configure_action_button(
+            self._install_taxonomy_button
+        )
         layout.addWidget(
             self._install_taxonomy_button,
-            alignment=self._left_alignment(),
+            alignment=Qt.AlignmentFlag.AlignLeft,
         )
 
         self._status_label = QLabel("")
         self._status_label.setWordWrap(True)
         layout.addWidget(self._status_label)
 
-        bvv_group = QGroupBox("BVV-Jahresdaten")
-        bvv_layout = QFormLayout(bvv_group)
+        layout.addStretch()
 
-        self._effective_previous_hgb_equity_label = QLabel("–")
-        bvv_layout.addRow(
-            "HGB-Vorjahreseigenkapital",
-            self._effective_previous_hgb_equity_label,
+        return group
+
+    def _create_bvv_group(
+        self,
+        *,
+        on_export_bvv_pdf: Callable[[], None],
+    ) -> QGroupBox:
+        """Erzeugt die Anzeige des Betriebsvermögensvergleichs."""
+
+        group = QGroupBox(
+            "Steuerliche Gewinnermittlung (BVV)"
+        )
+        layout = QFormLayout(group)
+
+        self._bvv_current_hgb_equity_label = QLabel("–")
+        layout.addRow(
+            "HGB-Eigenkapital",
+            self._bvv_current_hgb_equity_label,
         )
 
-        self._previous_hgb_equity_source_label = QLabel("")
-        bvv_layout.addRow(
-            "Herkunft",
-            self._previous_hgb_equity_source_label,
+        self._bvv_current_book_value_difference_label = QLabel("–")
+        layout.addRow(
+            "Buchwertabweichung aus steuerlicher AfA",
+            self._bvv_current_book_value_difference_label,
         )
 
-        self._previous_hgb_equity_override_edit = QLineEdit()
-        self._previous_hgb_equity_override_edit.setMaximumWidth(180)
-        bvv_layout.addRow(
-            "Manueller Korrekturwert",
-            self._previous_hgb_equity_override_edit,
+        self._bvv_current_tax_equity_label = QLabel("–")
+        layout.addRow(
+            "Steuerliches Betriebsvermögen Ende",
+            self._bvv_current_tax_equity_label,
         )
 
-        hint_label = QLabel(
-            "Leer lassen, um den automatisch ermittelten "
-            "Wert zu verwenden."
-        )
-        hint_label.setWordWrap(True)
-        bvv_layout.addRow("", hint_label)
+        separator = QLabel("")
+        separator.setMinimumHeight(8)
+        layout.addRow(separator)
 
-        self._contribution_edit = QLineEdit("0,00")
-        self._contribution_edit.setMaximumWidth(180)
-        bvv_layout.addRow(
-            "Einlagen",
-            self._contribution_edit,
+        self._bvv_previous_hgb_equity_label = QLabel("–")
+        layout.addRow(
+            "HGB-Eigenkapital zu Jahresbeginn",
+            self._bvv_previous_hgb_equity_label,
         )
 
-        self._withdrawal_distribution_edit = QLineEdit("0,00")
-        self._withdrawal_distribution_edit.setMaximumWidth(180)
-        bvv_layout.addRow(
-            "Entnahmen / Ausschüttungen",
-            self._withdrawal_distribution_edit,
+        self._bvv_previous_book_value_difference_label = QLabel("–")
+        layout.addRow(
+            "Buchwertabweichung zu Jahresbeginn",
+            self._bvv_previous_book_value_difference_label,
         )
 
-        save_bvv_button = QPushButton("BVV-Daten speichern")
-        save_bvv_button.clicked.connect(on_save_bvv)
-        bvv_layout.addRow("", save_bvv_button)
+        self._bvv_previous_tax_equity_label = QLabel("–")
+        layout.addRow(
+            "Steuerliches Betriebsvermögen Vorjahr",
+            self._bvv_previous_tax_equity_label,
+        )
 
-        layout.addWidget(bvv_group)
+        self._bvv_change_in_tax_equity_label = QLabel("–")
+        layout.addRow(
+            "Veränderung des Betriebsvermögens",
+            self._bvv_change_in_tax_equity_label,
+        )
 
-        actions_widget = QWidget()
-        actions_layout = QGridLayout(actions_widget)
+        self._bvv_contribution_label = QLabel("–")
+        layout.addRow(
+            "− gebuchte Einlagen",
+            self._bvv_contribution_label,
+        )
+
+        self._bvv_withdrawal_distribution_label = QLabel("–")
+        layout.addRow(
+            "+ gebuchte Entnahmen / Ausschüttungen",
+            self._bvv_withdrawal_distribution_label,
+        )
+
+        self._bvv_profit_loss_label = QLabel("–")
+        self._bvv_profit_loss_label.setStyleSheet(
+            "font-weight: bold;"
+        )
+        layout.addRow(
+            "Steuerlicher Gewinn / Verlust",
+            self._bvv_profit_loss_label,
+        )
+
+        self._bvv_source_label = QLabel(
+            "Alle Werte werden aus der Buchführung ermittelt."
+        )
+        self._bvv_source_label.setWordWrap(True)
+        layout.addRow("", self._bvv_source_label)
+
+        self._export_bvv_pdf_button = QPushButton(
+            "BVV als PDF exportieren"
+        )
+        self._export_bvv_pdf_button.clicked.connect(
+            on_export_bvv_pdf
+        )
+        self._configure_action_button(
+            self._export_bvv_pdf_button
+        )
+        self._export_bvv_pdf_button.setEnabled(False)
+
+        layout.addRow(
+            "",
+            self._export_bvv_pdf_button,
+        )
+
+        return group
+
+    def _create_actions_group(
+        self,
+        *,
+        on_prepare: Callable[[], None],
+        on_build: Callable[[], None],
+        on_validate: Callable[[], None],
+        on_export_xbrl: Callable[[], None],
+        on_export_pdf: Callable[[], None],
+        on_send_test: Callable[[], None],
+        on_send_production: Callable[[], None],
+    ) -> QGroupBox:
+        """Erzeugt den Bereich für die E-Bilanz-Aktionen."""
+
+        group = QGroupBox("E-Bilanz-Aktionen")
+        layout = QVBoxLayout(group)
 
         self._prepare_button = QPushButton(
             "E-Bilanz vorbereiten"
         )
         self._prepare_button.clicked.connect(on_prepare)
-        actions_layout.addWidget(self._prepare_button, 0, 0)
 
         self._build_button = QPushButton(
             "E-Bilanz erzeugen"
         )
         self._build_button.clicked.connect(on_build)
-        actions_layout.addWidget(self._build_button, 0, 1)
 
         self._validate_button = QPushButton(
             "E-Bilanz validieren"
         )
         self._validate_button.clicked.connect(on_validate)
-        actions_layout.addWidget(self._validate_button, 1, 0)
 
         self._export_xbrl_button = QPushButton(
             "E-Bilanz XBRL exportieren"
         )
         self._export_xbrl_button.clicked.connect(on_export_xbrl)
-        actions_layout.addWidget(self._export_xbrl_button, 1, 1)
 
         self._export_pdf_button = QPushButton(
             "E-Bilanz PDF exportieren"
         )
         self._export_pdf_button.clicked.connect(on_export_pdf)
-        actions_layout.addWidget(self._export_pdf_button, 2, 0)
 
         self._send_test_button = QPushButton(
             "ELSTER-Testübermittlung"
         )
         self._send_test_button.clicked.connect(on_send_test)
-        actions_layout.addWidget(self._send_test_button, 2, 1)
 
         self._send_production_button = QPushButton(
             "ELSTER-Produktivübermittlung"
@@ -162,48 +276,39 @@ class EBilanzFrame(QWidget):
         self._send_production_button.clicked.connect(
             on_send_production
         )
-        actions_layout.addWidget(
+
+        buttons = (
+            self._prepare_button,
+            self._build_button,
+            self._validate_button,
+            self._export_xbrl_button,
+            self._export_pdf_button,
+            self._send_test_button,
             self._send_production_button,
-            3,
-            1,
         )
 
-        layout.addWidget(actions_widget)
+        for button in buttons:
+            self._configure_action_button(button)
+            layout.addWidget(
+                button,
+                alignment=Qt.AlignmentFlag.AlignLeft,
+            )
+
         layout.addStretch()
 
-        self._prepare_button.setEnabled(False)
-        self._build_button.setEnabled(False)
-        self._validate_button.setEnabled(False)
-        self._export_xbrl_button.setEnabled(False)
-        self._export_pdf_button.setEnabled(False)
-        self._send_test_button.setEnabled(False)
-        self._send_production_button.setEnabled(False)
+        return group
 
     @staticmethod
-    def _left_alignment():
-        """Liefert die linksbündige Widget-Ausrichtung."""
+    def _configure_action_button(
+        button: QPushButton,
+    ) -> None:
+        """Hält Aktionsschaltflächen kompakt und gut lesbar."""
 
-        from PySide6.QtCore import Qt
-
-        return Qt.AlignmentFlag.AlignLeft
-
-    @property
-    def previous_hgb_equity_override(self) -> str:
-        """Liefert den eingegebenen manuellen Korrekturwert."""
-
-        return self._previous_hgb_equity_override_edit.text()
-
-    @property
-    def contribution(self) -> str:
-        """Liefert die eingegebenen Einlagen."""
-
-        return self._contribution_edit.text()
-
-    @property
-    def withdrawal_distribution(self) -> str:
-        """Liefert die eingegebenen Entnahmen/Ausschüttungen."""
-
-        return self._withdrawal_distribution_edit.text()
+        button.setSizePolicy(
+            QSizePolicy.Policy.Maximum,
+            QSizePolicy.Policy.Fixed,
+        )
+        button.setMaximumWidth(260)
 
     def set_taxonomy_status(
         self,
@@ -218,30 +323,70 @@ class EBilanzFrame(QWidget):
             install_enabled
         )
 
-    def set_bvv_values(
+    def set_bvv_evaluation(
         self,
         *,
-        effective_previous_hgb_equity: str,
-        previous_hgb_equity_source: str,
-        previous_hgb_equity_override: str,
+        current_hgb_equity: str,
+        current_book_value_difference: str,
+        current_tax_equity: str,
+        previous_hgb_equity: str,
+        previous_book_value_difference: str,
+        previous_tax_equity: str,
+        change_in_tax_equity: str,
         contribution: str,
         withdrawal_distribution: str,
+        profit_loss: str,
     ) -> None:
-        """Aktualisiert die angezeigten BVV-Jahresdaten."""
+        """Zeigt den aus der Buchführung ermittelten BVV an."""
 
-        self._effective_previous_hgb_equity_label.setText(
-            effective_previous_hgb_equity
+        self._bvv_current_hgb_equity_label.setText(
+            current_hgb_equity
         )
-        self._previous_hgb_equity_source_label.setText(
-            previous_hgb_equity_source
+        self._bvv_current_book_value_difference_label.setText(
+            current_book_value_difference
         )
-        self._previous_hgb_equity_override_edit.setText(
-            previous_hgb_equity_override
+        self._bvv_current_tax_equity_label.setText(
+            current_tax_equity
         )
-        self._contribution_edit.setText(contribution)
-        self._withdrawal_distribution_edit.setText(
+        self._bvv_previous_hgb_equity_label.setText(
+            previous_hgb_equity
+        )
+        self._bvv_previous_book_value_difference_label.setText(
+            previous_book_value_difference
+        )
+        self._bvv_previous_tax_equity_label.setText(
+            previous_tax_equity
+        )
+        self._bvv_change_in_tax_equity_label.setText(
+            change_in_tax_equity
+        )
+        self._bvv_contribution_label.setText(contribution)
+        self._bvv_withdrawal_distribution_label.setText(
             withdrawal_distribution
         )
+        self._bvv_profit_loss_label.setText(profit_loss)
+        self._export_bvv_pdf_button.setEnabled(True)
+
+    def clear_bvv_evaluation(self) -> None:
+        """Leert die BVV-Anzeige, wenn noch keine Auswertung möglich ist."""
+
+        labels = (
+            self._bvv_current_hgb_equity_label,
+            self._bvv_current_book_value_difference_label,
+            self._bvv_current_tax_equity_label,
+            self._bvv_previous_hgb_equity_label,
+            self._bvv_previous_book_value_difference_label,
+            self._bvv_previous_tax_equity_label,
+            self._bvv_change_in_tax_equity_label,
+            self._bvv_contribution_label,
+            self._bvv_withdrawal_distribution_label,
+            self._bvv_profit_loss_label,
+        )
+
+        for label in labels:
+            label.setText("–")
+
+        self._export_bvv_pdf_button.setEnabled(False)
 
     def set_workflow_state(
         self,

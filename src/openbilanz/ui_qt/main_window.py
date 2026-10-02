@@ -320,7 +320,7 @@ class MainWindow(QMainWindow):
         self._refresh_balance_sheet()
         self._refresh_closing()
         self._refresh_taxonomy_status()
-        self._refresh_bvv_annual_data()
+        self._refresh_bvv_evaluation()
         self._refresh_e_bilanz()
 
     def closeEvent(self, event) -> None:
@@ -346,10 +346,10 @@ class MainWindow(QMainWindow):
 
         self._e_bilanz_frame = EBilanzFrame(
             on_install_taxonomy=self._install_required_taxonomy,
-            on_save_bvv=self._save_bvv_annual_data,
             on_prepare=self._prepare_e_bilanz,
             on_build=self._build_e_bilanz,
             on_validate=self._validate_e_bilanz,
+            on_export_bvv_pdf=self._export_bvv_pdf,
             on_export_xbrl=self._export_e_bilanz,
             on_export_pdf=self._export_e_bilanz_pdf,
             on_send_test=self._send_e_bilanz_test,
@@ -358,76 +358,6 @@ class MainWindow(QMainWindow):
         )
 
         layout.addWidget(self._e_bilanz_frame)
-
-    def _save_bvv_annual_data(self) -> None:
-        """Speichert die BVV-Jahresdaten des aktuellen Geschäftsjahres."""
-
-        def parse_decimal(
-            value: str,
-            *,
-            allow_empty: bool = False,
-        ) -> Decimal | None:
-            normalized = (
-                value.strip()
-                .replace(".", "")
-                .replace(",", ".")
-            )
-
-            if not normalized:
-                if allow_empty:
-                    return None
-                return Decimal("0.00")
-
-            return Decimal(normalized)
-
-        try:
-            previous_hgb_equity = parse_decimal(
-                self._e_bilanz_frame.previous_hgb_equity_override,
-                allow_empty=True,
-            )
-
-            contribution = parse_decimal(
-                self._e_bilanz_frame.contribution,
-            )
-
-            withdrawal_distribution = parse_decimal(
-                self._e_bilanz_frame.withdrawal_distribution,
-            )
-
-            assert contribution is not None
-            assert withdrawal_distribution is not None
-
-            from openbilanz.domain.bvv_annual_data import BvvAnnualData
-
-            data = BvvAnnualData(
-                previous_hgb_equity=previous_hgb_equity,
-                contribution=contribution,
-                withdrawal_distribution=withdrawal_distribution,
-            )
-
-            self._workspace.save_bvv_annual_data(data)
-            self._refresh_bvv_annual_data()
-
-        except (
-            ValueError,
-            ArithmeticError,
-        ) as exc:
-            QMessageBox.critical(
-                self,
-                "BVV-Daten",
-                (
-                    "Die BVV-Jahresdaten konnten nicht "
-                    "gespeichert werden.\n\n"
-                    f"{exc}"
-                ),
-            )
-            return
-
-        QMessageBox.information(
-            self,
-            "BVV-Daten",
-            "Die BVV-Jahresdaten wurden gespeichert.",
-        )
 
     def _refresh_taxonomy_status(self) -> None:
         """Aktualisiert den Taxonomiestatus des Geschäftsjahres."""
@@ -472,63 +402,65 @@ class MainWindow(QMainWindow):
             "Die benötigte Taxonomie wurde erfolgreich installiert.",
         )
 
-    def _refresh_bvv_annual_data(self) -> None:
-        """Aktualisiert die BVV-Jahresdaten des Geschäftsjahres."""
+    def _refresh_bvv_evaluation(self) -> None:
+        """Aktualisiert den aus der Buchführung ermittelten BVV."""
 
-        data = self._workspace.load_bvv_annual_data()
+        if (
+            not self._workspace.is_closed
+            or self._current_income_statement is None
+        ):
+            self._e_bilanz_frame.clear_bvv_evaluation()
+            return
 
-        effective_previous_hgb_equity = (
-            self._workspace.effective_previous_hgb_equity(
+        try:
+            preparation = self._workspace.prepare_e_bilanz(
+                income_statement=self._current_income_statement,
+            )
+            evaluation = self._workspace.build_bvv_evaluation(
+                preparation=preparation,
                 chart_of_accounts=self._chart_of_accounts,
             )
-        )
+        except (
+            ValueError,
+            RuntimeError,
+        ):
+            self._e_bilanz_frame.clear_bvv_evaluation()
+            return
 
-        if effective_previous_hgb_equity is None:
-            effective_text = "nicht ermittelbar"
-        else:
-            effective_text = (
-                str(effective_previous_hgb_equity)
-                .replace(".", ",")
-                + " €"
-            )
+        def amount(value: object) -> str:
+            return f"{self._format_amount(value)} €"
 
-        if data is None:
-            source_text = (
-                "automatisch ermittelt"
-                if effective_previous_hgb_equity is not None
-                else "keine Angabe vorhanden"
-            )
-            override_text = ""
-            contribution_text = "0,00"
-            withdrawal_text = "0,00"
-        else:
-            if data.previous_hgb_equity is None:
-                source_text = (
-                    "automatisch ermittelt"
-                    if effective_previous_hgb_equity is not None
-                    else "keine Angabe vorhanden"
-                )
-                override_text = ""
-            else:
-                source_text = "manuell gespeichert"
-                override_text = str(
-                    data.previous_hgb_equity
-                ).replace(".", ",")
-
-            contribution_text = str(
-                data.contribution
-            ).replace(".", ",")
-
-            withdrawal_text = str(
-                data.withdrawal_distribution
-            ).replace(".", ",")
-
-        self._e_bilanz_frame.set_bvv_values(
-            effective_previous_hgb_equity=effective_text,
-            previous_hgb_equity_source=source_text,
-            previous_hgb_equity_override=override_text,
-            contribution=contribution_text,
-            withdrawal_distribution=withdrawal_text,
+        self._e_bilanz_frame.set_bvv_evaluation(
+            current_hgb_equity=amount(
+                evaluation.current_hgb_equity
+            ),
+            current_book_value_difference=amount(
+                evaluation.current_book_value_difference
+            ),
+            current_tax_equity=amount(
+                evaluation.current_tax_equity
+            ),
+            previous_hgb_equity=amount(
+                evaluation.previous_hgb_equity
+            ),
+            previous_book_value_difference=amount(
+                evaluation.previous_book_value_difference
+            ),
+            previous_tax_equity=amount(
+                evaluation.previous_tax_equity
+            ),
+            change_in_tax_equity=amount(
+                evaluation.change_in_tax_equity
+            ),
+            contribution=amount(
+                evaluation.contribution
+            ),
+            withdrawal_distribution=amount(
+                evaluation.withdrawal_distribution
+            ),
+            profit_loss=amount(
+                evaluation.profit_loss
+            ),
         )
 
     def _refresh_e_bilanz(self) -> None:
@@ -638,6 +570,7 @@ class MainWindow(QMainWindow):
         self._current_e_bilanz_document = None
         self._current_e_bilanz_arelle_valid = False
 
+        self._refresh_bvv_evaluation()
         self._refresh_e_bilanz()
 
     def _build_e_bilanz(self) -> None:
@@ -1063,6 +996,103 @@ class MainWindow(QMainWindow):
             (
                 "Der Übertragungsnachweis wurde gespeichert.\n\n"
                 f"{target}"
+            ),
+        )
+
+    def _export_bvv_pdf(self) -> None:
+        """Exportiert den Betriebsvermögensvergleich als PDF."""
+
+        if (
+            not self._workspace.is_closed
+            or self._current_income_statement is None
+        ):
+            QMessageBox.warning(
+                self,
+                "Betriebsvermögensvergleich",
+                (
+                    "Es steht kein Betriebsvermögensvergleich "
+                    "für den PDF-Export zur Verfügung."
+                ),
+            )
+            return
+
+        try:
+            preparation = self._workspace.prepare_e_bilanz(
+                income_statement=self._current_income_statement,
+            )
+            evaluation = self._workspace.build_bvv_evaluation(
+                preparation=preparation,
+                chart_of_accounts=self._chart_of_accounts,
+            )
+        except (
+            ValueError,
+            RuntimeError,
+        ) as exc:
+            QMessageBox.critical(
+                self,
+                "BVV PDF konnte nicht exportiert werden",
+                str(exc),
+            )
+            return
+
+        context = self._workspace.context
+        fiscal_year = context.fiscal_year
+
+        safe_company_name = "".join(
+            character
+            if character.isalnum() or character in "-_"
+            else "_"
+            for character in context.company.name
+        ).strip("_")
+
+        default_filename = (
+            "SimpleOB_BVV_"
+            f"{safe_company_name}_"
+            f"{fiscal_year.end_date.year}.pdf"
+        )
+
+        filename, _ = QFileDialog.getSaveFileName(
+            self,
+            "BVV als PDF exportieren",
+            default_filename,
+            "PDF-Dateien (*.pdf);;Alle Dateien (*)",
+        )
+
+        if not filename:
+            return
+
+        target = Path(filename)
+
+        if target.suffix.lower() != ".pdf":
+            target = target.with_suffix(".pdf")
+
+        try:
+            exported_path = (
+                self._pdf_reporting_service.export_bvv(
+                    evaluation=evaluation,
+                    company_name=context.company.name,
+                    fiscal_year_name=(
+                        f"{fiscal_year.start_date:%d.%m.%Y} – "
+                        f"{fiscal_year.end_date:%d.%m.%Y}"
+                    ),
+                    target=target,
+                )
+            )
+        except OSError as exc:
+            QMessageBox.critical(
+                self,
+                "BVV PDF konnte nicht exportiert werden",
+                str(exc),
+            )
+            return
+
+        QMessageBox.information(
+            self,
+            "Betriebsvermögensvergleich",
+            (
+                "Der Betriebsvermögensvergleich wurde "
+                "erfolgreich als PDF exportiert.\n\n"
+                f"{exported_path}"
             ),
         )
 
@@ -1512,9 +1542,25 @@ class MainWindow(QMainWindow):
             0,
         )
 
+        equity_contribution_account_numbers = frozenset(
+            rule.account_number
+            for rule in self._chart_of_accounts.account_mapping_rules
+            if (
+                rule.credit_position is not None
+                and rule.credit_position.code
+                in {
+                    "HGB.266.PASSIVA.A.I",
+                    "HGB.266.PASSIVA.A.II",
+                }
+            )
+        )
+
         self._booking_frame = BookingFrame(
             self._booking_frame_container,
             accounts=manual_bookable_accounts,
+            equity_contribution_account_numbers=(
+                equity_contribution_account_numbers
+            ),
             on_booking_created=self._post_booking,
         )
 
@@ -1574,6 +1620,7 @@ class MainWindow(QMainWindow):
     def _post_booking(
         self,
         booking,
+        equity_contribution_line_positions: tuple[int, ...] = (),
     ) -> None:
         """Verbucht und speichert eine Buchung."""
 
@@ -1581,7 +1628,15 @@ class MainWindow(QMainWindow):
             return
 
         self._workspace.post_booking(
-            booking
+            booking,
+            equity_contribution_line_positions=(
+                equity_contribution_line_positions
+            ),
+            chart_of_accounts=(
+                self._chart_of_accounts
+                if equity_contribution_line_positions
+                else None
+            ),
         )
 
         self._refresh_accounts()
@@ -3476,6 +3531,8 @@ class MainWindow(QMainWindow):
         self._refresh_journal()
         self._refresh_balance_sheet()
         self._refresh_closing()
+        self._refresh_bvv_evaluation()
+        self._refresh_e_bilanz()
         self._update_editing_state()
 
     def _refresh_closing(self) -> None:
