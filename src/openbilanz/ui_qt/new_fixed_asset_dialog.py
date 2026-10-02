@@ -377,9 +377,31 @@ class NewFixedAssetDialog(QDialog):
                 self._acquisition_cost_entry.text()
             )
 
-            useful_life_months = int(
+            useful_life_months_text = (
                 self._useful_life_months_entry.text().strip()
             )
+
+            if not useful_life_months_text:
+                raise ValueError(
+                    "Die Nutzungsdauer in Monaten muss "
+                    "angegeben werden."
+                )
+
+            try:
+                useful_life_months = int(
+                    useful_life_months_text
+                )
+            except ValueError as exc:
+                raise ValueError(
+                    "Die Nutzungsdauer in Monaten muss "
+                    "eine positive ganze Zahl sein."
+                ) from exc
+
+            if useful_life_months <= 0:
+                raise ValueError(
+                    "Die Nutzungsdauer in Monaten muss "
+                    "eine positive ganze Zahl sein."
+                )
 
             asset_type = (
                 self._asset_type_box.currentText()
