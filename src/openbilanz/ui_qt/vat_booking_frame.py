@@ -17,6 +17,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from openbilanz.amount_input import normalize_german_amount
+from openbilanz.date_input import (
+    normalize_german_date,
+    parse_german_date,
+)
 from openbilanz.domain.account import Account
 from openbilanz.domain.account_type import AccountType
 from openbilanz.domain.booking import Booking
@@ -25,11 +30,6 @@ from openbilanz.domain.vat_booking_item import VatBookingItem
 from openbilanz.services.vat_booking_service import (
     VatBookingService,
 )
-from openbilanz.date_input import (
-    normalize_german_date,
-    parse_german_date,
-)
-
 
 _INPUT_INVOICE = "Eingangsrechnung"
 _OUTPUT_INVOICE = "Ausgangsrechnung"
@@ -270,6 +270,13 @@ class VatBookingFrame(QWidget):
             Qt.AlignmentFlag.AlignRight
         )
         amount_entry.setMaximumWidth(140)
+        amount_entry.setPlaceholderText(
+            "0,00"
+        )
+        amount_entry.editingFinished.connect(
+            lambda entry=amount_entry:
+            self._normalize_amount_entry(entry)
+        )
 
         tax_rate_box = QComboBox()
         tax_rate_box.addItems(
@@ -679,6 +686,26 @@ class VatBookingFrame(QWidget):
         return parse_german_date(
             value
         )
+
+    def _normalize_amount_entry(
+        self,
+        entry: QLineEdit,
+    ) -> None:
+        """Normalisiert eine Betragseingabe."""
+
+        value = entry.text().strip()
+
+        if not value:
+            return
+
+        try:
+            normalized = normalize_german_amount(
+                value
+            )
+        except ValueError:
+            return
+
+        entry.setText(normalized)
 
     @staticmethod
     def _parse_amount(

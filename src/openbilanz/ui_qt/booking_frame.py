@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from openbilanz.amount_input import normalize_german_amount
 from openbilanz.date_input import (
     normalize_german_date,
     parse_german_date,
@@ -405,8 +406,33 @@ class BookingFrame(QWidget):
         entry.setAlignment(
             Qt.AlignmentFlag.AlignRight
         )
+        entry.setPlaceholderText("0,00")
+        entry.editingFinished.connect(
+            lambda entry=entry:
+            self._normalize_amount_entry(entry)
+        )
 
         return entry
+
+    def _normalize_amount_entry(
+        self,
+        entry: QLineEdit,
+    ) -> None:
+        """Normalisiert eine gültige Betragseingabe."""
+
+        value = entry.text().strip()
+
+        if not value:
+            return
+
+        try:
+            normalized = normalize_german_amount(
+                value
+            )
+        except ValueError:
+            return
+
+        entry.setText(normalized)
 
     def _update_contribution_checkbox(
         self,

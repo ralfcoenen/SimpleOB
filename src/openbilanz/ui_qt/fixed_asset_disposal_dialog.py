@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from openbilanz.amount_input import normalize_german_amount
 from openbilanz.date_input import (
     normalize_german_date,
     parse_german_date,
@@ -119,6 +120,12 @@ class FixedAssetDisposalDialog(QDialog):
         )
 
         self._gross_proceeds_entry = QLineEdit()
+        self._gross_proceeds_entry.setPlaceholderText(
+            "0,00"
+        )
+        self._gross_proceeds_entry.editingFinished.connect(
+            self._normalize_gross_proceeds
+        )
         form.addRow(
             "Verkaufspreis brutto",
             self._gross_proceeds_entry,
@@ -191,6 +198,25 @@ class FixedAssetDisposalDialog(QDialog):
             return
 
         self._disposal_date_entry.setText(normalized)
+
+    def _normalize_gross_proceeds(self) -> None:
+        """Normalisiert den Bruttoverkaufspreis."""
+
+        value = self._gross_proceeds_entry.text().strip()
+
+        if not value:
+            return
+
+        try:
+            normalized = normalize_german_amount(
+                value
+            )
+        except ValueError:
+            return
+
+        self._gross_proceeds_entry.setText(
+            normalized
+        )
 
     @staticmethod
     def _parse_amount(

@@ -15,12 +15,12 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from openbilanz.domain.fixed_asset import FixedAsset
+from openbilanz.amount_input import normalize_german_amount
 from openbilanz.date_input import (
     normalize_german_date,
     parse_german_date,
 )
-
+from openbilanz.domain.fixed_asset import FixedAsset
 
 _TECHNICAL_EQUIPMENT = "Technische Anlagen und Maschinen"
 _BUSINESS_EQUIPMENT = "Betriebs- und Geschäftsausstattung"
@@ -130,6 +130,12 @@ class NewFixedAssetDialog(QDialog):
         )
 
         self._acquisition_cost_entry = QLineEdit()
+        self._acquisition_cost_entry.setPlaceholderText(
+            "0,00"
+        )
+        self._acquisition_cost_entry.editingFinished.connect(
+            self._normalize_acquisition_cost
+        )
         form.addRow(
             "Anschaffungskosten",
             self._acquisition_cost_entry,
@@ -301,6 +307,25 @@ class NewFixedAssetDialog(QDialog):
             return
 
         entry.setText(
+            normalized
+        )
+
+    def _normalize_acquisition_cost(self) -> None:
+        """Normalisiert die Anschaffungskosten."""
+
+        value = self._acquisition_cost_entry.text().strip()
+
+        if not value:
+            return
+
+        try:
+            normalized = normalize_german_amount(
+                value
+            )
+        except ValueError:
+            return
+
+        self._acquisition_cost_entry.setText(
             normalized
         )
 

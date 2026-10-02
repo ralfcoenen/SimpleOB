@@ -14,22 +14,22 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QMessageBox,
     QPushButton,
-    QTabWidget,
     QTableWidget,
     QTableWidgetItem,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
 
 from openbilanz.core.context import ApplicationContext
-from openbilanz.domain.account import Account
-from openbilanz.domain.entry_side import EntrySide
-from openbilanz.services.fiscal_year_workspace import FiscalYearWorkspace
-from openbilanz.services.pdf_reporting_service import PdfReportingService
 from openbilanz.date_input import (
     normalize_german_date,
     parse_german_date,
 )
+from openbilanz.domain.account import Account
+from openbilanz.domain.entry_side import EntrySide
+from openbilanz.services.fiscal_year_workspace import FiscalYearWorkspace
+from openbilanz.services.pdf_reporting_service import PdfReportingService
 
 
 class ReportsWidget(QWidget):
@@ -125,6 +125,11 @@ class ReportsWidget(QWidget):
             )
         )
         self._trial_balance_start_date.setMaximumWidth(110)
+        self._trial_balance_start_date.editingFinished.connect(
+            lambda: self._normalize_date_entry(
+                self._trial_balance_start_date
+            )
+        )
         filter_layout.addWidget(
             self._trial_balance_start_date
         )
@@ -136,6 +141,11 @@ class ReportsWidget(QWidget):
             )
         )
         self._trial_balance_end_date.setMaximumWidth(110)
+        self._trial_balance_end_date.editingFinished.connect(
+            lambda: self._normalize_date_entry(
+                self._trial_balance_end_date
+            )
+        )
         filter_layout.addWidget(
             self._trial_balance_end_date
         )
@@ -590,6 +600,11 @@ class ReportsWidget(QWidget):
             )
         )
         self._journal_start_date.setMaximumWidth(110)
+        self._journal_start_date.editingFinished.connect(
+            lambda: self._normalize_date_entry(
+                self._journal_start_date
+            )
+        )
         filter_layout.addWidget(self._journal_start_date)
 
         filter_layout.addWidget(QLabel("Bis:"))
@@ -599,6 +614,11 @@ class ReportsWidget(QWidget):
             )
         )
         self._journal_end_date.setMaximumWidth(110)
+        self._journal_end_date.editingFinished.connect(
+            lambda: self._normalize_date_entry(
+                self._journal_end_date
+            )
+        )
         filter_layout.addWidget(self._journal_end_date)
 
         refresh_button = QPushButton("Aktualisieren")

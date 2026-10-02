@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from openbilanz.amount_input import normalize_german_amount
 from openbilanz.domain.profit_appropriation_annual_data import (
     ProfitAppropriationAnnualData,
 )
@@ -213,9 +214,38 @@ class ProfitAppropriationDialog(QDialog):
     ) -> QLineEdit:
         """Erzeugt ein Betragseingabefeld."""
 
-        return QLineEdit(
+        entry = QLineEdit(
             self._format_amount_for_input(value)
         )
+        entry.setPlaceholderText(
+            "0,00"
+        )
+        entry.editingFinished.connect(
+            lambda entry=entry:
+            self._normalize_amount_entry(entry)
+        )
+
+        return entry
+
+    def _normalize_amount_entry(
+        self,
+        entry: QLineEdit,
+    ) -> None:
+        """Normalisiert eine Betragseingabe."""
+
+        value = entry.text().strip()
+
+        if not value:
+            return
+
+        try:
+            normalized = normalize_german_amount(
+                value
+            )
+        except ValueError:
+            return
+
+        entry.setText(normalized)
 
     def _set_entries_read_only(
         self,

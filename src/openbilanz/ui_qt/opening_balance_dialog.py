@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from openbilanz.amount_input import normalize_german_amount
 from openbilanz.domain.account import Account
 from openbilanz.domain.account_type import AccountType
 from openbilanz.domain.opening_balance import OpeningBalance
@@ -119,6 +120,12 @@ class OpeningBalanceDialog(QDialog):
             Qt.AlignmentFlag.AlignRight
         )
         self._amount_entry.setMaximumWidth(180)
+        self._amount_entry.setPlaceholderText(
+            "0,00"
+        )
+        self._amount_entry.editingFinished.connect(
+            self._normalize_amount_entry
+        )
         amount_layout.addWidget(self._amount_entry)
 
         entry_layout.addLayout(amount_layout)
@@ -356,6 +363,25 @@ class OpeningBalanceDialog(QDialog):
         self._accept_button.setEnabled(
             bool(self._items)
             and opening_balance.is_balanced
+        )
+
+    def _normalize_amount_entry(self) -> None:
+        """Normalisiert den eingegebenen Anfangsbestand."""
+
+        value = self._amount_entry.text().strip()
+
+        if not value:
+            return
+
+        try:
+            normalized = normalize_german_amount(
+                value
+            )
+        except ValueError:
+            return
+
+        self._amount_entry.setText(
+            normalized
         )
 
     @staticmethod

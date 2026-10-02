@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from openbilanz.amount_input import normalize_german_amount
 from openbilanz.domain.fixed_asset import FixedAsset
 from openbilanz.domain.fixed_asset_depreciation import (
     FixedAssetDepreciation,
@@ -93,8 +94,14 @@ class TaxDepreciationAdjustmentDialog(QDialog):
                 initial_tax_amount
             )
         )
+        self._tax_amount_entry.setPlaceholderText(
+            "0,00"
+        )
         self._tax_amount_entry.textChanged.connect(
             self._update_difference
+        )
+        self._tax_amount_entry.editingFinished.connect(
+            self._normalize_tax_amount
         )
         form.addRow(
             "Steuerliche AfA",
@@ -208,6 +215,25 @@ class TaxDepreciationAdjustmentDialog(QDialog):
             )
 
         return amount
+
+    def _normalize_tax_amount(self) -> None:
+        """Normalisiert die steuerliche AfA."""
+
+        value = self._tax_amount_entry.text().strip()
+
+        if not value:
+            return
+
+        try:
+            normalized = normalize_german_amount(
+                value
+            )
+        except ValueError:
+            return
+
+        self._tax_amount_entry.setText(
+            normalized
+        )
 
     def _update_difference(self) -> None:
         """Berechnet die Differenz zur HGB-AfA."""
