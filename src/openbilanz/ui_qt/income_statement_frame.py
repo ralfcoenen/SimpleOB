@@ -3,6 +3,7 @@
 from decimal import Decimal
 
 from PySide6.QtWidgets import (
+    QHBoxLayout,
     QLabel,
     QTreeWidget,
     QTreeWidgetItem,
@@ -14,6 +15,7 @@ from openbilanz.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
 from openbilanz.accounting.income_statement import IncomeStatement
+from openbilanz.accounting.statement_category import StatementCategory
 from openbilanz.domain.money import ZERO
 
 
@@ -30,19 +32,31 @@ class IncomeStatementFrame(QWidget):
 
         layout = QVBoxLayout(self)
 
-        self._tree = QTreeWidget()
-        self._tree.setColumnCount(2)
-        self._tree.setHeaderLabels(
-            (
-                "Position",
-                "Betrag",
-            )
-        )
-        self._tree.setColumnWidth(0, 620)
-        self._tree.setColumnWidth(1, 150)
-        self._tree.setAlternatingRowColors(True)
+        headings_layout = QHBoxLayout()
 
-        layout.addWidget(self._tree)
+        income_label = QLabel("Erträge")
+        income_label.setStyleSheet(
+            "font-size: 15px; font-weight: bold;"
+        )
+        headings_layout.addWidget(income_label)
+
+        expenses_label = QLabel("Aufwendungen")
+        expenses_label.setStyleSheet(
+            "font-size: 15px; font-weight: bold;"
+        )
+        headings_layout.addWidget(expenses_label)
+
+        layout.addLayout(headings_layout)
+
+        trees_layout = QHBoxLayout()
+
+        self._income_tree = self._create_tree()
+        self._expenses_tree = self._create_tree()
+
+        trees_layout.addWidget(self._income_tree)
+        trees_layout.addWidget(self._expenses_tree)
+
+        layout.addLayout(trees_layout)
 
         self._result_label = QLabel(
             "Laufendes Ergebnis: 0,00 €"
@@ -52,6 +66,24 @@ class IncomeStatementFrame(QWidget):
         )
         layout.addWidget(self._result_label)
 
+    @staticmethod
+    def _create_tree() -> QTreeWidget:
+        """Erzeugt eine Baumansicht für eine GuV-Seite."""
+
+        tree = QTreeWidget()
+        tree.setColumnCount(2)
+        tree.setHeaderLabels(
+            (
+                "Position",
+                "Betrag",
+            )
+        )
+        tree.setColumnWidth(0, 330)
+        tree.setColumnWidth(1, 130)
+        tree.setAlternatingRowColors(True)
+
+        return tree
+
     def update_income_statement(
         self,
         *,
@@ -60,18 +92,21 @@ class IncomeStatementFrame(QWidget):
     ) -> None:
         """Aktualisiert die GuV."""
 
-        self._tree.clear()
+        self._income_tree.clear()
+        self._expenses_tree.clear()
 
         for position in (
             income_statement.income_statement.children
         ):
             self._insert_position(
-                parent=None,
+                income_parent=None,
+                expenses_parent=None,
                 position=position,
                 income_statement=income_statement,
             )
 
-        self._tree.expandAll()
+        self._income_tree.expandAll()
+        self._expenses_tree.expandAll()
 
         if net_income > ZERO:
             description = "Jahresüberschuss"
@@ -88,7 +123,8 @@ class IncomeStatementFrame(QWidget):
     def _insert_position(
         self,
         *,
-        parent: QTreeWidgetItem | None,
+        income_parent: QTreeWidgetItem | None,
+        expenses_parent: QTreeWidgetItem | None,
         position: FinancialStatementPosition,
         income_statement: IncomeStatement,
     ) -> None:
@@ -108,14 +144,42 @@ class IncomeStatementFrame(QWidget):
             )
         )
 
-        if parent is None:
-            self._tree.addTopLevelItem(item)
-        else:
-            parent.addChild(item)
+        if position.category is StatementCategory.INCOME:
+            if income_parent is None:
+                self._income_tree.addTopLevelItem(item)
+            else:
+                income_parent.addChild(item)
+
+            for child in position.children:
+                self._insert_position(
+                    income_parent=item,
+                    expenses_parent=None,
+                    position=child,
+                    income_statement=income_statement,
+                )
+
+            return
+
+        if position.category is StatementCategory.EXPENSE:
+            if expenses_parent is None:
+                self._expenses_tree.addTopLevelItem(item)
+            else:
+                expenses_parent.addChild(item)
+
+            for child in position.children:
+                self._insert_position(
+                    income_parent=None,
+                    expenses_parent=item,
+                    position=child,
+                    income_statement=income_statement,
+                )
+
+            return
 
         for child in position.children:
             self._insert_position(
-                parent=item,
+                income_parent=income_parent,
+                expenses_parent=expenses_parent,
                 position=child,
                 income_statement=income_statement,
             )
