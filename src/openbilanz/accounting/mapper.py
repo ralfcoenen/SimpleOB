@@ -39,7 +39,11 @@ class AccountMapper:
                     )
 
                 if (
-                    account.account_type is AccountType.REVENUE
+                    account.account_type
+                    in (
+                        AccountType.REVENUE,
+                        AccountType.EQUITY,
+                    )
                     and rule.credit_position is not None
                 ):
                     return (

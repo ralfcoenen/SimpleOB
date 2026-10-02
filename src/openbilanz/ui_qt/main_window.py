@@ -3533,10 +3533,29 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            self._workspace.validate_profit_appropriation(
-                net_income=self._current_closing_result.net_income,
-                data=dialog.result,
+            validation_result = (
+                self._workspace.validate_profit_appropriation(
+                    net_income=(
+                        self._current_closing_result.net_income
+                    ),
+                    data=dialog.result,
+                )
             )
+
+            if not validation_result.is_consistent:
+                errors = "\n".join(validation_result.errors)
+
+                QMessageBox.critical(
+                    self,
+                    "Ergebnisverwendungsbeschluss",
+                    (
+                        "Der Ergebnisverwendungsbeschluss ist "
+                        "rechnerisch nicht ausgeglichen.\n\n"
+                        f"{errors}"
+                    ),
+                )
+                return
+
             self._workspace.save_profit_appropriation_annual_data(
                 dialog.result
             )

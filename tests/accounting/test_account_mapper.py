@@ -81,5 +81,41 @@ def test_maps_credit_balance_to_credit_position() -> None:
     mapper = AccountMapper(chart)
 
     assert mapper.position_for(balance) is credit_position
-    
-    
+
+
+def test_maps_equity_debit_balance_to_credit_position_as_negative() -> None:
+    carryforward_position = FinancialStatementPosition(
+        code="HGB.266.PASSIVA.A.IV",
+        name="Gewinnvortrag/Verlustvortrag",
+    )
+
+    account = TemplateAccount(
+        account_number="2970",
+        name="Gewinnvortrag / Verlustvortrag",
+        account_type=AccountType.EQUITY,
+    )
+
+    rule = AccountMappingRule(
+        account_number="2970",
+        debit_position=None,
+        credit_position=carryforward_position,
+    )
+
+    chart = ChartOfAccountsTemplate(
+        name="SimpleOB",
+        accounts=(account,),
+        account_mapping_rules=(rule,),
+    )
+
+    balance = AccountBalance(
+        account_number="2970",
+        debit=Decimal("3941.64"),
+        credit=Decimal("0.00"),
+    )
+
+    mapper = AccountMapper(chart)
+
+    position, amount = mapper.map_balance(balance)
+
+    assert position is carryforward_position
+    assert amount == Decimal("-3941.64")
