@@ -13,6 +13,9 @@ from openbilanz.accounting.balance_sheet import BalanceSheet
 from openbilanz.accounting.income_statement import IncomeStatement
 from openbilanz.accounting.ledger import Ledger
 from openbilanz.accounting.mapper import AccountMapper
+from openbilanz.accounting.financial_statement_position import (
+    FinancialStatementPosition,
+)
 from openbilanz.core.context import ApplicationContext
 from openbilanz.domain.accounting_account_roles import (
     AccountingAccountRoles,
