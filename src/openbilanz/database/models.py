@@ -905,39 +905,6 @@ class SteuerlicheAfaAbweichung(Base):
         back_populates="steuerliche_afa_abweichung",
     )
 
-class BvvJahresdaten(Base):
-    """Persistierte BVV-Jahresdaten."""
-
-    __tablename__ = "bvv_jahresdaten"
-
-    id: Mapped[int] = mapped_column(
-        Integer,
-        primary_key=True,
-    )
-
-    wirtschaftsjahr_id: Mapped[int] = mapped_column(
-        ForeignKey("wirtschaftsjahre.id"),
-        unique=True,
-        nullable=False,
-    )
-
-    previous_hgb_equity: Mapped[Decimal | None] = mapped_column(
-        Numeric(18, 2),
-        nullable=True,
-    )
-
-    contribution: Mapped[Decimal] = mapped_column(
-        Numeric(18, 2),
-        nullable=False,
-    )
-
-    withdrawal_distribution: Mapped[Decimal] = mapped_column(
-        Numeric(18, 2),
-        nullable=False,
-    )
-
-    wirtschaftsjahr: Mapped[Wirtschaftsjahr] = relationship()
-
 
 class GewinnverwendungsJahresdaten(Base):
     """Persistierte Jahresdaten zur Ergebnisverwendung."""
@@ -1024,6 +991,25 @@ class Gewinnverwendungsbuchung(Base):
 
     quell_wirtschaftsjahr: Mapped[Wirtschaftsjahr] = relationship(
         back_populates="gewinnverwendungsbuchungen",
+    )
+
+    buchungszeile: Mapped[Buchungszeile] = relationship()
+
+
+class Eigenkapitaleinlage(Base):
+    """Kennzeichnung einer Buchungszeile als BVV-Einlage."""
+
+    __tablename__ = "eigenkapitaleinlagen"
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+    )
+
+    buchungszeile_id: Mapped[int] = mapped_column(
+        ForeignKey("buchungszeilen.id"),
+        unique=True,
+        nullable=False,
     )
 
     buchungszeile: Mapped[Buchungszeile] = relationship()

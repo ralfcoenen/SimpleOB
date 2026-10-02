@@ -12,6 +12,7 @@ from openbilanz.database.models import (
     Mandant,
     Wirtschaftsjahr,
 )
+from openbilanz.domain.fiscal_year import FiscalYear
 from openbilanz.domain.profit_appropriation_posting import (
     ProfitAppropriationPosting,
 )
@@ -289,6 +290,66 @@ class ProfitAppropriationPostingRepository:
             .filter(
                 Gewinnverwendungsbuchung.quell_wirtschaftsjahr_id
                 == source_fiscal_year_model.id
+            )
+            .order_by(
+                Gewinnverwendungsbuchung.posting_date,
+                Gewinnverwendungsbuchung.id,
+            )
+            .all()
+        )
+
+        return tuple(
+            self._to_domain(model)
+            for model in models
+        )
+
+    def list_for_posting_fiscal_year(
+        self,
+        *,
+        company_id: UUID,
+        fiscal_year: FiscalYear,
+    ) -> tuple[ProfitAppropriationPosting, ...]:
+        """Lädt Umsetzungsbuchungen, die im Geschäftsjahr gebucht wurden."""
+
+        if not isinstance(company_id, UUID):
+            raise TypeError("company_id must be a UUID")
+
+        if not isinstance(fiscal_year, FiscalYear):
+            raise TypeError(
+                "fiscal_year must be a FiscalYear"
+            )
+
+        models = (
+            self._session.query(
+                Gewinnverwendungsbuchung
+            )
+            .join(
+                Buchungszeile,
+                Gewinnverwendungsbuchung.buchungszeile_id
+                == Buchungszeile.id,
+            )
+            .join(
+                Buchung,
+                Buchungszeile.buchung_id
+                == Buchung.id,
+            )
+            .join(
+                Wirtschaftsjahr,
+                Buchung.wirtschaftsjahr_id
+                == Wirtschaftsjahr.id,
+            )
+            .join(
+                Mandant,
+                Wirtschaftsjahr.mandant_id
+                == Mandant.id,
+            )
+            .filter(
+                Mandant.company_id
+                == str(company_id),
+                Wirtschaftsjahr.start_date
+                == fiscal_year.start_date,
+                Wirtschaftsjahr.end_date
+                == fiscal_year.end_date,
             )
             .order_by(
                 Gewinnverwendungsbuchung.posting_date,

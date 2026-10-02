@@ -33,9 +33,6 @@ from openbilanz.database.shareholder_repository import (
 from openbilanz.database.tax_depreciation_adjustment_repository import (
     TaxDepreciationAdjustmentRepository,
 )
-from openbilanz.database.bvv_annual_data_repository import (
-    BvvAnnualDataRepository,
-)
 from openbilanz.database.profit_appropriation_annual_data_repository import (
     ProfitAppropriationAnnualDataRepository,
 )
@@ -55,6 +52,7 @@ from openbilanz.domain.accounting_control_accounts import (
 from openbilanz.domain.booking import Booking
 from openbilanz.domain.booking_line import BookingLine
 from openbilanz.domain.booking_type import BookingType
+from openbilanz.domain.bvv_evaluation import BvvEvaluation
 from openbilanz.domain.chart_of_accounts_template import (
     ChartOfAccountsTemplate,
 )
@@ -94,22 +92,25 @@ from openbilanz.domain.managed_fiscal_year import ManagedFiscalYear
 from openbilanz.domain.profit_appropriation_annual_data import (
     ProfitAppropriationAnnualData,
 )
+from openbilanz.domain.profit_appropriation_posting_type import (
+    ProfitAppropriationPostingType,
+)
+from openbilanz.domain.equity_contribution_reference import (
+    EquityContributionReference,
+)
 from openbilanz.domain.shareholder import Shareholder
 from openbilanz.domain.tax_depreciation_adjustment import (
     TaxDepreciationAdjustment,
 )
 from openbilanz.domain.vat_accounts import VatAccounts
-from openbilanz.domain.bvv_annual_data import (
-    BvvAnnualData,
-)
-from openbilanz.domain.profit_appropriation_annual_data import (
-    ProfitAppropriationAnnualData,
-)
 from openbilanz.domain.profit_appropriation_posting import (
     ProfitAppropriationPosting,
 )
 from openbilanz.domain.profit_appropriation_posting_proposal import (
     ProfitAppropriationPostingProposal,
+)
+from openbilanz.eric.bilanz_generation.bvv_value_builder import (
+    BvvValueBuilder,
 )
 from openbilanz.reporting.account_activity_report import (
     AccountActivityReport,
@@ -117,6 +118,9 @@ from openbilanz.reporting.account_activity_report import (
 from openbilanz.reporting.journal_report import JournalReport
 from openbilanz.reporting.trial_balance_report import (
     TrialBalanceReport,
+)
+from openbilanz.database.equity_contribution_repository import (
+    EquityContributionRepository,
 )
 from openbilanz.services.closing_consistency_service import (
     ClosingConsistencyService,
@@ -186,9 +190,6 @@ class FiscalYearWorkspace:
         context: ApplicationContext,
         booking_repository: BookingRepository,
         company_repository: CompanyRepository,
-        bvv_annual_data_repository: (
-            BvvAnnualDataRepository | None
-        ) = None,
         profit_appropriation_annual_data_repository: (
             ProfitAppropriationAnnualDataRepository | None
         ) = None,
@@ -197,6 +198,9 @@ class FiscalYearWorkspace:
         ) = None,
         profit_appropriation_posting_repository: (
             ProfitAppropriationPostingRepository | None
+        ) = None,
+        equity_contribution_repository: (
+            EquityContributionRepository | None
         ) = None,
         profit_appropriation_posting_service: (
             ProfitAppropriationPostingService | None
@@ -242,9 +246,6 @@ class FiscalYearWorkspace:
         self._context = context
         self._booking_repository = booking_repository
         self._company_repository = company_repository
-        self._bvv_annual_data_repository = (
-            bvv_annual_data_repository
-        )
         self._profit_appropriation_annual_data_repository = (
             profit_appropriation_annual_data_repository
         )
@@ -255,6 +256,9 @@ class FiscalYearWorkspace:
         )
         self._profit_appropriation_posting_repository = (
             profit_appropriation_posting_repository
+        )
+        self._equity_contribution_repository = (
+            equity_contribution_repository
         )
         self._profit_appropriation_posting_service = (
             profit_appropriation_posting_service
@@ -630,11 +634,103 @@ class FiscalYearWorkspace:
             lines=reversed_lines,
         )
 
+    def effective_equity_contributions(self) -> Decimal:
+        """Ermittelt die wirksamen BVV-Einlagen des Geschäftsjahres."""
+
+        if self._equity_contribution_repository is None:
+            return Decimal("0.00")
+
+        references = (
+            self._equity_contribution_repository
+            .list_for_fiscal_year(
+                company_id=self._context.company.company_id,
+                fiscal_year=self._context.fiscal_year,
+            )
+        )
+
+        total = Decimal("0.00")
+
+        for reference in references:
+            if self._booking_repository.is_reversed(
+                reference.booking_id
+            ):
+                continue
+
+            booking = self._booking_repository.get(
+                reference.booking_id
+            )
+
+            if booking is None:
+                raise ValueError(
+                    "Die zu einer BVV-Einlage gehörende "
+                    "Buchung ist nicht vorhanden."
+                )
+
+            position = reference.booking_line_position
+
+            if position >= len(booking.lines):
+                raise ValueError(
+                    "Die zu einer BVV-Einlage gehörende "
+                    "Buchungszeile ist nicht vorhanden."
+                )
+
+            total += booking.lines[position].amount
+
+        return total
+
+    def effective_withdrawal_distributions(self) -> Decimal:
+        """Ermittelt die wirksamen Ausschüttungen für die BVV."""
+
+        if (
+            self._profit_appropriation_posting_repository
+            is None
+        ):
+            return Decimal("0.00")
+
+        postings = (
+            self._profit_appropriation_posting_repository
+            .list_for_posting_fiscal_year(
+                company_id=self._context.company.company_id,
+                fiscal_year=self._context.fiscal_year,
+            )
+        )
+
+        total = Decimal("0.00")
+
+        for posting in postings:
+            if (
+                posting.posting_type
+                is not ProfitAppropriationPostingType.DISTRIBUTION
+            ):
+                continue
+
+            if self._booking_repository.is_reversed(
+                posting.booking_id
+            ):
+                continue
+
+            total += posting.amount
+
+        return total
+
     def post_booking(
         self,
         booking: Booking,
+        *,
+        equity_contribution_line_positions: tuple[int, ...] = (),
+        chart_of_accounts: ChartOfAccountsTemplate | None = None,
     ) -> None:
         """Verbucht und persistiert eine laufende Buchung."""
+
+        if equity_contribution_line_positions:
+            self._post_booking_with_equity_contributions(
+                booking=booking,
+                booking_line_positions=(
+                    equity_contribution_line_positions
+                ),
+                chart_of_accounts=chart_of_accounts,
+            )
+            return
 
         if (
             booking.booking_type is not BookingType.REVERSAL
@@ -739,6 +835,123 @@ class FiscalYearWorkspace:
                         fixed_asset=restored_fixed_asset,
                         commit=False,
                     )
+
+            self._booking_repository.commit()
+
+        except Exception:
+            self._booking_repository.rollback()
+            raise
+
+        self.reload()
+
+    def _post_booking_with_equity_contributions(
+        self,
+        *,
+        booking: Booking,
+        booking_line_positions: tuple[int, ...],
+        chart_of_accounts: ChartOfAccountsTemplate | None,
+    ) -> None:
+        """Persistiert eine Buchung mit gekennzeichneten Einlagenzeilen."""
+
+        if self._equity_contribution_repository is None:
+            raise RuntimeError(
+                "Die Einlagenverwaltung ist nicht konfiguriert."
+            )
+
+        if chart_of_accounts is None:
+            raise ValueError(
+                "Für eine Einlagenbuchung ist der Kontenrahmen "
+                "erforderlich."
+            )
+
+        if booking.booking_type is not BookingType.REGULAR:
+            raise ValueError(
+                "Nur laufende Buchungen können "
+                "Gesellschaftereinlagen enthalten."
+            )
+
+        if len(set(booking_line_positions)) != len(
+            booking_line_positions
+        ):
+            raise ValueError(
+                "Eine Buchungszeile darf nur einmal als "
+                "Gesellschaftereinlage gekennzeichnet werden."
+            )
+
+        mapping_rules = {
+            rule.account_number: rule
+            for rule in chart_of_accounts.account_mapping_rules
+        }
+
+        references: list[EquityContributionReference] = []
+
+        for position in booking_line_positions:
+            if not isinstance(position, int):
+                raise TypeError(
+                    "booking_line_positions müssen Ganzzahlen sein."
+                )
+
+            if position < 0 or position >= len(booking.lines):
+                raise ValueError(
+                    "Die Position einer Einlagenzeile ist ungültig."
+                )
+
+            line = booking.lines[position]
+
+            if line.side is not EntrySide.CREDIT:
+                raise ValueError(
+                    "Eine Gesellschaftereinlage muss auf der "
+                    "Eigenkapitalseite im Haben gebucht werden."
+                )
+
+            mapping_rule = mapping_rules.get(
+                line.account_number
+            )
+
+            if mapping_rule is None:
+                raise ValueError(
+                    "Für das Einlagenkonto "
+                    f"{line.account_number} ist keine "
+                    "HGB-Zuordnung vorhanden."
+                )
+
+            credit_position = mapping_rule.credit_position
+
+            if (
+                credit_position is None
+                or credit_position.code
+                not in {
+                    "HGB.266.PASSIVA.A.I",
+                    "HGB.266.PASSIVA.A.II",
+                }
+            ):
+                raise ValueError(
+                    "Als Gesellschaftereinlage können nur "
+                    "Buchungszeilen auf gezeichnetes Kapital "
+                    "oder Kapitalrücklage gekennzeichnet werden."
+                )
+
+            references.append(
+                EquityContributionReference(
+                    booking_id=booking.booking_id,
+                    booking_line_position=position,
+                )
+            )
+
+        try:
+            self._booking_repository.add(
+                company_id=self._context.company.company_id,
+                fiscal_year=self._context.fiscal_year,
+                booking=booking,
+                commit=False,
+            )
+
+            for reference in references:
+                self._equity_contribution_repository.add(
+                    company_id=self._context.company.company_id,
+                    reference=reference,
+                    commit=False,
+                )
 
             self._booking_repository.commit()
 
@@ -2464,50 +2677,6 @@ class FiscalYearWorkspace:
             closed_ledger=self._ledger,
         )
 
-    def load_bvv_annual_data(
-        self,
-    ) -> BvvAnnualData | None:
-        """Lädt die BVV-Jahresdaten des geöffneten Geschäftsjahres."""
-
-        if self._bvv_annual_data_repository is None:
-            raise RuntimeError(
-                "Die BVV-Jahresdatenverwaltung ist nicht konfiguriert."
-            )
-
-        return (
-            self._bvv_annual_data_repository
-            .get_for_fiscal_year(
-                company_id=(
-                    self._context.company.company_id
-                ),
-                fiscal_year=(
-                    self._context.fiscal_year
-                ),
-            )
-        )
-
-
-    def save_bvv_annual_data(
-        self,
-        data: BvvAnnualData,
-    ) -> None:
-        """Speichert die BVV-Jahresdaten des geöffneten Geschäftsjahres."""
-
-        if self._bvv_annual_data_repository is None:
-            raise RuntimeError(
-                "Die BVV-Jahresdatenverwaltung ist nicht konfiguriert."
-            )
-
-        self._bvv_annual_data_repository.save_for_fiscal_year(
-            company_id=(
-                self._context.company.company_id
-            ),
-            fiscal_year=(
-                self._context.fiscal_year
-            ),
-            data=data,
-        )
-
     def _effective_profit_appropriation_postings(
         self,
         postings: tuple[ProfitAppropriationPosting, ...],
@@ -2776,51 +2945,107 @@ class FiscalYearWorkspace:
             data=data,
         )
 
-    def effective_previous_hgb_equity(
+    def build_bvv_evaluation(
         self,
         *,
+        preparation: EBilanzPreparationResult,
         chart_of_accounts: ChartOfAccountsTemplate,
-    ) -> Decimal | None:
-        """Ermittelt das für BVV maßgebliche HGB-Vorjahreseigenkapital."""
+    ) -> BvvEvaluation:
+        """Ermittelt den BVV vollständig aus den Buchführungsdaten."""
 
-        annual_data = self.load_bvv_annual_data()
-
-        if (
-            annual_data is not None
-            and annual_data.previous_hgb_equity
-            is not None
-        ):
-            return annual_data.previous_hgb_equity
-
-        managed_fiscal_years = (
-            self._company_repository
-            .get_managed_fiscal_years(
-                self._context.company.company_id
-            )
-        )
-
-        current_managed_fiscal_year = next(
+        equity_position = next(
             (
-                managed_fiscal_year
-                for managed_fiscal_year
-                in managed_fiscal_years
-                if (
-                    managed_fiscal_year.fiscal_year
-                    == self._context.fiscal_year
-                )
+                position
+                for position in preparation.balance_sheet.liabilities.children
+                if position.code == "HGB.266.PASSIVA.A"
             ),
             None,
         )
 
-        if (
-            current_managed_fiscal_year is None
-            or current_managed_fiscal_year.opening_source
-            is None
-        ):
-            return None
+        if equity_position is None:
+            raise ValueError(
+                "Die HGB-Eigenkapitalposition "
+                "HGB.266.PASSIVA.A fehlt."
+            )
 
-        return self.opening_hgb_equity(
+        current_hgb_equity = (
+            preparation.balance_sheet.amount_for(
+                equity_position
+            )
+        )
+
+        previous_hgb_equity = self.opening_hgb_equity(
             chart_of_accounts=chart_of_accounts,
+        )
+
+        current_depreciation_difference = Decimal("0.00")
+        previous_depreciation_difference = Decimal("0.00")
+
+        if (
+            self._fixed_asset_repository is not None
+            and self._fixed_asset_depreciation_repository is not None
+            and self._tax_depreciation_adjustment_repository is not None
+        ):
+            (
+                current_depreciation_difference,
+                previous_depreciation_difference,
+            ) = self.tax_depreciation_differences_for_bga()
+
+        current_book_value_difference = (
+            -current_depreciation_difference
+        )
+        previous_book_value_difference = (
+            -previous_depreciation_difference
+        )
+
+        contribution = self.effective_equity_contributions()
+        withdrawal_distribution = (
+            self.effective_withdrawal_distributions()
+        )
+
+        values = BvvValueBuilder.build(
+            current_hgb_equity=current_hgb_equity,
+            previous_hgb_equity=previous_hgb_equity,
+            current_book_value_difference=(
+                current_book_value_difference
+            ),
+            previous_book_value_difference=(
+                previous_book_value_difference
+            ),
+            contribution=contribution,
+            withdrawal_distribution=(
+                withdrawal_distribution
+            ),
+        )
+
+        return BvvEvaluation(
+            current_hgb_equity=current_hgb_equity,
+            previous_hgb_equity=previous_hgb_equity,
+            current_depreciation_difference=(
+                current_depreciation_difference
+            ),
+            previous_depreciation_difference=(
+                previous_depreciation_difference
+            ),
+            current_book_value_difference=(
+                current_book_value_difference
+            ),
+            previous_book_value_difference=(
+                previous_book_value_difference
+            ),
+            current_tax_equity=values[
+                ("BVV.profitLoss.assetsCurrentYear",)
+            ],
+            previous_tax_equity=values[
+                ("BVV.profitLoss.assetsPreviousYear",)
+            ],
+            contribution=contribution,
+            withdrawal_distribution=(
+                withdrawal_distribution
+            ),
+            profit_loss=values[
+                ("BVV.profitLoss",)
+            ],
         )
 
     def opening_hgb_equity(
@@ -3053,49 +3278,9 @@ class FiscalYearWorkspace:
             )
         )
 
-        current_depreciation_difference = Decimal("0.00")
-        previous_depreciation_difference = Decimal("0.00")
-
-        if (
-            self._fixed_asset_repository is not None
-            and self._fixed_asset_depreciation_repository is not None
-            and self._tax_depreciation_adjustment_repository is not None
-        ):
-            (
-                current_depreciation_difference,
-                previous_depreciation_difference,
-            ) = self.tax_depreciation_differences_for_bga()
-
-        previous_hgb_equity: Decimal | None = None
-        contribution = Decimal("0.00")
-        withdrawal_distribution = Decimal("0.00")
-
-        bvv_annual_data = self.load_bvv_annual_data()
-
-        if bvv_annual_data is None:
-            raise ValueError(
-                "Für den Betriebsvermögensvergleich "
-                "fehlen die BVV-Jahresdaten."
-            )
-
-        previous_hgb_equity = (
-            self.effective_previous_hgb_equity(
-                chart_of_accounts=chart_of_accounts,
-            )
-        )
-
-        if previous_hgb_equity is None:
-            if self.previous_fiscal_year is None:
-                previous_hgb_equity = Decimal("0.00")
-            else:
-                raise ValueError(
-                    "Für den Betriebsvermögensvergleich "
-                    "fehlt das HGB-Vorjahreseigenkapital."
-                )
-
-        contribution = bvv_annual_data.contribution
-        withdrawal_distribution = (
-            bvv_annual_data.withdrawal_distribution
+        bvv_evaluation = self.build_bvv_evaluation(
+            preparation=preparation,
+            chart_of_accounts=chart_of_accounts,
         )
 
         profit_appropriation_data = None
@@ -3144,17 +3329,19 @@ class FiscalYearWorkspace:
             ),
             shareholders=shareholders,
             current_depreciation_difference=(
-                current_depreciation_difference
+                bvv_evaluation.current_depreciation_difference
             ),
             previous_depreciation_difference=(
-                previous_depreciation_difference
+                bvv_evaluation.previous_depreciation_difference
             ),
             previous_hgb_equity=(
-                previous_hgb_equity
+                bvv_evaluation.previous_hgb_equity
             ),
-            contribution=contribution,
+            contribution=(
+                bvv_evaluation.contribution
+            ),
             withdrawal_distribution=(
-                withdrawal_distribution
+                bvv_evaluation.withdrawal_distribution
             ),
             profit_appropriation_data=(
                 profit_appropriation_data

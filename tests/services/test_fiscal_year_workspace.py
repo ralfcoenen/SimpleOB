@@ -23,6 +23,7 @@ from openbilanz.domain.accounting_control_accounts import (
 from openbilanz.domain.booking import Booking
 from openbilanz.domain.booking_line import BookingLine
 from openbilanz.domain.booking_type import BookingType
+from openbilanz.domain.bvv_evaluation import BvvEvaluation
 from openbilanz.domain.chart_of_accounts_template import (
     ChartOfAccountsTemplate,
 )
@@ -43,6 +44,9 @@ from openbilanz.domain.depreciation_source import (
     DepreciationSource,
 )
 from openbilanz.domain.entry_side import EntrySide
+from openbilanz.domain.equity_contribution_reference import (
+    EquityContributionReference,
+)
 from openbilanz.domain.fiscal_year import FiscalYear
 from openbilanz.domain.fiscal_year_status import FiscalYearStatus
 from openbilanz.domain.fixed_asset import FixedAsset
@@ -77,10 +81,12 @@ from openbilanz.domain.tax_depreciation_adjustment import (
     TaxDepreciationAdjustment,
 )
 from openbilanz.domain.vat_accounts import VatAccounts
-from openbilanz.domain.bvv_annual_data import BvvAnnualData
 from openbilanz.services.closing_result import ClosingResult
 from openbilanz.services.e_bilanz_export_service import (
     EBilanzExportService,
+)
+from openbilanz.services.e_bilanz_preparation_service import (
+    EBilanzPreparationResult,
 )
 from openbilanz.services.fiscal_year_workspace import FiscalYearWorkspace
 from openbilanz.services.posting_service import PostingService
@@ -436,6 +442,554 @@ def test_post_booking_does_not_change_workspace_when_persistence_fails(
         company_id=context.company.company_id,
         fiscal_year=context.fiscal_year,
     )
+
+
+def test_effective_equity_contributions_sums_referenced_lines(
+    context: ApplicationContext,
+) -> None:
+    booking_repository = Mock()
+    equity_contribution_repository = Mock()
+
+    booking = Booking(
+        booking_date=date(2026, 3, 15),
+        description="Gesellschaftereinlage",
+        lines=(
+            BookingLine(
+                account_number="1200",
+                side=EntrySide.DEBIT,
+                amount=Decimal("7000.00"),
+            ),
+            BookingLine(
+                account_number="0800",
+                side=EntrySide.CREDIT,
+                amount=Decimal("2000.00"),
+            ),
+            BookingLine(
+                account_number="0810",
+                side=EntrySide.CREDIT,
+                amount=Decimal("5000.00"),
+            ),
+        ),
+    )
+
+    booking_repository.list_for_fiscal_year.return_value = (
+        booking,
+    )
+    booking_repository.get.return_value = booking
+    booking_repository.is_reversed.return_value = False
+
+    equity_contribution_repository.list_for_fiscal_year.return_value = (
+        EquityContributionReference(
+            booking_id=booking.booking_id,
+            booking_line_position=1,
+        ),
+        EquityContributionReference(
+            booking_id=booking.booking_id,
+            booking_line_position=2,
+        ),
+    )
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=Mock(),
+        equity_contribution_repository=(
+            equity_contribution_repository
+        ),
+        posting_service=PostingService(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
+        taxonomy_management_service=Mock(),
+        e_bilanz_export_service=Mock(),
+    )
+
+    result = workspace.effective_equity_contributions()
+
+    assert result == Decimal("7000.00")
+
+    equity_contribution_repository.list_for_fiscal_year.assert_called_once_with(
+        company_id=context.company.company_id,
+        fiscal_year=context.fiscal_year,
+    )
+
+
+def test_effective_equity_contributions_ignores_reversed_booking(
+    context: ApplicationContext,
+) -> None:
+    booking_repository = Mock()
+    equity_contribution_repository = Mock()
+
+    booking = Booking(
+        booking_date=date(2026, 3, 15),
+        description="Gesellschaftereinlage",
+        lines=(
+            BookingLine(
+                account_number="1200",
+                side=EntrySide.DEBIT,
+                amount=Decimal("1000.00"),
+            ),
+            BookingLine(
+                account_number="0800",
+                side=EntrySide.CREDIT,
+                amount=Decimal("1000.00"),
+            ),
+        ),
+    )
+
+    booking_repository.list_for_fiscal_year.return_value = (
+        booking,
+    )
+    booking_repository.is_reversed.return_value = True
+
+    equity_contribution_repository.list_for_fiscal_year.return_value = (
+        EquityContributionReference(
+            booking_id=booking.booking_id,
+            booking_line_position=1,
+        ),
+    )
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=Mock(),
+        equity_contribution_repository=(
+            equity_contribution_repository
+        ),
+        posting_service=PostingService(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
+        taxonomy_management_service=Mock(),
+        e_bilanz_export_service=Mock(),
+    )
+
+    result = workspace.effective_equity_contributions()
+
+    assert result == Decimal("0.00")
+
+    booking_repository.is_reversed.assert_called_once_with(
+        booking.booking_id
+    )
+    booking_repository.get.assert_not_called()
+
+
+def test_effective_equity_contributions_returns_zero_without_repository(
+    context: ApplicationContext,
+) -> None:
+    booking_repository = Mock()
+    booking_repository.list_for_fiscal_year.return_value = ()
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=Mock(),
+        posting_service=PostingService(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
+        taxonomy_management_service=Mock(),
+        e_bilanz_export_service=Mock(),
+    )
+
+    assert (
+        workspace.effective_equity_contributions()
+        == Decimal("0.00")
+    )
+
+
+def test_post_booking_persists_equity_contribution_reference(
+    context: ApplicationContext,
+) -> None:
+    booking_repository = Mock()
+    equity_contribution_repository = Mock()
+    company_repository = Mock()
+
+    booking = Booking(
+        booking_date=date(2026, 3, 15),
+        voucher_no="E-001",
+        description="Einzahlung Stammkapital",
+        lines=(
+            BookingLine(
+                account_number="1200",
+                side=EntrySide.DEBIT,
+                amount=Decimal("10000.00"),
+            ),
+            BookingLine(
+                account_number="0800",
+                side=EntrySide.CREDIT,
+                amount=Decimal("10000.00"),
+            ),
+        ),
+    )
+
+    booking_repository.list_for_fiscal_year.side_effect = (
+        (),
+        (booking,),
+    )
+
+    credit_position = Mock()
+    credit_position.code = "HGB.266.PASSIVA.A.I"
+
+    mapping_rule = Mock()
+    mapping_rule.account_number = "0800"
+    mapping_rule.credit_position = credit_position
+
+    chart_of_accounts = Mock(
+        spec=ChartOfAccountsTemplate
+    )
+    chart_of_accounts.account_mapping_rules = (
+        mapping_rule,
+    )
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=company_repository,
+        equity_contribution_repository=(
+            equity_contribution_repository
+        ),
+        posting_service=PostingService(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
+        taxonomy_management_service=Mock(),
+        e_bilanz_export_service=Mock(),
+    )
+
+    workspace.post_booking(
+        booking,
+        equity_contribution_line_positions=(1,),
+        chart_of_accounts=chart_of_accounts,
+    )
+
+    booking_repository.add.assert_called_once_with(
+        company_id=context.company.company_id,
+        fiscal_year=context.fiscal_year,
+        booking=booking,
+        commit=False,
+    )
+
+    reference = (
+        equity_contribution_repository
+        .add.call_args.kwargs["reference"]
+    )
+
+    assert reference.booking_id == booking.booking_id
+    assert reference.booking_line_position == 1
+
+    equity_contribution_repository.add.assert_called_once()
+    assert (
+        equity_contribution_repository
+        .add.call_args.kwargs["company_id"]
+        == context.company.company_id
+    )
+    assert (
+        equity_contribution_repository
+        .add.call_args.kwargs["commit"]
+        is False
+    )
+
+    booking_repository.commit.assert_called_once_with()
+    booking_repository.rollback.assert_not_called()
+
+    assert tuple(workspace.journal) == (booking,)
+
+
+def test_post_booking_persists_multiple_equity_contribution_references(
+    context: ApplicationContext,
+) -> None:
+    booking_repository = Mock()
+    equity_contribution_repository = Mock()
+    company_repository = Mock()
+
+    booking = Booking(
+        booking_date=date(2026, 3, 15),
+        description="Gesellschaftereinlage",
+        lines=(
+            BookingLine(
+                account_number="1200",
+                side=EntrySide.DEBIT,
+                amount=Decimal("7000.00"),
+            ),
+            BookingLine(
+                account_number="0800",
+                side=EntrySide.CREDIT,
+                amount=Decimal("2000.00"),
+            ),
+            BookingLine(
+                account_number="0810",
+                side=EntrySide.CREDIT,
+                amount=Decimal("5000.00"),
+            ),
+        ),
+    )
+
+    booking_repository.list_for_fiscal_year.side_effect = (
+        (),
+        (booking,),
+    )
+
+    subscribed_position = Mock()
+    subscribed_position.code = "HGB.266.PASSIVA.A.I"
+
+    capital_reserve_position = Mock()
+    capital_reserve_position.code = "HGB.266.PASSIVA.A.II"
+
+    subscribed_rule = Mock()
+    subscribed_rule.account_number = "0800"
+    subscribed_rule.credit_position = subscribed_position
+
+    capital_reserve_rule = Mock()
+    capital_reserve_rule.account_number = "0810"
+    capital_reserve_rule.credit_position = (
+        capital_reserve_position
+    )
+
+    chart_of_accounts = Mock(
+        spec=ChartOfAccountsTemplate
+    )
+    chart_of_accounts.account_mapping_rules = (
+        subscribed_rule,
+        capital_reserve_rule,
+    )
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=company_repository,
+        equity_contribution_repository=(
+            equity_contribution_repository
+        ),
+        posting_service=PostingService(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
+        taxonomy_management_service=Mock(),
+        e_bilanz_export_service=Mock(),
+    )
+
+    workspace.post_booking(
+        booking,
+        equity_contribution_line_positions=(1, 2),
+        chart_of_accounts=chart_of_accounts,
+    )
+
+    assert equity_contribution_repository.add.call_count == 2
+
+    references = tuple(
+        call.kwargs["reference"]
+        for call in equity_contribution_repository.add.call_args_list
+    )
+
+    assert tuple(
+        reference.booking_line_position
+        for reference in references
+    ) == (1, 2)
+
+    assert all(
+        reference.booking_id == booking.booking_id
+        for reference in references
+    )
+
+    booking_repository.commit.assert_called_once_with()
+    booking_repository.rollback.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("booking_type", "line_side", "position_code", "error_match"),
+    (
+        (
+            BookingType.REGULAR,
+            EntrySide.DEBIT,
+            "HGB.266.PASSIVA.A.I",
+            "im Haben",
+        ),
+        (
+            BookingType.REGULAR,
+            EntrySide.CREDIT,
+            "HGB.266.PASSIVA.A.III.1",
+            "gezeichnetes Kapital",
+        ),
+        (
+            BookingType.OPENING,
+            EntrySide.CREDIT,
+            "HGB.266.PASSIVA.A.I",
+            "Nur laufende Buchungen",
+        ),
+    ),
+)
+def test_post_booking_rejects_invalid_equity_contribution(
+    context: ApplicationContext,
+    booking_type: BookingType,
+    line_side: EntrySide,
+    position_code: str,
+    error_match: str,
+) -> None:
+    booking_repository = Mock()
+    equity_contribution_repository = Mock()
+    booking_repository.list_for_fiscal_year.return_value = ()
+
+    booking = Booking(
+        booking_date=date(2026, 3, 15),
+        description="Ungültige Einlage",
+        booking_type=booking_type,
+        lines=(
+            BookingLine(
+                account_number="1200",
+                side=(
+                    EntrySide.CREDIT
+                    if line_side is EntrySide.DEBIT
+                    else EntrySide.DEBIT
+                ),
+                amount=Decimal("1000.00"),
+            ),
+            BookingLine(
+                account_number="0800",
+                side=line_side,
+                amount=Decimal("1000.00"),
+            ),
+        ),
+    )
+
+    credit_position = Mock()
+    credit_position.code = position_code
+
+    mapping_rule = Mock()
+    mapping_rule.account_number = "0800"
+    mapping_rule.credit_position = credit_position
+
+    chart_of_accounts = Mock(
+        spec=ChartOfAccountsTemplate
+    )
+    chart_of_accounts.account_mapping_rules = (
+        mapping_rule,
+    )
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=Mock(),
+        equity_contribution_repository=(
+            equity_contribution_repository
+        ),
+        posting_service=PostingService(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
+        taxonomy_management_service=Mock(),
+        e_bilanz_export_service=Mock(),
+    )
+
+    with pytest.raises(ValueError, match=error_match):
+        workspace.post_booking(
+            booking,
+            equity_contribution_line_positions=(1,),
+            chart_of_accounts=chart_of_accounts,
+        )
+
+    booking_repository.add.assert_not_called()
+    booking_repository.commit.assert_not_called()
+    equity_contribution_repository.add.assert_not_called()
+
+
+def test_post_booking_rolls_back_when_equity_contribution_persistence_fails(
+    context: ApplicationContext,
+) -> None:
+    booking_repository = Mock()
+    equity_contribution_repository = Mock()
+    company_repository = Mock()
+
+    booking = Booking(
+        booking_date=date(2026, 3, 15),
+        description="Gesellschaftereinlage",
+        lines=(
+            BookingLine(
+                account_number="1200",
+                side=EntrySide.DEBIT,
+                amount=Decimal("1000.00"),
+            ),
+            BookingLine(
+                account_number="0800",
+                side=EntrySide.CREDIT,
+                amount=Decimal("1000.00"),
+            ),
+        ),
+    )
+
+    booking_repository.list_for_fiscal_year.return_value = ()
+
+    credit_position = Mock()
+    credit_position.code = "HGB.266.PASSIVA.A.I"
+
+    mapping_rule = Mock()
+    mapping_rule.account_number = "0800"
+    mapping_rule.credit_position = credit_position
+
+    chart_of_accounts = Mock(
+        spec=ChartOfAccountsTemplate
+    )
+    chart_of_accounts.account_mapping_rules = (
+        mapping_rule,
+    )
+
+    equity_contribution_repository.add.side_effect = ValueError(
+        "Einlagenreferenz konnte nicht gespeichert werden."
+    )
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=company_repository,
+        equity_contribution_repository=(
+            equity_contribution_repository
+        ),
+        posting_service=PostingService(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
+        taxonomy_management_service=Mock(),
+        e_bilanz_export_service=Mock(),
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="Einlagenreferenz konnte nicht gespeichert werden",
+    ):
+        workspace.post_booking(
+            booking,
+            equity_contribution_line_positions=(1,),
+            chart_of_accounts=chart_of_accounts,
+        )
+
+    booking_repository.add.assert_called_once_with(
+        company_id=context.company.company_id,
+        fiscal_year=context.fiscal_year,
+        booking=booking,
+        commit=False,
+    )
+    booking_repository.commit.assert_not_called()
+    booking_repository.rollback.assert_called_once_with()
+
+    booking_repository.list_for_fiscal_year.assert_called_once_with(
+        company_id=context.company.company_id,
+        fiscal_year=context.fiscal_year,
+    )
+
 
 def test_create_reversal_booking_mirrors_original_booking(
     context: ApplicationContext,
@@ -2102,7 +2656,6 @@ def test_builds_e_bilanz_from_prepared_data(
 ) -> None:
     booking_repository = Mock()
     company_repository = Mock()
-    bvv_repository = Mock()
     shareholder_repository = Mock()
     chart_of_accounts_repository = Mock()
     preparation_service = Mock()
@@ -2110,16 +2663,6 @@ def test_builds_e_bilanz_from_prepared_data(
     account_detail_service = Mock()
 
     booking_repository.list_for_fiscal_year.return_value = ()
-
-    bvv_annual_data = BvvAnnualData(
-        previous_hgb_equity=Decimal("12345.67"),
-        contribution=Decimal("0.00"),
-        withdrawal_distribution=Decimal("0.00"),
-    )
-
-    bvv_repository.get_for_fiscal_year.return_value = (
-        bvv_annual_data
-    )
 
     previous_fiscal_year = FiscalYear(
         start_date=date(2025, 1, 1),
@@ -2216,7 +2759,6 @@ def test_builds_e_bilanz_from_prepared_data(
         context=context,
         booking_repository=booking_repository,
         company_repository=company_repository,
-        bvv_annual_data_repository=bvv_repository,
         shareholder_repository=shareholder_repository,
         chart_of_accounts_repository=(
             chart_of_accounts_repository
@@ -2239,12 +2781,36 @@ def test_builds_e_bilanz_from_prepared_data(
         spec=ChartOfAccountsTemplate
     )
 
-    result = workspace.build_e_bilanz(
+    bvv_evaluation = BvvEvaluation(
+        current_hgb_equity=Decimal("15000.00"),
+        previous_hgb_equity=Decimal("12345.67"),
+        current_depreciation_difference=Decimal("0.00"),
+        previous_depreciation_difference=Decimal("0.00"),
+        current_book_value_difference=Decimal("0.00"),
+        previous_book_value_difference=Decimal("0.00"),
+        current_tax_equity=Decimal("15000.00"),
+        previous_tax_equity=Decimal("12345.67"),
+        contribution=Decimal("0.00"),
+        withdrawal_distribution=Decimal("0.00"),
+        profit_loss=Decimal("2654.33"),
+    )
+
+    with patch.object(
+        workspace,
+        "build_bvv_evaluation",
+        return_value=bvv_evaluation,
+    ) as build_bvv_evaluation:
+        result = workspace.build_e_bilanz(
+            preparation=preparation,
+            chart_of_accounts=chart_of_accounts,
+        )
+
+    assert result is expected_document
+
+    build_bvv_evaluation.assert_called_once_with(
         preparation=preparation,
         chart_of_accounts=chart_of_accounts,
     )
-
-    assert result is expected_document
 
     account_detail_service.build_for_e_bilanz.assert_called_once_with(
         pre_closing_ledger=workspace.pre_closing_ledger,
@@ -2306,8 +2872,7 @@ def test_builds_e_bilanz_from_prepared_data(
         withdrawal_distribution=Decimal("0.00"),
         profit_appropriation_data=None,
         previous_profit_loss_carryforward=Decimal("0.00"),
-        )
-
+    )
 
 def test_build_e_bilanz_passes_profit_appropriation_data(
     context: ApplicationContext,
@@ -2375,16 +2940,6 @@ def test_build_e_bilanz_passes_profit_appropriation_data(
         .return_value
     ) = {}
 
-    bvv_annual_data = BvvAnnualData(
-        previous_hgb_equity=Decimal("0.00"),
-        contribution=Decimal("0.00"),
-        withdrawal_distribution=Decimal("0.00"),
-    )
-
-    bvv_repository.get_for_fiscal_year.return_value = (
-        bvv_annual_data
-    )
-
     profit_appropriation_data = ProfitAppropriationAnnualData(
         statutory_reserve_addition=Decimal("500.00"),
         other_revenue_reserves_addition=Decimal("1000.00"),
@@ -2412,7 +2967,6 @@ def test_build_e_bilanz_passes_profit_appropriation_data(
         context=context,
         booking_repository=booking_repository,
         company_repository=company_repository,
-        bvv_annual_data_repository=bvv_repository,
         profit_appropriation_annual_data_repository=(
             profit_appropriation_repository
         ),
@@ -2437,11 +2991,32 @@ def test_build_e_bilanz_passes_profit_appropriation_data(
         spec=ChartOfAccountsTemplate
     )
 
-    with patch.object(
-        workspace,
-        "previous_profit_loss_carryforward",
-        return_value=Decimal("2000.00"),
-    ) as previous_profit_loss_carryforward:
+    bvv_evaluation = BvvEvaluation(
+        current_hgb_equity=Decimal("0.00"),
+        previous_hgb_equity=Decimal("0.00"),
+        current_depreciation_difference=Decimal("0.00"),
+        previous_depreciation_difference=Decimal("0.00"),
+        current_book_value_difference=Decimal("0.00"),
+        previous_book_value_difference=Decimal("0.00"),
+        current_tax_equity=Decimal("0.00"),
+        previous_tax_equity=Decimal("0.00"),
+        contribution=Decimal("0.00"),
+        withdrawal_distribution=Decimal("0.00"),
+        profit_loss=Decimal("0.00"),
+    )
+
+    with (
+        patch.object(
+            workspace,
+            "previous_profit_loss_carryforward",
+            return_value=Decimal("2000.00"),
+        ) as previous_profit_loss_carryforward,
+        patch.object(
+            workspace,
+            "build_bvv_evaluation",
+            return_value=bvv_evaluation,
+        ),
+    ):
         result = workspace.build_e_bilanz(
             preparation=preparation,
             chart_of_accounts=chart_of_accounts,
@@ -3401,185 +3976,6 @@ def test_saves_tax_depreciation_adjustment(
         tax_amount=Decimal("620.00"),
     )
 
-def test_uses_explicit_previous_hgb_equity_for_bvv(
-    context: ApplicationContext,
-) -> None:
-    """Explizites BVV-Vorjahreseigenkapital hat Vorrang."""
-
-    booking_repository = Mock()
-    company_repository = Mock()
-    bvv_repository = Mock()
-
-    booking_repository.list_for_fiscal_year.return_value = ()
-
-    bvv_repository.get_for_fiscal_year.return_value = (
-        BvvAnnualData(
-            previous_hgb_equity=Decimal("12345.67"),
-            contribution=Decimal("0.00"),
-            withdrawal_distribution=Decimal("0.00"),
-        )
-    )
-
-    workspace = FiscalYearWorkspace(
-        context=context,
-        booking_repository=booking_repository,
-        company_repository=company_repository,
-        bvv_annual_data_repository=bvv_repository,
-        posting_service=Mock(),
-        closing_workflow=Mock(),
-        closing_consistency_service=Mock(),
-        e_bilanz_preparation_service=Mock(),
-        e_bilanz_service=Mock(),
-        e_bilanz_account_detail_service=Mock(),
-        e_bilanz_export_service=Mock(),
-        taxonomy_management_service=Mock(),
-    )
-
-    chart_of_accounts = Mock(
-        spec=ChartOfAccountsTemplate
-    )
-
-    result = workspace.effective_previous_hgb_equity(
-        chart_of_accounts=chart_of_accounts,
-    )
-
-    assert result == Decimal("12345.67")
-
-    bvv_repository.get_for_fiscal_year.assert_called_once_with(
-        company_id=context.company.company_id,
-        fiscal_year=context.fiscal_year,
-    )
-
-    company_repository.get_managed_fiscal_years.assert_not_called()
-
-
-def test_derives_previous_hgb_equity_from_opening_source_for_bvv(
-    context: ApplicationContext,
-) -> None:
-    """Vorjahreseigenkapital wird bei Saldovortrag aus der Eröffnung abgeleitet."""
-
-    booking_repository = Mock()
-    company_repository = Mock()
-    bvv_repository = Mock()
-
-    booking_repository.list_for_fiscal_year.return_value = ()
-
-    bvv_repository.get_for_fiscal_year.return_value = (
-        BvvAnnualData(
-            previous_hgb_equity=None,
-            contribution=Decimal("0.00"),
-            withdrawal_distribution=Decimal("0.00"),
-        )
-    )
-
-    previous_fiscal_year = FiscalYear(
-        start_date=date(2025, 1, 1),
-        end_date=date(2025, 12, 31),
-    )
-
-    company_repository.get_managed_fiscal_years.return_value = (
-        ManagedFiscalYear(
-            fiscal_year=previous_fiscal_year,
-            status=FiscalYearStatus.CLOSED,
-            opening_source=None,
-        ),
-        ManagedFiscalYear(
-            fiscal_year=context.fiscal_year,
-            status=FiscalYearStatus.OPEN,
-            opening_source=previous_fiscal_year,
-        ),
-    )
-
-    workspace = FiscalYearWorkspace(
-        context=context,
-        booking_repository=booking_repository,
-        company_repository=company_repository,
-        bvv_annual_data_repository=bvv_repository,
-        posting_service=Mock(),
-        closing_workflow=Mock(),
-        closing_consistency_service=Mock(),
-        e_bilanz_preparation_service=Mock(),
-        e_bilanz_service=Mock(),
-        e_bilanz_account_detail_service=Mock(),
-        e_bilanz_export_service=Mock(),
-        taxonomy_management_service=Mock(),
-    )
-
-    chart_of_accounts = Mock(
-        spec=ChartOfAccountsTemplate
-    )
-
-    workspace.opening_hgb_equity = Mock(
-        return_value=Decimal("13868.35")
-    )
-
-    result = workspace.effective_previous_hgb_equity(
-        chart_of_accounts=chart_of_accounts,
-    )
-
-    assert result == Decimal("13868.35")
-
-    workspace.opening_hgb_equity.assert_called_once_with(
-        chart_of_accounts=chart_of_accounts,
-    )
-
-
-def test_does_not_infer_previous_hgb_equity_without_opening_source(
-    context: ApplicationContext,
-) -> None:
-    """Ohne Vorjahresübernahme wird kein BVV-Vorjahreseigenkapital geraten."""
-
-    booking_repository = Mock()
-    company_repository = Mock()
-    bvv_repository = Mock()
-
-    booking_repository.list_for_fiscal_year.return_value = ()
-
-    bvv_repository.get_for_fiscal_year.return_value = (
-        BvvAnnualData(
-            previous_hgb_equity=None,
-            contribution=Decimal("10000.00"),
-            withdrawal_distribution=Decimal("0.00"),
-        )
-    )
-
-    company_repository.get_managed_fiscal_years.return_value = (
-        ManagedFiscalYear(
-            fiscal_year=context.fiscal_year,
-            status=FiscalYearStatus.OPEN,
-            opening_source=None,
-        ),
-    )
-
-    workspace = FiscalYearWorkspace(
-        context=context,
-        booking_repository=booking_repository,
-        company_repository=company_repository,
-        bvv_annual_data_repository=bvv_repository,
-        posting_service=Mock(),
-        closing_workflow=Mock(),
-        closing_consistency_service=Mock(),
-        e_bilanz_preparation_service=Mock(),
-        e_bilanz_service=Mock(),
-        e_bilanz_account_detail_service=Mock(),
-        e_bilanz_export_service=Mock(),
-        taxonomy_management_service=Mock(),
-    )
-
-    chart_of_accounts = Mock(
-        spec=ChartOfAccountsTemplate
-    )
-
-    workspace.opening_hgb_equity = Mock()
-
-    result = workspace.effective_previous_hgb_equity(
-        chart_of_accounts=chart_of_accounts,
-    )
-
-    assert result is None
-
-    workspace.opening_hgb_equity.assert_not_called()
-
 
 def test_previous_profit_loss_carryforward_uses_account_configuration(
     context: ApplicationContext,
@@ -3919,6 +4315,289 @@ def test_profit_appropriation_annual_data_can_be_changed_after_reversal(
     )
 
 
+def test_effective_withdrawal_distributions_sums_distributions(
+    context: ApplicationContext,
+) -> None:
+    booking_repository = Mock()
+    booking_repository.list_for_fiscal_year.return_value = ()
+
+    posting_repository = Mock()
+
+    first_booking_id = uuid4()
+    second_booking_id = uuid4()
+
+    posting_repository.list_for_posting_fiscal_year.return_value = (
+        ProfitAppropriationPosting(
+            source_fiscal_year_end=date(2025, 12, 31),
+            posting_date=date(2026, 3, 15),
+            amount=Decimal("3000.00"),
+            booking_id=first_booking_id,
+            posting_type=(
+                ProfitAppropriationPostingType.DISTRIBUTION
+            ),
+        ),
+        ProfitAppropriationPosting(
+            source_fiscal_year_end=date(2025, 12, 31),
+            posting_date=date(2026, 4, 15),
+            amount=Decimal("2000.00"),
+            booking_id=second_booking_id,
+            posting_type=(
+                ProfitAppropriationPostingType.DISTRIBUTION
+            ),
+        ),
+    )
+
+    booking_repository.is_reversed.return_value = False
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=Mock(),
+        profit_appropriation_posting_repository=(
+            posting_repository
+        ),
+        posting_service=PostingService(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
+        taxonomy_management_service=Mock(),
+        e_bilanz_export_service=Mock(),
+    )
+
+    result = workspace.effective_withdrawal_distributions()
+
+    assert result == Decimal("5000.00")
+
+    posting_repository.list_for_posting_fiscal_year.assert_called_once_with(
+        company_id=context.company.company_id,
+        fiscal_year=context.fiscal_year,
+    )
+
+
+def test_effective_withdrawal_distributions_ignores_non_distributions_and_reversals(
+    context: ApplicationContext,
+) -> None:
+    booking_repository = Mock()
+    booking_repository.list_for_fiscal_year.return_value = ()
+
+    posting_repository = Mock()
+
+    distribution_booking_id = uuid4()
+    reversed_distribution_booking_id = uuid4()
+    reserve_booking_id = uuid4()
+
+    posting_repository.list_for_posting_fiscal_year.return_value = (
+        ProfitAppropriationPosting(
+            source_fiscal_year_end=date(2025, 12, 31),
+            posting_date=date(2026, 3, 15),
+            amount=Decimal("3000.00"),
+            booking_id=distribution_booking_id,
+            posting_type=(
+                ProfitAppropriationPostingType.DISTRIBUTION
+            ),
+        ),
+        ProfitAppropriationPosting(
+            source_fiscal_year_end=date(2025, 12, 31),
+            posting_date=date(2026, 3, 20),
+            amount=Decimal("2000.00"),
+            booking_id=reversed_distribution_booking_id,
+            posting_type=(
+                ProfitAppropriationPostingType.DISTRIBUTION
+            ),
+        ),
+        ProfitAppropriationPosting(
+            source_fiscal_year_end=date(2025, 12, 31),
+            posting_date=date(2026, 3, 25),
+            amount=Decimal("1000.00"),
+            booking_id=reserve_booking_id,
+            posting_type=(
+                ProfitAppropriationPostingType.STATUTORY_RESERVE_ADDITION
+            ),
+        ),
+    )
+
+    booking_repository.is_reversed.side_effect = (
+        lambda booking_id: (
+            booking_id
+            == reversed_distribution_booking_id
+        )
+    )
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=Mock(),
+        profit_appropriation_posting_repository=(
+            posting_repository
+        ),
+        posting_service=PostingService(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
+        taxonomy_management_service=Mock(),
+        e_bilanz_export_service=Mock(),
+    )
+
+    result = workspace.effective_withdrawal_distributions()
+
+    assert result == Decimal("3000.00")
+
+    assert booking_repository.is_reversed.call_count == 2
+
+
+def test_effective_withdrawal_distributions_returns_zero_without_repository(
+    context: ApplicationContext,
+) -> None:
+    booking_repository = Mock()
+    booking_repository.list_for_fiscal_year.return_value = ()
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=Mock(),
+        posting_service=PostingService(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
+        taxonomy_management_service=Mock(),
+        e_bilanz_export_service=Mock(),
+    )
+
+    assert (
+        workspace.effective_withdrawal_distributions()
+        == Decimal("0.00")
+    )
+
+
+def test_builds_bvv_evaluation_from_bookkeeping(
+    context: ApplicationContext,
+) -> None:
+    booking_repository = Mock()
+    booking_repository.list_for_fiscal_year.return_value = ()
+
+    assets = FinancialStatementPosition(
+        code="HGB.266.AKTIVA",
+        name="Aktiva",
+    )
+
+    equity = FinancialStatementPosition(
+        code="HGB.266.PASSIVA.A",
+        name="Eigenkapital",
+    )
+
+    liabilities = FinancialStatementPosition(
+        code="HGB.266.PASSIVA",
+        name="Passiva",
+        children=(equity,),
+    )
+
+    balance_sheet = BalanceSheet(
+        assets=assets,
+        liabilities=liabilities,
+        amounts={
+            equity: Decimal("28875.36"),
+        },
+    )
+
+    preparation = Mock(
+        spec=EBilanzPreparationResult,
+    )
+    preparation.balance_sheet = balance_sheet
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=Mock(),
+        posting_service=Mock(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
+        e_bilanz_export_service=Mock(),
+        taxonomy_management_service=Mock(),
+    )
+
+    chart_of_accounts = Mock(
+        spec=ChartOfAccountsTemplate
+    )
+
+    with (
+        patch.object(
+            workspace,
+            "opening_hgb_equity",
+            return_value=Decimal("13868.35"),
+        ),
+        patch.object(
+            workspace,
+            "tax_depreciation_differences_for_bga",
+            return_value=(
+                Decimal("-83.33"),
+                Decimal("-83.33"),
+            ),
+        ),
+        patch.object(
+            workspace,
+            "effective_equity_contributions",
+            return_value=Decimal("2000.00"),
+        ),
+        patch.object(
+            workspace,
+            "effective_withdrawal_distributions",
+            return_value=Decimal("5000.00"),
+        ),
+    ):
+        workspace._fixed_asset_repository = Mock()
+        workspace._fixed_asset_depreciation_repository = Mock()
+        workspace._tax_depreciation_adjustment_repository = Mock()
+
+        result = workspace.build_bvv_evaluation(
+            preparation=preparation,
+            chart_of_accounts=chart_of_accounts,
+        )
+
+    assert isinstance(result, BvvEvaluation)
+
+    assert result.current_hgb_equity == Decimal("28875.36")
+    assert result.previous_hgb_equity == Decimal("13868.35")
+
+    assert (
+        result.current_depreciation_difference
+        == Decimal("-83.33")
+    )
+    assert (
+        result.previous_depreciation_difference
+        == Decimal("-83.33")
+    )
+
+    assert (
+        result.current_book_value_difference
+        == Decimal("83.33")
+    )
+    assert (
+        result.previous_book_value_difference
+        == Decimal("83.33")
+    )
+
+    assert result.current_tax_equity == Decimal("29042.02")
+    assert result.previous_tax_equity == Decimal("13951.68")
+    assert result.change_in_tax_equity == Decimal("15090.34")
+
+    assert result.contribution == Decimal("2000.00")
+    assert (
+        result.withdrawal_distribution
+        == Decimal("5000.00")
+    )
+
+    assert result.profit_loss == Decimal("18090.34")
+
+
 def test_profit_appropriation_posting_proposals_respect_effective_postings(
     company: Company,
 ) -> None:
@@ -4202,10 +4881,10 @@ def test_confirm_profit_appropriation_posting_delegates_to_workflow(
     reload_workspace.assert_called_once_with()
 
 
-def test_build_e_bilanz_passes_bvv_data_for_hgbm(
+def test_build_e_bilanz_passes_derived_bvv_data_for_hgbm(
     context: ApplicationContext,
 ) -> None:
-    """Reicht bei HGBM die BVV-Jahresdaten an den E-Bilanz-Service weiter."""
+    """Leitet die BVV-Daten bei HGBM aus Buchführung und Anlagenbuchhaltung ab."""
 
     booking_repository = Mock()
     company_repository = Mock()
@@ -4323,32 +5002,25 @@ def test_build_e_bilanz_passes_bvv_data_for_hgbm(
         spec=ChartOfAccountsTemplate
     )
 
-    bvv_annual_data = BvvAnnualData(
+    bvv_evaluation = BvvEvaluation(
+        current_hgb_equity=Decimal("28875.36"),
         previous_hgb_equity=Decimal("13868.35"),
-        contribution=Decimal("0.00"),
-        withdrawal_distribution=Decimal("0.00"),
+        current_depreciation_difference=Decimal("-83.33"),
+        previous_depreciation_difference=Decimal("-83.33"),
+        current_book_value_difference=Decimal("83.33"),
+        previous_book_value_difference=Decimal("83.33"),
+        current_tax_equity=Decimal("29042.02"),
+        previous_tax_equity=Decimal("13951.68"),
+        contribution=Decimal("2000.00"),
+        withdrawal_distribution=Decimal("5000.00"),
+        profit_loss=Decimal("18090.34"),
     )
 
-    with (
-        patch.object(
-            workspace,
-            "tax_depreciation_differences_for_bga",
-            return_value=(
-                Decimal("-83.33"),
-                Decimal("-83.33"),
-            ),
-        ),
-        patch.object(
-            workspace,
-            "load_bvv_annual_data",
-            return_value=bvv_annual_data,
-        ) as load_bvv_annual_data,
-        patch.object(
-            workspace,
-            "effective_previous_hgb_equity",
-            return_value=Decimal("13868.35"),
-        ) as effective_previous_hgb_equity,
-    ):
+    with patch.object(
+        workspace,
+        "build_bvv_evaluation",
+        return_value=bvv_evaluation,
+    ) as build_bvv_evaluation:
         result = workspace.build_e_bilanz(
             preparation=preparation,
             chart_of_accounts=chart_of_accounts,
@@ -4356,9 +5028,8 @@ def test_build_e_bilanz_passes_bvv_data_for_hgbm(
 
     assert result is expected_document
 
-    load_bvv_annual_data.assert_called_once_with()
-
-    effective_previous_hgb_equity.assert_called_once_with(
+    build_bvv_evaluation.assert_called_once_with(
+        preparation=preparation,
         chart_of_accounts=chart_of_accounts,
     )
 
@@ -4370,25 +5041,21 @@ def test_build_e_bilanz_passes_bvv_data_for_hgbm(
         build_kwargs["current_depreciation_difference"]
         == Decimal("-83.33")
     )
-
     assert (
         build_kwargs["previous_depreciation_difference"]
         == Decimal("-83.33")
     )
-
     assert (
         build_kwargs["previous_hgb_equity"]
         == Decimal("13868.35")
     )
-
     assert (
         build_kwargs["contribution"]
-        == Decimal("0.00")
+        == Decimal("2000.00")
     )
-
     assert (
         build_kwargs["withdrawal_distribution"]
-        == Decimal("0.00")
+        == Decimal("5000.00")
     )
 
 
@@ -4503,32 +5170,25 @@ def test_build_e_bilanz_passes_bvv_data_without_tax_difference(
         spec=ChartOfAccountsTemplate
     )
 
-    bvv_annual_data = BvvAnnualData(
-        previous_hgb_equity=None,
+    bvv_evaluation = BvvEvaluation(
+        current_hgb_equity=Decimal("10000.00"),
+        previous_hgb_equity=Decimal("0.00"),
+        current_depreciation_difference=Decimal("0.00"),
+        previous_depreciation_difference=Decimal("0.00"),
+        current_book_value_difference=Decimal("0.00"),
+        previous_book_value_difference=Decimal("0.00"),
+        current_tax_equity=Decimal("10000.00"),
+        previous_tax_equity=Decimal("0.00"),
         contribution=Decimal("10000.00"),
         withdrawal_distribution=Decimal("0.00"),
+        profit_loss=Decimal("0.00"),
     )
 
-    with (
-        patch.object(
-            workspace,
-            "tax_depreciation_differences_for_bga",
-            return_value=(
-                Decimal("0.00"),
-                Decimal("0.00"),
-            ),
-        ),
-        patch.object(
-            workspace,
-            "load_bvv_annual_data",
-            return_value=bvv_annual_data,
-        ) as load_bvv_annual_data,
-        patch.object(
-            workspace,
-            "effective_previous_hgb_equity",
-            return_value=None,
-        ) as effective_previous_hgb_equity,
-    ):
+    with patch.object(
+        workspace,
+        "build_bvv_evaluation",
+        return_value=bvv_evaluation,
+    ) as build_bvv_evaluation:
         result = workspace.build_e_bilanz(
             preparation=preparation,
             chart_of_accounts=chart_of_accounts,
@@ -4536,9 +5196,8 @@ def test_build_e_bilanz_passes_bvv_data_without_tax_difference(
 
     assert result is expected_document
 
-    load_bvv_annual_data.assert_called_once_with()
-
-    effective_previous_hgb_equity.assert_called_once_with(
+    build_bvv_evaluation.assert_called_once_with(
+        preparation=preparation,
         chart_of_accounts=chart_of_accounts,
     )
 
@@ -4550,22 +5209,18 @@ def test_build_e_bilanz_passes_bvv_data_without_tax_difference(
         build_kwargs["current_depreciation_difference"]
         == Decimal("0.00")
     )
-
     assert (
         build_kwargs["previous_depreciation_difference"]
         == Decimal("0.00")
     )
-
     assert (
         build_kwargs["previous_hgb_equity"]
         == Decimal("0.00")
     )
-
     assert (
         build_kwargs["contribution"]
         == Decimal("10000.00")
     )
-
     assert (
         build_kwargs["withdrawal_distribution"]
         == Decimal("0.00")

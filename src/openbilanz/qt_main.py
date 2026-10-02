@@ -14,9 +14,7 @@ from openbilanz.accounting.hgb_financial_statement_position_provider import (
 )
 from openbilanz.core.config import load_config
 from openbilanz.database.booking_repository import BookingRepository
-from openbilanz.database.bvv_annual_data_repository import (
-    BvvAnnualDataRepository,
-)
+
 from openbilanz.database.profit_appropriation_annual_data_repository import (
     ProfitAppropriationAnnualDataRepository,
 )
@@ -27,6 +25,9 @@ from openbilanz.database.chart_of_accounts_repository import (
     ChartOfAccountsRepository,
 )
 from openbilanz.database.company_repository import CompanyRepository
+from openbilanz.database.equity_contribution_repository import (
+    EquityContributionRepository,
+)
 from openbilanz.database.database import Database
 from openbilanz.database.fixed_asset_depreciation_repository import (
     FixedAssetDepreciationRepository,
@@ -464,10 +465,6 @@ def main() -> None:
                 ),
             )
 
-            bvv_annual_data_repository = BvvAnnualDataRepository(
-                session
-            )
-
             profit_appropriation_annual_data_repository = (
                 ProfitAppropriationAnnualDataRepository(
                     session
@@ -476,6 +473,12 @@ def main() -> None:
 
             profit_appropriation_posting_repository = (
                 ProfitAppropriationPostingRepository(
+                    session
+                )
+            )
+
+            equity_contribution_repository = (
+                EquityContributionRepository(
                     session
                 )
             )
@@ -498,14 +501,14 @@ def main() -> None:
                 context=context,
                 booking_repository=booking_repository,
                 company_repository=company_repository,
-                bvv_annual_data_repository=(
-                    bvv_annual_data_repository
-                ),
                 profit_appropriation_annual_data_repository=(
                     profit_appropriation_annual_data_repository
                 ),
                 profit_appropriation_posting_repository=(
                     profit_appropriation_posting_repository
+                ),
+                equity_contribution_repository=(
+                    equity_contribution_repository
                 ),
                 profit_appropriation_posting_workflow=(
                     profit_appropriation_posting_workflow

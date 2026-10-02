@@ -152,6 +152,20 @@ def test_adds_and_loads_profit_appropriation_posting() -> None:
             )
         )
 
+        source_year_postings = (
+            posting_repository.list_for_posting_fiscal_year(
+                company_id=company.company_id,
+                fiscal_year=source_fiscal_year,
+            )
+        )
+
+        target_year_postings = (
+            posting_repository.list_for_posting_fiscal_year(
+                company_id=company.company_id,
+                fiscal_year=target_fiscal_year,
+            )
+        )
+
     assert loaded == posting
     assert postings == (posting,)
     assert loaded.booking_id == booking.booking_id
@@ -159,6 +173,8 @@ def test_adds_and_loads_profit_appropriation_posting() -> None:
         loaded.source_fiscal_year_end
         == date(2026, 12, 31)
     )
+    assert source_year_postings == ()
+    assert target_year_postings == (posting,)
 
 
 def test_allows_same_posting_type_with_different_bookings() -> None:

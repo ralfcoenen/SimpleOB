@@ -8,6 +8,7 @@ from decimal import Decimal, InvalidOperation
 from PySide6.QtCore import QEvent, QObject, Qt
 from PySide6.QtGui import QKeyEvent
 from PySide6.QtWidgets import (
+    QCheckBox,
     QCompleter,
     QFormLayout,
     QHBoxLayout,
@@ -40,9 +41,9 @@ class _BookingRow:
     name_item: QTableWidgetItem
     debit_entry: QLineEdit
     credit_entry: QLineEdit
+    contribution_checkbox: QCheckBox
     remove_button: QPushButton
     completer: QCompleter
-
 
 class BookingFrame(QWidget):
     """Erfasst einfache und mehrzeilige laufende Buchungen."""
@@ -51,18 +52,26 @@ class BookingFrame(QWidget):
     _NAME_COLUMN = 1
     _DEBIT_COLUMN = 2
     _CREDIT_COLUMN = 3
-    _REMOVE_COLUMN = 4
+    _CONTRIBUTION_COLUMN = 4
+    _REMOVE_COLUMN = 5
 
     def __init__(
         self,
         parent: QWidget | None = None,
         *,
         accounts: tuple[Account, ...],
-        on_booking_created: Callable[[Booking], None],
+        equity_contribution_account_numbers: frozenset[str],
+        on_booking_created: Callable[
+            [Booking, tuple[int, ...]],
+            None,
+        ],
     ) -> None:
         super().__init__(parent)
 
         self._accounts = accounts
+        self._equity_contribution_account_numbers = (
+            equity_contribution_account_numbers
+        )
         self._on_booking_created = on_booking_created
         self._enabled = True
 
@@ -117,13 +126,14 @@ class BookingFrame(QWidget):
         layout.addLayout(form)
 
         self._booking_table = QTableWidget()
-        self._booking_table.setColumnCount(5)
+        self._booking_table.setColumnCount(6)
         self._booking_table.setHorizontalHeaderLabels(
             (
                 "Konto",
                 "Kontoname",
                 "Soll",
                 "Haben",
+                "Einlage",
                 "",
             )
         )
@@ -151,6 +161,10 @@ class BookingFrame(QWidget):
         )
         header.setSectionResizeMode(
             self._CREDIT_COLUMN,
+            QHeaderView.ResizeMode.ResizeToContents,
+        )
+        header.setSectionResizeMode(
+            self._CONTRIBUTION_COLUMN,
             QHeaderView.ResizeMode.ResizeToContents,
         )
         header.setSectionResizeMode(
@@ -291,6 +305,13 @@ class BookingFrame(QWidget):
         debit_entry = self._create_amount_entry()
         credit_entry = self._create_amount_entry()
 
+        contribution_checkbox = QCheckBox()
+        contribution_checkbox.setEnabled(False)
+        contribution_checkbox.setToolTip(
+            "Diese Habenzeile als Einlage "
+            "für den Betriebsvermögensvergleich kennzeichnen."
+        )
+
         remove_button = QPushButton("×")
         remove_button.setMaximumWidth(36)
         remove_button.setToolTip(
@@ -305,6 +326,7 @@ class BookingFrame(QWidget):
             name_item=name_item,
             debit_entry=debit_entry,
             credit_entry=credit_entry,
+            contribution_checkbox=contribution_checkbox,
             remove_button=remove_button,
             completer=completer,
         )
@@ -330,6 +352,11 @@ class BookingFrame(QWidget):
             row_index,
             self._CREDIT_COLUMN,
             credit_entry,
+        )
+        self._booking_table.setCellWidget(
+            row_index,
+            self._CONTRIBUTION_COLUMN,
+            contribution_checkbox,
         )
         self._booking_table.setCellWidget(
             row_index,
@@ -381,6 +408,31 @@ class BookingFrame(QWidget):
 
         return entry
 
+    def _update_contribution_checkbox(
+        self,
+        row: _BookingRow,
+    ) -> None:
+        """Aktualisiert die Einlagenkennzeichnung einer Buchungszeile."""
+
+        account = self._resolve_account(
+            row.account_entry.text()
+        )
+
+        is_eligible = (
+            account is not None
+            and account.number
+            in self._equity_contribution_account_numbers
+            and bool(row.credit_entry.text().strip())
+            and not bool(row.debit_entry.text().strip())
+        )
+
+        row.contribution_checkbox.setEnabled(
+            is_eligible
+        )
+
+        if not is_eligible:
+            row.contribution_checkbox.setChecked(False)
+
     def _on_account_changed(
         self,
         row: _BookingRow,
@@ -397,6 +449,7 @@ class BookingFrame(QWidget):
             else ""
         )
 
+        self._update_contribution_checkbox(row)
         self._ensure_trailing_empty_row()
         self._on_form_changed()
 
@@ -418,6 +471,8 @@ class BookingFrame(QWidget):
         row.name_item.setText(
             account.name
         )
+
+        self._update_contribution_checkbox(row)
 
         self._ensure_trailing_empty_row()
         self._on_form_changed()
@@ -692,8 +747,10 @@ class BookingFrame(QWidget):
                 self._enabled
             )
 
+        self._update_contribution_checkbox(row)
         self._ensure_trailing_empty_row()
         self._on_form_changed()
+
 
     def _remove_row(
         self,
@@ -857,6 +914,7 @@ class BookingFrame(QWidget):
         )
 
         lines: list[BookingLine] = []
+        equity_contribution_line_positions: list[int] = []
 
         for row in self._rows:
             if self._row_is_empty(row):
@@ -888,6 +946,8 @@ class BookingFrame(QWidget):
                         )
                     )
                 elif credit_text and not debit_text:
+                    line_position = len(lines)
+
                     lines.append(
                         BookingLine(
                             account_number=account.number,
@@ -897,6 +957,11 @@ class BookingFrame(QWidget):
                             ),
                         )
                     )
+
+                    if row.contribution_checkbox.isChecked():
+                        equity_contribution_line_positions.append(
+                            line_position
+                        )
                 else:
                     return
             except ValueError:
@@ -920,7 +985,10 @@ class BookingFrame(QWidget):
         except ValueError:
             return
 
-        self._on_booking_created(booking)
+        self._on_booking_created(
+            booking,
+            tuple(equity_contribution_line_positions),
+        )
 
         self._clear()
 

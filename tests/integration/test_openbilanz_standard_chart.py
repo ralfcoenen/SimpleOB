@@ -84,6 +84,7 @@ def test_imports_complete_openbilanz_standard_chart() -> None:
 
     assert accounts["0400"].account_type is AccountType.ASSET
     assert accounts["0800"].account_type is AccountType.EQUITY
+    assert accounts["0840"].account_type is AccountType.EQUITY
     assert accounts["1600"].account_type is AccountType.LIABILITY
     assert accounts["4830"].account_type is AccountType.EXPENSE
     assert accounts["8400"].account_type is AccountType.REVENUE
@@ -101,6 +102,11 @@ def test_imports_complete_openbilanz_standard_chart() -> None:
     assert (
         rules["0800"].credit_position.code
         == "HGB.266.PASSIVA.A.I"
+    )
+
+    assert (
+        rules["0840"].credit_position.code
+        == "HGB.266.PASSIVA.A.II"
     )
 
     assert (
