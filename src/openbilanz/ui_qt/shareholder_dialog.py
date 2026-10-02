@@ -51,6 +51,7 @@ class ShareholdersDialog(QDialog):
 
         self._workspace = workspace
         self._shareholders: dict[UUID, Shareholder] = {}
+        self.data_changed = False
 
         self.setWindowTitle("SimpleOB – Gesellschafter")
         self.resize(980, 520)
@@ -252,6 +253,7 @@ class ShareholdersDialog(QDialog):
             )
             return
 
+        self.data_changed = True
         self._reload()
 
     def _edit(self) -> None:
@@ -292,6 +294,7 @@ class ShareholdersDialog(QDialog):
             )
             return
 
+        self.data_changed = True
         self._reload()
 
     def _delete(self) -> None:
@@ -337,6 +340,7 @@ class ShareholdersDialog(QDialog):
             )
             return
 
+        self.data_changed = True
         self._reload()
 
     def _on_double_click(

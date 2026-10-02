@@ -2850,7 +2850,7 @@ class FiscalYearWorkspace:
     def load_profit_appropriation_annual_data(
         self,
     ) -> ProfitAppropriationAnnualData | None:
-        """Lädt die Ergebnisverwendung des geöffneten Geschäftsjahres."""
+        """Lädt die Ergebnisverwendung des aktuellen Geschäftsjahres."""
 
         if self._profit_appropriation_annual_data_repository is None:
             raise RuntimeError(
@@ -2873,7 +2873,7 @@ class FiscalYearWorkspace:
         self,
         data: ProfitAppropriationAnnualData,
     ) -> None:
-        """Speichert die Ergebnisverwendung des geöffneten Geschäftsjahres."""
+        """Speichert die Ergebnisverwendung des aktuellen Geschäftsjahres."""
 
         if self._profit_appropriation_annual_data_repository is None:
             raise RuntimeError(

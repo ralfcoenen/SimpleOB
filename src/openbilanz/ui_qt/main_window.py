@@ -41,6 +41,7 @@ from openbilanz.domain.entry_side import EntrySide
 from openbilanz.domain.chart_of_accounts_template import (
     ChartOfAccountsTemplate,
 )
+from openbilanz.domain.fiscal_year_status import FiscalYearStatus
 from openbilanz.domain.vat_accounts import VatAccounts
 from openbilanz.eric.elster_bilanz_transmission_service import (
     ElsterBilanzTransmissionService,
@@ -51,7 +52,6 @@ from openbilanz.services.closing_service import (
     ClosingResult,
     ClosingService,
 )
-from openbilanz.services.pdf_reporting_service import PdfReportingService
 from openbilanz.core.context import ApplicationContext
 from openbilanz.services.fiscal_year_workspace import FiscalYearWorkspace
 from openbilanz.services.opening_balance_service import OpeningBalanceService
@@ -87,14 +87,14 @@ from openbilanz.ui_qt.fixed_asset_disposal_link_dialog import (
 from openbilanz.ui_qt.income_statement_frame import (
     IncomeStatementFrame,
 )
-from openbilanz.ui_qt.income_statement_frame import (
-    IncomeStatementFrame,
-)
 from openbilanz.ui_qt.new_fixed_asset_dialog import NewFixedAssetDialog
 from openbilanz.ui_qt.opening_balance_dialog import OpeningBalanceDialog
 from openbilanz.ui_qt.vat_booking_frame import VatBookingFrame
 from openbilanz.ui_qt.tax_depreciation_adjustment_dialog import (
     TaxDepreciationAdjustmentDialog,
+)
+from openbilanz.ui_qt.profit_appropriation_dialog import (
+    ProfitAppropriationDialog,
 )
 from openbilanz.ui_qt.reports_widget import ReportsWidget
 from openbilanz.ui_qt.shareholder_dialog import ShareholdersDialog
@@ -531,6 +531,13 @@ class MainWindow(QMainWindow):
                 is not None
             ),
         )
+
+    def _invalidate_built_e_bilanz(self) -> None:
+        """Verwirft eine aus inzwischen geänderten Daten erzeugte E-Bilanz."""
+
+        self._current_e_bilanz_document = None
+        self._current_e_bilanz_arelle_valid = False
+        self._refresh_e_bilanz()
 
     def _prepare_e_bilanz(self) -> None:
         """Bereitet die Abschlusswerte für die E-Bilanz auf."""
@@ -1266,6 +1273,12 @@ class MainWindow(QMainWindow):
         self._closing_frame = ClosingFrame(
             on_validate=self._validate_closing,
             on_close=self._close_fiscal_year,
+            on_edit_profit_appropriation=(
+                self._edit_profit_appropriation
+            ),
+            on_post_previous_profit_appropriation=(
+                self._post_previous_profit_appropriation
+            ),
             parent=self._closing_tab,
         )
 
@@ -3425,6 +3438,246 @@ class MainWindow(QMainWindow):
         self._refresh_journal()
         self._refresh_balance_sheet()
 
+    def _edit_profit_appropriation(self) -> None:
+        """Öffnet den Ergebnisverwendungsbeschluss."""
+
+        managed_fiscal_year = self._workspace.managed_fiscal_year
+
+        if managed_fiscal_year.status is not FiscalYearStatus.CLOSED:
+            return
+
+        if self._current_closing_result is None:
+            QMessageBox.warning(
+                self,
+                "Ergebnisverwendungsbeschluss",
+                (
+                    "Das Jahresergebnis konnte nicht ermittelt werden."
+                ),
+            )
+            return
+
+        try:
+            initial_data = (
+                self._workspace.load_profit_appropriation_annual_data()
+            )
+            previous_profit_loss_carryforward = (
+                self._workspace.previous_profit_loss_carryforward()
+            )
+            resolution_locked = (
+                self._workspace
+                .has_effective_profit_appropriation_postings()
+            )
+        except (ValueError, RuntimeError) as exc:
+            QMessageBox.critical(
+                self,
+                "Ergebnisverwendungsbeschluss",
+                (
+                    "Der Ergebnisverwendungsbeschluss konnte "
+                    "nicht geladen werden.\n\n"
+                    f"{exc}"
+                ),
+            )
+            return
+
+        dialog = ProfitAppropriationDialog(
+            self,
+            fiscal_year_name=(
+                managed_fiscal_year.fiscal_year.display_name
+            ),
+            net_income=self._current_closing_result.net_income,
+            previous_profit_loss_carryforward=(
+                previous_profit_loss_carryforward
+            ),
+            initial_data=initial_data,
+            read_only=resolution_locked,
+        )
+
+        dialog.exec()
+
+        if resolution_locked or dialog.result is None:
+            return
+
+        try:
+            self._workspace.validate_profit_appropriation(
+                net_income=self._current_closing_result.net_income,
+                data=dialog.result,
+            )
+            self._workspace.save_profit_appropriation_annual_data(
+                dialog.result
+            )
+        except (ValueError, RuntimeError) as exc:
+            QMessageBox.critical(
+                self,
+                "Ergebnisverwendungsbeschluss",
+                (
+                    "Der Ergebnisverwendungsbeschluss konnte "
+                    "nicht gespeichert werden.\n\n"
+                    f"{exc}"
+                ),
+            )
+            return
+
+        self._invalidate_built_e_bilanz()
+        self._refresh_closing()
+
+        QMessageBox.information(
+            self,
+            "Ergebnisverwendungsbeschluss",
+            (
+                "Der Ergebnisverwendungsbeschluss wurde "
+                "gespeichert."
+            ),
+        )
+
+    def _post_previous_profit_appropriation(self) -> None:
+        """Bucht die Ergebnisverwendung des Vorjahres."""
+
+        managed_fiscal_year = self._workspace.managed_fiscal_year
+
+        if (
+            managed_fiscal_year.status is not FiscalYearStatus.OPEN
+            or managed_fiscal_year.opening_source is None
+        ):
+            return
+
+        default_date = date.today()
+
+        if not managed_fiscal_year.fiscal_year.contains(
+            default_date
+        ):
+            default_date = managed_fiscal_year.fiscal_year.start_date
+
+        booking_date_text, accepted = QInputDialog.getText(
+            self,
+            "Ergebnisverwendung Vorjahr buchen",
+            (
+                "Bitte geben Sie das Buchungsdatum ein "
+                "(TT.MM.JJJJ):"
+            ),
+            text=default_date.strftime("%d.%m.%Y"),
+        )
+
+        if not accepted:
+            return
+
+        try:
+            booking_date = parse_german_date(
+                booking_date_text
+            )
+
+            proposals = (
+                self._workspace
+                .build_profit_appropriation_posting_proposals(
+                    booking_date=booking_date,
+                )
+            )
+        except (
+            TypeError,
+            ValueError,
+            RuntimeError,
+        ) as exc:
+            QMessageBox.critical(
+                self,
+                "Ergebnisverwendung konnte nicht vorbereitet werden",
+                str(exc),
+            )
+            return
+
+        if not proposals:
+            QMessageBox.information(
+                self,
+                "Ergebnisverwendung Vorjahr",
+                (
+                    "Für das Vorjahr sind keine offenen "
+                    "Umsetzungsbuchungen zur Ergebnisverwendung "
+                    "vorhanden."
+                ),
+            )
+            return
+
+        posting_type_names = {
+            "STATUTORY_RESERVE_ADDITION": (
+                "Zuführung zur gesetzlichen Rücklage"
+            ),
+            "OTHER_REVENUE_RESERVES_ADDITION": (
+                "Zuführung zu anderen Gewinnrücklagen"
+            ),
+            "STATUTORY_RESERVE_RELEASE": (
+                "Auflösung der gesetzlichen Rücklage"
+            ),
+            "OTHER_REVENUE_RESERVES_RELEASE": (
+                "Auflösung anderer Gewinnrücklagen"
+            ),
+            "DISTRIBUTION": "Ausschüttung",
+        }
+
+        account_names = {
+            account.number: account.name
+            for account in self._accounts
+        }
+
+        for proposal in proposals:
+            posting_type_name = posting_type_names.get(
+                proposal.posting_type.value,
+                proposal.posting_type.value,
+            )
+
+            debit_account_name = account_names.get(
+                proposal.debit_account_number,
+                "Unbekanntes Konto",
+            )
+            credit_account_name = account_names.get(
+                proposal.credit_account_number,
+                "Unbekanntes Konto",
+            )
+
+            answer = QMessageBox.question(
+                self,
+                "Ergebnisverwendung buchen",
+                (
+                    "Folgende Umsetzungsbuchung wurde aus dem "
+                    "Ergebnisverwendungsbeschluss des Vorjahres "
+                    "ermittelt:\n\n"
+                    f"Art: {posting_type_name}\n"
+                    f"Betrag: {self._format_amount(proposal.amount)}\n"
+                    f"Sollkonto: {proposal.debit_account_number} "
+                    f"{debit_account_name}\n"
+                    f"Habenkonto: {proposal.credit_account_number} "
+                    f"{credit_account_name}\n"
+                    "Datum: "
+                    f"{proposal.booking_date:%d.%m.%Y}\n\n"
+                    "Soll diese Buchung jetzt durchgeführt werden?"
+                ),
+                (
+                    QMessageBox.StandardButton.Yes
+                    | QMessageBox.StandardButton.No
+                ),
+                QMessageBox.StandardButton.No,
+            )
+
+            if answer != QMessageBox.StandardButton.Yes:
+                continue
+
+            try:
+                self._workspace.confirm_profit_appropriation_posting(
+                    proposal
+                )
+            except (
+                ValueError,
+                RuntimeError,
+            ) as exc:
+                QMessageBox.critical(
+                    self,
+                    "Ergebnisverwendung konnte nicht gebucht werden",
+                    str(exc),
+                )
+                break
+
+        self._refresh_accounts()
+        self._refresh_journal()
+        self._refresh_balance_sheet()
+        self._refresh_closing()
+
     def _validate_closing(self) -> None:
         """Prüft den Jahresabschluss."""
 
@@ -3542,6 +3795,35 @@ class MainWindow(QMainWindow):
 
         self._closing_frame.update_fiscal_year_status(
             managed_fiscal_year.status
+        )
+
+        resolution_locked = False
+
+        if managed_fiscal_year.status is FiscalYearStatus.CLOSED:
+            try:
+                resolution_locked = (
+                    self._workspace
+                    .has_effective_profit_appropriation_postings()
+                )
+            except RuntimeError:
+                resolution_locked = False
+
+        can_edit_resolution = (
+            managed_fiscal_year.status
+            is FiscalYearStatus.CLOSED
+            and not resolution_locked
+        )
+
+        can_post_previous = (
+            managed_fiscal_year.status
+            is FiscalYearStatus.OPEN
+            and managed_fiscal_year.opening_source is not None
+        )
+
+        self._closing_frame.update_profit_appropriation_state(
+            can_edit_resolution=can_edit_resolution,
+            can_post_previous=can_post_previous,
+            resolution_locked=resolution_locked,
         )
 
         if self._current_closing_result is None:
@@ -4118,6 +4400,9 @@ class MainWindow(QMainWindow):
             workspace=self._workspace,
         )
         dialog.exec()
+
+        if dialog.data_changed:
+            self._invalidate_built_e_bilanz()
 
     def _open_account_configuration(self) -> None:
         """Öffnet die mandantenspezifische Kontenkonfiguration."""

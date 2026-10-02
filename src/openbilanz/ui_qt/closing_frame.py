@@ -26,12 +26,20 @@ class ClosingFrame(QWidget):
         *,
         on_validate: Callable[[], None],
         on_close: Callable[[], None],
+        on_edit_profit_appropriation: Callable[[], None],
+        on_post_previous_profit_appropriation: Callable[[], None],
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
 
         self._on_validate = on_validate
         self._on_close = on_close
+        self._on_edit_profit_appropriation = (
+            on_edit_profit_appropriation
+        )
+        self._on_post_previous_profit_appropriation = (
+            on_post_previous_profit_appropriation
+        )
 
         self._create_ui()
 
@@ -95,6 +103,58 @@ class ClosingFrame(QWidget):
         buttons_layout.addStretch()
 
         layout.addLayout(buttons_layout)
+
+        appropriation_title = QLabel(
+            "Ergebnisverwendung"
+        )
+        appropriation_title.setStyleSheet(
+            "font-size: 15px; font-weight: bold;"
+        )
+        layout.addWidget(appropriation_title)
+
+        self._profit_appropriation_status_label = QLabel()
+        layout.addWidget(
+            self._profit_appropriation_status_label
+        )
+
+        appropriation_buttons_layout = QHBoxLayout()
+
+        self._edit_profit_appropriation_button = QPushButton(
+            "Ergebnisverwendungsbeschluss"
+        )
+        self._edit_profit_appropriation_button.clicked.connect(
+            self._on_edit_profit_appropriation
+        )
+        appropriation_buttons_layout.addWidget(
+            self._edit_profit_appropriation_button
+        )
+
+        self._post_previous_profit_appropriation_button = (
+            QPushButton(
+                "Ergebnisverwendung Vorjahr buchen"
+            )
+        )
+        (
+            self._post_previous_profit_appropriation_button
+            .clicked.connect(
+                self._on_post_previous_profit_appropriation
+            )
+        )
+        appropriation_buttons_layout.addWidget(
+            self._post_previous_profit_appropriation_button
+        )
+
+        appropriation_buttons_layout.addStretch()
+
+        layout.addLayout(
+            appropriation_buttons_layout
+        )
+
+        self.update_profit_appropriation_state(
+            can_edit_resolution=False,
+            can_post_previous=False,
+            resolution_locked=False,
+        )
 
     def update_fiscal_year_status(
         self,
@@ -163,6 +223,48 @@ class ClosingFrame(QWidget):
 
         self._consistency_status_label.setText(
             "Geschäftsjahr wurde abgeschlossen."
+        )
+
+    def update_profit_appropriation_state(
+        self,
+        *,
+        can_edit_resolution: bool,
+        can_post_previous: bool,
+        resolution_locked: bool,
+    ) -> None:
+        """Aktualisiert die Aktionen zur Ergebnisverwendung."""
+
+        self._edit_profit_appropriation_button.setEnabled(
+            can_edit_resolution or resolution_locked
+        )
+        self._post_previous_profit_appropriation_button.setEnabled(
+            can_post_previous
+        )
+
+        if resolution_locked:
+            text = (
+                "Der Ergebnisverwendungsbeschluss ist gesperrt, "
+                "weil bereits wirksame Umsetzungsbuchungen "
+                "vorhanden sind."
+            )
+        elif can_edit_resolution:
+            text = (
+                "Der Ergebnisverwendungsbeschluss kann "
+                "erfasst oder geändert werden."
+            )
+        elif can_post_previous:
+            text = (
+                "Ein Ergebnisverwendungsbeschluss des "
+                "Vorjahres kann umgesetzt werden."
+            )
+        else:
+            text = (
+                "Für dieses Geschäftsjahr steht derzeit "
+                "keine Aktion zur Ergebnisverwendung zur Verfügung."
+            )
+
+        self._profit_appropriation_status_label.setText(
+            text
         )
 
     @staticmethod
