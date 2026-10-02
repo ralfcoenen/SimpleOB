@@ -177,6 +177,92 @@ def test_adds_and_loads_profit_appropriation_posting() -> None:
     assert target_year_postings == (posting,)
 
 
+def test_lists_profit_appropriation_postings_with_booking_line_positions() -> None:
+    engine = create_engine(
+        "sqlite:///:memory:"
+    )
+    Base.metadata.create_all(engine)
+
+    Session = sessionmaker(
+        bind=engine
+    )
+
+    company = Company(
+        company_id=uuid4(),
+        name="Muster UG",
+    )
+    source_fiscal_year = _source_fiscal_year()
+    target_fiscal_year = _target_fiscal_year()
+
+    booking = _distribution_booking(
+        amount=Decimal("5000.00"),
+        booking_date=date(2027, 3, 15),
+    )
+
+    posting = ProfitAppropriationPosting(
+        source_fiscal_year_end=(
+            source_fiscal_year.end_date
+        ),
+        posting_date=booking.booking_date,
+        amount=Decimal("5000.00"),
+        booking_id=booking.booking_id,
+        posting_type=(
+            ProfitAppropriationPostingType.DISTRIBUTION
+        ),
+    )
+
+    with Session() as session:
+        company_repository = CompanyRepository(
+            session
+        )
+        booking_repository = BookingRepository(
+            session
+        )
+        posting_repository = (
+            ProfitAppropriationPostingRepository(
+                session
+            )
+        )
+
+        company_repository.add(
+            company
+        )
+        company_repository.add_fiscal_year(
+            company.company_id,
+            source_fiscal_year,
+        )
+        company_repository.add_fiscal_year(
+            company.company_id,
+            target_fiscal_year,
+        )
+
+        booking_repository.add(
+            company_id=company.company_id,
+            fiscal_year=target_fiscal_year,
+            booking=booking,
+        )
+
+        posting_repository.add(
+            company_id=company.company_id,
+            posting=posting,
+            booking_line_position=1,
+        )
+
+        loaded = (
+            posting_repository
+            .list_with_positions_for_source_fiscal_year(
+                company_id=company.company_id,
+                source_fiscal_year_end=(
+                    source_fiscal_year.end_date
+                ),
+            )
+        )
+
+    assert loaded == (
+        (posting, 1),
+    )
+
+
 def test_allows_same_posting_type_with_different_bookings() -> None:
     engine = create_engine(
         "sqlite:///:memory:"

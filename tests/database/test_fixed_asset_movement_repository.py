@@ -262,6 +262,58 @@ def test_lists_movements_for_fixed_asset_chronologically() -> None:
     )
 
 
+def test_lists_movements_for_fixed_asset_with_booking_line_positions() -> None:
+    Session, company, fiscal_year, asset = (
+        _prepare_database()
+    )
+
+    with Session() as session:
+        _add_master_data(
+            session=session,
+            company=company,
+            fiscal_year=fiscal_year,
+            asset=asset,
+        )
+
+        booking = _add_booking(
+            session=session,
+            company=company,
+            fiscal_year=fiscal_year,
+            booking_date=date(2026, 3, 15),
+            amount=Decimal("10000.00"),
+        )
+
+        movement = FixedAssetMovement(
+            fixed_asset_id=asset.fixed_asset_id,
+            fiscal_year_end=fiscal_year.end_date,
+            movement_date=date(2026, 3, 15),
+            amount=Decimal("10000.00"),
+            booking_id=booking.booking_id,
+            movement_type=(
+                FixedAssetMovementType.ACQUISITION
+            ),
+        )
+
+        repository = FixedAssetMovementRepository(
+            session
+        )
+
+        repository.add(
+            movement=movement,
+            booking_line_position=1,
+        )
+
+        loaded = (
+            repository.list_with_positions_for_fixed_asset(
+                asset.fixed_asset_id
+            )
+        )
+
+    assert loaded == (
+        (movement, 1),
+    )
+
+
 def test_preserves_disposal_reversal_with_different_amount() -> None:
     Session, company, fiscal_year, asset = (
         _prepare_database()

@@ -303,6 +303,82 @@ class ProfitAppropriationPostingRepository:
             for model in models
         )
 
+    def list_with_positions_for_source_fiscal_year(
+        self,
+        *,
+        company_id: UUID,
+        source_fiscal_year_end: date,
+    ) -> tuple[
+        tuple[ProfitAppropriationPosting, int],
+        ...,
+    ]:
+        """Lädt Umsetzungsbuchungen samt Buchungszeilenposition."""
+
+        if not isinstance(
+            company_id,
+            UUID,
+        ):
+            raise TypeError(
+                "company_id must be a UUID"
+            )
+
+        if not isinstance(
+            source_fiscal_year_end,
+            date,
+        ):
+            raise TypeError(
+                "source_fiscal_year_end must be a date"
+            )
+
+        company_model = (
+            self._session.query(Mandant)
+            .filter(
+                Mandant.company_id
+                == str(company_id)
+            )
+            .one_or_none()
+        )
+
+        if company_model is None:
+            return ()
+
+        source_fiscal_year_model = (
+            self._session.query(Wirtschaftsjahr)
+            .filter(
+                Wirtschaftsjahr.mandant_id
+                == company_model.id,
+                Wirtschaftsjahr.end_date
+                == source_fiscal_year_end,
+            )
+            .one_or_none()
+        )
+
+        if source_fiscal_year_model is None:
+            return ()
+
+        models = (
+            self._session.query(
+                Gewinnverwendungsbuchung
+            )
+            .filter(
+                Gewinnverwendungsbuchung.quell_wirtschaftsjahr_id
+                == source_fiscal_year_model.id
+            )
+            .order_by(
+                Gewinnverwendungsbuchung.posting_date,
+                Gewinnverwendungsbuchung.id,
+            )
+            .all()
+        )
+
+        return tuple(
+            (
+                self._to_domain(model),
+                model.buchungszeile.position,
+            )
+            for model in models
+        )
+
     def list_for_posting_fiscal_year(
         self,
         *,

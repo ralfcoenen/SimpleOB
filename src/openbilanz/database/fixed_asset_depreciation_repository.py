@@ -254,6 +254,56 @@ class FixedAssetDepreciationRepository:
             for model in models
         )
 
+    def list_with_positions_for_fixed_asset(
+        self,
+        fixed_asset_id: UUID,
+    ) -> tuple[
+        tuple[FixedAssetDepreciation, int],
+        ...,
+    ]:
+        """Lädt Abschreibungen samt Buchungszeilenposition."""
+
+        if not isinstance(
+            fixed_asset_id,
+            UUID,
+        ):
+            raise TypeError(
+                "fixed_asset_id must be a UUID"
+            )
+
+        asset_model = (
+            self._session.query(Anlagegut)
+            .filter(
+                Anlagegut.fixed_asset_id
+                == str(fixed_asset_id)
+            )
+            .one_or_none()
+        )
+
+        if asset_model is None:
+            return ()
+
+        models = (
+            self._session.query(Anlageabschreibung)
+            .filter(
+                Anlageabschreibung.anlagegut_id
+                == asset_model.id
+            )
+            .order_by(
+                Anlageabschreibung.depreciation_date,
+                Anlageabschreibung.id,
+            )
+            .all()
+        )
+
+        return tuple(
+            (
+                self._to_domain(model),
+                model.buchungszeile.position,
+            )
+            for model in models
+        )
+
     @staticmethod
     def _to_domain(
         model: Anlageabschreibung,

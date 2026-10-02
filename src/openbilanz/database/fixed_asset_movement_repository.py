@@ -380,6 +380,53 @@ class FixedAssetMovementRepository:
             for model in models
         )
 
+    def list_with_positions_for_fixed_asset(
+        self,
+        fixed_asset_id: UUID,
+    ) -> tuple[tuple[FixedAssetMovement, int], ...]:
+        """Lädt Anlagenbewegungen samt Buchungszeilenposition."""
+
+        if not isinstance(
+            fixed_asset_id,
+            UUID,
+        ):
+            raise TypeError(
+                "fixed_asset_id must be a UUID"
+            )
+
+        asset_model = (
+            self._session.query(Anlagegut)
+            .filter(
+                Anlagegut.fixed_asset_id
+                == str(fixed_asset_id)
+            )
+            .one_or_none()
+        )
+
+        if asset_model is None:
+            return ()
+
+        models = (
+            self._session.query(Anlagebewegung)
+            .filter(
+                Anlagebewegung.anlagegut_id
+                == asset_model.id
+            )
+            .order_by(
+                Anlagebewegung.movement_date,
+                Anlagebewegung.id,
+            )
+            .all()
+        )
+
+        return tuple(
+            (
+                self._to_domain(model),
+                model.buchungszeile.position,
+            )
+            for model in models
+        )
+
     @staticmethod
     def _to_domain(
         model: Anlagebewegung,

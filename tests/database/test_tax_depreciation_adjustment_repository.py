@@ -242,3 +242,25 @@ def test_rejects_unknown_depreciation(
             depreciation_id=uuid4(),
             tax_amount=Decimal("650.00"),
         )
+
+
+def test_lists_depreciations_for_fixed_asset_with_booking_line_positions(
+    session,
+) -> None:
+    depreciation = _create_confirmed_depreciation(
+        session
+    )
+
+    repository = FixedAssetDepreciationRepository(
+        session
+    )
+
+    loaded = (
+        repository.list_with_positions_for_fixed_asset(
+            depreciation.fixed_asset_id
+        )
+    )
+
+    assert loaded == (
+        (depreciation, 1),
+    )

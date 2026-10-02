@@ -1054,6 +1054,52 @@ class ChartOfAccountsRepository:
             for model in models
         }
 
+    def load_all_account_taxonomy_concepts(
+        self,
+        company_id: UUID,
+    ) -> dict[str, dict[str, str]]:
+        """Lädt alle Taxonomiezuordnungen eines Mandanten."""
+
+        if not isinstance(company_id, UUID):
+            raise TypeError(
+                "company_id must be a UUID"
+            )
+
+        company_model = self._find_company(
+            company_id
+        )
+
+        if company_model is None:
+            return {}
+
+        models = (
+            self._session.query(
+                KontenTaxonomieZuordnung
+            )
+            .filter(
+                KontenTaxonomieZuordnung.mandant_id
+                == company_model.id
+            )
+            .order_by(
+                KontenTaxonomieZuordnung.taxonomy_version,
+                KontenTaxonomieZuordnung.account_number,
+            )
+            .all()
+        )
+
+        result: dict[str, dict[str, str]] = {}
+
+        for model in models:
+            concepts = result.setdefault(
+                model.taxonomy_version,
+                {},
+            )
+            concepts[model.account_number] = (
+                model.concept_name
+            )
+
+        return result
+
     def save_account_roles(
         self,
         *,
