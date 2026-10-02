@@ -2,29 +2,27 @@
 
 from datetime import date, datetime
 from decimal import Decimal
-from uuid import UUID
 from pathlib import Path
-
-from openbilanz.date_input import parse_german_date
+from uuid import UUID
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QApplication,
     QAbstractItemView,
+    QApplication,
     QComboBox,
     QDialog,
     QFileDialog,
     QHBoxLayout,
     QHeaderView,
     QInputDialog,
-    QMenu,
     QLabel,
     QMainWindow,
+    QMenu,
     QMessageBox,
     QPushButton,
-    QTabWidget,
     QTableWidget,
     QTableWidgetItem,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -33,14 +31,19 @@ from openbilanz.accounting.balance_sheet import BalanceSheet
 from openbilanz.accounting.financial_statement_builder import (
     FinancialStatementBuilder,
 )
+from openbilanz.accounting.financial_statement_position import (
+    FinancialStatementPosition,
+)
 from openbilanz.accounting.income_statement import IncomeStatement
+from openbilanz.core.context import ApplicationContext
+from openbilanz.date_input import parse_german_date
 from openbilanz.domain.account import Account
 from openbilanz.domain.account_type import AccountType
 from openbilanz.domain.booking_type import BookingType
-from openbilanz.domain.entry_side import EntrySide
 from openbilanz.domain.chart_of_accounts_template import (
     ChartOfAccountsTemplate,
 )
+from openbilanz.domain.entry_side import EntrySide
 from openbilanz.domain.fiscal_year_status import FiscalYearStatus
 from openbilanz.domain.vat_accounts import VatAccounts
 from openbilanz.eric.elster_bilanz_transmission_service import (
@@ -52,13 +55,9 @@ from openbilanz.services.closing_service import (
     ClosingResult,
     ClosingService,
 )
-from openbilanz.core.context import ApplicationContext
 from openbilanz.services.fiscal_year_workspace import FiscalYearWorkspace
 from openbilanz.services.opening_balance_service import OpeningBalanceService
 from openbilanz.services.pdf_reporting_service import PdfReportingService
-from openbilanz.accounting.financial_statement_position import (
-    FinancialStatementPosition,
-)
 from openbilanz.ui_qt.account_configuration_dialog import (
     AccountConfigurationDialog,
 )
@@ -89,15 +88,16 @@ from openbilanz.ui_qt.income_statement_frame import (
 )
 from openbilanz.ui_qt.new_fixed_asset_dialog import NewFixedAssetDialog
 from openbilanz.ui_qt.opening_balance_dialog import OpeningBalanceDialog
-from openbilanz.ui_qt.vat_booking_frame import VatBookingFrame
-from openbilanz.ui_qt.tax_depreciation_adjustment_dialog import (
-    TaxDepreciationAdjustmentDialog,
-)
 from openbilanz.ui_qt.profit_appropriation_dialog import (
     ProfitAppropriationDialog,
 )
 from openbilanz.ui_qt.reports_widget import ReportsWidget
 from openbilanz.ui_qt.shareholder_dialog import ShareholdersDialog
+from openbilanz.ui_qt.tax_depreciation_adjustment_dialog import (
+    TaxDepreciationAdjustmentDialog,
+)
+from openbilanz.ui_qt.vat_booking_frame import VatBookingFrame
+
 ZERO = Decimal("0.00")
 
 
@@ -167,7 +167,9 @@ class MainWindow(QMainWindow):
         self._current_e_bilanz_arelle_valid = False
 
         self._return_to_start_requested = False
-
+        self._company_master_data = (
+            self._workspace.load_company_master_data()
+        )
         self.setWindowTitle(
             f"SimpleOB – {self._context.company.name}"
         )
@@ -319,9 +321,12 @@ class MainWindow(QMainWindow):
 
         self._refresh_balance_sheet()
         self._refresh_closing()
-        self._refresh_taxonomy_status()
-        self._refresh_bvv_evaluation()
-        self._refresh_e_bilanz()
+        self._refresh_e_bilanz_availability()
+
+        if self._company_master_data.supports_e_bilanz:
+            self._refresh_taxonomy_status()
+            self._refresh_bvv_evaluation()
+            self._refresh_e_bilanz()
 
     def closeEvent(self, event) -> None:
         """Kehrt beim Schließen des Hauptfensters zur Buchhaltungsauswahl zurück."""
@@ -358,6 +363,21 @@ class MainWindow(QMainWindow):
         )
 
         layout.addWidget(self._e_bilanz_frame)
+
+    def _refresh_e_bilanz_availability(self) -> None:
+        """Aktiviert die E-Bilanz nur für unterstützte Rechtsformen."""
+
+        tab_index = self._notebook.indexOf(
+            self._e_bilanz_tab
+        )
+
+        if tab_index < 0:
+            return
+
+        self._notebook.setTabEnabled(
+            tab_index,
+            self._company_master_data.supports_e_bilanz,
+        )
 
     def _refresh_taxonomy_status(self) -> None:
         """Aktualisiert den Taxonomiestatus des Geschäftsjahres."""
@@ -404,6 +424,10 @@ class MainWindow(QMainWindow):
 
     def _refresh_bvv_evaluation(self) -> None:
         """Aktualisiert den aus der Buchführung ermittelten BVV."""
+
+        if not self._company_master_data.supports_e_bilanz:
+            self._e_bilanz_frame.clear_bvv_evaluation()
+            return
 
         if (
             not self._workspace.is_closed
@@ -541,6 +565,17 @@ class MainWindow(QMainWindow):
 
     def _prepare_e_bilanz(self) -> None:
         """Bereitet die Abschlusswerte für die E-Bilanz auf."""
+
+        if not self._company_master_data.supports_e_bilanz:
+            QMessageBox.warning(
+                self,
+                "E-Bilanz",
+                (
+                    "Für die gewählte Rechtsform steht die "
+                    "E-Bilanz-Funktion nicht zur Verfügung."
+                ),
+            )
+            return
 
         if not self._workspace.is_closed:
             QMessageBox.warning(
@@ -4385,6 +4420,20 @@ class MainWindow(QMainWindow):
                 str(exc),
             )
             return
+
+        self._company_master_data = dialog.result
+        self._current_e_bilanz_preparation = None
+        self._current_e_bilanz_document = None
+        self._current_e_bilanz_arelle_valid = False
+
+        self._refresh_e_bilanz_availability()
+
+        if self._company_master_data.supports_e_bilanz:
+            self._refresh_taxonomy_status()
+            self._refresh_bvv_evaluation()
+            self._refresh_e_bilanz()
+        else:
+            self._e_bilanz_frame.clear_bvv_evaluation()
 
         QMessageBox.information(
             self,

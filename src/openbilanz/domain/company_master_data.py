@@ -28,6 +28,23 @@ GERMAN_FEDERAL_STATE_CODES = frozenset(
     }
 )
 
+LEGAL_FORM_SOLE_PROPRIETORSHIP_GBR = "Einzelunternehmen/GbR"
+LEGAL_FORM_UG = "UG (haftungsbeschränkt)"
+LEGAL_FORM_GMBH = "GmbH"
+
+SUPPORTED_LEGAL_FORMS = (
+    LEGAL_FORM_SOLE_PROPRIETORSHIP_GBR,
+    LEGAL_FORM_UG,
+    LEGAL_FORM_GMBH,
+)
+
+E_BILANZ_LEGAL_FORMS = frozenset(
+    {
+        LEGAL_FORM_UG,
+        LEGAL_FORM_GMBH,
+    }
+)
+
 
 @dataclass(frozen=True, slots=True)
 class CompanyMasterData:
@@ -151,11 +168,17 @@ class CompanyMasterData:
             )
 
     @property
+    def supports_e_bilanz(self) -> bool:
+        """Zeigt, ob die Rechtsform vom E-Bilanz-Pfad unterstützt wird."""
+
+        return self.legal_form in E_BILANZ_LEGAL_FORMS
+
+    @property
     def is_e_bilanz_ready(self) -> bool:
         """Prüft die zwingenden E-Bilanz-Stammdaten."""
 
         return bool(
-            self.legal_form
+            self.supports_e_bilanz
             and self.tax_number
             and self.federal_state
             and self.street
@@ -168,6 +191,12 @@ class CompanyMasterData:
 
     def validate_e_bilanz_ready(self) -> None:
         """Validiert die für die E-Bilanz erforderlichen Stammdaten."""
+
+        if not self.supports_e_bilanz:
+            raise ValueError(
+                "Die Rechtsform wird vom E-Bilanz-Pfad "
+                "nicht unterstützt."
+            )
 
         required_fields = (
             ("Rechtsform", self.legal_form),

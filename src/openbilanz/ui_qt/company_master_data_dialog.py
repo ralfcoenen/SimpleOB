@@ -12,8 +12,10 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from openbilanz.domain.company_master_data import CompanyMasterData
-
+from openbilanz.domain.company_master_data import (
+    SUPPORTED_LEGAL_FORMS,
+    CompanyMasterData,
+)
 
 FEDERAL_STATES = (
     ("BW", "Baden-Württemberg"),
@@ -82,7 +84,14 @@ class CompanyMasterDataDialog(QDialog):
         form = QFormLayout()
         layout.addLayout(form)
 
-        self._legal_form_edit = QLineEdit()
+        self._legal_form_box = QComboBox()
+        self._legal_form_box.addItem("", "")
+
+        for legal_form in SUPPORTED_LEGAL_FORMS:
+            self._legal_form_box.addItem(
+                legal_form,
+                legal_form,
+            )
         self._tax_number_edit = QLineEdit()
         self._tax_office_edit = QLineEdit()
         self._tax_id_edit = QLineEdit()
@@ -97,7 +106,7 @@ class CompanyMasterDataDialog(QDialog):
 
         form.addRow(
             "Rechtsform *",
-            self._legal_form_edit,
+            self._legal_form_box,
         )
         form.addRow(
             "Steuernummer *",
@@ -181,9 +190,14 @@ class CompanyMasterDataDialog(QDialog):
     def _load_values(self) -> None:
         """Übernimmt die vorhandenen Stammdaten."""
 
-        self._legal_form_edit.setText(
+        legal_form_index = self._legal_form_box.findData(
             self._master_data.legal_form
         )
+
+        if legal_form_index >= 0:
+            self._legal_form_box.setCurrentIndex(
+                legal_form_index
+            )
         self._tax_number_edit.setText(
             self._master_data.tax_number
         )
@@ -233,7 +247,10 @@ class CompanyMasterDataDialog(QDialog):
         try:
             master_data = CompanyMasterData(
                 company=self._master_data.company,
-                legal_form=self._legal_form_edit.text().strip(),
+                legal_form=(
+                    self._legal_form_box.currentData()
+                    or ""
+                ),
                 tax_number=self._tax_number_edit.text().strip(),
                 tax_office=self._tax_office_edit.text().strip(),
                 tax_id=self._tax_id_edit.text().strip(),
@@ -256,8 +273,6 @@ class CompanyMasterDataDialog(QDialog):
                 ),
                 business=self._business_edit.text().strip(),
             )
-
-            master_data.validate_e_bilanz_ready()
 
         except (TypeError, ValueError) as exc:
             QMessageBox.critical(

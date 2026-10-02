@@ -6,6 +6,9 @@ import pytest
 
 from openbilanz.domain.company import Company
 from openbilanz.domain.company_master_data import (
+    LEGAL_FORM_GMBH,
+    LEGAL_FORM_SOLE_PROPRIETORSHIP_GBR,
+    LEGAL_FORM_UG,
     CompanyMasterData,
 )
 
@@ -172,3 +175,29 @@ def test_is_not_e_bilanz_ready_without_federal_state() -> None:
     )
 
     assert master_data.is_e_bilanz_ready is False
+
+def test_supported_corporate_legal_forms_support_e_bilanz() -> None:
+    ug_master_data = _complete_master_data(
+        legal_form=LEGAL_FORM_UG,
+    )
+    gmbh_master_data = _complete_master_data(
+        legal_form=LEGAL_FORM_GMBH,
+    )
+
+    assert ug_master_data.supports_e_bilanz is True
+    assert gmbh_master_data.supports_e_bilanz is True
+
+
+def test_sole_proprietorship_gbr_does_not_support_e_bilanz() -> None:
+    master_data = _complete_master_data(
+        legal_form=LEGAL_FORM_SOLE_PROPRIETORSHIP_GBR,
+    )
+
+    assert master_data.supports_e_bilanz is False
+    assert master_data.is_e_bilanz_ready is False
+
+    with pytest.raises(
+        ValueError,
+        match="Die Rechtsform wird vom E-Bilanz-Pfad nicht unterstützt",
+    ):
+        master_data.validate_e_bilanz_ready()
