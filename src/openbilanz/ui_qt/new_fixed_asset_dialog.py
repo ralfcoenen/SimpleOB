@@ -22,8 +22,8 @@ from openbilanz.date_input import (
 )
 from openbilanz.domain.fixed_asset import FixedAsset
 
-_TECHNICAL_EQUIPMENT = "Technische Anlagen und Maschinen"
-_BUSINESS_EQUIPMENT = "Betriebs- und Geschäftsausstattung"
+_TECHNICAL_EQUIPMENT = "0200 – Technische Anlagen und Maschinen"
+_BUSINESS_EQUIPMENT = "0400 – Betriebs- und Geschäftsausstattung"
 
 
 class NewFixedAssetDialog(QDialog):
