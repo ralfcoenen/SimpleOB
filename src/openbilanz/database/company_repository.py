@@ -62,7 +62,7 @@ class CompanyRepository:
             company_id=UUID(model.company_id),
             name=model.name,
         )
-    
+
     def add_fiscal_year(
         self,
         company_id: UUID,
@@ -84,7 +84,7 @@ class CompanyRepository:
             raise ValueError(
                 "Das Unternehmen ist nicht vorhanden."
             )
-            
+
         overlapping_model = (
             self._session.query(Wirtschaftsjahr)
             .filter(
@@ -153,7 +153,7 @@ class CompanyRepository:
             )
             for model in models
         )
-    
+
     def list_companies(
         self,
     ) -> tuple[Company, ...]:
@@ -346,7 +346,7 @@ class CompanyRepository:
 
         if commit:
             self._session.commit()
-        
+
     def get_master_data(
     self,
     company_id: UUID,
@@ -384,11 +384,13 @@ class CompanyRepository:
             country=model.land or "",
             federal_state=model.bundesland or "",
             business=model.geschaeftstaetigkeit or "",
-        ) 
-        
+        )
+
     def save_master_data(
         self,
         master_data: CompanyMasterData,
+        *,
+        commit: bool = True,
     ) -> None:
         """Speichert die Stammdaten eines Unternehmens."""
 
@@ -446,4 +448,15 @@ class CompanyRepository:
             master_data.business or None
         )
 
-        self._session.commit()       
+        if commit:
+            self._session.commit()
+
+    def commit(self) -> None:
+        """Bestätigt die aktuelle Repository-Transaktion."""
+
+        self._session.commit()
+
+    def rollback(self) -> None:
+        """Verwirft die aktuelle Repository-Transaktion."""
+
+        self._session.rollback()

@@ -309,7 +309,7 @@ def test_new_fiscal_year_is_open() -> None:
             status=FiscalYearStatus.OPEN,
         ),
     )
-    
+
 
 def test_closes_fiscal_year() -> None:
     """Ein offenes Geschäftsjahr kann abgeschlossen werden."""
@@ -954,6 +954,70 @@ def test_updates_company_master_data() -> None:
 
     assert loaded_master_data == (
         updated_master_data
+    )
+
+
+def test_save_master_data_can_be_rolled_back() -> None:
+    """Stammdaten können ohne Commit gespeichert und zurückgerollt werden."""
+
+    engine = create_engine(
+        "sqlite:///:memory:"
+    )
+    Base.metadata.create_all(engine)
+
+    Session = sessionmaker(
+        bind=engine
+    )
+
+    with Session() as session:
+        repository = CompanyRepository(
+            session
+        )
+
+        company = Company(
+            company_id=uuid4(),
+            name="Muster UG",
+        )
+
+        repository.add(company)
+
+        original_master_data = CompanyMasterData(
+            company=company,
+            legal_form="UG (haftungsbeschränkt)",
+            tax_number="1234567890123",
+            city="Musterstadt",
+            country="DE",
+            federal_state="NW",
+        )
+
+        repository.save_master_data(
+            original_master_data
+        )
+
+        changed_master_data = CompanyMasterData(
+            company=company,
+            legal_form="GmbH",
+            tax_number="9876543210987",
+            city="Berlin",
+            country="DE",
+            federal_state="BE",
+        )
+
+        repository.save_master_data(
+            changed_master_data,
+            commit=False,
+        )
+
+        session.rollback()
+
+        loaded_master_data = (
+            repository.get_master_data(
+                company.company_id
+            )
+        )
+
+    assert loaded_master_data == (
+        original_master_data
     )
 
 
