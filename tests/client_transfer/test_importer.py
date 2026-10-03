@@ -2,6 +2,7 @@
 
 from datetime import date, datetime, timezone
 from uuid import UUID
+from decimal import Decimal
 
 import pytest
 from sqlalchemy import create_engine
@@ -25,12 +26,18 @@ from openbilanz.client_transfer.model import (
     ClientTransferApplication,
     ClientTransferBooking,
     ClientTransferBookingLine,
+    ClientTransferBookingLineReference,
+    ClientTransferFixedAssetDepreciation,
+    ClientTransferTaxDepreciationAdjustment,
+    ClientTransferFixedAssetMovement,
     ClientTransferClient,
     ClientTransferControlAccounts,
     ClientTransferFiscalYear,
     ClientTransferFiscalYearReference,
+    ClientTransferFixedAsset,
     ClientTransferFormat,
     ClientTransferMasterData,
+    ClientTransferShareholder,
     ClientTransferTaxonomyMapping,
     ClientTransferVatAccounts,
 )
@@ -44,12 +51,36 @@ from openbilanz.database.company_repository import (
     CompanyRepository,
 )
 from openbilanz.database.database import Base
+from openbilanz.database.fixed_asset_depreciation_repository import (
+    FixedAssetDepreciationRepository,
+)
+from openbilanz.database.tax_depreciation_adjustment_repository import (
+    TaxDepreciationAdjustmentRepository,
+)
+from openbilanz.database.fixed_asset_repository import (
+    FixedAssetRepository,
+)
+from openbilanz.database.fixed_asset_movement_repository import (
+    FixedAssetMovementRepository,
+)
+from openbilanz.database.shareholder_repository import (
+    ShareholderRepository,
+)
 from openbilanz.domain.company import Company
+from openbilanz.domain.depreciation_kind import DepreciationKind
+from openbilanz.domain.depreciation_source import DepreciationSource
 from openbilanz.domain.fiscal_year_status import (
     FiscalYearStatus,
 )
+from openbilanz.domain.fixed_asset_movement_type import (
+    FixedAssetMovementType,
+)
 from openbilanz.domain.booking_type import BookingType
 from openbilanz.domain.entry_side import EntrySide
+from openbilanz.domain.fixed_asset_status import (
+    FixedAssetStatus,
+)
+
 
 
 COMPANY_ID = UUID(
@@ -301,12 +332,49 @@ def test_importer_restores_client_base_data() -> None:
             session
         )
 
+        shareholder_repository = ShareholderRepository(
+            session
+        )
+
+        fixed_asset_repository = FixedAssetRepository(
+            session
+        )
+
+        fixed_asset_movement_repository = (
+            FixedAssetMovementRepository(
+                session
+            )
+        )
+
+        fixed_asset_depreciation_repository = (
+            FixedAssetDepreciationRepository(
+                session
+            )
+        )
+
+        tax_depreciation_adjustment_repository = (
+            TaxDepreciationAdjustmentRepository(
+                session
+            )
+        )
+
         importer = ClientTransferImporter(
             company_repository=company_repository,
             chart_of_accounts_repository=(
                 chart_repository
             ),
             booking_repository=booking_repository,
+            shareholder_repository=shareholder_repository,
+            fixed_asset_repository=fixed_asset_repository,
+            fixed_asset_movement_repository=(
+                fixed_asset_movement_repository
+            ),
+            fixed_asset_depreciation_repository=(
+                fixed_asset_depreciation_repository
+            ),
+            tax_depreciation_adjustment_repository=(
+                tax_depreciation_adjustment_repository
+            ),
         )
 
         importer.import_transfer(
@@ -467,6 +535,32 @@ def test_importer_rejects_existing_company_id() -> None:
             session
         )
 
+        shareholder_repository = ShareholderRepository(
+            session
+        )
+
+        fixed_asset_repository = FixedAssetRepository(
+            session
+        )
+
+        fixed_asset_movement_repository = (
+            FixedAssetMovementRepository(
+                session
+            )
+        )
+
+        fixed_asset_depreciation_repository = (
+            FixedAssetDepreciationRepository(
+                session
+            )
+        )
+
+        tax_depreciation_adjustment_repository = (
+            TaxDepreciationAdjustmentRepository(
+                session
+            )
+        )
+
         existing_company = Company(
             company_id=COMPANY_ID,
             name="Bestehender Mandant",
@@ -481,6 +575,17 @@ def test_importer_rejects_existing_company_id() -> None:
                 chart_repository
             ),
             booking_repository=booking_repository,
+            shareholder_repository=shareholder_repository,
+            fixed_asset_repository=fixed_asset_repository,
+            fixed_asset_movement_repository=(
+                fixed_asset_movement_repository
+            ),
+            fixed_asset_depreciation_repository=(
+                fixed_asset_depreciation_repository
+            ),
+            tax_depreciation_adjustment_repository=(
+                tax_depreciation_adjustment_repository
+            ),
         )
 
         with pytest.raises(
@@ -536,12 +641,49 @@ def test_importer_rolls_back_complete_import_on_error(
             session
         )
 
+        shareholder_repository = ShareholderRepository(
+            session
+        )
+
+        fixed_asset_repository = FixedAssetRepository(
+            session
+        )
+
+        fixed_asset_movement_repository = (
+            FixedAssetMovementRepository(
+                session
+            )
+        )
+
+        fixed_asset_depreciation_repository = (
+            FixedAssetDepreciationRepository(
+                session
+            )
+        )
+
+        tax_depreciation_adjustment_repository = (
+            TaxDepreciationAdjustmentRepository(
+                session
+            )
+        )
+
         importer = ClientTransferImporter(
             company_repository=company_repository,
             chart_of_accounts_repository=(
                 chart_repository
             ),
             booking_repository=booking_repository,
+            shareholder_repository=shareholder_repository,
+            fixed_asset_repository=fixed_asset_repository,
+            fixed_asset_movement_repository=(
+                fixed_asset_movement_repository
+            ),
+            fixed_asset_depreciation_repository=(
+                fixed_asset_depreciation_repository
+            ),
+            tax_depreciation_adjustment_repository=(
+                tax_depreciation_adjustment_repository
+            ),
         )
 
         position_provider = (
@@ -710,12 +852,49 @@ def test_importer_restores_booking_and_reversal() -> None:
             session
         )
 
+        shareholder_repository = ShareholderRepository(
+            session
+        )
+
+        fixed_asset_repository = FixedAssetRepository(
+            session
+        )
+
+        fixed_asset_movement_repository = (
+            FixedAssetMovementRepository(
+                session
+            )
+        )
+
+        fixed_asset_depreciation_repository = (
+            FixedAssetDepreciationRepository(
+                session
+            )
+        )
+
+        tax_depreciation_adjustment_repository = (
+            TaxDepreciationAdjustmentRepository(
+                session
+            )
+        )
+
         importer = ClientTransferImporter(
             company_repository=company_repository,
             chart_of_accounts_repository=(
                 chart_repository
             ),
             booking_repository=booking_repository,
+            shareholder_repository=shareholder_repository,
+            fixed_asset_repository=fixed_asset_repository,
+            fixed_asset_movement_repository=(
+                fixed_asset_movement_repository
+            ),
+            fixed_asset_depreciation_repository=(
+                fixed_asset_depreciation_repository
+            ),
+            tax_depreciation_adjustment_repository=(
+                tax_depreciation_adjustment_repository
+            ),
         )
 
         importer.import_transfer(
@@ -787,4 +966,921 @@ def test_importer_restores_booking_and_reversal() -> None:
 
     assert managed_fiscal_years[0].status is (
         FiscalYearStatus.CLOSED
+    )
+
+
+def test_importer_restores_shareholder() -> None:
+    engine = create_engine(
+        "sqlite:///:memory:"
+    )
+    Base.metadata.create_all(engine)
+
+    Session = sessionmaker(
+        bind=engine
+    )
+
+    shareholder_id = UUID(
+        "33333333-3333-3333-3333-333333333333"
+    )
+
+    base_transfer = _build_transfer()
+
+    transfer = ClientTransfer(
+        format=base_transfer.format,
+        application=base_transfer.application,
+        exported_at=base_transfer.exported_at,
+        client=ClientTransferClient(
+            company_id=base_transfer.client.company_id,
+            master_data=base_transfer.client.master_data,
+            accounts=base_transfer.client.accounts,
+            control_accounts=(
+                base_transfer.client.control_accounts
+            ),
+            vat_accounts=base_transfer.client.vat_accounts,
+            account_roles=base_transfer.client.account_roles,
+            taxonomy_mappings=(
+                base_transfer.client.taxonomy_mappings
+            ),
+            shareholders=(
+                ClientTransferShareholder(
+                    shareholder_id=shareholder_id,
+                    shareholder_number="1",
+                    name="Mustermann",
+                    first_name="Max",
+                    legal_status="NATURAL_PERSON",
+                    share_numerator="1",
+                    share_denominator="2",
+                    tax_number="1234567890123",
+                    tax_number_federal_state="NW",
+                    tax_id="12345678901",
+                    wid="",
+                ),
+            ),
+            fiscal_years=base_transfer.client.fiscal_years,
+            fixed_assets=base_transfer.client.fixed_assets,
+            profit_appropriation_annual_data=(
+                base_transfer.client
+                .profit_appropriation_annual_data
+            ),
+            profit_appropriation_postings=(
+                base_transfer.client
+                .profit_appropriation_postings
+            ),
+            equity_contributions=(
+                base_transfer.client.equity_contributions
+            ),
+        ),
+    )
+
+    with Session() as session:
+        company_repository = CompanyRepository(
+            session
+        )
+        chart_repository = (
+            ChartOfAccountsRepository(
+                session
+            )
+        )
+        booking_repository = BookingRepository(
+            session
+        )
+        shareholder_repository = (
+            ShareholderRepository(
+                session
+            )
+        )
+
+        fixed_asset_repository = (
+            FixedAssetRepository(
+                session
+            )
+        )
+
+        fixed_asset_movement_repository = (
+            FixedAssetMovementRepository(
+                session
+            )
+        )
+
+        fixed_asset_depreciation_repository = (
+            FixedAssetDepreciationRepository(
+                session
+            )
+        )
+
+        tax_depreciation_adjustment_repository = (
+            TaxDepreciationAdjustmentRepository(
+                session
+            )
+        )
+
+        importer = ClientTransferImporter(
+            company_repository=company_repository,
+            chart_of_accounts_repository=(
+                chart_repository
+            ),
+            booking_repository=booking_repository,
+            shareholder_repository=(
+                shareholder_repository
+            ),
+            fixed_asset_repository=(
+                fixed_asset_repository
+            ),
+            fixed_asset_movement_repository=(
+                fixed_asset_movement_repository
+            ),
+            fixed_asset_depreciation_repository=(
+                fixed_asset_depreciation_repository
+            ),
+            tax_depreciation_adjustment_repository=(
+                tax_depreciation_adjustment_repository
+            ),
+        )
+
+        importer.import_transfer(
+            transfer=transfer,
+            position_provider=(
+                _build_position_provider()
+            ),
+        )
+
+        shareholders = (
+            shareholder_repository.list_for_company(
+                COMPANY_ID
+            )
+        )
+
+    assert len(shareholders) == 1
+
+    shareholder = shareholders[0]
+
+    assert shareholder.shareholder_id == (
+        shareholder_id
+    )
+    assert shareholder.company_id == COMPANY_ID
+    assert shareholder.shareholder_number == "1"
+    assert shareholder.name == "Mustermann"
+    assert shareholder.first_name == "Max"
+    assert shareholder.legal_status == (
+        "NATURAL_PERSON"
+    )
+    assert shareholder.share_numerator == "1"
+    assert shareholder.share_denominator == "2"
+    assert shareholder.tax_number == (
+        "1234567890123"
+    )
+    assert (
+        shareholder.tax_number_federal_state
+        == "NW"
+    )
+    assert shareholder.tax_id == "12345678901"
+    assert shareholder.wid == ""
+
+
+def test_importer_restores_fixed_asset() -> None:
+    engine = create_engine(
+        "sqlite:///:memory:"
+    )
+    Base.metadata.create_all(engine)
+
+    Session = sessionmaker(
+        bind=engine
+    )
+
+    fixed_asset_id = UUID(
+        "44444444-4444-4444-4444-444444444444"
+    )
+
+    base_transfer = _build_transfer()
+
+    transfer = ClientTransfer(
+        format=base_transfer.format,
+        application=base_transfer.application,
+        exported_at=base_transfer.exported_at,
+        client=ClientTransferClient(
+            company_id=base_transfer.client.company_id,
+            master_data=base_transfer.client.master_data,
+            accounts=base_transfer.client.accounts,
+            control_accounts=(
+                base_transfer.client.control_accounts
+            ),
+            vat_accounts=base_transfer.client.vat_accounts,
+            account_roles=base_transfer.client.account_roles,
+            taxonomy_mappings=(
+                base_transfer.client.taxonomy_mappings
+            ),
+            shareholders=base_transfer.client.shareholders,
+            fixed_assets=(
+                ClientTransferFixedAsset(
+                    fixed_asset_id=fixed_asset_id,
+                    asset_code="BGA-001",
+                    description="Notebook",
+                    position_code=(
+                        "HGB.266.AKTIVA.A.II.3"
+                    ),
+                    asset_account_number="1200",
+                    depreciation_expense_account_number=(
+                        "1000"
+                    ),
+                    acquisition_date=date(
+                        2025,
+                        8,
+                        15,
+                    ),
+                    acquisition_cost="1200.00",
+                    depreciation_start_date=date(
+                        2025,
+                        8,
+                        15,
+                    ),
+                    useful_life_months=36,
+                    status="ACTIVE",
+                ),
+            ),
+            profit_appropriation_annual_data=(
+                base_transfer.client
+                .profit_appropriation_annual_data
+            ),
+            profit_appropriation_postings=(
+                base_transfer.client
+                .profit_appropriation_postings
+            ),
+            equity_contributions=(
+                base_transfer.client.equity_contributions
+            ),
+            fiscal_years=base_transfer.client.fiscal_years,
+        ),
+    )
+
+    with Session() as session:
+        company_repository = CompanyRepository(
+            session
+        )
+        chart_repository = (
+            ChartOfAccountsRepository(
+                session
+            )
+        )
+        booking_repository = BookingRepository(
+            session
+        )
+        shareholder_repository = (
+            ShareholderRepository(
+                session
+            )
+        )
+        fixed_asset_repository = (
+            FixedAssetRepository(
+                session
+            )
+        )
+
+        fixed_asset_movement_repository = (
+            FixedAssetMovementRepository(
+                session
+            )
+        )
+
+        fixed_asset_depreciation_repository = (
+            FixedAssetDepreciationRepository(
+                session
+            )
+        )
+
+        tax_depreciation_adjustment_repository = (
+            TaxDepreciationAdjustmentRepository(
+                session
+            )
+        )
+
+        importer = ClientTransferImporter(
+            company_repository=company_repository,
+            chart_of_accounts_repository=(
+                chart_repository
+            ),
+            booking_repository=booking_repository,
+            shareholder_repository=(
+                shareholder_repository
+            ),
+            fixed_asset_repository=(
+                fixed_asset_repository
+            ),
+            fixed_asset_movement_repository=(
+                fixed_asset_movement_repository
+            ),
+            fixed_asset_depreciation_repository=(
+                fixed_asset_depreciation_repository
+            ),
+            tax_depreciation_adjustment_repository=(
+                tax_depreciation_adjustment_repository
+            ),
+        )
+
+        importer.import_transfer(
+            transfer=transfer,
+            position_provider=(
+                _build_position_provider()
+            ),
+        )
+
+        fixed_assets = (
+            fixed_asset_repository.list_for_company(
+                COMPANY_ID
+            )
+        )
+
+    assert len(fixed_assets) == 1
+
+    fixed_asset = fixed_assets[0]
+
+    assert fixed_asset.fixed_asset_id == fixed_asset_id
+    assert fixed_asset.company_id == COMPANY_ID
+    assert fixed_asset.asset_code == "BGA-001"
+    assert fixed_asset.description == "Notebook"
+    assert (
+        fixed_asset.position_code
+        == "HGB.266.AKTIVA.A.II.3"
+    )
+    assert fixed_asset.asset_account_number == "1200"
+    assert (
+        fixed_asset.depreciation_expense_account_number
+        == "1000"
+    )
+    assert fixed_asset.acquisition_date == date(
+        2025,
+        8,
+        15,
+    )
+    assert fixed_asset.acquisition_cost == Decimal(
+        "1200.00"
+    )
+    assert fixed_asset.depreciation_start_date == date(
+        2025,
+        8,
+        15,
+    )
+    assert fixed_asset.useful_life_months == 36
+    assert fixed_asset.status is FixedAssetStatus.ACTIVE
+    assert fixed_asset.disposal_date is None
+
+
+def test_importer_restores_fixed_asset_movements() -> None:
+    engine = create_engine(
+        "sqlite:///:memory:"
+    )
+    Base.metadata.create_all(engine)
+
+    Session = sessionmaker(
+        bind=engine
+    )
+
+    original_booking_id = UUID(
+        "11111111-1111-1111-1111-111111111111"
+    )
+    reversal_booking_id = UUID(
+        "22222222-2222-2222-2222-222222222222"
+    )
+    fixed_asset_id = UUID(
+        "44444444-4444-4444-4444-444444444444"
+    )
+    original_movement_id = UUID(
+        "55555555-5555-5555-5555-555555555555"
+    )
+    reversal_movement_id = UUID(
+        "66666666-6666-6666-6666-666666666666"
+    )
+
+    base_transfer = _build_transfer()
+
+    first_fiscal_year = (
+        base_transfer.client.fiscal_years[0]
+    )
+    second_fiscal_year = (
+        base_transfer.client.fiscal_years[1]
+    )
+
+    reversal_booking = ClientTransferBooking(
+        booking_id=reversal_booking_id,
+        booking_date=date(2026, 2, 2),
+        booking_type="REVERSAL",
+        voucher_no="ST-1",
+        description="Storno Anlagenzugang",
+        reversal_of_booking_id=original_booking_id,
+        lines=(
+            ClientTransferBookingLine(
+                position=0,
+                account_number="1200",
+                side="CREDIT",
+                amount="123.45",
+            ),
+            ClientTransferBookingLine(
+                position=1,
+                account_number="1000",
+                side="DEBIT",
+                amount="123.45",
+            ),
+        ),
+    )
+
+    original_booking = ClientTransferBooking(
+        booking_id=original_booking_id,
+        booking_date=date(2026, 2, 1),
+        booking_type="REGULAR",
+        voucher_no="B-1",
+        description="Anlagenzugang",
+        lines=(
+            ClientTransferBookingLine(
+                position=0,
+                account_number="1200",
+                side="DEBIT",
+                amount="123.45",
+            ),
+            ClientTransferBookingLine(
+                position=1,
+                account_number="1000",
+                side="CREDIT",
+                amount="123.45",
+            ),
+        ),
+    )
+
+    fixed_asset = ClientTransferFixedAsset(
+        fixed_asset_id=fixed_asset_id,
+        asset_code="BGA-001",
+        description="Notebook",
+        position_code="HGB.266.AKTIVA.A.II.3",
+        asset_account_number="1200",
+        depreciation_expense_account_number="1000",
+        acquisition_date=date(2026, 2, 1),
+        acquisition_cost="123.45",
+        depreciation_start_date=date(2026, 2, 1),
+        useful_life_months=36,
+        status="ACTIVE",
+        movements=(
+            # Absichtlich Storno zuerst:
+            ClientTransferFixedAssetMovement(
+                movement_id=reversal_movement_id,
+                fiscal_year_end=first_fiscal_year.end_date,
+                movement_date=date(2026, 2, 2),
+                amount="123.45",
+                booking_line=(
+                    ClientTransferBookingLineReference(
+                        booking_id=reversal_booking_id,
+                        position=0,
+                    )
+                ),
+                movement_type="REVERSAL",
+                reversed_movement_id=original_movement_id,
+            ),
+            ClientTransferFixedAssetMovement(
+                movement_id=original_movement_id,
+                fiscal_year_end=first_fiscal_year.end_date,
+                movement_date=date(2026, 2, 1),
+                amount="123.45",
+                booking_line=(
+                    ClientTransferBookingLineReference(
+                        booking_id=original_booking_id,
+                        position=0,
+                    )
+                ),
+                movement_type="ACQUISITION",
+            ),
+        ),
+    )
+
+    transfer = ClientTransfer(
+        format=base_transfer.format,
+        application=base_transfer.application,
+        exported_at=base_transfer.exported_at,
+        client=ClientTransferClient(
+            company_id=base_transfer.client.company_id,
+            master_data=base_transfer.client.master_data,
+            accounts=base_transfer.client.accounts,
+            control_accounts=(
+                base_transfer.client.control_accounts
+            ),
+            vat_accounts=base_transfer.client.vat_accounts,
+            account_roles=base_transfer.client.account_roles,
+            taxonomy_mappings=(
+                base_transfer.client.taxonomy_mappings
+            ),
+            shareholders=base_transfer.client.shareholders,
+            fixed_assets=(
+                fixed_asset,
+            ),
+            profit_appropriation_annual_data=(
+                base_transfer.client
+                .profit_appropriation_annual_data
+            ),
+            profit_appropriation_postings=(
+                base_transfer.client
+                .profit_appropriation_postings
+            ),
+            equity_contributions=(
+                base_transfer.client.equity_contributions
+            ),
+            fiscal_years=(
+                ClientTransferFiscalYear(
+                    start_date=first_fiscal_year.start_date,
+                    end_date=first_fiscal_year.end_date,
+                    status=first_fiscal_year.status,
+                    opening_source=(
+                        first_fiscal_year.opening_source
+                    ),
+                    bookings=(
+                        reversal_booking,
+                        original_booking,
+                    ),
+                ),
+                second_fiscal_year,
+            ),
+        ),
+    )
+
+    with Session() as session:
+        company_repository = CompanyRepository(
+            session
+        )
+        chart_repository = (
+            ChartOfAccountsRepository(
+                session
+            )
+        )
+        booking_repository = BookingRepository(
+            session
+        )
+        shareholder_repository = (
+            ShareholderRepository(
+                session
+            )
+        )
+        fixed_asset_repository = (
+            FixedAssetRepository(
+                session
+            )
+        )
+        fixed_asset_movement_repository = (
+            FixedAssetMovementRepository(
+                session
+            )
+        )
+
+        fixed_asset_depreciation_repository = (
+            FixedAssetDepreciationRepository(
+                session
+            )
+        )
+
+        tax_depreciation_adjustment_repository = (
+            TaxDepreciationAdjustmentRepository(
+                session
+            )
+        )
+
+        importer = ClientTransferImporter(
+            company_repository=company_repository,
+            chart_of_accounts_repository=(
+                chart_repository
+            ),
+            booking_repository=booking_repository,
+            shareholder_repository=(
+                shareholder_repository
+            ),
+            fixed_asset_repository=(
+                fixed_asset_repository
+            ),
+            fixed_asset_movement_repository=(
+                fixed_asset_movement_repository
+            ),
+            fixed_asset_depreciation_repository=(
+                fixed_asset_depreciation_repository
+            ),
+            tax_depreciation_adjustment_repository=(
+                tax_depreciation_adjustment_repository
+            ),
+        )
+
+        importer.import_transfer(
+            transfer=transfer,
+            position_provider=(
+                _build_position_provider()
+            ),
+        )
+
+        loaded_original = (
+            fixed_asset_movement_repository.get(
+                original_movement_id
+            )
+        )
+        loaded_reversal = (
+            fixed_asset_movement_repository.get(
+                reversal_movement_id
+            )
+        )
+
+    assert loaded_original is not None
+    assert loaded_original.movement_id == (
+        original_movement_id
+    )
+    assert loaded_original.fixed_asset_id == (
+        fixed_asset_id
+    )
+    assert loaded_original.fiscal_year_end == (
+        first_fiscal_year.end_date
+    )
+    assert loaded_original.movement_date == date(
+        2026,
+        2,
+        1,
+    )
+    assert loaded_original.amount == Decimal(
+        "123.45"
+    )
+    assert loaded_original.booking_id == (
+        original_booking_id
+    )
+    assert loaded_original.movement_type is (
+        FixedAssetMovementType.ACQUISITION
+    )
+    assert loaded_original.reversed_movement_id is None
+
+    assert loaded_reversal is not None
+    assert loaded_reversal.movement_id == (
+        reversal_movement_id
+    )
+    assert loaded_reversal.fixed_asset_id == (
+        fixed_asset_id
+    )
+    assert loaded_reversal.fiscal_year_end == (
+        first_fiscal_year.end_date
+    )
+    assert loaded_reversal.movement_date == date(
+        2026,
+        2,
+        2,
+    )
+    assert loaded_reversal.amount == Decimal(
+        "123.45"
+    )
+    assert loaded_reversal.booking_id == (
+        reversal_booking_id
+    )
+    assert loaded_reversal.movement_type is (
+        FixedAssetMovementType.REVERSAL
+    )
+    assert loaded_reversal.reversed_movement_id == (
+        original_movement_id
+    )
+
+
+def test_importer_restores_fixed_asset_depreciation_with_tax_adjustment(
+) -> None:
+    engine = create_engine(
+        "sqlite:///:memory:"
+    )
+    Base.metadata.create_all(engine)
+
+    Session = sessionmaker(
+        bind=engine
+    )
+
+    depreciation_booking_id = UUID(
+        "77777777-7777-7777-7777-777777777777"
+    )
+    fixed_asset_id = UUID(
+        "44444444-4444-4444-4444-444444444444"
+    )
+    depreciation_id = UUID(
+        "88888888-8888-8888-8888-888888888888"
+    )
+
+    base_transfer = _build_transfer()
+
+    first_fiscal_year = (
+        base_transfer.client.fiscal_years[0]
+    )
+    second_fiscal_year = (
+        base_transfer.client.fiscal_years[1]
+    )
+
+    depreciation_booking = ClientTransferBooking(
+        booking_id=depreciation_booking_id,
+        booking_date=date(2026, 3, 31),
+        booking_type="REGULAR",
+        voucher_no="AFA-1",
+        description="Abschreibung Notebook",
+        lines=(
+            ClientTransferBookingLine(
+                position=0,
+                account_number="1000",
+                side="DEBIT",
+                amount="40.00",
+            ),
+            ClientTransferBookingLine(
+                position=1,
+                account_number="1200",
+                side="CREDIT",
+                amount="40.00",
+            ),
+        ),
+    )
+
+    depreciation = ClientTransferFixedAssetDepreciation(
+        depreciation_id=depreciation_id,
+        fiscal_year_end=first_fiscal_year.end_date,
+        depreciation_date=date(2026, 3, 31),
+        amount="40.00",
+        booking_line=ClientTransferBookingLineReference(
+            booking_id=depreciation_booking_id,
+            position=0,
+        ),
+        kind="LINEAR",
+        source="CALCULATED",
+        tax_adjustment=(
+            ClientTransferTaxDepreciationAdjustment(
+                depreciation_id=depreciation_id,
+                tax_amount="50.00",
+            )
+        ),
+    )
+
+    fixed_asset = ClientTransferFixedAsset(
+        fixed_asset_id=fixed_asset_id,
+        asset_code="BGA-001",
+        description="Notebook",
+        position_code="HGB.266.AKTIVA.A.II.3",
+        asset_account_number="1200",
+        depreciation_expense_account_number="1000",
+        acquisition_date=date(2025, 8, 15),
+        acquisition_cost="1200.00",
+        depreciation_start_date=date(2025, 8, 15),
+        useful_life_months=36,
+        status="ACTIVE",
+        depreciations=(
+            depreciation,
+        ),
+    )
+
+    transfer = ClientTransfer(
+        format=base_transfer.format,
+        application=base_transfer.application,
+        exported_at=base_transfer.exported_at,
+        client=ClientTransferClient(
+            company_id=base_transfer.client.company_id,
+            master_data=base_transfer.client.master_data,
+            accounts=base_transfer.client.accounts,
+            control_accounts=(
+                base_transfer.client.control_accounts
+            ),
+            vat_accounts=base_transfer.client.vat_accounts,
+            account_roles=base_transfer.client.account_roles,
+            taxonomy_mappings=(
+                base_transfer.client.taxonomy_mappings
+            ),
+            shareholders=base_transfer.client.shareholders,
+            fixed_assets=(
+                fixed_asset,
+            ),
+            profit_appropriation_annual_data=(
+                base_transfer.client
+                .profit_appropriation_annual_data
+            ),
+            profit_appropriation_postings=(
+                base_transfer.client
+                .profit_appropriation_postings
+            ),
+            equity_contributions=(
+                base_transfer.client.equity_contributions
+            ),
+            fiscal_years=(
+                ClientTransferFiscalYear(
+                    start_date=first_fiscal_year.start_date,
+                    end_date=first_fiscal_year.end_date,
+                    status=first_fiscal_year.status,
+                    opening_source=(
+                        first_fiscal_year.opening_source
+                    ),
+                    bookings=(
+                        depreciation_booking,
+                    ),
+                ),
+                second_fiscal_year,
+            ),
+        ),
+    )
+
+    with Session() as session:
+        company_repository = CompanyRepository(
+            session
+        )
+        chart_repository = ChartOfAccountsRepository(
+            session
+        )
+        booking_repository = BookingRepository(
+            session
+        )
+        shareholder_repository = ShareholderRepository(
+            session
+        )
+        fixed_asset_repository = FixedAssetRepository(
+            session
+        )
+        fixed_asset_movement_repository = (
+            FixedAssetMovementRepository(
+                session
+            )
+        )
+        fixed_asset_depreciation_repository = (
+            FixedAssetDepreciationRepository(
+                session
+            )
+        )
+        tax_depreciation_adjustment_repository = (
+            TaxDepreciationAdjustmentRepository(
+                session
+            )
+        )
+
+        importer = ClientTransferImporter(
+            company_repository=company_repository,
+            chart_of_accounts_repository=(
+                chart_repository
+            ),
+            booking_repository=booking_repository,
+            shareholder_repository=(
+                shareholder_repository
+            ),
+            fixed_asset_repository=(
+                fixed_asset_repository
+            ),
+            fixed_asset_movement_repository=(
+                fixed_asset_movement_repository
+            ),
+            fixed_asset_depreciation_repository=(
+                fixed_asset_depreciation_repository
+            ),
+            tax_depreciation_adjustment_repository=(
+                tax_depreciation_adjustment_repository
+            ),
+        )
+
+        importer.import_transfer(
+            transfer=transfer,
+            position_provider=(
+                _build_position_provider()
+            ),
+        )
+
+        loaded_depreciation = (
+            fixed_asset_depreciation_repository.get(
+                depreciation_id
+            )
+        )
+        loaded_adjustment = (
+            tax_depreciation_adjustment_repository
+            .get_for_depreciation(
+                depreciation_id
+            )
+        )
+
+    assert loaded_depreciation is not None
+    assert loaded_depreciation.depreciation_id == (
+        depreciation_id
+    )
+    assert loaded_depreciation.fixed_asset_id == (
+        fixed_asset_id
+    )
+    assert loaded_depreciation.fiscal_year_end == (
+        first_fiscal_year.end_date
+    )
+    assert loaded_depreciation.depreciation_date == date(
+        2026,
+        3,
+        31,
+    )
+    assert loaded_depreciation.amount == Decimal(
+        "40.00"
+    )
+    assert loaded_depreciation.booking_id == (
+        depreciation_booking_id
+    )
+    assert loaded_depreciation.kind is (
+        DepreciationKind.LINEAR
+    )
+    assert loaded_depreciation.source is (
+        DepreciationSource.CALCULATED
+    )
+
+    assert loaded_adjustment is not None
+    assert loaded_adjustment.depreciation_id == (
+        depreciation_id
+    )
+    assert loaded_adjustment.commercial_amount == Decimal(
+        "40.00"
+    )
+    assert loaded_adjustment.tax_amount == Decimal(
+        "50.00"
+    )
+    assert loaded_adjustment.difference == Decimal(
+        "10.00"
     )

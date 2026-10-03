@@ -23,6 +23,21 @@ from openbilanz.database.chart_of_accounts_repository import (
 from openbilanz.database.company_repository import (
     CompanyRepository,
 )
+from openbilanz.database.shareholder_repository import (
+    ShareholderRepository,
+)
+from openbilanz.database.fixed_asset_repository import (
+    FixedAssetRepository,
+)
+from openbilanz.database.fixed_asset_movement_repository import (
+    FixedAssetMovementRepository,
+)
+from openbilanz.database.fixed_asset_depreciation_repository import (
+    FixedAssetDepreciationRepository,
+)
+from openbilanz.database.tax_depreciation_adjustment_repository import (
+    TaxDepreciationAdjustmentRepository,
+)
 from openbilanz.domain.account import Account
 from openbilanz.domain.account_mapping_rule import (
     AccountMappingRule,
@@ -41,11 +56,26 @@ from openbilanz.domain.company import Company
 from openbilanz.domain.company_master_data import (
     CompanyMasterData,
 )
+from openbilanz.domain.depreciation_kind import DepreciationKind
+from openbilanz.domain.depreciation_source import DepreciationSource
+from openbilanz.domain.fixed_asset_depreciation import (
+    FixedAssetDepreciation,
+)
 from openbilanz.domain.entry_side import EntrySide
 from openbilanz.domain.fiscal_year import FiscalYear
+from openbilanz.domain.fixed_asset import FixedAsset
+from openbilanz.domain.fixed_asset_status import (
+    FixedAssetStatus,
+)
+from openbilanz.domain.fixed_asset_movement import (
+    FixedAssetMovement,
+)
+from openbilanz.domain.fixed_asset_movement_type import (
+    FixedAssetMovementType,
+)
 from openbilanz.domain.template_account import TemplateAccount
 from openbilanz.domain.vat_accounts import VatAccounts
-
+from openbilanz.domain.shareholder import Shareholder
 
 class ClientTransferImporter:
     """Importiert einen portablen SimpleOB-Mandanten."""
@@ -56,12 +86,38 @@ class ClientTransferImporter:
         company_repository: CompanyRepository,
         chart_of_accounts_repository: ChartOfAccountsRepository,
         booking_repository: BookingRepository,
+        shareholder_repository: ShareholderRepository,
+        fixed_asset_repository: FixedAssetRepository,
+        fixed_asset_movement_repository: (
+            FixedAssetMovementRepository
+        ),
+        fixed_asset_depreciation_repository: (
+            FixedAssetDepreciationRepository
+        ),
+        tax_depreciation_adjustment_repository: (
+            TaxDepreciationAdjustmentRepository
+        ),
     ) -> None:
         self._company_repository = company_repository
         self._chart_of_accounts_repository = (
             chart_of_accounts_repository
         )
         self._booking_repository = booking_repository
+        self._shareholder_repository = (
+            shareholder_repository
+        )
+        self._fixed_asset_repository = (
+            fixed_asset_repository
+        )
+        self._fixed_asset_movement_repository = (
+            fixed_asset_movement_repository
+        )
+        self._fixed_asset_depreciation_repository = (
+            fixed_asset_depreciation_repository
+        )
+        self._tax_depreciation_adjustment_repository = (
+            tax_depreciation_adjustment_repository
+        )
 
     def import_transfer(
         self,
@@ -141,12 +197,31 @@ class ClientTransferImporter:
                 transfer=transfer
             )
 
+            self._save_shareholders(
+                transfer=transfer
+            )
+
+            self._save_fixed_assets(
+                transfer=transfer
+            )
+
             self._create_fiscal_years(
                 transfer=transfer
             )
 
             self._save_bookings(
                 transfer=transfer
+            )
+
+            self._save_fixed_asset_movements(
+                transfer=transfer,
+            )
+            self._save_fixed_asset_depreciations(
+                transfer=transfer,
+            )
+
+            self._save_tax_depreciation_adjustments(
+                transfer=transfer,
             )
 
             self._set_opening_sources(
@@ -169,18 +244,6 @@ class ClientTransferImporter:
         transfer: ClientTransfer,
     ) -> None:
         client = transfer.client
-
-        if client.shareholders:
-            raise ValueError(
-                "Der Import von Gesellschaftern ist "
-                "noch nicht implementiert."
-            )
-
-        if client.fixed_assets:
-            raise ValueError(
-                "Der Import der Anlagenbuchhaltung ist "
-                "noch nicht implementiert."
-            )
 
         if client.profit_appropriation_annual_data:
             raise ValueError(
@@ -404,6 +467,77 @@ class ClientTransferImporter:
                 commit=False,
             )
 
+    def _save_shareholders(
+        self,
+        *,
+        transfer: ClientTransfer,
+    ) -> None:
+        company_id = transfer.client.company_id
+
+        for data in transfer.client.shareholders:
+            self._shareholder_repository.add(
+                shareholder=Shareholder(
+                    company_id=company_id,
+                    shareholder_number=(
+                        data.shareholder_number
+                    ),
+                    name=data.name,
+                    first_name=data.first_name,
+                    legal_status=data.legal_status,
+                    share_numerator=data.share_numerator,
+                    share_denominator=(
+                        data.share_denominator
+                    ),
+                    tax_number=data.tax_number,
+                    tax_number_federal_state=(
+                        data.tax_number_federal_state
+                    ),
+                    tax_id=data.tax_id,
+                    wid=data.wid,
+                    shareholder_id=data.shareholder_id,
+                ),
+                commit=False,
+            )
+
+    def _save_fixed_assets(
+        self,
+        *,
+        transfer: ClientTransfer,
+    ) -> None:
+        company_id = transfer.client.company_id
+
+        for data in transfer.client.fixed_assets:
+            self._fixed_asset_repository.add(
+                fixed_asset=FixedAsset(
+                    company_id=company_id,
+                    asset_code=data.asset_code,
+                    description=data.description,
+                    position_code=data.position_code,
+                    asset_account_number=(
+                        data.asset_account_number
+                    ),
+                    depreciation_expense_account_number=(
+                        data.depreciation_expense_account_number
+                    ),
+                    acquisition_date=data.acquisition_date,
+                    acquisition_cost=Decimal(
+                        data.acquisition_cost
+                    ),
+                    depreciation_start_date=(
+                        data.depreciation_start_date
+                    ),
+                    useful_life_months=(
+                        data.useful_life_months
+                    ),
+                    fixed_asset_id=data.fixed_asset_id,
+                    status=FixedAssetStatus(
+                        data.status
+                    ),
+                    disposal_date=data.disposal_date,
+                ),
+                commit=False,
+            )
+
     def _create_fiscal_years(
         self,
         *,
@@ -470,6 +604,58 @@ class ClientTransferImporter:
                     ),
                     commit=False,
                 )
+
+    def _save_fixed_asset_movements(
+        self,
+        *,
+        transfer: ClientTransfer,
+    ) -> None:
+        movements = [
+            (fixed_asset, movement)
+            for fixed_asset in transfer.client.fixed_assets
+            for movement in fixed_asset.movements
+        ]
+
+        regular_movements = [
+            (fixed_asset, movement)
+            for fixed_asset, movement in movements
+            if movement.movement_type != "REVERSAL"
+        ]
+        reversal_movements = [
+            (fixed_asset, movement)
+            for fixed_asset, movement in movements
+            if movement.movement_type == "REVERSAL"
+        ]
+
+        for fixed_asset, movement in (
+            regular_movements + reversal_movements
+        ):
+            self._fixed_asset_movement_repository.add(
+                movement=FixedAssetMovement(
+                    fixed_asset_id=(
+                        fixed_asset.fixed_asset_id
+                    ),
+                    fiscal_year_end=(
+                        movement.fiscal_year_end
+                    ),
+                    movement_date=movement.movement_date,
+                    amount=Decimal(movement.amount),
+                    booking_id=(
+                        movement.booking_line.booking_id
+                    ),
+                    movement_type=FixedAssetMovementType(
+                        movement.movement_type
+                    ),
+                    movement_id=movement.movement_id,
+                    reversed_movement_id=(
+                        movement.reversed_movement_id
+                    ),
+                ),
+                booking_line_position=(
+                    movement.booking_line.position
+                ),
+                commit=False,
+            )
 
     @staticmethod
     def _build_booking(
@@ -581,3 +767,65 @@ class ClientTransferImporter:
                 ),
                 commit=False,
             )
+
+    def _save_fixed_asset_depreciations(
+        self,
+        *,
+        transfer: ClientTransfer,
+    ) -> None:
+        for fixed_asset in transfer.client.fixed_assets:
+            for depreciation in fixed_asset.depreciations:
+                self._fixed_asset_depreciation_repository.add(
+                    depreciation=FixedAssetDepreciation(
+                        fixed_asset_id=(
+                            fixed_asset.fixed_asset_id
+                        ),
+                        fiscal_year_end=(
+                            depreciation.fiscal_year_end
+                        ),
+                        depreciation_date=(
+                            depreciation.depreciation_date
+                        ),
+                        amount=Decimal(
+                            depreciation.amount
+                        ),
+                        booking_id=(
+                            depreciation.booking_line.booking_id
+                        ),
+                        kind=DepreciationKind(
+                            depreciation.kind
+                        ),
+                        source=DepreciationSource(
+                            depreciation.source
+                        ),
+                        depreciation_id=(
+                            depreciation.depreciation_id
+                        ),
+                    ),
+                    booking_line_position=(
+                        depreciation.booking_line.position
+                    ),
+                    commit=False,
+                )
+
+    def _save_tax_depreciation_adjustments(
+        self,
+        *,
+        transfer: ClientTransfer,
+    ) -> None:
+        for fixed_asset in transfer.client.fixed_assets:
+            for depreciation in fixed_asset.depreciations:
+                adjustment = depreciation.tax_adjustment
+
+                if adjustment is None:
+                    continue
+
+                self._tax_depreciation_adjustment_repository.save(
+                    depreciation_id=(
+                        depreciation.depreciation_id
+                    ),
+                    tax_amount=Decimal(
+                        adjustment.tax_amount
+                    ),
+                    commit=False,
+                )
