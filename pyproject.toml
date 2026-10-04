@@ -21,6 +21,7 @@ dependencies = [
     "lxml",
     "reportlab",
     "PySide6>=6.11,<6.12",
+    "arelle-release>=2.44,<2.45",
 ]
 
 [project.optional-dependencies]
