@@ -80,11 +80,42 @@ def desktop_application_data_dir() -> Path:
     )
 
 
+def bundled_eric_lib_dir() -> Path | None:
+    """Liefert das ERiC-lib-Verzeichnis der gebündelten Anwendung."""
+
+    if not getattr(sys, "frozen", False):
+        return None
+
+    bundle_dir_value = getattr(sys, "_MEIPASS", None)
+
+    if not bundle_dir_value:
+        return None
+
+    lib_dir = (
+        Path(bundle_dir_value)
+        / "eric"
+        / "lib"
+    )
+
+    if not lib_dir.is_dir():
+        return None
+
+    return lib_dir
+
+
 def installed_config() -> ApplicationConfig:
     """Erzeugt die Standardkonfiguration der installierten Anwendung."""
 
-    return _default_config_for_data_dir(
+    config = _default_config_for_data_dir(
         desktop_application_data_dir()
+    )
+
+    return ApplicationConfig(
+        data_dir=config.data_dir,
+        database_file=config.database_file,
+        taxonomy_dir=config.taxonomy_dir,
+        config_file=config.config_file,
+        eric_lib_dir=bundled_eric_lib_dir(),
     )
 
 
@@ -113,6 +144,11 @@ def load_config(
             database_file=effective_defaults.database_file,
             taxonomy_dir=effective_defaults.taxonomy_dir,
             config_file=path,
+            eric_lib_dir=effective_defaults.eric_lib_dir,
+            eric_manufacturer_id=effective_defaults.eric_manufacturer_id,
+            eric_data_supplier=effective_defaults.eric_data_supplier,
+            eric_certificate_path=effective_defaults.eric_certificate_path,
+            eric_certificate_pin=effective_defaults.eric_certificate_pin,
         )
 
     with path.open("rb") as file:
@@ -231,9 +267,21 @@ def load_installed_config() -> ApplicationConfig:
 
     defaults = installed_config()
 
-    return load_config(
+    config = load_config(
         defaults.config_file,
         defaults=defaults,
+    )
+
+    return ApplicationConfig(
+        data_dir=config.data_dir,
+        database_file=config.database_file,
+        taxonomy_dir=config.taxonomy_dir,
+        config_file=config.config_file,
+        eric_lib_dir=defaults.eric_lib_dir,
+        eric_manufacturer_id=config.eric_manufacturer_id,
+        eric_data_supplier=config.eric_data_supplier,
+        eric_certificate_path=config.eric_certificate_path,
+        eric_certificate_pin=config.eric_certificate_pin,
     )
 
 

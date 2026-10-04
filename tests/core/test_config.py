@@ -1,9 +1,11 @@
 """Tests für die Anwendungskonfiguration."""
 
+import sys
 from pathlib import Path
 
 from openbilanz.core.config import (
     ApplicationConfig,
+    bundled_eric_lib_dir,
     default_config,
     desktop_application_data_dir,
     installed_config,
@@ -211,6 +213,7 @@ def test_load_config_reads_eric_configuration(
     assert config.eric_manufacturer_id == "12345"
     assert config.eric_certificate_path == certificate_path
     assert config.eric_certificate_pin == "123456"
+
 
 def test_load_config_expands_eric_lib_directory(
     tmp_path: Path,
@@ -420,3 +423,129 @@ def test_prepare_application_data_directories_creates_required_directories(
     assert taxonomy_dir.is_dir()
     assert not config.database_file.exists()
     assert not config.config_file.exists()
+
+
+def test_bundled_eric_lib_dir_returns_none_outside_frozen_application(
+    monkeypatch,
+) -> None:
+    monkeypatch.delattr(
+        sys,
+        "frozen",
+        raising=False,
+    )
+    monkeypatch.delattr(
+        sys,
+        "_MEIPASS",
+        raising=False,
+    )
+
+    assert bundled_eric_lib_dir() is None
+
+
+def test_bundled_eric_lib_dir_returns_bundled_lib_directory(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    eric_lib_dir = (
+        tmp_path
+        / "eric"
+        / "lib"
+    )
+    eric_lib_dir.mkdir(
+        parents=True
+    )
+
+    monkeypatch.setattr(
+        sys,
+        "frozen",
+        True,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        sys,
+        "_MEIPASS",
+        str(tmp_path),
+        raising=False,
+    )
+
+    assert (
+        bundled_eric_lib_dir()
+        == eric_lib_dir
+    )
+
+
+def test_load_installed_config_uses_bundled_eric_lib_directory(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        "openbilanz.core.config.sys.platform",
+        "darwin",
+    )
+    monkeypatch.setattr(
+        Path,
+        "home",
+        lambda: tmp_path,
+    )
+
+    application_data_dir = (
+        tmp_path
+        / "Library"
+        / "Application Support"
+        / "SimpleOB"
+    )
+    application_data_dir.mkdir(
+        parents=True
+    )
+
+    bundle_dir = (
+        tmp_path
+        / "bundle"
+    )
+    eric_lib_dir = (
+        bundle_dir
+        / "eric"
+        / "lib"
+    )
+    eric_lib_dir.mkdir(
+        parents=True
+    )
+
+    config_file = (
+        application_data_dir
+        / "config.toml"
+    )
+    config_file.write_text(
+        (
+            "[eric]\n"
+            'lib_dir = "/old/development/eric/lib"\n'
+            'manufacturer_id = "22924"\n'
+            'data_supplier = "Testlieferant"\n'
+            'certificate_path = "/tmp/test.pfx"\n'
+            'certificate_pin = "123456"\n'
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        sys,
+        "frozen",
+        True,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        sys,
+        "_MEIPASS",
+        str(bundle_dir),
+        raising=False,
+    )
+
+    config = load_installed_config()
+
+    assert config.eric_lib_dir == eric_lib_dir
+    assert config.eric_manufacturer_id == "22924"
+    assert config.eric_data_supplier == "Testlieferant"
+    assert config.eric_certificate_path == Path(
+        "/tmp/test.pfx"
+    )
+    assert config.eric_certificate_pin == "123456"
