@@ -152,7 +152,10 @@ coll = COLLECT(
 app = BUNDLE(
     coll,
     name="SimpleOB.app",
-    icon=None,
+    icon=str(
+        PROJECT_ROOT
+        / "packaging/macos/resources/SimpleOB.icns"
+    ),
     bundle_identifier="de.subuthi.simpleob",
     version=APPLICATION_VERSION,
 )
