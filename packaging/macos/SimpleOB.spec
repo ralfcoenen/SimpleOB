@@ -1,5 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+from importlib.metadata import version
 import os
 from pathlib import Path
 
@@ -8,6 +9,7 @@ from PyInstaller.utils.hooks import collect_data_files
 
 PROJECT_ROOT = Path(SPECPATH).resolve().parents[1]
 SRC_ROOT = PROJECT_ROOT / "src"
+APPLICATION_VERSION = version("openbilanz")
 
 eric_sdk_root_value = os.environ.get("SIMPLEOB_ERIC_SDK_ROOT")
 
@@ -151,5 +153,6 @@ app = BUNDLE(
     coll,
     name="SimpleOB.app",
     icon=None,
-    bundle_identifier=None,
+    bundle_identifier="de.subuthi.simpleob",
+    version=APPLICATION_VERSION,
 )
