@@ -1,5 +1,6 @@
 """PySide6-Hauptfenster von SimpleOB."""
 
+from collections.abc import Callable
 from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -35,6 +36,10 @@ from openbilanz.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
 from openbilanz.accounting.income_statement import IncomeStatement
+from openbilanz.client_transfer.archive import (
+    write_client_transfer_archive,
+)
+from openbilanz.client_transfer.model import ClientTransfer
 from openbilanz.core.context import ApplicationContext
 from openbilanz.date_input import parse_german_date
 from openbilanz.domain.account import Account
@@ -123,6 +128,9 @@ class MainWindow(QMainWindow):
         account_mapper,
         vat_accounts: VatAccounts,
         pdf_reporting_service: PdfReportingService,
+        export_client_transfer: (
+            Callable[[], ClientTransfer] | None
+        ) = None,
         elster_bilanz_transmission_service: (
             ElsterBilanzTransmissionService | None
         ) = None,
@@ -154,6 +162,9 @@ class MainWindow(QMainWindow):
         self._closing_service = closing_service
         self._vat_accounts = vat_accounts
         self._pdf_reporting_service = pdf_reporting_service
+        self._export_client_transfer = (
+            export_client_transfer
+        )
         self._elster_bilanz_transmission_service = (
             elster_bilanz_transmission_service
         )
@@ -234,6 +245,18 @@ class MainWindow(QMainWindow):
         )
         administration_layout.addWidget(
             self._account_configuration_button
+        )
+        self._export_company_button = QPushButton(
+            "Mandant exportieren …"
+        )
+        self._export_company_button.setEnabled(
+            self._export_client_transfer is not None
+        )
+        self._export_company_button.clicked.connect(
+            self._export_company
+        )
+        administration_layout.addWidget(
+            self._export_company_button
         )
         self._return_to_start_button = QPushButton(
             "Buchhaltung wechseln"
@@ -4401,6 +4424,55 @@ class MainWindow(QMainWindow):
                 "öffnen Sie sie erneut, damit der geänderte "
                 "Kontenrahmen vollständig wirksam wird."
             ),
+        )
+
+    def _export_company(self) -> None:
+        """Exportiert den aktuellen Mandanten als .simpleob-Datei."""
+
+        if self._export_client_transfer is None:
+            return
+
+        suggested_filename = (
+            f"{self._context.company.name}.simpleob"
+        )
+
+        filename, _ = QFileDialog.getSaveFileName(
+            self,
+            "Mandant exportieren",
+            suggested_filename,
+            "SimpleOB-Mandantensicherung (*.simpleob)",
+        )
+
+        if not filename:
+            return
+
+        archive_path = Path(filename)
+
+        if archive_path.suffix.lower() != ".simpleob":
+            archive_path = archive_path.with_name(
+                f"{archive_path.name}.simpleob"
+            )
+
+        try:
+            transfer = self._export_client_transfer()
+            write_client_transfer_archive(
+                archive_path,
+                transfer,
+            )
+        except Exception as exc:
+            QMessageBox.critical(
+                self,
+                "Mandant exportieren",
+                "Der Mandant konnte nicht exportiert werden.\n\n"
+                f"{exc}",
+            )
+            return
+
+        QMessageBox.information(
+            self,
+            "Mandant exportieren",
+            "Der Mandant wurde erfolgreich exportiert.\n\n"
+            f"{archive_path}",
         )
 
     def _open_company_master_data(self) -> None:

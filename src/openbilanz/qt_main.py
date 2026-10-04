@@ -12,23 +12,19 @@ from openbilanz.accounting.financial_statement_context import (
 from openbilanz.accounting.hgb_financial_statement_position_provider import (
     HgbFinancialStatementPositionProvider,
 )
+from openbilanz.client_transfer.exporter import ClientTransferExporter
+from openbilanz.client_transfer.importer import ClientTransferImporter
+from openbilanz.client_transfer.model import ClientTransfer
 from openbilanz.core.config import load_config
 from openbilanz.database.booking_repository import BookingRepository
-
-from openbilanz.database.profit_appropriation_annual_data_repository import (
-    ProfitAppropriationAnnualDataRepository,
-)
-from openbilanz.database.profit_appropriation_posting_repository import (
-    ProfitAppropriationPostingRepository,
-)
 from openbilanz.database.chart_of_accounts_repository import (
     ChartOfAccountsRepository,
 )
 from openbilanz.database.company_repository import CompanyRepository
+from openbilanz.database.database import Database
 from openbilanz.database.equity_contribution_repository import (
     EquityContributionRepository,
 )
-from openbilanz.database.database import Database
 from openbilanz.database.fixed_asset_depreciation_repository import (
     FixedAssetDepreciationRepository,
 )
@@ -36,6 +32,12 @@ from openbilanz.database.fixed_asset_movement_repository import (
     FixedAssetMovementRepository,
 )
 from openbilanz.database.fixed_asset_repository import FixedAssetRepository
+from openbilanz.database.profit_appropriation_annual_data_repository import (
+    ProfitAppropriationAnnualDataRepository,
+)
+from openbilanz.database.profit_appropriation_posting_repository import (
+    ProfitAppropriationPostingRepository,
+)
 from openbilanz.database.shareholder_repository import ShareholderRepository
 from openbilanz.database.tax_depreciation_adjustment_repository import (
     TaxDepreciationAdjustmentRepository,
@@ -232,6 +234,80 @@ def main() -> None:
             FixedAssetMovementRepository(session)
         )
 
+        profit_appropriation_annual_data_repository = (
+            ProfitAppropriationAnnualDataRepository(
+                session
+            )
+        )
+
+        profit_appropriation_posting_repository = (
+            ProfitAppropriationPostingRepository(
+                session
+            )
+        )
+
+        equity_contribution_repository = (
+            EquityContributionRepository(
+                session
+            )
+        )
+
+        client_transfer_importer = ClientTransferImporter(
+            company_repository=company_repository,
+            chart_of_accounts_repository=(
+                chart_of_accounts_repository
+            ),
+            booking_repository=booking_repository,
+            shareholder_repository=shareholder_repository,
+            fixed_asset_repository=fixed_asset_repository,
+            fixed_asset_movement_repository=(
+                fixed_asset_movement_repository
+            ),
+            fixed_asset_depreciation_repository=(
+                fixed_asset_depreciation_repository
+            ),
+            tax_depreciation_adjustment_repository=(
+                tax_depreciation_adjustment_repository
+            ),
+            profit_appropriation_annual_data_repository=(
+                profit_appropriation_annual_data_repository
+            ),
+            profit_appropriation_posting_repository=(
+                profit_appropriation_posting_repository
+            ),
+            equity_contribution_repository=(
+                equity_contribution_repository
+            ),
+        )
+
+        client_transfer_exporter = ClientTransferExporter(
+            company_repository=company_repository,
+            chart_of_accounts_repository=(
+                chart_of_accounts_repository
+            ),
+            booking_repository=booking_repository,
+            shareholder_repository=shareholder_repository,
+            fixed_asset_repository=fixed_asset_repository,
+            fixed_asset_movement_repository=(
+                fixed_asset_movement_repository
+            ),
+            fixed_asset_depreciation_repository=(
+                fixed_asset_depreciation_repository
+            ),
+            tax_depreciation_adjustment_repository=(
+                tax_depreciation_adjustment_repository
+            ),
+            profit_appropriation_annual_data_repository=(
+                profit_appropriation_annual_data_repository
+            ),
+            profit_appropriation_posting_repository=(
+                profit_appropriation_posting_repository
+            ),
+            equity_contribution_repository=(
+                equity_contribution_repository
+            ),
+        )
+
         fixed_asset_schedule_service = FixedAssetScheduleService(
             fixed_asset_repository=fixed_asset_repository,
             fixed_asset_movement_repository=(
@@ -272,9 +348,20 @@ def main() -> None:
         reporting_service = ReportingService()
         pdf_reporting_service = PdfReportingService()
 
+        def import_client_transfer(
+            transfer: ClientTransfer,
+        ) -> None:
+            client_transfer_importer.import_transfer(
+                transfer=transfer,
+                position_provider=position_provider,
+            )
+
         while True:
             dialog = StartDialog(
                 repository=company_repository,
+                import_client_transfer=(
+                    import_client_transfer
+                ),
             )
 
             if dialog.exec() != QDialog.DialogCode.Accepted:
@@ -284,6 +371,12 @@ def main() -> None:
 
             if context is None:
                 break
+
+            def export_client_transfer() -> ClientTransfer:
+                return client_transfer_exporter.export(
+                    company_id=context.company.company_id,
+                    position_provider=position_provider,
+                )
 
             opening_transfer_request = (
                 dialog.opening_transfer_request
@@ -465,24 +558,6 @@ def main() -> None:
                 ),
             )
 
-            profit_appropriation_annual_data_repository = (
-                ProfitAppropriationAnnualDataRepository(
-                    session
-                )
-            )
-
-            profit_appropriation_posting_repository = (
-                ProfitAppropriationPostingRepository(
-                    session
-                )
-            )
-
-            equity_contribution_repository = (
-                EquityContributionRepository(
-                    session
-                )
-            )
-
             profit_appropriation_posting_workflow = (
                 ProfitAppropriationPostingWorkflow(
                     session=session,
@@ -585,6 +660,9 @@ def main() -> None:
                 ),
                 vat_accounts=vat_accounts,
                 pdf_reporting_service=pdf_reporting_service,
+                export_client_transfer=(
+                    export_client_transfer
+                ),
                 elster_bilanz_transmission_service=(
                     elster_bilanz_transmission_service
                 ),

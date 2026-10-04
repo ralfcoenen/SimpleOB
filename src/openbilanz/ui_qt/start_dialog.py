@@ -1,15 +1,23 @@
 """PySide6-Startdialog für SimpleOB."""
 
+from collections.abc import Callable
+
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
     QDialogButtonBox,
+    QFileDialog,
     QFormLayout,
     QLabel,
+    QMessageBox,
     QPushButton,
     QVBoxLayout,
 )
 
+from openbilanz.client_transfer.archive import (
+    read_client_transfer_archive,
+)
+from openbilanz.client_transfer.model import ClientTransfer
 from openbilanz.core.context import ApplicationContext
 from openbilanz.database.company_repository import CompanyRepository
 from openbilanz.domain.company import Company
@@ -27,10 +35,14 @@ class StartDialog(QDialog):
         self,
         *,
         repository: CompanyRepository,
+        import_client_transfer: (
+            Callable[[ClientTransfer], None] | None
+        ) = None,
     ) -> None:
         super().__init__()
 
         self._repository = repository
+        self._import_client_transfer = import_client_transfer
 
         self.result: ApplicationContext | None = None
         self.opening_transfer_request: (
@@ -103,6 +115,20 @@ class StartDialog(QDialog):
         )
         button_box.addButton(
             new_company_button,
+            QDialogButtonBox.ButtonRole.ActionRole,
+        )
+
+        self._import_company_button = QPushButton(
+            "Mandant importieren …"
+        )
+        self._import_company_button.setEnabled(
+            self._import_client_transfer is not None
+        )
+        self._import_company_button.clicked.connect(
+            self._import_company
+        )
+        button_box.addButton(
+            self._import_company_button,
             QDialogButtonBox.ButtonRole.ActionRole,
         )
 
@@ -240,6 +266,64 @@ class StartDialog(QDialog):
         )
 
         self.accept()
+
+    def _import_company(self) -> None:
+        """Importiert eine portable SimpleOB-Mandantensicherung."""
+
+        if self._import_client_transfer is None:
+            return
+
+        filename, _ = QFileDialog.getOpenFileName(
+            self,
+            "Mandant importieren",
+            "",
+            "SimpleOB-Mandantensicherung (*.simpleob)",
+        )
+
+        if not filename:
+            return
+
+        try:
+            transfer = read_client_transfer_archive(
+                filename
+            )
+            self._import_client_transfer(
+                transfer
+            )
+        except Exception as exc:
+            QMessageBox.critical(
+                self,
+                "Mandant importieren",
+                "Der Mandant konnte nicht importiert werden.\n\n"
+                f"{exc}",
+            )
+            return
+
+        self._load_companies()
+
+        imported_company_id = transfer.client.company_id
+
+        for index in range(
+            self._company_box.count()
+        ):
+            company = self._company_by_display_name.get(
+                self._company_box.itemText(index)
+            )
+
+            if (
+                company is not None
+                and company.company_id == imported_company_id
+            ):
+                self._company_box.setCurrentIndex(
+                    index
+                )
+                break
+
+        QMessageBox.information(
+            self,
+            "Mandant importieren",
+            "Der Mandant wurde erfolgreich importiert.",
+        )
 
     def _create_new_company(self) -> None:
         """Öffnet den Dialog zum Anlegen einer Buchhaltung."""
