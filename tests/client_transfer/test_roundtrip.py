@@ -2,6 +2,7 @@
 
 from datetime import date, datetime, timezone
 from uuid import UUID
+from pathlib import Path
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
@@ -11,6 +12,10 @@ from openbilanz.accounting.financial_statement_position import (
 )
 from openbilanz.accounting.hgb_financial_statement_position_provider import (
     HgbFinancialStatementPositionProvider,
+)
+from openbilanz.client_transfer.archive import (
+    read_client_transfer_archive,
+    write_client_transfer_archive,
 )
 from openbilanz.client_transfer.exporter import (
     ClientTransferExporter,
@@ -765,3 +770,55 @@ def test_client_transfer_roundtrip_preserves_client_data(
     )
 
     assert first_export.client == second_export.client
+
+
+def test_client_transfer_archive_roundtrip_preserves_client_data(
+    tmp_path: Path,
+) -> None:
+    source_transfer = _build_rich_transfer()
+
+    first_engine = create_engine(
+        "sqlite:///:memory:"
+    )
+    Base.metadata.create_all(
+        first_engine
+    )
+
+    first_export = _import_and_export(
+        engine=first_engine,
+        transfer=source_transfer,
+    )
+
+    archive_path = (
+        tmp_path / "roundtrip.simpleob"
+    )
+
+    write_client_transfer_archive(
+        archive_path,
+        first_export,
+    )
+
+    archived_transfer = (
+        read_client_transfer_archive(
+            archive_path
+        )
+    )
+
+    assert archived_transfer == first_export
+
+    second_engine = create_engine(
+        "sqlite:///:memory:"
+    )
+    Base.metadata.create_all(
+        second_engine
+    )
+
+    second_export = _import_and_export(
+        engine=second_engine,
+        transfer=archived_transfer,
+    )
+
+    assert (
+        first_export.client
+        == second_export.client
+    )
