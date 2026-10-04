@@ -23,6 +23,9 @@ from openbilanz.database.chart_of_accounts_repository import (
 from openbilanz.database.company_repository import (
     CompanyRepository,
 )
+from openbilanz.database.equity_contribution_repository import (
+    EquityContributionRepository,
+)
 from openbilanz.database.profit_appropriation_annual_data_repository import (
     ProfitAppropriationAnnualDataRepository,
 )
@@ -64,6 +67,9 @@ from openbilanz.domain.company_master_data import (
 )
 from openbilanz.domain.depreciation_kind import DepreciationKind
 from openbilanz.domain.depreciation_source import DepreciationSource
+from openbilanz.domain.equity_contribution_reference import (
+    EquityContributionReference,
+)
 from openbilanz.domain.fixed_asset_depreciation import (
     FixedAssetDepreciation,
 )
@@ -118,6 +124,7 @@ class ClientTransferImporter:
         profit_appropriation_posting_repository: (
             ProfitAppropriationPostingRepository
         ),
+        equity_contribution_repository: EquityContributionRepository,
     ) -> None:
         self._company_repository = company_repository
         self._chart_of_accounts_repository = (
@@ -144,6 +151,9 @@ class ClientTransferImporter:
         )
         self._profit_appropriation_posting_repository = (
             profit_appropriation_posting_repository
+        )
+        self._equity_contribution_repository = (
+            equity_contribution_repository
         )
 
     def import_transfer(
@@ -259,6 +269,10 @@ class ClientTransferImporter:
                 transfer=transfer,
             )
 
+            self._save_equity_contributions(
+                transfer=transfer,
+            )
+
             self._set_opening_sources(
                 transfer=transfer
             )
@@ -278,13 +292,7 @@ class ClientTransferImporter:
         *,
         transfer: ClientTransfer,
     ) -> None:
-        client = transfer.client
-
-        if client.equity_contributions:
-            raise ValueError(
-                "Der Import der Eigenkapitaleinlagen ist "
-                "noch nicht implementiert."
-            )
+        del transfer
 
     @staticmethod
     def _build_master_data(
@@ -918,6 +926,27 @@ class ClientTransferImporter:
                 ),
                 booking_line_position=(
                     data.booking_line.position
+                ),
+                commit=False,
+            )
+
+    def _save_equity_contributions(
+        self,
+        *,
+        transfer: ClientTransfer,
+    ) -> None:
+        company_id = transfer.client.company_id
+
+        for contribution in transfer.client.equity_contributions:
+            self._equity_contribution_repository.add(
+                company_id=company_id,
+                reference=EquityContributionReference(
+                    booking_id=(
+                        contribution.booking_line.booking_id
+                    ),
+                    booking_line_position=(
+                        contribution.booking_line.position
+                    ),
                 ),
                 commit=False,
             )

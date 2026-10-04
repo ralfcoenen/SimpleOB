@@ -28,6 +28,7 @@ from openbilanz.client_transfer.model import (
     ClientTransferBookingLine,
     ClientTransferBookingLineReference,
     ClientTransferFixedAssetDepreciation,
+    ClientTransferEquityContribution,
     ClientTransferTaxDepreciationAdjustment,
     ClientTransferFixedAssetMovement,
     ClientTransferClient,
@@ -59,6 +60,9 @@ from openbilanz.database.fixed_asset_depreciation_repository import (
 from openbilanz.database.tax_depreciation_adjustment_repository import (
     TaxDepreciationAdjustmentRepository,
 )
+from openbilanz.database.equity_contribution_repository import (
+    EquityContributionRepository,
+)
 from openbilanz.database.fixed_asset_repository import (
     FixedAssetRepository,
 )
@@ -80,6 +84,9 @@ from openbilanz.domain.profit_appropriation_posting_type import (
 from openbilanz.domain.company import Company
 from openbilanz.domain.depreciation_kind import DepreciationKind
 from openbilanz.domain.depreciation_source import DepreciationSource
+from openbilanz.domain.equity_contribution_reference import (
+    EquityContributionReference,
+)
 from openbilanz.domain.fiscal_year import FiscalYear
 from openbilanz.domain.fiscal_year_status import (
     FiscalYearStatus,
@@ -380,6 +387,11 @@ def test_importer_restores_client_base_data() -> None:
                 session
             )
         )
+        equity_contribution_repository = (
+            EquityContributionRepository(
+                session
+            )
+        )
 
         importer = ClientTransferImporter(
             company_repository=company_repository,
@@ -403,6 +415,9 @@ def test_importer_restores_client_base_data() -> None:
             ),
             profit_appropriation_posting_repository=(
                 profit_appropriation_posting_repository
+            ),
+            equity_contribution_repository=(
+                equity_contribution_repository
             ),
         )
 
@@ -609,6 +624,12 @@ def test_importer_rejects_existing_company_id() -> None:
             existing_company
         )
 
+        equity_contribution_repository = (
+            EquityContributionRepository(
+                session
+            )
+        )
+
         importer = ClientTransferImporter(
             company_repository=company_repository,
             chart_of_accounts_repository=(
@@ -631,7 +652,10 @@ def test_importer_rejects_existing_company_id() -> None:
             ),
             profit_appropriation_posting_repository=(
                 profit_appropriation_posting_repository
-            )
+            ),
+            equity_contribution_repository=(
+                equity_contribution_repository
+            ),
         )
 
         with pytest.raises(
@@ -724,6 +748,12 @@ def test_importer_rolls_back_complete_import_on_error(
             )
         )
 
+        equity_contribution_repository = (
+            EquityContributionRepository(
+                session
+            )
+        )
+
         importer = ClientTransferImporter(
             company_repository=company_repository,
             chart_of_accounts_repository=(
@@ -746,7 +776,10 @@ def test_importer_rolls_back_complete_import_on_error(
             ),
             profit_appropriation_posting_repository=(
                 profit_appropriation_posting_repository
-            )
+            ),
+            equity_contribution_repository=(
+                equity_contribution_repository
+            ),
         )
 
         position_provider = (
@@ -952,6 +985,12 @@ def test_importer_restores_booking_and_reversal() -> None:
             )
         )
 
+        equity_contribution_repository = (
+            EquityContributionRepository(
+                session
+            )
+        )
+
         importer = ClientTransferImporter(
             company_repository=company_repository,
             chart_of_accounts_repository=(
@@ -974,6 +1013,9 @@ def test_importer_restores_booking_and_reversal() -> None:
             ),
             profit_appropriation_posting_repository=(
                 profit_appropriation_posting_repository
+            ),
+            equity_contribution_repository=(
+                equity_contribution_repository
             ),
         )
 
@@ -1165,6 +1207,12 @@ def test_importer_restores_shareholder() -> None:
             )
         )
 
+        equity_contribution_repository = (
+            EquityContributionRepository(
+                session
+            )
+        )
+
         importer = ClientTransferImporter(
             company_repository=company_repository,
             chart_of_accounts_repository=(
@@ -1191,6 +1239,9 @@ def test_importer_restores_shareholder() -> None:
             ),
             profit_appropriation_posting_repository=(
                 profit_appropriation_posting_repository
+            ),
+            equity_contribution_repository=(
+                equity_contribution_repository
             ),
         )
 
@@ -1361,6 +1412,12 @@ def test_importer_restores_fixed_asset() -> None:
             )
         )
 
+        equity_contribution_repository = (
+            EquityContributionRepository(
+                session
+            )
+        )
+
         importer = ClientTransferImporter(
             company_repository=company_repository,
             chart_of_accounts_repository=(
@@ -1387,6 +1444,9 @@ def test_importer_restores_fixed_asset() -> None:
             ),
             profit_appropriation_posting_repository=(
                 profit_appropriation_posting_repository
+            ),
+            equity_contribution_repository=(
+                equity_contribution_repository
             ),
         )
 
@@ -1662,6 +1722,12 @@ def test_importer_restores_fixed_asset_movements() -> None:
             )
         )
 
+        equity_contribution_repository = (
+            EquityContributionRepository(
+                session
+            )
+        )
+
         importer = ClientTransferImporter(
             company_repository=company_repository,
             chart_of_accounts_repository=(
@@ -1688,6 +1754,9 @@ def test_importer_restores_fixed_asset_movements() -> None:
             ),
             profit_appropriation_posting_repository=(
                 profit_appropriation_posting_repository
+            ),
+            equity_contribution_repository=(
+                equity_contribution_repository
             ),
         )
 
@@ -1943,6 +2012,12 @@ def test_importer_restores_fixed_asset_depreciation_with_tax_adjustment(
             )
         )
 
+        equity_contribution_repository = (
+            EquityContributionRepository(
+                session
+            )
+        )
+
         importer = ClientTransferImporter(
             company_repository=company_repository,
             chart_of_accounts_repository=(
@@ -1969,6 +2044,9 @@ def test_importer_restores_fixed_asset_depreciation_with_tax_adjustment(
             ),
             profit_appropriation_posting_repository=(
                 profit_appropriation_posting_repository
+            ),
+            equity_contribution_repository=(
+                equity_contribution_repository
             ),
         )
 
@@ -2200,6 +2278,18 @@ def test_importer_restores_profit_appropriation_data_and_posting(
             )
         )
 
+        equity_contribution_repository = (
+            EquityContributionRepository(
+                session
+            )
+        )
+
+        equity_contribution_repository = (
+            EquityContributionRepository(
+                session
+            )
+        )
+
         importer = ClientTransferImporter(
             company_repository=company_repository,
             chart_of_accounts_repository=(
@@ -2227,6 +2317,9 @@ def test_importer_restores_profit_appropriation_data_and_posting(
             profit_appropriation_posting_repository=(
                 profit_appropriation_posting_repository
             ),
+            equity_contribution_repository=(
+                equity_contribution_repository
+            )
         )
 
         importer.import_transfer(
@@ -2297,4 +2390,210 @@ def test_importer_restores_profit_appropriation_data_and_posting(
     assert loaded_posting.posting_type is (
         ProfitAppropriationPostingType
         .STATUTORY_RESERVE_ADDITION
+    )
+
+
+def test_importer_restores_equity_contribution(
+) -> None:
+    engine = create_engine(
+        "sqlite:///:memory:"
+    )
+    Base.metadata.create_all(engine)
+
+    Session = sessionmaker(
+        bind=engine
+    )
+
+    booking_id = UUID(
+        "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    )
+
+    base_transfer = _build_transfer()
+
+    first_fiscal_year = (
+        base_transfer.client.fiscal_years[0]
+    )
+    second_fiscal_year = (
+        base_transfer.client.fiscal_years[1]
+    )
+
+    contribution_booking = ClientTransferBooking(
+        booking_id=booking_id,
+        booking_date=date(2025, 8, 1),
+        booking_type="REGULAR",
+        voucher_no="EK-1",
+        description="Eigenkapitaleinlage",
+        lines=(
+            ClientTransferBookingLine(
+                position=0,
+                account_number="1200",
+                side="DEBIT",
+                amount="500.00",
+            ),
+            ClientTransferBookingLine(
+                position=1,
+                account_number="2970",
+                side="CREDIT",
+                amount="500.00",
+            ),
+        ),
+    )
+
+    contribution = ClientTransferEquityContribution(
+        booking_line=ClientTransferBookingLineReference(
+            booking_id=booking_id,
+            position=1,
+        ),
+    )
+
+    transfer = ClientTransfer(
+        format=base_transfer.format,
+        application=base_transfer.application,
+        exported_at=base_transfer.exported_at,
+        client=ClientTransferClient(
+            company_id=base_transfer.client.company_id,
+            master_data=base_transfer.client.master_data,
+            accounts=base_transfer.client.accounts,
+            control_accounts=(
+                base_transfer.client.control_accounts
+            ),
+            vat_accounts=base_transfer.client.vat_accounts,
+            account_roles=base_transfer.client.account_roles,
+            taxonomy_mappings=(
+                base_transfer.client.taxonomy_mappings
+            ),
+            shareholders=base_transfer.client.shareholders,
+            fixed_assets=base_transfer.client.fixed_assets,
+            profit_appropriation_annual_data=(
+                base_transfer.client
+                .profit_appropriation_annual_data
+            ),
+            profit_appropriation_postings=(
+                base_transfer.client
+                .profit_appropriation_postings
+            ),
+            equity_contributions=(
+                contribution,
+            ),
+            fiscal_years=(
+                ClientTransferFiscalYear(
+                    start_date=first_fiscal_year.start_date,
+                    end_date=first_fiscal_year.end_date,
+                    status=first_fiscal_year.status,
+                    opening_source=(
+                        first_fiscal_year.opening_source
+                    ),
+                    bookings=(
+                        contribution_booking,
+                    ),
+                ),
+                second_fiscal_year,
+            ),
+        ),
+    )
+
+    with Session() as session:
+        company_repository = CompanyRepository(
+            session
+        )
+        chart_repository = ChartOfAccountsRepository(
+            session
+        )
+        booking_repository = BookingRepository(
+            session
+        )
+        shareholder_repository = ShareholderRepository(
+            session
+        )
+        fixed_asset_repository = FixedAssetRepository(
+            session
+        )
+        fixed_asset_movement_repository = (
+            FixedAssetMovementRepository(
+                session
+            )
+        )
+        fixed_asset_depreciation_repository = (
+            FixedAssetDepreciationRepository(
+                session
+            )
+        )
+        tax_depreciation_adjustment_repository = (
+            TaxDepreciationAdjustmentRepository(
+                session
+            )
+        )
+        profit_appropriation_annual_data_repository = (
+            ProfitAppropriationAnnualDataRepository(
+                session
+            )
+        )
+        profit_appropriation_posting_repository = (
+            ProfitAppropriationPostingRepository(
+                session
+            )
+        )
+        equity_contribution_repository = (
+            EquityContributionRepository(
+                session
+            )
+        )
+
+        importer = ClientTransferImporter(
+            company_repository=company_repository,
+            chart_of_accounts_repository=(
+                chart_repository
+            ),
+            booking_repository=booking_repository,
+            shareholder_repository=(
+                shareholder_repository
+            ),
+            fixed_asset_repository=(
+                fixed_asset_repository
+            ),
+            fixed_asset_movement_repository=(
+                fixed_asset_movement_repository
+            ),
+            fixed_asset_depreciation_repository=(
+                fixed_asset_depreciation_repository
+            ),
+            tax_depreciation_adjustment_repository=(
+                tax_depreciation_adjustment_repository
+            ),
+            profit_appropriation_annual_data_repository=(
+                profit_appropriation_annual_data_repository
+            ),
+            profit_appropriation_posting_repository=(
+                profit_appropriation_posting_repository
+            ),
+            equity_contribution_repository=(
+                equity_contribution_repository
+            ),
+        )
+
+        importer.import_transfer(
+            transfer=transfer,
+            position_provider=(
+                _build_position_provider()
+            ),
+        )
+
+        loaded_contributions = (
+            equity_contribution_repository
+            .list_for_fiscal_year(
+                company_id=(
+                    base_transfer.client.company_id
+                ),
+                fiscal_year=FiscalYear(
+                    start_date=first_fiscal_year.start_date,
+                    end_date=first_fiscal_year.end_date,
+                ),
+            )
+        )
+
+    assert loaded_contributions == (
+        EquityContributionReference(
+            booking_id=booking_id,
+            booking_line_position=1,
+        ),
     )
