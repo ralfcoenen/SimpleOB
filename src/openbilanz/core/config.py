@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import sys
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,6 +13,8 @@ BASE_DIR = Path(__file__).resolve().parents[3]
 DEFAULT_DATA_DIR = BASE_DIR / "data"
 
 DEFAULT_CONFIG_FILE = DEFAULT_DATA_DIR / "config.toml"
+
+APPLICATION_DATA_DIRECTORY_NAME = "SimpleOB"
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,28 +41,77 @@ class ApplicationConfig:
 def default_config() -> ApplicationConfig:
     """Erzeugt die Standardkonfiguration für die Entwicklung."""
 
-    return ApplicationConfig(
-        data_dir=DEFAULT_DATA_DIR,
-        database_file=DEFAULT_DATA_DIR / "openbilanz.db",
-        taxonomy_dir=DEFAULT_DATA_DIR / "taxonomy",
-        config_file=DEFAULT_CONFIG_FILE,
+    return _default_config_for_data_dir(
+        DEFAULT_DATA_DIR
+    )
+
+
+def desktop_application_data_dir() -> Path:
+    """Liefert das Benutzerdatenverzeichnis der installierten Anwendung."""
+
+    if sys.platform == "darwin":
+        return (
+            Path.home()
+            / "Library"
+            / "Application Support"
+            / APPLICATION_DATA_DIRECTORY_NAME
+        )
+
+    if sys.platform == "win32":
+        local_app_data = os.environ.get(
+            "LOCALAPPDATA"
+        )
+
+        if not local_app_data:
+            raise RuntimeError(
+                "LOCALAPPDATA ist unter Windows nicht gesetzt."
+            )
+
+        return (
+            Path(local_app_data)
+            / APPLICATION_DATA_DIRECTORY_NAME
+        )
+
+    return (
+        Path.home()
+        / ".local"
+        / "share"
+        / APPLICATION_DATA_DIRECTORY_NAME
+    )
+
+
+def installed_config() -> ApplicationConfig:
+    """Erzeugt die Standardkonfiguration der installierten Anwendung."""
+
+    return _default_config_for_data_dir(
+        desktop_application_data_dir()
     )
 
 
 def load_config(
     config_file: Path | None = None,
+    *,
+    defaults: ApplicationConfig | None = None,
 ) -> ApplicationConfig:
     """Lädt die Anwendungskonfiguration aus einer TOML-Datei."""
 
-    defaults = default_config()
+    effective_defaults = (
+        defaults
+        if defaults is not None
+        else default_config()
+    )
 
-    path = config_file if config_file is not None else defaults.config_file
+    path = (
+        config_file
+        if config_file is not None
+        else effective_defaults.config_file
+    )
 
     if not path.is_file():
         return ApplicationConfig(
-            data_dir=defaults.data_dir,
-            database_file=defaults.database_file,
-            taxonomy_dir=defaults.taxonomy_dir,
+            data_dir=effective_defaults.data_dir,
+            database_file=effective_defaults.database_file,
+            taxonomy_dir=effective_defaults.taxonomy_dir,
             config_file=path,
         )
 
@@ -88,7 +141,7 @@ def load_config(
     data_dir = Path(
         application.get(
             "data_dir",
-            str(defaults.data_dir),
+            str(effective_defaults.data_dir),
         )
     ).expanduser()
 
@@ -170,6 +223,43 @@ def load_config(
         eric_data_supplier=eric_data_supplier,
         eric_certificate_path=eric_certificate_path,
         eric_certificate_pin=eric_certificate_pin,
+    )
+
+
+def load_installed_config() -> ApplicationConfig:
+    """Lädt die Konfiguration der installierten Desktop-Anwendung."""
+
+    defaults = installed_config()
+
+    return load_config(
+        defaults.config_file,
+        defaults=defaults,
+    )
+
+
+def prepare_application_data_directories(
+    config: ApplicationConfig,
+) -> None:
+    """Legt die benötigten beschreibbaren Anwendungsverzeichnisse an."""
+
+    config.data_dir.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    config.taxonomy_dir.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+def _default_config_for_data_dir(
+    data_dir: Path,
+) -> ApplicationConfig:
+    return ApplicationConfig(
+        data_dir=data_dir,
+        database_file=data_dir / "openbilanz.db",
+        taxonomy_dir=data_dir / "taxonomy",
+        config_file=data_dir / "config.toml",
     )
 
 

@@ -15,7 +15,11 @@ from openbilanz.accounting.hgb_financial_statement_position_provider import (
 from openbilanz.client_transfer.exporter import ClientTransferExporter
 from openbilanz.client_transfer.importer import ClientTransferImporter
 from openbilanz.client_transfer.model import ClientTransfer
-from openbilanz.core.config import load_config
+from openbilanz.core.config import (
+    load_config,
+    load_installed_config,
+    prepare_application_data_directories,
+)
 from openbilanz.database.booking_repository import BookingRepository
 from openbilanz.database.chart_of_accounts_repository import (
     ChartOfAccountsRepository,
@@ -117,13 +121,25 @@ from openbilanz.ui_qt.main_window import MainWindow
 from openbilanz.ui_qt.start_dialog import StartDialog
 
 
+def _load_application_config():
+    """Lädt die Konfiguration passend zur Ausführungsumgebung."""
+
+    if getattr(sys, "frozen", False):
+        return load_installed_config()
+
+    return load_config()
+
+
 def main() -> None:
     """Startet die PySide6-Oberfläche von SimpleOB."""
 
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
 
-    config = load_config()
+    config = _load_application_config()
+    prepare_application_data_directories(
+        config
+    )
 
     elster_bilanz_transmission_service = None
 
