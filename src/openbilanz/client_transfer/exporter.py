@@ -564,9 +564,7 @@ class ClientTransferExporter:
                 ClientTransferBooking(
                     booking_id=booking.booking_id,
                     booking_date=booking.booking_date,
-                    voucher_no=(
-                        booking.voucher_number
-                    ),
+                    voucher_no=booking.voucher_no,
                     description=booking.description,
                     booking_type=(
                         booking.booking_type.value

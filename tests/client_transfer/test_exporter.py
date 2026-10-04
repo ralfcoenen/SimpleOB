@@ -414,7 +414,7 @@ def test_exporter_builds_complete_transfer() -> None:
     booking = SimpleNamespace(
         booking_id=BOOKING_ID,
         booking_date=date(2026, 6, 30),
-        voucher_number="B-001",
+        voucher_no="B-001",
         description="Vollständige Testbuchung",
         booking_type=SimpleNamespace(
             value="REGULAR",
