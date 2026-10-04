@@ -129,7 +129,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,
-    console=True,
+    console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
@@ -145,4 +145,11 @@ coll = COLLECT(
     upx=False,
     upx_exclude=[],
     name="SimpleOB",
+)
+
+app = BUNDLE(
+    coll,
+    name="SimpleOB.app",
+    icon=None,
+    bundle_identifier=None,
 )
