@@ -23,6 +23,12 @@ from openbilanz.database.chart_of_accounts_repository import (
 from openbilanz.database.company_repository import (
     CompanyRepository,
 )
+from openbilanz.database.profit_appropriation_annual_data_repository import (
+    ProfitAppropriationAnnualDataRepository,
+)
+from openbilanz.database.profit_appropriation_posting_repository import (
+    ProfitAppropriationPostingRepository,
+)
 from openbilanz.database.shareholder_repository import (
     ShareholderRepository,
 )
@@ -73,6 +79,15 @@ from openbilanz.domain.fixed_asset_movement import (
 from openbilanz.domain.fixed_asset_movement_type import (
     FixedAssetMovementType,
 )
+from openbilanz.domain.profit_appropriation_annual_data import (
+    ProfitAppropriationAnnualData,
+)
+from openbilanz.domain.profit_appropriation_posting import (
+    ProfitAppropriationPosting,
+)
+from openbilanz.domain.profit_appropriation_posting_type import (
+    ProfitAppropriationPostingType,
+)
 from openbilanz.domain.template_account import TemplateAccount
 from openbilanz.domain.vat_accounts import VatAccounts
 from openbilanz.domain.shareholder import Shareholder
@@ -97,6 +112,12 @@ class ClientTransferImporter:
         tax_depreciation_adjustment_repository: (
             TaxDepreciationAdjustmentRepository
         ),
+        profit_appropriation_annual_data_repository: (
+            ProfitAppropriationAnnualDataRepository
+        ),
+        profit_appropriation_posting_repository: (
+            ProfitAppropriationPostingRepository
+        ),
     ) -> None:
         self._company_repository = company_repository
         self._chart_of_accounts_repository = (
@@ -117,6 +138,12 @@ class ClientTransferImporter:
         )
         self._tax_depreciation_adjustment_repository = (
             tax_depreciation_adjustment_repository
+        )
+        self._profit_appropriation_annual_data_repository = (
+            profit_appropriation_annual_data_repository
+        )
+        self._profit_appropriation_posting_repository = (
+            profit_appropriation_posting_repository
         )
 
     def import_transfer(
@@ -224,6 +251,14 @@ class ClientTransferImporter:
                 transfer=transfer,
             )
 
+            self._save_profit_appropriation_annual_data(
+                transfer=transfer,
+            )
+
+            self._save_profit_appropriation_postings(
+                transfer=transfer,
+            )
+
             self._set_opening_sources(
                 transfer=transfer
             )
@@ -244,19 +279,6 @@ class ClientTransferImporter:
         transfer: ClientTransfer,
     ) -> None:
         client = transfer.client
-
-        if client.profit_appropriation_annual_data:
-            raise ValueError(
-                "Der Import der Ergebnisverwendungsdaten "
-                "ist noch nicht implementiert."
-            )
-
-        if client.profit_appropriation_postings:
-            raise ValueError(
-                "Der Import der "
-                "Ergebnisverwendungsbuchungen ist "
-                "noch nicht implementiert."
-            )
 
         if client.equity_contributions:
             raise ValueError(
@@ -829,3 +851,73 @@ class ClientTransferImporter:
                     ),
                     commit=False,
                 )
+
+    def _save_profit_appropriation_annual_data(
+        self,
+        *,
+        transfer: ClientTransfer,
+    ) -> None:
+        company_id = transfer.client.company_id
+
+        for data in (
+            transfer.client.profit_appropriation_annual_data
+        ):
+            self._profit_appropriation_annual_data_repository.save_for_fiscal_year(
+                company_id=company_id,
+                fiscal_year=FiscalYear(
+                    start_date=data.fiscal_year.start_date,
+                    end_date=data.fiscal_year.end_date,
+                ),
+                data=ProfitAppropriationAnnualData(
+                    statutory_reserve_addition=Decimal(
+                        data.statutory_reserve_addition
+                    ),
+                    other_revenue_reserves_addition=Decimal(
+                        data.other_revenue_reserves_addition
+                    ),
+                    statutory_reserve_release=Decimal(
+                        data.statutory_reserve_release
+                    ),
+                    other_revenue_reserves_release=Decimal(
+                        data.other_revenue_reserves_release
+                    ),
+                    distribution=Decimal(
+                        data.distribution
+                    ),
+                    profit_loss_carryforward=Decimal(
+                        data.profit_loss_carryforward
+                    ),
+                ),
+                commit=False,
+            )
+
+
+    def _save_profit_appropriation_postings(
+        self,
+        *,
+        transfer: ClientTransfer,
+    ) -> None:
+        company_id = transfer.client.company_id
+
+        for data in (
+            transfer.client.profit_appropriation_postings
+        ):
+            self._profit_appropriation_posting_repository.add(
+                company_id=company_id,
+                posting=ProfitAppropriationPosting(
+                    source_fiscal_year_end=(
+                        data.source_fiscal_year.end_date
+                    ),
+                    posting_date=data.posting_date,
+                    amount=Decimal(data.amount),
+                    booking_id=data.booking_line.booking_id,
+                    posting_type=ProfitAppropriationPostingType(
+                        data.posting_type
+                    ),
+                    posting_id=data.posting_id,
+                ),
+                booking_line_position=(
+                    data.booking_line.position
+                ),
+                commit=False,
+            )
