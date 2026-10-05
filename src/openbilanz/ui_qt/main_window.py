@@ -77,6 +77,9 @@ from openbilanz.ui_qt.e_bilanz_account_mapping_dialog import (
     EBilanzAccountMappingDialog,
 )
 from openbilanz.ui_qt.e_bilanz_frame import EBilanzFrame
+from openbilanz.ui_qt.eric_information_dialog import (
+    EricInformationDialog,
+)
 from openbilanz.ui_qt.fixed_asset_acquisition_link_dialog import (
     AcquisitionBookingCandidate,
     FixedAssetAcquisitionLinkDialog,
@@ -186,6 +189,17 @@ class MainWindow(QMainWindow):
         )
         self.resize(1300, 800)
         self.setMinimumSize(1100, 700)
+
+        help_menu = self.menuBar().addMenu(
+            "Hilfe"
+        )
+
+        eric_information_action = help_menu.addAction(
+            "Datenschutz und ERiC-Hinweise"
+        )
+        eric_information_action.triggered.connect(
+            self._open_eric_information
+        )
 
         central_widget = QWidget(self)
         layout = QVBoxLayout(central_widget)
@@ -366,6 +380,29 @@ class MainWindow(QMainWindow):
         """Zeigt an, ob zur Buchhaltungsauswahl zurückgekehrt werden soll."""
 
         return self._return_to_start_requested
+
+    def _open_eric_information(self) -> None:
+        """Zeigt die dauerhaft verfügbaren ERiC-Informationen."""
+
+        resource_dir = (
+            Path(__file__).resolve().parent.parent
+            / "resources"
+            / "eric"
+        )
+
+        dialog = EricInformationDialog(
+            privacy_notice_file=(
+                resource_dir
+                / "privacy_notice.txt"
+            ),
+            privacy_information_file=(
+                resource_dir
+                / "privacy_information.txt"
+            ),
+            parent=self,
+        )
+
+        dialog.exec()
 
     def _create_e_bilanz_tab(self) -> None:
         """Erzeugt den Arbeitsbereich E-Bilanz."""
