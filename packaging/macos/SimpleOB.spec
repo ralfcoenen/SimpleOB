@@ -59,6 +59,12 @@ arelle_datas = collect_data_files(
     include_py_files=False,
 )
 
+arelle_datas = [
+    entry
+    for entry in arelle_datas
+    if "arelle/resources/libs/TkTable" not in str(entry[1])
+]
+
 eric_binaries = [
     (
         str(path),
