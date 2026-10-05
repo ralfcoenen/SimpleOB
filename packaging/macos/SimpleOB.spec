@@ -135,6 +135,65 @@ a = Analysis(
     optimize=0,
 )
 
+# SimpleOB is a desktop Qt Widgets application and does not use
+# Qt Virtual Keyboard or Qt's PDF image-format plugin. PyInstaller
+# collects these optional Qt components through QtGui plugin groups and
+# resolves their linked frameworks during Analysis. On macOS, framework
+# metadata and symlinks are subsequently stored in a.datas.
+# Remove these unused branches from the application bundle.
+UNUSED_QT_COMPONENTS = (
+    "libqtvirtualkeyboardplugin.dylib",
+    "QtVirtualKeyboard.framework",
+    "QtVirtualKeyboardQml.framework",
+    "libqpdf.dylib",
+    "QtPdf.framework",
+    "QtOpenGL.framework",
+    "QtQml.framework",
+    "QtQmlMeta.framework",
+    "QtQmlModels.framework",
+    "QtQmlWorkerScript.framework",
+    "QtQuick.framework",
+)
+
+UNUSED_QT_TOP_LEVEL_SYMLINKS = {
+    "QtVirtualKeyboard",
+    "QtVirtualKeyboardQml",
+    "QtPdf",
+    "QtOpenGL",
+    "QtQml",
+    "QtQmlMeta",
+    "QtQmlModels",
+    "QtQmlWorkerScript",
+    "QtQuick",
+}
+
+
+def _is_unused_qt_entry(entry):
+    dest_name = str(entry[0])
+    src_name = str(entry[1])
+
+    return (
+        any(
+            component in dest_name or component in src_name
+            for component in UNUSED_QT_COMPONENTS
+        )
+        or dest_name in UNUSED_QT_TOP_LEVEL_SYMLINKS
+    )
+
+
+a.binaries = [
+    entry
+    for entry in a.binaries
+    if not _is_unused_qt_entry(entry)
+]
+
+a.datas = [
+    entry
+    for entry in a.datas
+    if not _is_unused_qt_entry(entry)
+]
+
+
 pyz = PYZ(a.pure)
 
 exe = EXE(
