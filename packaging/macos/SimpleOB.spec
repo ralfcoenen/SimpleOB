@@ -139,6 +139,7 @@ a = Analysis(
     excludes=[
         "tkinter",
         "_tkinter",
+        "readline",
     ],
     noarchive=False,
     optimize=0,
