@@ -129,6 +129,13 @@ a = Analysis(
             ),
             "openbilanz/resources/eric",
         ),
+        (
+            str(
+                SRC_ROOT
+                / "openbilanz/resources/licenses/qt"
+            ),
+            "openbilanz/resources/licenses/qt",
+        ),
         *arelle_datas,
         *eric_wrapper_datas,
     ],

@@ -1,0 +1,103 @@
+Qt / PySide6 / Shiboken6 - Source Code and Library Replacement
+==============================================================
+
+SimpleOB uses Qt, PySide6 and Shiboken6 version 6.11.2 under the
+GNU Lesser General Public License version 3 (LGPLv3).
+
+1. Corresponding source code
+----------------------------
+
+The source code corresponding to the Qt, PySide6 and Shiboken6
+components distributed with this version of SimpleOB is available
+in the following original source archives:
+
+qtbase-everywhere-src-6.11.2.tar.xz
+SHA-256:
+5b2e00eccaf5a4d8c14134ffa0ea8dfd0a35ae1ffc7f8d87fa4305a1ed23cf22
+
+qtsvg-everywhere-src-6.11.2.tar.xz
+SHA-256:
+d594337feca84c26fb67fe87b85e6a5c12fda404b611d905f9d138210c311876
+
+pyside-setup-everywhere-src-6.11.2.zip
+SHA-256:
+c0fdd62b91a1d36d5ee2e1fb71050a32fbc93fcdeef0fdcb41d29afaaf00d9b5
+
+These archives contain the relevant license information and source
+material supplied by the Qt Project.
+
+Information about the SimpleOB-controlled download location for these
+source archives is provided with the SimpleOB distribution or on the
+SimpleOB distribution website.
+
+2. Dynamic library use
+----------------------
+
+The macOS version of SimpleOB uses Qt through dynamically linked
+frameworks and PySide6/Shiboken6 runtime libraries.
+
+The distributed Qt frameworks include:
+
+- QtCore
+- QtDBus
+- QtGui
+- QtNetwork
+- QtSvg
+- QtWidgets
+
+These libraries are separate files inside the SimpleOB application
+bundle.
+
+3. Replacing LGPL-covered libraries
+-----------------------------------
+
+Users may replace LGPL-covered Qt, PySide6 or Shiboken6 libraries with
+compatible modified versions of those libraries for their own use, as
+permitted by the LGPLv3.
+
+On macOS, changing or replacing a library inside an application bundle
+invalidates the existing code signature of the affected component and
+normally also the signature of the application bundle.
+
+SimpleOB does not require a Developer ID signature from the user in
+order to use a modified LGPL-covered library.
+
+After replacing an LGPL-covered component, the modified component and
+the application bundle can be signed locally using Apple's codesign
+tool with an ad-hoc signature.
+
+For example, for a replaced Qt framework:
+
+    codesign --force --sign - <path-to-Qt-framework>
+
+The application bundle can subsequently be re-signed locally:
+
+    codesign --force --deep --sign - <path-to-SimpleOB.app>
+
+The resulting signature can be checked with:
+
+    codesign --verify --deep --strict --verbose=2 <path-to-SimpleOB.app>
+
+An ad-hoc signature does not require an Apple Developer ID certificate.
+
+Depending on the macOS security configuration and how the application
+was obtained, macOS may require the user to explicitly approve opening
+the modified application.
+
+It is not necessary to disable Gatekeeper globally.
+
+4. Reverse engineering for LGPL purposes
+----------------------------------------
+
+Nothing in the SimpleOB license terms is intended to prohibit reverse
+engineering of the LGPL-covered components when such reverse engineering
+is necessary for exercising rights granted by the LGPLv3.
+
+5. SimpleOB application code
+----------------------------
+
+These rights concerning Qt, PySide6 and Shiboken6 do not change the
+license applicable to the separately developed SimpleOB application
+code.
+
+See LGPL-3.0.txt for the complete license terms.
