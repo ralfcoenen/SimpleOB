@@ -107,6 +107,22 @@ a = Analysis(
             ),
             "openbilanz/resources/e_bilanz/account_mappings/6.9",
         ),
+        (
+            str(
+                SRC_ROOT
+                / "openbilanz/resources/eric/"
+                "privacy_notice.txt"
+            ),
+            "openbilanz/resources/eric",
+        ),
+        (
+            str(
+                SRC_ROOT
+                / "openbilanz/resources/eric/"
+                "privacy_information.txt"
+            ),
+            "openbilanz/resources/eric",
+        ),
         *arelle_datas,
         *eric_wrapper_datas,
     ],

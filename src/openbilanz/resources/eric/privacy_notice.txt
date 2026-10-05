@@ -1,0 +1,11 @@
+      Datenschutzhinweis durch die Finanzverwaltung:
+      "Mit dieser Software werden personenbezogene Daten im Sinne des Art. 4 Nr. 1
+      Datenschutzgrundverordnung (DSGVO) und Art. 9 Abs. 1 DSGVO zum Zwecke der
+      Verarbeitung erhoben. Neben den reinen Daten, die zur Steuerveranlagung benötigt
+      werden, erhebt die Software Daten über die Art des Betriebssystems des Nutzers und
+      übermittelt diese an die Finanzverwaltung. Diese Daten werden benötigt, um die
+      ordnungsgemäße Verarbeitung der Daten sicherzustellen und Fehlern im
+      Verarbeitungsprozess vorzubeugen. Die Nutzung der Daten erfolgt im Rahmen des Art.
+      6 Abs. 1 UAbs. 1 Buchst. e i.V.m. Abs. 3 UAbs. 1 Buchst. b DSGVO i.V.m. bundes- bzw.
+      landesgesetzlicher Steuergesetze durch die Finanzverwaltung und nur für den
+      genannten Zweck."

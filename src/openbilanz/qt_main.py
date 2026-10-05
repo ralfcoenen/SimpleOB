@@ -16,9 +16,14 @@ from openbilanz.client_transfer.exporter import ClientTransferExporter
 from openbilanz.client_transfer.importer import ClientTransferImporter
 from openbilanz.client_transfer.model import ClientTransfer
 from openbilanz.core.config import (
+    ApplicationConfig,
     load_config,
     load_installed_config,
     prepare_application_data_directories,
+)
+from openbilanz.core.eric_privacy_acknowledgement import (
+    is_eric_privacy_acknowledged,
+    save_eric_privacy_acknowledgement,
 )
 from openbilanz.database.booking_repository import BookingRepository
 from openbilanz.database.chart_of_accounts_repository import (
@@ -117,6 +122,7 @@ from openbilanz.taxonomy.taxonomy_downloader import TaxonomyDownloader
 from openbilanz.taxonomy.taxonomy_installation_service import (
     TaxonomyInstallationService,
 )
+from openbilanz.ui_qt.eric_privacy_dialog import EricPrivacyDialog
 from openbilanz.ui_qt.main_window import MainWindow
 from openbilanz.ui_qt.start_dialog import StartDialog
 
@@ -130,6 +136,43 @@ def _load_application_config():
     return load_config()
 
 
+def _ensure_eric_privacy_acknowledgement(
+    *,
+    config: ApplicationConfig,
+) -> bool:
+    """Stellt die Kenntnisnahme der ERiC-Datenschutzinformationen sicher."""
+
+    if is_eric_privacy_acknowledged(
+        config.data_dir
+    ):
+        return True
+
+    resource_dir = (
+        Path(__file__).resolve().parent
+        / "resources"
+        / "eric"
+    )
+
+    dialog = EricPrivacyDialog(
+        privacy_notice_file=(
+            resource_dir
+            / "privacy_notice.txt"
+        ),
+        privacy_information_file=(
+            resource_dir
+            / "privacy_information.txt"
+        ),
+    )
+
+    if dialog.exec() != QDialog.DialogCode.Accepted:
+        return False
+
+    save_eric_privacy_acknowledgement(
+        config.data_dir
+    )
+
+    return True
+
 def main() -> None:
     """Startet die PySide6-Oberfläche von SimpleOB."""
 
@@ -137,9 +180,15 @@ def main() -> None:
     app.setQuitOnLastWindowClosed(False)
 
     config = _load_application_config()
+
     prepare_application_data_directories(
         config
     )
+
+    if not _ensure_eric_privacy_acknowledgement(
+        config=config
+    ):
+        return
 
     elster_bilanz_transmission_service = None
 
