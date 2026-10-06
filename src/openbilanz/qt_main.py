@@ -26,6 +26,9 @@ from openbilanz.core.eric_privacy_acknowledgement import (
     is_eric_privacy_acknowledged,
     save_eric_privacy_acknowledgement,
 )
+from openbilanz.database.migration_service import (
+    DatabaseMigrationService,
+)
 from openbilanz.database.booking_repository import BookingRepository
 from openbilanz.database.chart_of_accounts_repository import (
     ChartOfAccountsRepository,
@@ -210,8 +213,11 @@ def main() -> None:
             )
         )
 
+    DatabaseMigrationService(
+        application_config=config
+    ).upgrade_to_head()
+
     database = Database(config)
-    database.create_database()
 
     standard_financial_statement_context = (
         create_standard_financial_statement_context()

@@ -150,10 +150,20 @@ a = Analysis(
             ),
             "openbilanz/resources/licenses/gettext",
         ),
+        (
+            str(PROJECT_ROOT / "alembic.ini"),
+            ".",
+        ),
+        (
+            str(PROJECT_ROOT / "migrations"),
+            "migrations",
+        ),
         *arelle_datas,
         *eric_wrapper_datas,
     ],
-    hiddenimports=[],
+    hiddenimports=[
+        "logging.config",
+    ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
