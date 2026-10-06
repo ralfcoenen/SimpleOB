@@ -267,6 +267,8 @@ def test_save_eric_certificate_path_preserves_existing_config(
             f'data_dir = "{data_dir}"\n'
             "\n"
             "[eric]\n"
+            'manufacturer_id = "legacy-manufacturer"\n'
+            'certificate_pin = "legacy-pin"\n'
             f'certificate_path = "{old_certificate_path}"\n'
             "\n"
             "[eric.data_supplier]\n"
@@ -326,6 +328,8 @@ def test_save_eric_certificate_path_preserves_existing_config(
         reloaded.eric_certificate_path
         == new_certificate_path
     )
+    assert "manufacturer_id" not in text
+    assert "certificate_pin" not in text
 
 
 def test_save_eric_data_supplier_preserves_existing_config(
@@ -345,13 +349,31 @@ def test_save_eric_data_supplier_preserves_existing_config(
     config_file.write_text(
         (
             "[eric]\n"
+            'manufacturer_id = "legacy-manufacturer"\n'
             f'certificate_path = "{certificate_path}"\n'
+            'certificate_pin = "legacy-pin"\n'
+            'data_supplier = "Alter Ersteller; Altstraße; 9; a; '
+            'Zusatz; 40210; Düsseldorf; Deutschland; '
+            '0211/123456; alt@example.invalid"\n'
         ),
         encoding="utf-8",
     )
 
     config = load_config(
         config_file
+    )
+
+    assert config.eric_data_supplier == ElsterDataSupplier(
+        name="Alter Ersteller",
+        street="Altstraße",
+        house_number="9",
+        house_number_suffix="a",
+        address_addition="Zusatz",
+        postal_code="40210",
+        city="Düsseldorf",
+        country="Deutschland",
+        phone="0211/123456",
+        email="alt@example.invalid",
     )
 
     data_supplier = ElsterDataSupplier(
@@ -369,6 +391,17 @@ def test_save_eric_data_supplier_preserves_existing_config(
         config,
         data_supplier,
     )
+
+    text = config_file.read_text(
+        encoding="utf-8",
+    )
+
+    assert "manufacturer_id" not in text
+    assert "certificate_pin" not in text
+    assert 'data_supplier = "Alter Ersteller;' not in text
+
+    assert "[eric.data_supplier]" in text
+    assert 'name = "Test-Ersteller"' in text
 
     reloaded = load_config(
         config_file
@@ -693,19 +726,11 @@ def test_load_installed_config_uses_bundled_eric_lib_directory(
         (
             "[eric]\n"
             'lib_dir = "/old/development/eric/lib"\n'
+            'manufacturer_id = "legacy-manufacturer"\n'
             'certificate_path = "/tmp/test.pfx"\n'
-            "\n"
-            "[eric.data_supplier]\n"
-            'name = "Testlieferant"\n'
-            'street = "Teststraße"\n'
-            'house_number = "1"\n'
-            'house_number_suffix = ""\n'
-            'address_addition = ""\n'
-            'postal_code = "45127"\n'
-            'city = "Essen"\n'
-            'country = "Deutschland"\n'
-            'phone = ""\n'
-            'email = ""\n'
+            'certificate_pin = "legacy-pin"\n'
+            'data_supplier = "Testlieferant; Teststraße; 1; ; ; '
+            '45127; Essen; Deutschland; ; "\n'
         ),
         encoding="utf-8",
     )

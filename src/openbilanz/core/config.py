@@ -207,31 +207,59 @@ def load_config(
         {},
     )
 
-    if not isinstance(data_supplier, dict):
-        raise ValueError(
-            "eric.data_supplier muss eine TOML-Tabelle sein."
+    if isinstance(data_supplier, str):
+        legacy_parts = [
+            part.strip()
+            for part in data_supplier.split(";")
+        ]
+
+        if len(legacy_parts) != 10:
+            raise ValueError(
+                "Der alte Wert eric.data_supplier "
+                "muss aus genau 10 durch Semikolon "
+                "getrennten Feldern bestehen."
+            )
+
+        eric_data_supplier = ElsterDataSupplier(
+            name=legacy_parts[0],
+            street=legacy_parts[1],
+            house_number=legacy_parts[2],
+            house_number_suffix=legacy_parts[3],
+            address_addition=legacy_parts[4],
+            postal_code=legacy_parts[5],
+            city=legacy_parts[6],
+            country=legacy_parts[7],
+            phone=legacy_parts[8],
+            email=legacy_parts[9],
         )
 
-    eric_data_supplier = ElsterDataSupplier(
-        name=str(data_supplier.get("name", "")),
-        street=str(data_supplier.get("street", "")),
-        house_number=str(
-            data_supplier.get("house_number", "")
-        ),
-        house_number_suffix=str(
-            data_supplier.get("house_number_suffix", "")
-        ),
-        address_addition=str(
-            data_supplier.get("address_addition", "")
-        ),
-        postal_code=str(
-            data_supplier.get("postal_code", "")
-        ),
-        city=str(data_supplier.get("city", "")),
-        country=str(data_supplier.get("country", "")),
-        phone=str(data_supplier.get("phone", "")),
-        email=str(data_supplier.get("email", "")),
-    )
+    elif isinstance(data_supplier, dict):
+        eric_data_supplier = ElsterDataSupplier(
+            name=str(data_supplier.get("name", "")),
+            street=str(data_supplier.get("street", "")),
+            house_number=str(
+                data_supplier.get("house_number", "")
+            ),
+            house_number_suffix=str(
+                data_supplier.get("house_number_suffix", "")
+            ),
+            address_addition=str(
+                data_supplier.get("address_addition", "")
+            ),
+            postal_code=str(
+                data_supplier.get("postal_code", "")
+            ),
+            city=str(data_supplier.get("city", "")),
+            country=str(data_supplier.get("country", "")),
+            phone=str(data_supplier.get("phone", "")),
+            email=str(data_supplier.get("email", "")),
+        )
+
+    else:
+        raise ValueError(
+            "eric.data_supplier muss eine TOML-Tabelle "
+            "oder ein alter Zeichenkettenwert sein."
+        )
 
     if not eric_data_supplier.is_configured:
         eric_data_supplier = None
@@ -277,6 +305,58 @@ def load_installed_config() -> ApplicationConfig:
     )
 
 
+def _remove_legacy_eric_settings(
+    lines: list[str],
+) -> list[str]:
+    """Entfernt veraltete Einträge aus der direkten [eric]-Sektion."""
+
+    legacy_keys = {
+        "manufacturer_id",
+        "certificate_pin",
+        "data_supplier",
+    }
+
+    eric_start: int | None = None
+    eric_end = len(lines)
+
+    for index, line in enumerate(lines):
+        stripped = line.strip()
+
+        if stripped == "[eric]":
+            eric_start = index
+            continue
+
+        if (
+            eric_start is not None
+            and index > eric_start
+            and stripped.startswith("[")
+            and stripped.endswith("]")
+        ):
+            eric_end = index
+            break
+
+    if eric_start is None:
+        return lines
+
+    cleaned_lines = list(lines)
+
+    for index in range(
+        eric_end - 1,
+        eric_start,
+        -1,
+    ):
+        stripped = cleaned_lines[index].strip()
+        key, separator, _ = stripped.partition("=")
+
+        if (
+            separator
+            and key.strip() in legacy_keys
+        ):
+            del cleaned_lines[index]
+
+    return cleaned_lines
+
+
 def save_eric_certificate_path(
     config: ApplicationConfig,
     certificate_path: Path,
@@ -309,7 +389,9 @@ def save_eric_certificate_path(
         text = ""
 
     lines = text.splitlines()
-
+    lines = _remove_legacy_eric_settings(
+        lines
+    )
     eric_start: int | None = None
     eric_end = len(lines)
 
@@ -406,6 +488,9 @@ def save_eric_data_supplier(
         text = ""
 
     lines = text.splitlines()
+    lines = _remove_legacy_eric_settings(
+        lines
+    )
 
     section_name = "[eric.data_supplier]"
     section_start: int | None = None
