@@ -133,8 +133,7 @@ def test_test_transmission_uses_validated_test_marker_path() -> None:
         send_adapter=send_adapter,
         manufacturer_id="22924",
         data_supplier="SimpleOB Testdatenlieferant",
-        certificate_path=certificate_path,
-        certificate_pin="123456",
+
     )
 
     master_data = SimpleNamespace()
@@ -161,10 +160,10 @@ def test_test_transmission_uses_validated_test_marker_path() -> None:
         validated.elster_xml
     )
 
-    certificate_path = Path("/test/test-softidnr-pse.pfx")
-
     result = service.send_test_transmission(
         validated=validated,
+        certificate_path=certificate_path,
+        certificate_pin="123456",
     )
 
     assert send_adapter.calls == [
@@ -196,8 +195,7 @@ def test_production_transmission_uses_path_without_test_marker() -> None:
         send_adapter=send_adapter,
         manufacturer_id="22924",
         data_supplier="SimpleOB Testdatenlieferant",
-        certificate_path=certificate_path,
-        certificate_pin="123456",
+
     )
 
     master_data = SimpleNamespace()
@@ -222,6 +220,8 @@ def test_production_transmission_uses_path_without_test_marker() -> None:
 
     result = service.send_production_transmission(
         validated=validated,
+        certificate_path=certificate_path,
+        certificate_pin="123456",
     )
 
     assert send_adapter.calls == [
@@ -241,6 +241,9 @@ def test_production_transmission_rejects_test_marker_before_send() -> None:
     create_th_adapter = FakeCreateThAdapter()
     validate_adapter = FakeValidateAdapter()
     send_adapter = FakeSendAdapter()
+    certificate_path = Path(
+        "/test/test-softidnr-pse.pfx"
+    )
 
     service = ElsterBilanzTransmissionService(
         payload_service=payload_service,
@@ -249,10 +252,6 @@ def test_production_transmission_rejects_test_marker_before_send() -> None:
         send_adapter=send_adapter,
         manufacturer_id="22924",
         data_supplier="SimpleOB Testdatenlieferant",
-        certificate_path=Path(
-            "/test/test-softidnr-pse.pfx"
-        ),
-        certificate_pin="123456",
     )
 
     validated = service.validate_production_transmission(
@@ -274,7 +273,10 @@ def test_production_transmission_rejects_test_marker_before_send() -> None:
     try:
         service.send_production_transmission(
             validated=manipulated,
+            certificate_path=certificate_path,
+            certificate_pin="123456",
         )
+
     except RuntimeError as exc:
         assert "SICHERHEITSABBRUCH" in str(exc)
     else:

@@ -21,6 +21,7 @@ from openbilanz.core.config import (
     load_installed_config,
     prepare_application_data_directories,
 )
+from openbilanz.core.product import ERIC_MANUFACTURER_ID
 from openbilanz.core.eric_privacy_acknowledgement import (
     is_eric_privacy_acknowledged,
     save_eric_privacy_acknowledgement,
@@ -194,10 +195,7 @@ def main() -> None:
 
     if (
         config.eric_lib_dir is not None
-        and config.eric_manufacturer_id is not None
         and config.eric_data_supplier is not None
-        and config.eric_certificate_path is not None
-        and config.eric_certificate_pin is not None
     ):
         elster_bilanz_transmission_service = (
             ElsterBilanzTransmissionService(
@@ -211,10 +209,8 @@ def main() -> None:
                 send_adapter=EricSendAdapter(
                     lib_dir=config.eric_lib_dir,
                 ),
-                manufacturer_id=config.eric_manufacturer_id,
+                manufacturer_id=ERIC_MANUFACTURER_ID,
                 data_supplier=config.eric_data_supplier,
-                certificate_path=config.eric_certificate_path,
-                certificate_pin=config.eric_certificate_pin,
             )
         )
 
@@ -730,6 +726,10 @@ def main() -> None:
                 ),
                 elster_bilanz_transmission_service=(
                     elster_bilanz_transmission_service
+                ),
+                application_config=config,
+                eric_certificate_path=(
+                    config.eric_certificate_path
                 ),
             )
             window.show()

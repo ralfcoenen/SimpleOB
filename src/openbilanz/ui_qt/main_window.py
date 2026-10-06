@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QInputDialog,
     QLabel,
+    QLineEdit,
     QMainWindow,
     QMenu,
     QMessageBox,
@@ -40,6 +41,10 @@ from openbilanz.client_transfer.archive import (
     write_client_transfer_archive,
 )
 from openbilanz.client_transfer.model import ClientTransfer
+from openbilanz.core.config import (
+    ApplicationConfig,
+    save_eric_certificate_path,
+)
 from openbilanz.core.context import ApplicationContext
 from openbilanz.date_input import parse_german_date
 from openbilanz.domain.account import Account
@@ -137,6 +142,8 @@ class MainWindow(QMainWindow):
         elster_bilanz_transmission_service: (
             ElsterBilanzTransmissionService | None
         ) = None,
+        eric_certificate_path: Path | None = None,
+        application_config: ApplicationConfig | None = None,
     ) -> None:
         super().__init__()
 
@@ -171,6 +178,12 @@ class MainWindow(QMainWindow):
         self._elster_bilanz_transmission_service = (
             elster_bilanz_transmission_service
         )
+        self._application_config = application_config
+        self._eric_certificate_path = (
+            Path(eric_certificate_path).expanduser()
+            if eric_certificate_path is not None
+            else None
+        )
         self._current_income_statement: IncomeStatement | None = None
         self._current_closing_result: ClosingResult | None = None
         self._current_balance_sheet: BalanceSheet | None = None
@@ -189,6 +202,19 @@ class MainWindow(QMainWindow):
         )
         self.resize(1300, 800)
         self.setMinimumSize(1100, 700)
+
+        settings_menu = self.menuBar().addMenu(
+            "Einstellungen"
+        )
+
+        elster_certificate_action = (
+            settings_menu.addAction(
+                "ELSTER-Zertifikat…"
+            )
+        )
+        elster_certificate_action.triggered.connect(
+            self._configure_elster_certificate
+        )
 
         help_menu = self.menuBar().addMenu(
             "Hilfe"
@@ -768,6 +794,158 @@ class MainWindow(QMainWindow):
             ),
         )
 
+    def _configure_elster_certificate(self) -> None:
+        """Wählt das ELSTER-Zertifikat aus und speichert dessen Pfad."""
+
+        if self._application_config is None:
+            QMessageBox.critical(
+                self,
+                "ELSTER-Zertifikat",
+                (
+                    "Die Anwendungskonfiguration ist nicht "
+                    "verfügbar."
+                ),
+            )
+            return
+
+        if self._eric_certificate_path is not None:
+            initial_path = str(
+                self._eric_certificate_path.parent
+            )
+            current_certificate = str(
+                self._eric_certificate_path
+            )
+        else:
+            initial_path = str(Path.home())
+            current_certificate = "Noch nicht konfiguriert"
+
+        answer = QMessageBox.question(
+            self,
+            "ELSTER-Zertifikat",
+            (
+                "Aktuell konfiguriertes ELSTER-Zertifikat:\n\n"
+                f"{current_certificate}\n\n"
+                "Möchten Sie ein ELSTER-Zertifikat auswählen?"
+            ),
+            QMessageBox.StandardButton.Yes
+            | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes,
+        )
+
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+
+        certificate_file, _ = QFileDialog.getOpenFileName(
+            self,
+            "ELSTER-Zertifikat auswählen",
+            initial_path,
+            (
+                "ELSTER-Zertifikate (*.pfx *.p12);;"
+                "Alle Dateien (*)"
+            ),
+        )
+
+        if not certificate_file:
+            return
+
+        certificate_path = Path(
+            certificate_file
+        ).expanduser()
+
+        if not certificate_path.is_file():
+            QMessageBox.warning(
+                self,
+                "ELSTER-Zertifikat",
+                (
+                    "Die ausgewählte Zertifikatsdatei "
+                    "wurde nicht gefunden."
+                ),
+            )
+            return
+
+        try:
+            save_eric_certificate_path(
+                self._application_config,
+                certificate_path,
+            )
+        except OSError as exc:
+            QMessageBox.critical(
+                self,
+                "ELSTER-Zertifikat",
+                (
+                    "Der Zertifikatspfad konnte nicht "
+                    "gespeichert werden.\n\n"
+                    f"{exc}"
+                ),
+            )
+            return
+
+        self._eric_certificate_path = certificate_path
+
+        QMessageBox.information(
+            self,
+            "ELSTER-Zertifikat",
+            (
+                "Das ELSTER-Zertifikat wurde konfiguriert.\n\n"
+                f"{certificate_path}\n\n"
+                "Die PIN wird nicht gespeichert. "
+                "SimpleOB fragt sie erst unmittelbar vor "
+                "einer ELSTER-Übermittlung ab."
+            ),
+        )
+
+    def _request_elster_certificate_credentials(
+        self,
+        *,
+        window_title: str,
+    ) -> tuple[Path, str] | None:
+        """Liefert Zertifikatspfad und einmalig eingegebene PIN."""
+
+        if self._eric_certificate_path is None:
+            QMessageBox.warning(
+                self,
+                window_title,
+                (
+                    "Es ist noch kein ELSTER-Zertifikat "
+                    "konfiguriert."
+                ),
+            )
+            return None
+
+        certificate_path = self._eric_certificate_path
+
+        if not certificate_path.is_file():
+            QMessageBox.warning(
+                self,
+                window_title,
+                (
+                    "Das konfigurierte ELSTER-Zertifikat "
+                    "wurde nicht gefunden:\n\n"
+                    f"{certificate_path}"
+                ),
+            )
+            return None
+
+        certificate_pin, accepted = QInputDialog.getText(
+            self,
+            window_title,
+            "PIN des ELSTER-Zertifikats:",
+            QLineEdit.EchoMode.Password,
+        )
+
+        if not accepted:
+            return None
+
+        if not certificate_pin:
+            QMessageBox.warning(
+                self,
+                window_title,
+                "Die ELSTER-Zertifikats-PIN darf nicht leer sein.",
+            )
+            return None
+
+        return certificate_path, certificate_pin
+
     def _send_e_bilanz_test(self) -> None:
         """Übermittelt die E-Bilanz als echte ELSTER-Testsendung."""
 
@@ -814,6 +992,15 @@ class MainWindow(QMainWindow):
         if not accepted or confirmation != "TESTSENDUNG":
             return
 
+        credentials = self._request_elster_certificate_credentials(
+            window_title="ELSTER-Testübermittlung",
+        )
+
+        if credentials is None:
+            return
+
+        certificate_path, certificate_pin = credentials
+
         try:
             master_data = self._workspace.load_company_master_data()
 
@@ -832,6 +1019,8 @@ class MainWindow(QMainWindow):
                 self._elster_bilanz_transmission_service
                 .send_test_transmission(
                     validated=validated,
+                    certificate_path=certificate_path,
+                    certificate_pin=certificate_pin,
                 )
             )
             transmitted_at = datetime.now()
@@ -943,6 +1132,15 @@ class MainWindow(QMainWindow):
         if not accepted or confirmation != "PRODUKTIV SENDEN":
             return
 
+        credentials = self._request_elster_certificate_credentials(
+            window_title="ELSTER-Produktivübermittlung",
+        )
+
+        if credentials is None:
+            return
+
+        certificate_path, certificate_pin = credentials
+
         try:
             master_data = self._workspace.load_company_master_data()
 
@@ -961,6 +1159,8 @@ class MainWindow(QMainWindow):
                 self._elster_bilanz_transmission_service
                 .send_production_transmission(
                     validated=validated,
+                    certificate_path=certificate_path,
+                    certificate_pin=certificate_pin,
                 )
             )
             transmitted_at = datetime.now()

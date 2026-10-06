@@ -26,10 +26,8 @@ class ApplicationConfig:
     taxonomy_dir: Path
     config_file: Path
     eric_lib_dir: Path | None = None
-    eric_manufacturer_id: str | None = None
     eric_data_supplier: str | None = None
     eric_certificate_path: Path | None = None
-    eric_certificate_pin: str | None = None
 
     @property
     def database_url(self) -> str:
@@ -145,10 +143,8 @@ def load_config(
             taxonomy_dir=effective_defaults.taxonomy_dir,
             config_file=path,
             eric_lib_dir=effective_defaults.eric_lib_dir,
-            eric_manufacturer_id=effective_defaults.eric_manufacturer_id,
             eric_data_supplier=effective_defaults.eric_data_supplier,
             eric_certificate_path=effective_defaults.eric_certificate_path,
-            eric_certificate_pin=effective_defaults.eric_certificate_pin,
         )
 
     with path.open("rb") as file:
@@ -204,18 +200,6 @@ def load_config(
         else None
     )
 
-    eric_manufacturer_id_value = eric.get(
-        "manufacturer_id",
-    )
-    eric_manufacturer_id = (
-        str(eric_manufacturer_id_value).strip()
-        if eric_manufacturer_id_value is not None
-        else None
-    )
-
-    if not eric_manufacturer_id:
-        eric_manufacturer_id = None
-
     eric_data_supplier_value = eric.get(
         "data_supplier",
     )
@@ -237,28 +221,14 @@ def load_config(
         else None
     )
 
-    eric_certificate_pin_value = eric.get(
-        "certificate_pin",
-    )
-    eric_certificate_pin = (
-        str(eric_certificate_pin_value)
-        if eric_certificate_pin_value is not None
-        else None
-    )
-
-    if not eric_certificate_pin:
-        eric_certificate_pin = None
-
     return ApplicationConfig(
         data_dir=data_dir,
         database_file=database_file,
         taxonomy_dir=taxonomy_dir,
         config_file=path,
         eric_lib_dir=eric_lib_dir,
-        eric_manufacturer_id=eric_manufacturer_id,
         eric_data_supplier=eric_data_supplier,
         eric_certificate_path=eric_certificate_path,
-        eric_certificate_pin=eric_certificate_pin,
     )
 
 
@@ -278,10 +248,104 @@ def load_installed_config() -> ApplicationConfig:
         taxonomy_dir=config.taxonomy_dir,
         config_file=config.config_file,
         eric_lib_dir=defaults.eric_lib_dir,
-        eric_manufacturer_id=config.eric_manufacturer_id,
         eric_data_supplier=config.eric_data_supplier,
         eric_certificate_path=config.eric_certificate_path,
-        eric_certificate_pin=config.eric_certificate_pin,
+    )
+
+
+def save_eric_certificate_path(
+    config: ApplicationConfig,
+    certificate_path: Path,
+) -> None:
+    """Speichert den Pfad zum ELSTER-Zertifikat in der Konfiguration."""
+
+    certificate_path = Path(
+        certificate_path
+    ).expanduser()
+
+    config_file = config.config_file
+    config_file.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    certificate_value = str(
+        certificate_path
+    ).replace("\\", "\\\\").replace('"', '\\"')
+
+    certificate_line = (
+        f'certificate_path = "{certificate_value}"'
+    )
+
+    if config_file.is_file():
+        text = config_file.read_text(
+            encoding="utf-8",
+        )
+    else:
+        text = ""
+
+    lines = text.splitlines()
+
+    eric_start: int | None = None
+    eric_end = len(lines)
+
+    for index, line in enumerate(lines):
+        stripped = line.strip()
+
+        if stripped == "[eric]":
+            eric_start = index
+            continue
+
+        if (
+            eric_start is not None
+            and index > eric_start
+            and stripped.startswith("[")
+            and stripped.endswith("]")
+        ):
+            eric_end = index
+            break
+
+    if eric_start is None:
+        if lines and lines[-1].strip():
+            lines.append("")
+
+        lines.extend(
+            (
+                "[eric]",
+                certificate_line,
+            )
+        )
+    else:
+        certificate_index: int | None = None
+
+        for index in range(
+            eric_start + 1,
+            eric_end,
+        ):
+            stripped = lines[index].strip()
+
+            if not stripped.startswith(
+                "certificate_path"
+            ):
+                continue
+
+            key, separator, _ = stripped.partition("=")
+
+            if separator and key.strip() == "certificate_path":
+                certificate_index = index
+                break
+
+        if certificate_index is None:
+            lines.insert(
+                eric_end,
+                certificate_line,
+            )
+        else:
+            lines[certificate_index] = certificate_line
+
+    config_file.write_text(
+        "\n".join(lines) + "\n",
+        encoding="utf-8",
     )
 
 

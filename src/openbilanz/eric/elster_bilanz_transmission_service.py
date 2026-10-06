@@ -50,8 +50,6 @@ class ElsterBilanzTransmissionService:
         send_adapter: EricSendAdapter,
         manufacturer_id: str,
         data_supplier: str,
-        certificate_path: Path,
-        certificate_pin: str,
     ) -> None:
         manufacturer_id = manufacturer_id.strip()
         data_supplier = data_supplier.strip()
@@ -66,22 +64,12 @@ class ElsterBilanzTransmissionService:
                 "Der ELSTER-Datenlieferant darf nicht leer sein."
             )
 
-        if not certificate_pin:
-            raise ValueError(
-                "Die ELSTER-Zertifikats-PIN darf nicht leer sein."
-            )
-
         self._payload_service = payload_service
         self._create_th_adapter = create_th_adapter
         self._validate_adapter = validate_adapter
         self._send_adapter = send_adapter
         self._manufacturer_id = manufacturer_id
         self._data_supplier = data_supplier
-        self._certificate_path = Path(
-            certificate_path
-        ).expanduser()
-        self._certificate_pin = certificate_pin
-
 
     def validate_test_transmission(
         self,
@@ -168,6 +156,8 @@ class ElsterBilanzTransmissionService:
         self,
         *,
         validated: ElsterBilanzValidationResult,
+        certificate_path: Path,
+        certificate_pin: str,
         datenart_version: str = DEFAULT_BILANZ_DATENART_VERSION,
     ) -> EricSendResult:
         """Versendet einen zuvor lokal validierten ELSTER-Testdatensatz."""
@@ -179,8 +169,8 @@ class ElsterBilanzTransmissionService:
 
         return self._send_adapter.send(
             elster_xml=validated.elster_xml,
-            certificate_path=self._certificate_path,
-            certificate_pin=self._certificate_pin,
+            certificate_path=Path(certificate_path).expanduser(),
+            certificate_pin=certificate_pin,
             datenart_version=datenart_version,
         )
 
@@ -188,6 +178,8 @@ class ElsterBilanzTransmissionService:
         self,
         *,
         validated: ElsterBilanzValidationResult,
+        certificate_path: Path,
+        certificate_pin: str,
         datenart_version: str = DEFAULT_BILANZ_DATENART_VERSION,
     ) -> EricSendResult:
         """Versendet einen zuvor lokal validierten ELSTER-Produktivdatensatz."""
@@ -198,11 +190,10 @@ class ElsterBilanzTransmissionService:
 
         return self._send_adapter.send(
             elster_xml=validated.elster_xml,
-            certificate_path=self._certificate_path,
-            certificate_pin=self._certificate_pin,
+            certificate_path=Path(certificate_path).expanduser(),
+            certificate_pin=certificate_pin,
             datenart_version=datenart_version,
         )
-
     @staticmethod
     def _assert_test_marker(
         *,

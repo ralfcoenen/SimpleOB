@@ -12,6 +12,7 @@ from openbilanz.core.config import (
     load_config,
     load_installed_config,
     prepare_application_data_directories,
+    save_eric_certificate_path,
 )
 
 
@@ -38,7 +39,6 @@ def test_default_config_uses_project_data_directory() -> None:
     )
 
     assert config.eric_lib_dir is None
-    assert config.eric_manufacturer_id is None
 
 
 def test_load_config_uses_defaults_when_file_is_missing(
@@ -72,7 +72,6 @@ def test_load_config_uses_defaults_when_file_is_missing(
     )
 
     assert config.eric_lib_dir is None
-    assert config.eric_manufacturer_id is None
 
 
 def test_load_config_reads_toml_file(
@@ -134,7 +133,6 @@ def test_load_config_reads_toml_file(
     )
 
     assert config.eric_lib_dir is None
-    assert config.eric_manufacturer_id is None
 
 
 def test_database_and_taxonomy_paths_follow_configured_data_dir(
@@ -197,10 +195,8 @@ def test_load_config_reads_eric_configuration(
         (
             "[eric]\n"
             f'lib_dir = "{eric_lib_dir}"\n'
-            'manufacturer_id = " 12345 "\n'
             'data_supplier = " Test-Datenlieferant "\n'
             f'certificate_path = "{certificate_path}"\n'
-            'certificate_pin = "123456"\n'
         ),
         encoding="utf-8",
     )
@@ -210,9 +206,81 @@ def test_load_config_reads_eric_configuration(
     )
 
     assert config.eric_lib_dir == eric_lib_dir
-    assert config.eric_manufacturer_id == "12345"
     assert config.eric_certificate_path == certificate_path
-    assert config.eric_certificate_pin == "123456"
+
+
+
+def test_save_eric_certificate_path_preserves_existing_config(
+    tmp_path: Path,
+) -> None:
+    config_file = (
+        tmp_path
+        / "config.toml"
+    )
+
+    data_dir = (
+        tmp_path
+        / "application-data"
+    )
+
+    old_certificate_path = (
+        tmp_path
+        / "certificates"
+        / "old.pfx"
+    )
+
+    new_certificate_path = (
+        tmp_path
+        / "certificates"
+        / "new.pfx"
+    )
+
+    config_file.write_text(
+        (
+            "[application]\n"
+            f'data_dir = "{data_dir}"\n'
+            "\n"
+            "[eric]\n"
+            'data_supplier = "Testlieferant"\n'
+            f'certificate_path = "{old_certificate_path}"\n'
+        ),
+        encoding="utf-8",
+    )
+
+    config = load_config(
+        config_file
+    )
+
+    save_eric_certificate_path(
+        config,
+        new_certificate_path,
+    )
+
+    text = config_file.read_text(
+        encoding="utf-8",
+    )
+
+    assert (
+        f'data_dir = "{data_dir}"'
+        in text
+    )
+    assert 'data_supplier = "Testlieferant"' in text
+    assert (
+        f'certificate_path = "{new_certificate_path}"'
+        in text
+    )
+    assert str(old_certificate_path) not in text
+
+    reloaded = load_config(
+        config_file
+    )
+
+    assert reloaded.data_dir == data_dir
+    assert reloaded.eric_data_supplier == "Testlieferant"
+    assert (
+        reloaded.eric_certificate_path
+        == new_certificate_path
+    )
 
 
 def test_load_config_expands_eric_lib_directory(
@@ -253,8 +321,6 @@ def test_load_config_expands_eric_lib_directory(
         / "lib"
     )
 
-    assert config.eric_manufacturer_id is None
-
 
 def test_load_config_treats_empty_eric_values_as_missing(
     tmp_path: Path,
@@ -268,7 +334,7 @@ def test_load_config_treats_empty_eric_values_as_missing(
         (
             "[eric]\n"
             'lib_dir = ""\n'
-            'manufacturer_id = "   "\n'
+            'data_supplier = "   "\n'
         ),
         encoding="utf-8",
     )
@@ -278,7 +344,6 @@ def test_load_config_treats_empty_eric_values_as_missing(
     )
 
     assert config.eric_lib_dir is None
-    assert config.eric_manufacturer_id is None
     assert config.eric_data_supplier is None
 
 
@@ -371,10 +436,7 @@ def test_load_installed_config_reads_config_from_desktop_data_directory(
         / "config.toml"
     )
     config_file.write_text(
-        (
-            "[eric]\n"
-            'manufacturer_id = "22924"\n'
-        ),
+        "",
         encoding="utf-8",
     )
 
@@ -390,7 +452,6 @@ def test_load_installed_config_reads_config_from_desktop_data_directory(
         / "taxonomy"
     )
     assert config.config_file == config_file
-    assert config.eric_manufacturer_id == "22924"
 
 
 def test_prepare_application_data_directories_creates_required_directories(
@@ -519,10 +580,8 @@ def test_load_installed_config_uses_bundled_eric_lib_directory(
         (
             "[eric]\n"
             'lib_dir = "/old/development/eric/lib"\n'
-            'manufacturer_id = "22924"\n'
             'data_supplier = "Testlieferant"\n'
             'certificate_path = "/tmp/test.pfx"\n'
-            'certificate_pin = "123456"\n'
         ),
         encoding="utf-8",
     )
@@ -543,9 +602,7 @@ def test_load_installed_config_uses_bundled_eric_lib_directory(
     config = load_installed_config()
 
     assert config.eric_lib_dir == eric_lib_dir
-    assert config.eric_manufacturer_id == "22924"
     assert config.eric_data_supplier == "Testlieferant"
     assert config.eric_certificate_path == Path(
         "/tmp/test.pfx"
     )
-    assert config.eric_certificate_pin == "123456"
