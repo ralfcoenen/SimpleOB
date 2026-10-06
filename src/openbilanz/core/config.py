@@ -8,6 +8,8 @@ import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
+from openbilanz.domain.elster_data_supplier import ElsterDataSupplier
+
 BASE_DIR = Path(__file__).resolve().parents[3]
 
 DEFAULT_DATA_DIR = BASE_DIR / "data"
@@ -200,16 +202,38 @@ def load_config(
         else None
     )
 
-    eric_data_supplier_value = eric.get(
+    data_supplier = eric.get(
         "data_supplier",
-    )
-    eric_data_supplier = (
-        str(eric_data_supplier_value).strip()
-        if eric_data_supplier_value is not None
-        else None
+        {},
     )
 
-    if not eric_data_supplier:
+    if not isinstance(data_supplier, dict):
+        raise ValueError(
+            "eric.data_supplier muss eine TOML-Tabelle sein."
+        )
+
+    eric_data_supplier = ElsterDataSupplier(
+        name=str(data_supplier.get("name", "")),
+        street=str(data_supplier.get("street", "")),
+        house_number=str(
+            data_supplier.get("house_number", "")
+        ),
+        house_number_suffix=str(
+            data_supplier.get("house_number_suffix", "")
+        ),
+        address_addition=str(
+            data_supplier.get("address_addition", "")
+        ),
+        postal_code=str(
+            data_supplier.get("postal_code", "")
+        ),
+        city=str(data_supplier.get("city", "")),
+        country=str(data_supplier.get("country", "")),
+        phone=str(data_supplier.get("phone", "")),
+        email=str(data_supplier.get("email", "")),
+    )
+
+    if not eric_data_supplier.is_configured:
         eric_data_supplier = None
 
     eric_certificate_path_value = eric.get(
@@ -342,6 +366,120 @@ def save_eric_certificate_path(
             )
         else:
             lines[certificate_index] = certificate_line
+
+    config_file.write_text(
+        "\n".join(lines) + "\n",
+        encoding="utf-8",
+    )
+
+
+def save_eric_data_supplier(
+    config: ApplicationConfig,
+    data_supplier: ElsterDataSupplier,
+) -> None:
+    """Speichert die Daten des ELSTER-Datenlieferanten."""
+
+    if not isinstance(
+        data_supplier,
+        ElsterDataSupplier,
+    ):
+        raise TypeError(
+            "data_supplier muss ein ElsterDataSupplier sein."
+        )
+
+    if not data_supplier.is_configured:
+        raise ValueError(
+            "Der ELSTER-Datenlieferant ist nicht konfiguriert."
+        )
+
+    config_file = config.config_file
+    config_file.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    if config_file.is_file():
+        text = config_file.read_text(
+            encoding="utf-8",
+        )
+    else:
+        text = ""
+
+    lines = text.splitlines()
+
+    section_name = "[eric.data_supplier]"
+    section_start: int | None = None
+    section_end = len(lines)
+
+    for index, line in enumerate(lines):
+        stripped = line.strip()
+
+        if stripped == section_name:
+            section_start = index
+            continue
+
+        if (
+            section_start is not None
+            and index > section_start
+            and stripped.startswith("[")
+            and stripped.endswith("]")
+        ):
+            section_end = index
+            break
+
+    if section_start is not None:
+        del lines[
+            section_start:section_end
+        ]
+
+        while (
+            section_start > 0
+            and section_start <= len(lines)
+            and not lines[section_start - 1].strip()
+        ):
+            del lines[section_start - 1]
+            section_start -= 1
+
+    def toml_string(value: str) -> str:
+        escaped = (
+            value
+            .replace("\\", "\\\\")
+            .replace('"', '\\"')
+        )
+        return f'"{escaped}"'
+
+    supplier_lines = [
+        section_name,
+        f"name = {toml_string(data_supplier.name)}",
+        f"street = {toml_string(data_supplier.street)}",
+        (
+            "house_number = "
+            f"{toml_string(data_supplier.house_number)}"
+        ),
+        (
+            "house_number_suffix = "
+            f"{toml_string(data_supplier.house_number_suffix)}"
+        ),
+        (
+            "address_addition = "
+            f"{toml_string(data_supplier.address_addition)}"
+        ),
+        (
+            "postal_code = "
+            f"{toml_string(data_supplier.postal_code)}"
+        ),
+        f"city = {toml_string(data_supplier.city)}",
+        f"country = {toml_string(data_supplier.country)}",
+        f"phone = {toml_string(data_supplier.phone)}",
+        f"email = {toml_string(data_supplier.email)}",
+    ]
+
+    if lines and lines[-1].strip():
+        lines.append("")
+
+    lines.extend(
+        supplier_lines
+    )
 
     config_file.write_text(
         "\n".join(lines) + "\n",

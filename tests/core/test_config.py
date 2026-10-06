@@ -13,7 +13,12 @@ from openbilanz.core.config import (
     load_installed_config,
     prepare_application_data_directories,
     save_eric_certificate_path,
+    save_eric_data_supplier,
 )
+from openbilanz.domain.elster_data_supplier import (
+    ElsterDataSupplier,
+)
+
 
 
 def test_default_config_uses_project_data_directory() -> None:
@@ -195,8 +200,19 @@ def test_load_config_reads_eric_configuration(
         (
             "[eric]\n"
             f'lib_dir = "{eric_lib_dir}"\n'
-            'data_supplier = " Test-Datenlieferant "\n'
             f'certificate_path = "{certificate_path}"\n'
+            "\n"
+            "[eric.data_supplier]\n"
+            'name = "Test-Ersteller"\n'
+            'street = "Teststraße"\n'
+            'house_number = "1"\n'
+            'house_number_suffix = ""\n'
+            'address_addition = ""\n'
+            'postal_code = "45127"\n'
+            'city = "Essen"\n'
+            'country = "Deutschland"\n'
+            'phone = "0201/000000"\n'
+            'email = "test@example.invalid"\n'
         ),
         encoding="utf-8",
     )
@@ -208,6 +224,16 @@ def test_load_config_reads_eric_configuration(
     assert config.eric_lib_dir == eric_lib_dir
     assert config.eric_certificate_path == certificate_path
 
+    assert config.eric_data_supplier == ElsterDataSupplier(
+        name="Test-Ersteller",
+        street="Teststraße",
+        house_number="1",
+        postal_code="45127",
+        city="Essen",
+        country="Deutschland",
+        phone="0201/000000",
+        email="test@example.invalid",
+    )
 
 
 def test_save_eric_certificate_path_preserves_existing_config(
@@ -241,8 +267,19 @@ def test_save_eric_certificate_path_preserves_existing_config(
             f'data_dir = "{data_dir}"\n'
             "\n"
             "[eric]\n"
-            'data_supplier = "Testlieferant"\n'
             f'certificate_path = "{old_certificate_path}"\n'
+            "\n"
+            "[eric.data_supplier]\n"
+            'name = "Testlieferant"\n'
+            'street = "Teststraße"\n'
+            'house_number = "1"\n'
+            'house_number_suffix = ""\n'
+            'address_addition = ""\n'
+            'postal_code = "45127"\n'
+            'city = "Essen"\n'
+            'country = "Deutschland"\n'
+            'phone = ""\n'
+            'email = ""\n'
         ),
         encoding="utf-8",
     )
@@ -264,7 +301,8 @@ def test_save_eric_certificate_path_preserves_existing_config(
         f'data_dir = "{data_dir}"'
         in text
     )
-    assert 'data_supplier = "Testlieferant"' in text
+    assert '[eric.data_supplier]' in text
+    assert 'name = "Testlieferant"' in text
     assert (
         f'certificate_path = "{new_certificate_path}"'
         in text
@@ -276,10 +314,73 @@ def test_save_eric_certificate_path_preserves_existing_config(
     )
 
     assert reloaded.data_dir == data_dir
-    assert reloaded.eric_data_supplier == "Testlieferant"
+    assert reloaded.eric_data_supplier == ElsterDataSupplier(
+        name="Testlieferant",
+        street="Teststraße",
+        house_number="1",
+        postal_code="45127",
+        city="Essen",
+        country="Deutschland",
+    )
     assert (
         reloaded.eric_certificate_path
         == new_certificate_path
+    )
+
+
+def test_save_eric_data_supplier_preserves_existing_config(
+    tmp_path: Path,
+) -> None:
+    config_file = (
+        tmp_path
+        / "config.toml"
+    )
+
+    certificate_path = (
+        tmp_path
+        / "certificate"
+        / "elster.pfx"
+    )
+
+    config_file.write_text(
+        (
+            "[eric]\n"
+            f'certificate_path = "{certificate_path}"\n'
+        ),
+        encoding="utf-8",
+    )
+
+    config = load_config(
+        config_file
+    )
+
+    data_supplier = ElsterDataSupplier(
+        name="Test-Ersteller",
+        street="Teststraße",
+        house_number="1",
+        postal_code="45127",
+        city="Essen",
+        country="Deutschland",
+        phone="0201/000000",
+        email="test@example.invalid",
+    )
+
+    save_eric_data_supplier(
+        config,
+        data_supplier,
+    )
+
+    reloaded = load_config(
+        config_file
+    )
+
+    assert (
+        reloaded.eric_certificate_path
+        == certificate_path
+    )
+    assert (
+        reloaded.eric_data_supplier
+        == data_supplier
     )
 
 
@@ -334,7 +435,18 @@ def test_load_config_treats_empty_eric_values_as_missing(
         (
             "[eric]\n"
             'lib_dir = ""\n'
-            'data_supplier = "   "\n'
+            "\n"
+            "[eric.data_supplier]\n"
+            'name = "   "\n'
+            'street = ""\n'
+            'house_number = ""\n'
+            'house_number_suffix = ""\n'
+            'address_addition = ""\n'
+            'postal_code = ""\n'
+            'city = ""\n'
+            'country = ""\n'
+            'phone = ""\n'
+            'email = ""\n'
         ),
         encoding="utf-8",
     )
@@ -576,12 +688,24 @@ def test_load_installed_config_uses_bundled_eric_lib_directory(
         application_data_dir
         / "config.toml"
     )
+
     config_file.write_text(
         (
             "[eric]\n"
             'lib_dir = "/old/development/eric/lib"\n'
-            'data_supplier = "Testlieferant"\n'
             'certificate_path = "/tmp/test.pfx"\n'
+            "\n"
+            "[eric.data_supplier]\n"
+            'name = "Testlieferant"\n'
+            'street = "Teststraße"\n'
+            'house_number = "1"\n'
+            'house_number_suffix = ""\n'
+            'address_addition = ""\n'
+            'postal_code = "45127"\n'
+            'city = "Essen"\n'
+            'country = "Deutschland"\n'
+            'phone = ""\n'
+            'email = ""\n'
         ),
         encoding="utf-8",
     )
@@ -602,7 +726,14 @@ def test_load_installed_config_uses_bundled_eric_lib_directory(
     config = load_installed_config()
 
     assert config.eric_lib_dir == eric_lib_dir
-    assert config.eric_data_supplier == "Testlieferant"
+    assert config.eric_data_supplier == ElsterDataSupplier(
+        name="Testlieferant",
+        street="Teststraße",
+        house_number="1",
+        postal_code="45127",
+        city="Essen",
+        country="Deutschland",
+    )
     assert config.eric_certificate_path == Path(
         "/tmp/test.pfx"
     )

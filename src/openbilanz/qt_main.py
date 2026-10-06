@@ -193,10 +193,7 @@ def main() -> None:
 
     elster_bilanz_transmission_service = None
 
-    if (
-        config.eric_lib_dir is not None
-        and config.eric_data_supplier is not None
-    ):
+    if config.eric_lib_dir is not None:
         elster_bilanz_transmission_service = (
             ElsterBilanzTransmissionService(
                 payload_service=ElsterBilanzPayloadService(),
@@ -210,7 +207,6 @@ def main() -> None:
                     lib_dir=config.eric_lib_dir,
                 ),
                 manufacturer_id=ERIC_MANUFACTURER_ID,
-                data_supplier=config.eric_data_supplier,
             )
         )
 
@@ -730,6 +726,9 @@ def main() -> None:
                 application_config=config,
                 eric_certificate_path=(
                     config.eric_certificate_path
+                ),
+                eric_data_supplier=(
+                    config.eric_data_supplier
                 ),
             )
             window.show()

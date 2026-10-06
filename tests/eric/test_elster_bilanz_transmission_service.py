@@ -132,8 +132,6 @@ def test_test_transmission_uses_validated_test_marker_path() -> None:
         validate_adapter=validate_adapter,
         send_adapter=send_adapter,
         manufacturer_id="22924",
-        data_supplier="SimpleOB Testdatenlieferant",
-
     )
 
     master_data = SimpleNamespace()
@@ -142,6 +140,7 @@ def test_test_transmission_uses_validated_test_marker_path() -> None:
         xbrl_xml="<xbrl/>",
         master_data=master_data,
         balance_sheet_date=date(2026, 12, 31),
+        data_supplier="SimpleOB Testdatenlieferant",
     )
 
     assert validated.data_part_xml == (
@@ -194,8 +193,6 @@ def test_production_transmission_uses_path_without_test_marker() -> None:
         validate_adapter=validate_adapter,
         send_adapter=send_adapter,
         manufacturer_id="22924",
-        data_supplier="SimpleOB Testdatenlieferant",
-
     )
 
     master_data = SimpleNamespace()
@@ -204,6 +201,7 @@ def test_production_transmission_uses_path_without_test_marker() -> None:
         xbrl_xml="<xbrl/>",
         master_data=master_data,
         balance_sheet_date=date(2026, 12, 31),
+        data_supplier="SimpleOB Testdatenlieferant",
     )
 
     assert validated.data_part_xml == (
@@ -251,13 +249,13 @@ def test_production_transmission_rejects_test_marker_before_send() -> None:
         validate_adapter=validate_adapter,
         send_adapter=send_adapter,
         manufacturer_id="22924",
-        data_supplier="SimpleOB Testdatenlieferant",
     )
 
     validated = service.validate_production_transmission(
         xbrl_xml="<xbrl/>",
         master_data=SimpleNamespace(),
         balance_sheet_date=date(2026, 12, 31),
+        data_supplier="SimpleOB Testdatenlieferant",
     )
 
     manipulated = type(validated)(

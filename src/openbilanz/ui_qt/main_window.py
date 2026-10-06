@@ -44,6 +44,7 @@ from openbilanz.client_transfer.model import ClientTransfer
 from openbilanz.core.config import (
     ApplicationConfig,
     save_eric_certificate_path,
+    save_eric_data_supplier,
 )
 from openbilanz.core.context import ApplicationContext
 from openbilanz.date_input import parse_german_date
@@ -54,6 +55,7 @@ from openbilanz.domain.chart_of_accounts_template import (
     ChartOfAccountsTemplate,
 )
 from openbilanz.domain.entry_side import EntrySide
+from openbilanz.domain.elster_data_supplier import ElsterDataSupplier
 from openbilanz.domain.fiscal_year_status import FiscalYearStatus
 from openbilanz.domain.vat_accounts import VatAccounts
 from openbilanz.eric.elster_bilanz_transmission_service import (
@@ -84,6 +86,9 @@ from openbilanz.ui_qt.e_bilanz_account_mapping_dialog import (
 from openbilanz.ui_qt.e_bilanz_frame import EBilanzFrame
 from openbilanz.ui_qt.eric_information_dialog import (
     EricInformationDialog,
+)
+from openbilanz.ui_qt.elster_data_supplier_dialog import (
+    ElsterDataSupplierDialog,
 )
 from openbilanz.ui_qt.fixed_asset_acquisition_link_dialog import (
     AcquisitionBookingCandidate,
@@ -143,6 +148,7 @@ class MainWindow(QMainWindow):
             ElsterBilanzTransmissionService | None
         ) = None,
         eric_certificate_path: Path | None = None,
+        eric_data_supplier: ElsterDataSupplier | None = None,
         application_config: ApplicationConfig | None = None,
     ) -> None:
         super().__init__()
@@ -184,6 +190,7 @@ class MainWindow(QMainWindow):
             if eric_certificate_path is not None
             else None
         )
+        self._eric_data_supplier = eric_data_supplier
         self._current_income_statement: IncomeStatement | None = None
         self._current_closing_result: ClosingResult | None = None
         self._current_balance_sheet: BalanceSheet | None = None
@@ -214,6 +221,15 @@ class MainWindow(QMainWindow):
         )
         elster_certificate_action.triggered.connect(
             self._configure_elster_certificate
+        )
+
+        elster_data_supplier_action = (
+            settings_menu.addAction(
+                "ELSTER-Datenlieferant…"
+            )
+        )
+        elster_data_supplier_action.triggered.connect(
+            self._configure_elster_data_supplier
         )
 
         help_menu = self.menuBar().addMenu(
@@ -794,6 +810,62 @@ class MainWindow(QMainWindow):
             ),
         )
 
+    def _configure_elster_data_supplier(self) -> None:
+        """Bearbeitet und speichert den ELSTER-Datenlieferanten."""
+
+        if self._application_config is None:
+            QMessageBox.critical(
+                self,
+                "ELSTER-Datenlieferant",
+                (
+                    "Die Anwendungskonfiguration ist nicht "
+                    "verfügbar."
+                ),
+            )
+            return
+
+        dialog = ElsterDataSupplierDialog(
+            self,
+            data_supplier=self._eric_data_supplier,
+        )
+
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        data_supplier = dialog.result
+
+        if data_supplier is None:
+            return
+
+        try:
+            save_eric_data_supplier(
+                self._application_config,
+                data_supplier,
+            )
+        except (OSError, ValueError) as exc:
+            QMessageBox.critical(
+                self,
+                "ELSTER-Datenlieferant",
+                (
+                    "Der ELSTER-Datenlieferant konnte nicht "
+                    "gespeichert werden.\n\n"
+                    f"{exc}"
+                ),
+            )
+            return
+
+        self._eric_data_supplier = data_supplier
+
+        QMessageBox.information(
+            self,
+            "ELSTER-Datenlieferant",
+            (
+                "Der ELSTER-Datenlieferant wurde gespeichert.\n\n"
+                "Die neuen Angaben werden ab der nächsten "
+                "ELSTER-Validierung verwendet."
+            ),
+        )
+
     def _configure_elster_certificate(self) -> None:
         """Wählt das ELSTER-Zertifikat aus und speichert dessen Pfad."""
 
@@ -992,6 +1064,19 @@ class MainWindow(QMainWindow):
         if not accepted or confirmation != "TESTSENDUNG":
             return
 
+        if self._eric_data_supplier is None:
+            QMessageBox.warning(
+                self,
+                "ELSTER-Testübermittlung",
+                (
+                    "Es ist noch kein ELSTER-Datenlieferant "
+                    "konfiguriert.\n\n"
+                    "Bitte hinterlegen Sie ihn unter "
+                    "Einstellungen → ELSTER-Datenlieferant…"
+                ),
+            )
+            return
+
         credentials = self._request_elster_certificate_credentials(
             window_title="ELSTER-Testübermittlung",
         )
@@ -1011,6 +1096,9 @@ class MainWindow(QMainWindow):
                     master_data=master_data,
                     balance_sheet_date=(
                         self._context.fiscal_year.end_date
+                    ),
+                    data_supplier=(
+                        self._eric_data_supplier.to_eric_value()
                     ),
                 )
             )
@@ -1132,6 +1220,20 @@ class MainWindow(QMainWindow):
         if not accepted or confirmation != "PRODUKTIV SENDEN":
             return
 
+        if self._eric_data_supplier is None:
+            QMessageBox.warning(
+                self,
+                "ELSTER-Produktivübermittlung",
+                (
+                    "Es ist noch kein ELSTER-Datenlieferant "
+                    "konfiguriert.\n\n"
+                    "Bitte hinterlegen Sie ihn unter "
+                    "Einstellungen → ELSTER-Datenlieferant…"
+                ),
+            )
+            return
+
+
         credentials = self._request_elster_certificate_credentials(
             window_title="ELSTER-Produktivübermittlung",
         )
@@ -1151,6 +1253,9 @@ class MainWindow(QMainWindow):
                     master_data=master_data,
                     balance_sheet_date=(
                         self._context.fiscal_year.end_date
+                    ),
+                    data_supplier=(
+                        self._eric_data_supplier.to_eric_value()
                     ),
                 )
             )

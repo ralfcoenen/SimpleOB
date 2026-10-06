@@ -49,19 +49,12 @@ class ElsterBilanzTransmissionService:
         validate_adapter: EricValidateAdapter,
         send_adapter: EricSendAdapter,
         manufacturer_id: str,
-        data_supplier: str,
     ) -> None:
         manufacturer_id = manufacturer_id.strip()
-        data_supplier = data_supplier.strip()
 
         if not manufacturer_id:
             raise ValueError(
                 "Die ERiC-Hersteller-ID darf nicht leer sein."
-            )
-
-        if not data_supplier:
-            raise ValueError(
-                "Der ELSTER-Datenlieferant darf nicht leer sein."
             )
 
         self._payload_service = payload_service
@@ -69,7 +62,6 @@ class ElsterBilanzTransmissionService:
         self._validate_adapter = validate_adapter
         self._send_adapter = send_adapter
         self._manufacturer_id = manufacturer_id
-        self._data_supplier = data_supplier
 
     def validate_test_transmission(
         self,
@@ -77,22 +69,30 @@ class ElsterBilanzTransmissionService:
         xbrl_xml: str,
         master_data: CompanyMasterData,
         balance_sheet_date: date,
+        data_supplier: str,
         datenart_version: str = DEFAULT_BILANZ_DATENART_VERSION,
     ) -> ElsterBilanzValidationResult:
         """Bereitet eine Testsendung vor und validiert sie lokal mit ERiC."""
+
+        data_supplier = data_supplier.strip()
+
+        if not data_supplier:
+            raise ValueError(
+                "Der ELSTER-Datenlieferant darf nicht leer sein."
+            )
 
         data_part_xml = self._payload_service.build(
             xbrl_xml=xbrl_xml,
             master_data=master_data,
             balance_sheet_date=balance_sheet_date,
-            data_supplier=self._data_supplier,
+            data_supplier=data_supplier,
         )
 
         elster_xml = self._create_th_adapter.create(
             data_part_xml=data_part_xml,
             manufacturer_id=self._manufacturer_id,
             version_client=get_application_version(),
-            data_supplier=self._data_supplier,
+            data_supplier=data_supplier,
             test_marker=ELSTER_TEST_MARKER,
         )
 
@@ -118,22 +118,30 @@ class ElsterBilanzTransmissionService:
         xbrl_xml: str,
         master_data: CompanyMasterData,
         balance_sheet_date: date,
+        data_supplier: str,
         datenart_version: str = DEFAULT_BILANZ_DATENART_VERSION,
     ) -> ElsterBilanzValidationResult:
         """Bereitet eine Produktivsendung vor und validiert sie lokal mit ERiC."""
+
+        data_supplier = data_supplier.strip()
+
+        if not data_supplier:
+            raise ValueError(
+                "Der ELSTER-Datenlieferant darf nicht leer sein."
+            )
 
         data_part_xml = self._payload_service.build(
             xbrl_xml=xbrl_xml,
             master_data=master_data,
             balance_sheet_date=balance_sheet_date,
-            data_supplier=self._data_supplier,
+            data_supplier=data_supplier,
         )
 
         elster_xml = self._create_th_adapter.create(
             data_part_xml=data_part_xml,
             manufacturer_id=self._manufacturer_id,
             version_client=get_application_version(),
-            data_supplier=self._data_supplier,
+            data_supplier=data_supplier,
             test_marker=None,
         )
 
