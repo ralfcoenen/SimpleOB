@@ -17,6 +17,7 @@ from openbilanz.database.migration_service import (
 
 
 BASELINE_REVISION = "7392d6cc6892"
+HEAD_REVISION = "3d5f3f742f56"
 
 
 def _application_config(
@@ -88,7 +89,7 @@ def test_new_database_is_upgraded_to_head(
 
     assert database_file.is_file()
     assert _current_revision(database_file) == (
-        LEGACY_SCHEMA_REVISION
+        HEAD_REVISION
     )
     assert not _backup_file(database_file).exists()
 
@@ -117,14 +118,15 @@ def test_alembic_database_is_backed_up_and_upgraded_to_head(
         )
     ).upgrade_to_head()
 
+    assert _current_revision(database_file) == (
+        HEAD_REVISION
+    )
+
     backup_file = _backup_file(database_file)
 
     assert backup_file.is_file()
     assert _current_revision(backup_file) == (
         BASELINE_REVISION
-    )
-    assert _current_revision(database_file) == (
-        LEGACY_SCHEMA_REVISION
     )
 
 
@@ -143,7 +145,7 @@ def test_database_already_at_head_is_not_backed_up(
     )
 
     assert _current_revision(database_file) == (
-        LEGACY_SCHEMA_REVISION
+        HEAD_REVISION
     )
 
     DatabaseMigrationService(
@@ -153,7 +155,7 @@ def test_database_already_at_head_is_not_backed_up(
     ).upgrade_to_head()
 
     assert _current_revision(database_file) == (
-        LEGACY_SCHEMA_REVISION
+        HEAD_REVISION
     )
     assert not _backup_file(database_file).exists()
 
@@ -251,6 +253,7 @@ def test_legacy_database_is_backed_up_before_stamp(
         ("stamp", LEGACY_SCHEMA_REVISION),
         ("upgrade", "head"),
     ]
+
 
 def test_unknown_unversioned_database_is_rejected(
     tmp_path: Path,

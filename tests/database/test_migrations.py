@@ -7,7 +7,7 @@ from alembic.config import Config
 from sqlalchemy import create_engine, inspect
 
 BASELINE_REVISION = "7392d6cc6892"
-HEAD_REVISION = "f65c37865e28"
+HEAD_REVISION = "3d5f3f742f56"
 
 
 def _alembic_config(
@@ -207,6 +207,189 @@ def test_migrations_upgrade_from_baseline_to_head(
             constraint["column_names"]
             == ["anlageabschreibung_id"]
             for constraint in adjustment_unique_constraints
+        )
+
+        assert (
+            "konten_taxonomie_zuordnungen"
+            in inspector.get_table_names()
+        )
+
+        taxonomy_mapping_columns = {
+            column["name"]
+            for column in inspector.get_columns(
+                "konten_taxonomie_zuordnungen"
+            )
+        }
+
+        assert taxonomy_mapping_columns == {
+            "id",
+            "mandant_id",
+            "account_number",
+            "taxonomy_version",
+            "concept_name",
+        }
+
+        taxonomy_mapping_foreign_keys = (
+            inspector.get_foreign_keys(
+                "konten_taxonomie_zuordnungen"
+            )
+        )
+
+        assert any(
+            foreign_key["constrained_columns"]
+            == ["mandant_id"]
+            and foreign_key["referred_table"]
+            == "mandanten"
+            and foreign_key["referred_columns"]
+            == ["id"]
+            for foreign_key in taxonomy_mapping_foreign_keys
+        )
+
+        taxonomy_mapping_unique_constraints = (
+            inspector.get_unique_constraints(
+                "konten_taxonomie_zuordnungen"
+            )
+        )
+
+        assert any(
+            constraint["column_names"]
+            == [
+                "mandant_id",
+                "account_number",
+                "taxonomy_version",
+            ]
+            for constraint
+            in taxonomy_mapping_unique_constraints
+        )
+
+    finally:
+        engine.dispose()
+
+    assert (
+        _current_revision(database_path)
+        == HEAD_REVISION
+    )
+    assert _foreign_key_check(database_path) == []
+
+
+def test_account_taxonomy_mapping_migration_preserves_existing_table(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """Eine historisch bereits vorhandene Tabelle bleibt unverändert."""
+
+    database_path = tmp_path / "openbilanz.db"
+    database_url = f"sqlite:///{database_path}"
+
+    monkeypatch.setenv(
+        "OPENBILANZ_DATABASE_URL",
+        database_url,
+    )
+
+    config = _alembic_config(
+        database_path
+    )
+
+    command.upgrade(
+        config,
+        "f65c37865e28",
+    )
+
+    engine = create_engine(
+        database_url
+    )
+
+    try:
+        with engine.begin() as connection:
+            connection.exec_driver_sql(
+                """
+                CREATE TABLE konten_taxonomie_zuordnungen (
+                    id INTEGER NOT NULL,
+                    mandant_id INTEGER NOT NULL,
+                    account_number VARCHAR NOT NULL,
+                    taxonomy_version VARCHAR NOT NULL,
+                    concept_name VARCHAR NOT NULL,
+                    PRIMARY KEY (id),
+                    FOREIGN KEY(mandant_id)
+                        REFERENCES mandanten (id),
+                    CONSTRAINT
+                        uq_konten_taxonomie_mandant_account_version
+                    UNIQUE (
+                        mandant_id,
+                        account_number,
+                        taxonomy_version
+                    )
+                )
+                """
+            )
+
+            result = connection.exec_driver_sql(
+                """
+                INSERT INTO mandanten (
+                    company_id,
+                    name
+                )
+                VALUES (
+                    'taxonomy-migration-test',
+                    'Taxonomy Migration Test UG'
+                )
+                """
+            )
+
+            mandant_id = result.lastrowid
+
+            connection.exec_driver_sql(
+                """
+                INSERT INTO konten_taxonomie_zuordnungen (
+                    mandant_id,
+                    account_number,
+                    taxonomy_version,
+                    concept_name
+                )
+                VALUES (
+                    ?,
+                    '1400',
+                    '6.9',
+                    'bs.ass.currAss.receiv.trade.other'
+                )
+                """,
+                (mandant_id,),
+            )
+    finally:
+        engine.dispose()
+
+    command.upgrade(
+        config,
+        "head",
+    )
+
+    engine = create_engine(
+        database_url
+    )
+
+    try:
+        inspector = inspect(engine)
+
+        assert (
+            "konten_taxonomie_zuordnungen"
+            in inspector.get_table_names()
+        )
+
+        with engine.connect() as connection:
+            mapping = connection.exec_driver_sql(
+                """
+                SELECT
+                    account_number,
+                    taxonomy_version,
+                    concept_name
+                FROM konten_taxonomie_zuordnungen
+                """
+            ).one()
+
+        assert mapping == (
+            "1400",
+            "6.9",
+            "bs.ass.currAss.receiv.trade.other",
         )
     finally:
         engine.dispose()
