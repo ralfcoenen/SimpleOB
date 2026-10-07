@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import sqlite3
 import sys
 from pathlib import Path
 
 from alembic import command
 from alembic.config import Config
+from alembic.runtime.migration import MigrationContext
+from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine, inspect
 
 from openbilanz.core.config import ApplicationConfig
@@ -284,6 +287,9 @@ class DatabaseMigrationService:
             self._application_config.database_url
         )
 
+        current_revision: str | None = None
+        is_legacy_database = False
+
         try:
             inspector = inspect(engine)
             table_names = set(
@@ -298,24 +304,49 @@ class DatabaseMigrationService:
                 return
 
             if "alembic_version" in table_names:
-                command.upgrade(
-                    alembic_config,
-                    "head",
-                )
-                return
+                with engine.connect() as connection:
+                    migration_context = (
+                        MigrationContext.configure(
+                            connection
+                        )
+                    )
 
-            if not self._matches_legacy_schema(
-                inspector=inspector,
-                table_names=table_names,
-            ):
-                raise RuntimeError(
-                    "Die vorhandene SimpleOB-Datenbank besitzt "
-                    "keine Alembic-Versionsinformation und entspricht "
-                    "nicht dem bekannten Legacy-Schema. "
-                    "Die Datenbank wurde nicht verändert."
-                )
+                    current_revision = (
+                        migration_context.get_current_revision()
+                    )
+            else:
+                if not self._matches_legacy_schema(
+                    inspector=inspector,
+                    table_names=table_names,
+                ):
+                    raise RuntimeError(
+                        "Die vorhandene SimpleOB-Datenbank besitzt "
+                        "keine Alembic-Versionsinformation und entspricht "
+                        "nicht dem bekannten Legacy-Schema. "
+                        "Die Datenbank wurde nicht verändert."
+                    )
+
+                is_legacy_database = True
         finally:
             engine.dispose()
+
+        head_revision = self._head_revision(
+            alembic_config
+        )
+
+        if not is_legacy_database:
+            if current_revision == head_revision:
+                return
+
+            self._backup_database()
+
+            command.upgrade(
+                alembic_config,
+                "head",
+            )
+            return
+
+        self._backup_database()
 
         command.stamp(
             alembic_config,
@@ -326,6 +357,49 @@ class DatabaseMigrationService:
             alembic_config,
             "head",
         )
+
+    @staticmethod
+    def _head_revision(
+        alembic_config: Config,
+    ) -> str:
+        """Liefert die aktuelle Alembic-Head-Revision."""
+
+        script_directory = ScriptDirectory.from_config(
+            alembic_config
+        )
+
+        head_revision = script_directory.get_current_head()
+
+        if head_revision is None:
+            raise RuntimeError(
+                "Für die SimpleOB-Datenbank wurde keine "
+                "Alembic-Head-Revision gefunden."
+            )
+
+        return head_revision
+
+    def _backup_database(self) -> Path:
+        """Sichert die SQLite-Datenbank vor einer Schemaänderung."""
+
+        database_file = self._application_config.database_file
+
+        backup_file = database_file.with_name(
+            f"{database_file.stem}"
+            "-before-migration"
+            f"{database_file.suffix}"
+        )
+
+        try:
+            with sqlite3.connect(database_file) as source:
+                with sqlite3.connect(backup_file) as target:
+                    source.backup(target)
+        except sqlite3.Error as exc:
+            raise RuntimeError(
+                "Die SimpleOB-Datenbank konnte vor der "
+                "Migration nicht gesichert werden."
+            ) from exc
+
+        return backup_file
 
     @staticmethod
     def _matches_legacy_schema(
