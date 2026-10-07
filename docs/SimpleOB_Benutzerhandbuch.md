@@ -210,6 +210,24 @@ Programmstarts wieder zur Verfügung.
 Das Zertifikat selbst wird dadurch nicht in die SimpleOB-Datenbank
 übernommen.
 
+Für Übungs- und Testzwecke wird mit SimpleOB zusätzlich das
+ELSTER-Testzertifikat
+
+`test-softidnr-pse.pfx`
+
+bereitgestellt. Das Testzertifikat wird als separate Datei zusammen mit
+SimpleOB ausgeliefert und nicht automatisch eingerichtet.
+
+Der Benutzer kann das Testzertifikat über denselben Einstellungsdialog
+auswählen, über den später auch das persönliche ELSTER-Zertifikat
+eingerichtet wird. Dadurch kann der vollständige Ablauf der
+Zertifikatseinrichtung vor einer produktiven Übermittlung praktisch
+erprobt werden.
+
+Das Testzertifikat ist ausschließlich für Testübermittlungen vorgesehen.
+Vor einer produktiven ELSTER-Übermittlung muss in SimpleOB das persönliche
+ELSTER-Zertifikat des Benutzers ausgewählt werden.
+
 ### 5.2 ELSTER-Datenlieferant
 
 Für die E-Bilanz-Übermittlung benötigt ELSTER Angaben zum Datenlieferanten.
@@ -247,6 +265,35 @@ durchgeführt werden.
 
 Damit kann der technische Übermittlungsweg geprüft werden, ohne die
 E-Bilanz als produktive Übermittlung einzureichen.
+
+Für einen vollständigen Praxistest kann das mit SimpleOB ausgelieferte
+ELSTER-Testzertifikat
+
+`test-softidnr-pse.pfx`
+
+verwendet werden.
+
+Dazu wird das Testzertifikat zunächst unter
+
+**Einstellungen → ELSTER-Zertifikat…**
+
+ausgewählt. Die Einrichtung erfolgt damit auf demselben Weg wie später
+bei einem persönlichen ELSTER-Zertifikat.
+
+Die PIN des mitgelieferten Testzertifikats lautet:
+
+**123456**
+
+Die PIN wird nicht in SimpleOB hinterlegt. Sie wird bei der
+Testübermittlung manuell in den von SimpleOB angezeigten PIN-Dialog
+eingegeben.
+
+Nach dem Praxistest sollte der Benutzer daran denken, vor einer
+produktiven Übermittlung das Testzertifikat durch sein persönliches
+ELSTER-Zertifikat zu ersetzen.
+
+Der vollständige Ablauf einer ELSTER-Testübermittlung ist in
+Kapitel 13 beschrieben.
 
 ### 5.5 Produktive Übermittlung
 
@@ -2105,7 +2152,30 @@ Vor einer produktiven Übermittlung kann eine
 
 durchgeführt werden.
 
-Dabei handelt es sich um eine echte Verbindung zum ELSTER-Server.
+Für einen vollständigen Praxistest kann das zusammen mit SimpleOB
+ausgelieferte ELSTER-Testzertifikat
+
+`test-softidnr-pse.pfx`
+
+verwendet werden.
+
+Das Testzertifikat wird nicht automatisch von SimpleOB eingerichtet.
+Der Benutzer wählt es zunächst unter
+
+**Einstellungen → ELSTER-Zertifikat…**
+
+aus. Damit wird derselbe Einrichtungsvorgang durchlaufen, der später
+auch für das persönliche ELSTER-Zertifikat erforderlich ist.
+
+Die PIN des Testzertifikats lautet:
+
+**123456**
+
+Sie wird nicht in SimpleOB gespeichert, sondern bei der Testübermittlung
+manuell in den PIN-Dialog eingegeben.
+
+Bei der Testübermittlung handelt es sich um eine echte Verbindung zum
+ELSTER-Server.
 
 Der Datensatz wird jedoch als Testsendung mit dem ELSTER-Testmerker
 
@@ -2152,6 +2222,13 @@ Eine erfolgreiche Testsendung sollte vor der ersten produktiven
 Übermittlung genutzt werden, um den technischen Übertragungsweg zu
 prüfen.
 
+Wurde für den Praxistest das mitgelieferte Testzertifikat verwendet,
+muss vor einer späteren produktiven Übermittlung unter
+
+**Einstellungen → ELSTER-Zertifikat…**
+
+das persönliche ELSTER-Zertifikat des Benutzers ausgewählt werden.
+
 ### 13.13 ELSTER-Produktivübermittlung
 
 Mit
@@ -2162,6 +2239,17 @@ wird die E-Bilanz produktiv an ELSTER übertragen.
 
 Diese Funktion ist ausdrücklich von der Testübermittlung zu
 unterscheiden.
+
+Wurde zuvor das mit SimpleOB ausgelieferte Testzertifikat verwendet,
+muss vor der Produktivübermittlung das persönliche ELSTER-Zertifikat
+des Benutzers unter
+
+**Einstellungen → ELSTER-Zertifikat…**
+
+ausgewählt werden.
+
+Das mitgelieferte Testzertifikat darf nicht für eine produktive
+Übermittlung verwendet werden.
 
 SimpleOB zeigt vor dem Versand eine deutliche Warnung an:
 
