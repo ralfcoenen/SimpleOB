@@ -1,76 +1,167 @@
-# OpenBilanz-UG
+# SimpleOB
 
-Lokale Buchhaltungs- und E-Bilanz-Software für kleine Kapitalgesellschaften.
+**SimpleOB** ist eine lokale Buchhaltungs- und E-Bilanz-Anwendung für kleine Kapitalgesellschaften.
+
+Das Projekt wird im Repository unter dem Entwicklungsnamen **OpenBilanz-UG** geführt. Der Name der ausgelieferten Anwendung ist **SimpleOB**.
+
+## Aktueller Stand
+
+Aktuelle Version: **0.47.1**
+
+SimpleOB umfasst inzwischen insbesondere:
+
+- mandantenbezogene Buchführung
+- Geschäftsjahre und Jahresabschluss
+- Journal und Kontenführung
+- Summen- und Saldenliste
+- Bilanz nach § 266 HGB
+- Gewinn- und Verlustrechnung nach § 275 HGB
+- Anlagenbuchhaltung
+- grundlegenden Workflow für Eröffnungsbilanzen
+- Umsatzsteuer- und Steuerkontenkonfiguration
+- E-Bilanz auf Basis der Taxonomie 6.9
+- XBRL-Erzeugung und -Validierung
+- ELSTER-/ERiC-Übermittlung
+- Testübermittlung mit ELSTER-Testzertifikat
+- lokale SQLite-Datenhaltung
+- Datenbankmigrationen mit Alembic
+- PDF-Auswertungen
+- PySide6-Benutzeroberfläche
+
+## Zielsetzung
+
+SimpleOB ist als lokale Desktop-Anwendung für die Buchführung und den Jahresabschluss kleiner Kapitalgesellschaften konzipiert.
+
+Ein Schwerpunkt liegt auf einem nachvollziehbaren durchgängigen Ablauf:
+
+```text
+Buchungen
+    ↓
+Journal und Konten
+    ↓
+Summen- und Saldenliste
+    ↓
+Bilanz und GuV
+    ↓
+Jahresabschluss
+    ↓
+E-Bilanz / XBRL
+    ↓
+ERiC / ELSTER
+```
+
+Die Anwendung soll dabei fachliche Buchhaltungslogik, HGB-Abschlusslogik und die technische E-Bilanz-/ELSTER-Übermittlung klar voneinander trennen.
 
 ## Technologie
+
+SimpleOB basiert derzeit auf:
 
 - Python 3.12
 - PySide6
 - SQLAlchemy
+- Alembic
 - SQLite
+- Arelle
+- ERiC
+- ReportLab
 
-## Status
+Weitere verwendete Bibliotheken sind in `pyproject.toml` dokumentiert.
 
-v0.18.0: Implement opening balance workflow
+## Entwicklung
 
-- add OpeningBalance domain model
-- add OpeningBalanceItem
-- add OpeningBalanceService
-- validate balanced opening balances
-- create opening bookings via EBK
-- integrate with PostingService
-- add integration tests
-## Ziel
+Vorausgesetzt wird Python 3.12.
 
-Entwicklung einer modularen Anwendung für:
+Eine Entwicklungsumgebung kann beispielsweise so eingerichtet werden:
 
-- Buchführung
-- Jahresabschluss
-- Bilanz
-- GuV
-- E-Bilanz/XBRL
+```bash
+python -m venv .venv
+source .venv/bin/activate
 
-## Versionshistorie
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev]"
+```
 
-### 0.15.0
+Die Anwendung kann anschließend aus der Entwicklungsumgebung gestartet werden:
 
-- Gewinn- und Verlustrechnung nach § 275 Abs. 2 HGB
-  im Gesamtkostenverfahren vollständig modelliert
-- GuV-Positionen fachlich als Ertrag, Aufwand oder Ergebnis kategorisiert
-- neues Domänenobjekt `IncomeStatement`
-- neuer `ClosingService` zur Ermittlung des Jahresergebnisses
-- neues unveränderliches `ClosingResult`
-- `FinancialStatementBuilder` um die Übernahme des
-  Jahresergebnisses in die Bilanz erweitert
-- erster vollständiger End-to-End-Jahresabschluss:
-  Buchungen → Journal → Ledger → Summen- und Saldenliste
-  → GuV → Jahresergebnis → Bilanz
-- Bilanzgleichheit nach Übernahme des Jahresüberschusses geprüft
+```bash
+openbilanz
+```
 
-### 0.14.0
+Die Tests werden mit `pytest` ausgeführt:
 
-- Bilanzgliederung nach § 266 HGB vollständig modelliert
-- Aktiv- und Passivseite als hierarchische Abschlussstruktur umgesetzt
-- Mehrstufige Aggregation über den Eigenkapital-Ast abgesichert
-- HGB-Regelwerk vom allgemeinen Accounting-Code getrennt
-- Bilanzstruktur in private Fabrikfunktionen konsolidiert
+```bash
+pytest
+```
 
-### 0.13.0
-- FinancialStatementBuilder fertiggestellt
-- Aggregation von Abschlusspositionen
-- Neues BalanceSheet-Domänenmodell
-- Entfernung von BalancePosition und BalanceSection
-- 375 Tests grün
+## macOS-Auslieferung
 
-### 0.12.0
-- Kontenzuordnungsregeln eingeführt
-- FinancialStatementPosition ergänzt
+Für macOS wird SimpleOB mit PyInstaller als eigenständige Anwendung gebaut.
 
+Die Release-Werkzeuge befinden sich unter `packaging/macos/`.
 
+Für die einzelnen Release-Schritte stehen zur Verfügung:
 
-## Dokumentation
+```text
+version_release.sh
+build.sh
+package_release.sh
+publish_release.sh
+```
 
-- README.md
-- CHANGELOG.md
-- ROADMAP.md
-- docs/development_principles.md
+Ein Release kann bis zum fertig geprüften Auslieferungspaket vorbereitet werden mit:
+
+```bash
+packaging/macos/release.sh VERSION
+```
+
+Die eigentliche Veröffentlichung erfolgt bewusst getrennt vom Build- und Packaging-Prozess.
+
+## Benutzerhandbuch
+
+Das Benutzerhandbuch befindet sich unter `docs/SimpleOB_Benutzerhandbuch.pdf`. Die bearbeitbare Quelle ist `docs/SimpleOB_Benutzerhandbuch.md`.
+
+Das PDF kann erzeugt werden mit:
+
+```bash
+scripts/build_user_manual.sh
+```
+
+Das Benutzerhandbuch enthält insbesondere Hinweise zu Installation und erstem Start unter macOS, Mandanten und Geschäftsjahren, Buchführung und Jahresabschluss, E-Bilanz, ELSTER-Zertifikat und ELSTER-Datenlieferant, Test- und Produktivübermittlung sowie Datenbankaktualisierungen.
+
+## Datenhaltung und Aktualisierungen
+
+SimpleOB speichert seine produktiven Daten lokal.
+
+Die Datenbankstruktur wird mit Alembic versioniert. Bei notwendigen Schemaaktualisierungen führt SimpleOB die vorgesehenen Migrationen beim Start aus.
+
+Vor einer tatsächlichen Migration einer bestehenden SQLite-Datenbank wird automatisch eine Sicherungskopie angelegt.
+
+## E-Bilanz und ELSTER
+
+Die E-Bilanz-Erzeugung basiert derzeit auf der **Taxonomie 6.9**.
+
+SimpleOB trennt dabei die fachliche Erzeugung der E-Bilanz von der technischen Übermittlung über ERiC/ELSTER.
+
+Für Testübermittlungen kann ein ELSTER-Testzertifikat verwendet werden. Für produktive Übermittlungen muss der Benutzer sein persönliches ELSTER-Zertifikat auswählen.
+
+Die Zertifikats-PIN wird nicht dauerhaft gespeichert.
+
+## Projektgrundsätze
+
+Bei der Entwicklung stehen insbesondere im Vordergrund:
+
+- nachvollziehbare Buchhaltungslogik
+- klare Trennung von Domänen-, Datenbank- und Benutzeroberflächenlogik
+- mandantenspezifische Konfiguration statt fest codierter Konten
+- kontrollierte Datenbankmigrationen
+- reproduzierbare Release-Prozesse
+- lokale Datenhaltung
+- möglichst geringe unnötige Komplexität
+
+E-Bilanz- und Taxonomiefunktionalität wird gezielt auf den für die technisch valide und tatsächlich übermittelbare E-Bilanz erforderlichen Umfang begrenzt.
+
+## Projektstatus
+
+SimpleOB befindet sich weiterhin in Entwicklung.
+
+Vor dem produktiven Einsatz sollten insbesondere die erzeugten Abschlüsse, E-Bilanz-Daten und ELSTER-Übermittlungen fachlich geprüft werden.
