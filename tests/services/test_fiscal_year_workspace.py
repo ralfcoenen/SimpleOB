@@ -447,6 +447,337 @@ def test_post_booking_does_not_change_workspace_when_persistence_fails(
     )
 
 
+def test_post_opening_balance_commits_all_bookings_and_reloads(
+    context: ApplicationContext,
+) -> None:
+    booking_repository = Mock()
+    company_repository = Mock()
+
+    company_repository.get_managed_fiscal_years.return_value = (
+        ManagedFiscalYear(
+            fiscal_year=context.fiscal_year,
+            status=FiscalYearStatus.OPEN,
+            opening_source=None,
+        ),
+    )
+
+    bookings = (
+        Booking(
+            booking_date=context.fiscal_year.start_date,
+            description="Eröffnungsbuchung Bank",
+            booking_type=BookingType.OPENING,
+            lines=(
+                BookingLine(
+                    account_number="1200",
+                    side=EntrySide.DEBIT,
+                    amount=Decimal("100.00"),
+                ),
+                BookingLine(
+                    account_number="9000",
+                    side=EntrySide.CREDIT,
+                    amount=Decimal("100.00"),
+                ),
+            ),
+        ),
+        Booking(
+            booking_date=context.fiscal_year.start_date,
+            description="Eröffnungsbuchung Eigenkapital",
+            booking_type=BookingType.OPENING,
+            lines=(
+                BookingLine(
+                    account_number="9000",
+                    side=EntrySide.DEBIT,
+                    amount=Decimal("100.00"),
+                ),
+                BookingLine(
+                    account_number="1800",
+                    side=EntrySide.CREDIT,
+                    amount=Decimal("100.00"),
+                ),
+            ),
+        ),
+    )
+
+    booking_repository.list_for_fiscal_year.side_effect = (
+        (),
+        (),
+        bookings,
+    )
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=company_repository,
+        posting_service=PostingService(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
+        taxonomy_management_service=Mock(),
+        e_bilanz_export_service=Mock(),
+    )
+
+    workspace.post_opening_balance(bookings)
+
+    assert booking_repository.add.call_count == 2
+
+    for booking in bookings:
+        booking_repository.add.assert_any_call(
+            company_id=context.company.company_id,
+            fiscal_year=context.fiscal_year,
+            booking=booking,
+            commit=False,
+        )
+
+    booking_repository.commit.assert_called_once_with()
+    booking_repository.rollback.assert_not_called()
+
+    assert tuple(workspace.journal) == bookings
+    assert workspace.ledger.get_account("1200").debit == Decimal("100.00")
+    assert workspace.ledger.get_account("1800").credit == Decimal("100.00")
+
+
+def test_post_opening_balance_commits_all_bookings_and_reloads(
+    context: ApplicationContext,
+) -> None:
+    booking_repository = Mock()
+    company_repository = Mock()
+
+    company_repository.get_managed_fiscal_years.return_value = (
+        ManagedFiscalYear(
+            fiscal_year=context.fiscal_year,
+            status=FiscalYearStatus.OPEN,
+            opening_source=None,
+        ),
+    )
+
+    bookings = (
+        Booking(
+            booking_date=context.fiscal_year.start_date,
+            description="Eröffnungsbuchung Bank",
+            booking_type=BookingType.OPENING,
+            lines=(
+                BookingLine(
+                    account_number="1200",
+                    side=EntrySide.DEBIT,
+                    amount=Decimal("100.00"),
+                ),
+                BookingLine(
+                    account_number="9000",
+                    side=EntrySide.CREDIT,
+                    amount=Decimal("100.00"),
+                ),
+            ),
+        ),
+        Booking(
+            booking_date=context.fiscal_year.start_date,
+            description="Eröffnungsbuchung Eigenkapital",
+            booking_type=BookingType.OPENING,
+            lines=(
+                BookingLine(
+                    account_number="9000",
+                    side=EntrySide.DEBIT,
+                    amount=Decimal("100.00"),
+                ),
+                BookingLine(
+                    account_number="1800",
+                    side=EntrySide.CREDIT,
+                    amount=Decimal("100.00"),
+                ),
+            ),
+        ),
+    )
+
+    booking_repository.list_for_fiscal_year.side_effect = (
+        (),
+        (),
+        bookings,
+    )
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=company_repository,
+        posting_service=PostingService(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
+        taxonomy_management_service=Mock(),
+        e_bilanz_export_service=Mock(),
+    )
+
+    workspace.post_opening_balance(bookings)
+
+    assert booking_repository.add.call_count == 2
+
+    for booking in bookings:
+        booking_repository.add.assert_any_call(
+            company_id=context.company.company_id,
+            fiscal_year=context.fiscal_year,
+            booking=booking,
+            commit=False,
+        )
+
+    booking_repository.commit.assert_called_once_with()
+    booking_repository.rollback.assert_not_called()
+
+    assert tuple(workspace.journal) == bookings
+    assert workspace.ledger.get_account("1200").debit == Decimal("100.00")
+    assert workspace.ledger.get_account("1800").credit == Decimal("100.00")
+
+
+def test_post_opening_balance_rejects_duplicate_opening(
+    context: ApplicationContext,
+) -> None:
+    booking_repository = Mock()
+    company_repository = Mock()
+
+    company_repository.get_managed_fiscal_years.return_value = (
+        ManagedFiscalYear(
+            fiscal_year=context.fiscal_year,
+            status=FiscalYearStatus.OPEN,
+            opening_source=None,
+        ),
+    )
+
+    booking = Booking(
+        booking_date=context.fiscal_year.start_date,
+        description="Eröffnungsbuchung",
+        booking_type=BookingType.OPENING,
+        lines=(
+            BookingLine(
+                account_number="1200",
+                side=EntrySide.DEBIT,
+                amount=Decimal("100.00"),
+            ),
+            BookingLine(
+                account_number="9000",
+                side=EntrySide.CREDIT,
+                amount=Decimal("100.00"),
+            ),
+        ),
+    )
+
+    booking_repository.list_for_fiscal_year.side_effect = (
+        (booking,),
+        (booking,),
+    )
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=company_repository,
+        posting_service=PostingService(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
+        taxonomy_management_service=Mock(),
+        e_bilanz_export_service=Mock(),
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="bereits Eröffnungsbuchungen vorhanden",
+    ):
+        workspace.post_opening_balance((booking,))
+
+    booking_repository.add.assert_not_called()
+    booking_repository.commit.assert_not_called()
+    assert tuple(workspace.journal) == (booking,)
+
+
+def test_post_opening_balance_rolls_back_on_persistence_failure(
+    context: ApplicationContext,
+) -> None:
+    booking_repository = Mock()
+    company_repository = Mock()
+
+    company_repository.get_managed_fiscal_years.return_value = (
+        ManagedFiscalYear(
+            fiscal_year=context.fiscal_year,
+            status=FiscalYearStatus.OPEN,
+            opening_source=None,
+        ),
+    )
+
+    bookings = (
+        Booking(
+            booking_date=context.fiscal_year.start_date,
+            description="Eröffnungsbuchung Bank",
+            booking_type=BookingType.OPENING,
+            lines=(
+                BookingLine(
+                    account_number="1200",
+                    side=EntrySide.DEBIT,
+                    amount=Decimal("100.00"),
+                ),
+                BookingLine(
+                    account_number="9000",
+                    side=EntrySide.CREDIT,
+                    amount=Decimal("100.00"),
+                ),
+            ),
+        ),
+        Booking(
+            booking_date=context.fiscal_year.start_date,
+            description="Eröffnungsbuchung Eigenkapital",
+            booking_type=BookingType.OPENING,
+            lines=(
+                BookingLine(
+                    account_number="9000",
+                    side=EntrySide.DEBIT,
+                    amount=Decimal("100.00"),
+                ),
+                BookingLine(
+                    account_number="1800",
+                    side=EntrySide.CREDIT,
+                    amount=Decimal("100.00"),
+                ),
+            ),
+        ),
+    )
+
+    booking_repository.list_for_fiscal_year.return_value = ()
+    booking_repository.add.side_effect = (
+        None,
+        RuntimeError("Speicherfehler"),
+    )
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=company_repository,
+        posting_service=PostingService(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
+        taxonomy_management_service=Mock(),
+        e_bilanz_export_service=Mock(),
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="Speicherfehler",
+    ):
+        workspace.post_opening_balance(bookings)
+
+    assert booking_repository.add.call_count == 2
+    booking_repository.rollback.assert_called_once_with()
+    booking_repository.commit.assert_not_called()
+
+    assert len(workspace.journal) == 0
+
+    with pytest.raises(KeyError):
+        workspace.ledger.get_account("1200")
+
+
 def test_effective_equity_contributions_sums_referenced_lines(
     context: ApplicationContext,
 ) -> None:

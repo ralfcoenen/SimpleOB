@@ -93,9 +93,13 @@ class OpeningBalanceDialog(QDialog):
         layout.addWidget(title_label)
 
         info_label = QLabel(
-            "Erfassen Sie nur die Konten, "
-            "für die ein Anfangsbestand vorhanden ist."
+            "Erfassen Sie nur Konten mit einem Anfangsbestand.\n"
+            "Die Eingaben werden erst mit „Übernehmen“ verbucht.\n"
+            "Bei Abbruch oder Schließen gehen alle Eingaben verloren. "
+            "Eine spätere Fortsetzung ist nicht möglich."
         )
+        info_label.setWordWrap(True)
+
         layout.addWidget(info_label)
 
         entry_layout = QHBoxLayout()
@@ -441,3 +445,27 @@ class OpeningBalanceDialog(QDialog):
 
         self.result = opening_balance
         self.accept()
+
+    def reject(self) -> None:
+        """Fragt vor dem Verwerfen erfasster Positionen nach."""
+
+        if self._items:
+            answer = QMessageBox.question(
+                self,
+                "Eröffnungsbilanz abbrechen?",
+                (
+                    "Die bisher erfassten Positionen "
+                    "werden nicht gespeichert.\n\n"
+                    "Möchten Sie die Eingaben verwerfen?"
+                ),
+                (
+                    QMessageBox.StandardButton.Yes
+                    | QMessageBox.StandardButton.No
+                ),
+                QMessageBox.StandardButton.No,
+            )
+
+            if answer != QMessageBox.StandardButton.Yes:
+                return
+
+        super().reject()

@@ -713,6 +713,79 @@ class FiscalYearWorkspace:
 
         return total
 
+    def post_opening_balance(
+        self,
+        bookings: tuple[Booking, ...],
+    ) -> None:
+        """Verbucht eine manuelle Eröffnungsbilanz atomar."""
+
+        if not bookings:
+            raise ValueError(
+                "Die Eröffnungsbilanz enthält keine Buchungen."
+            )
+
+        managed_fiscal_year = self.managed_fiscal_year
+
+        if managed_fiscal_year.is_closed:
+            raise ValueError(
+                "Das Geschäftsjahr ist bereits abgeschlossen."
+            )
+
+        if managed_fiscal_year.has_opening_source:
+            raise ValueError(
+                "Das Geschäftsjahr wurde bereits "
+                "aus einem Vorjahr eröffnet."
+            )
+
+        existing_bookings = (
+            self._booking_repository.list_for_fiscal_year(
+                company_id=self._context.company.company_id,
+                fiscal_year=self._context.fiscal_year,
+            )
+        )
+
+        if any(
+            booking.booking_type is BookingType.OPENING
+            for booking in existing_bookings
+        ):
+            raise ValueError(
+                "Für dieses Geschäftsjahr sind bereits "
+                "Eröffnungsbuchungen vorhanden."
+            )
+
+        for booking in bookings:
+            if booking.booking_type is not BookingType.OPENING:
+                raise ValueError(
+                    "Es sind ausschließlich "
+                    "Eröffnungsbuchungen zulässig."
+                )
+
+            if (
+                booking.booking_date
+                != self._context.fiscal_year.start_date
+            ):
+                raise ValueError(
+                    "Das Buchungsdatum muss dem Beginn "
+                    "des Geschäftsjahres entsprechen."
+                )
+
+        try:
+            for booking in bookings:
+                self._booking_repository.add(
+                    company_id=self._context.company.company_id,
+                    fiscal_year=self._context.fiscal_year,
+                    booking=booking,
+                    commit=False,
+                )
+
+            self._booking_repository.commit()
+
+        except Exception:
+            self._booking_repository.rollback()
+            raise
+
+        self.reload()
+
     def post_booking(
         self,
         booking: Booking,

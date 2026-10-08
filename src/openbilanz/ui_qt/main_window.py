@@ -3831,8 +3831,20 @@ class MainWindow(QMainWindow):
             booking_date=self._context.fiscal_year.start_date,
         )
 
-        for booking in bookings:
-            self._workspace.post_booking(booking)
+        try:
+            self._workspace.post_opening_balance(bookings)
+
+        except (ValueError, RuntimeError) as exc:
+            QMessageBox.critical(
+                self,
+                "Eröffnungsbilanz",
+                (
+                    "Die Eröffnungsbilanz konnte "
+                    "nicht verbucht werden.\n\n"
+                    f"{exc}"
+                ),
+            )
+            return
 
         self._refresh_accounts()
         self._refresh_journal()
