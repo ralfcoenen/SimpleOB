@@ -479,6 +479,19 @@ def main() -> None:
                 accounts,
             ) = loaded_chart_of_accounts
 
+            def reload_chart_of_accounts():
+                loaded = chart_of_accounts_repository.load_for_company(
+                    company_id=context.company.company_id,
+                    position_provider=position_provider,
+                )
+
+                if loaded is None:
+                    raise RuntimeError(
+                        "Der Kontenrahmen konnte nicht erneut geladen werden."
+                    )
+
+                return loaded
+
             control_accounts = (
                 chart_of_accounts_repository.load_control_accounts(
                     context.company.company_id
@@ -710,6 +723,7 @@ def main() -> None:
                     financial_statement_context.account_types
                 ),
                 chart_of_accounts=chart_of_accounts,
+                reload_chart_of_accounts=reload_chart_of_accounts,
                 opening_balance_account_number=(
                     control_accounts.opening_balance_account
                 ),

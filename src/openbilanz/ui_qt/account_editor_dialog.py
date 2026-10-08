@@ -79,7 +79,7 @@ class AccountEditorDialog(QDialog):
             if self._is_edit_mode
             else "SimpleOB – Neues Konto"
         )
-        self.setFixedSize(720, 430)
+        self.setFixedSize(850, 430)
 
         self._create_ui()
         self._update_mapping_choices()

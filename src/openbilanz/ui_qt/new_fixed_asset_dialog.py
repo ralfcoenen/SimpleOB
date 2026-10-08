@@ -22,9 +22,6 @@ from openbilanz.date_input import (
 )
 from openbilanz.domain.fixed_asset import FixedAsset
 
-_TECHNICAL_EQUIPMENT = "0200 – Technische Anlagen und Maschinen"
-_BUSINESS_EQUIPMENT = "0400 – Betriebs- und Geschäftsausstattung"
-
 
 class NewFixedAssetDialog(QDialog):
     """Erfasst ein neues oder bearbeitet ein vorhandenes Anlagegut."""
@@ -37,9 +34,11 @@ class NewFixedAssetDialog(QDialog):
         depreciation_expense_account_number: str,
         fixed_asset: FixedAsset | None = None,
         acquisition_linked: bool = False,
+        asset_account_options: tuple[tuple[str, str, str], ...],
     ) -> None:
         super().__init__(parent)
 
+        self._asset_account_options = asset_account_options
         self._company_id = company_id
         self._depreciation_expense_account_number = (
             depreciation_expense_account_number
@@ -105,14 +104,17 @@ class NewFixedAssetDialog(QDialog):
         )
 
         self._asset_type_box = QComboBox()
-        self._asset_type_box.addItems(
-            (
-                _TECHNICAL_EQUIPMENT,
-                _BUSINESS_EQUIPMENT,
+
+        for account_number, account_name, position_code in (
+            self._asset_account_options
+        ):
+            self._asset_type_box.addItem(
+                f"{account_number} – {account_name}",
+                (account_number, position_code),
             )
-        )
+
         form.addRow(
-            "Anlagenart",
+            "Anlagenkonto",
             self._asset_type_box,
         )
 
@@ -228,20 +230,44 @@ class NewFixedAssetDialog(QDialog):
             fixed_asset.description
         )
 
-        if (
-            fixed_asset.position_code
-            == "HGB.266.AKTIVA.A.II.2"
-        ):
-            self._asset_type_box.setCurrentText(
-                _TECHNICAL_EQUIPMENT
+        account_index = -1
+
+        for index in range(self._asset_type_box.count()):
+            account_data = self._asset_type_box.itemData(index)
+
+            if (
+                isinstance(account_data, tuple)
+                and len(account_data) == 2
+                and account_data[0] == fixed_asset.asset_account_number
+            ):
+                account_index = index
+                break
+
+        if account_index >= 0:
+            # Vorhandenes Konto auswählen und die beim Anlagegut
+            # gespeicherte HGB-Position zunächst beibehalten.
+            self._asset_type_box.setItemData(
+                account_index,
+                (
+                    fixed_asset.asset_account_number,
+                    fixed_asset.position_code,
+                ),
             )
-        elif (
-            fixed_asset.position_code
-            == "HGB.266.AKTIVA.A.II.3"
-        ):
-            self._asset_type_box.setCurrentText(
-                _BUSINESS_EQUIPMENT
+        else:
+            # Nur ergänzen, wenn die Kontonummer tatsächlich fehlt.
+            self._asset_type_box.addItem(
+                (
+                    f"{fixed_asset.asset_account_number} "
+                    "– nicht im aktiven Kontenplan"
+                ),
+                (
+                    fixed_asset.asset_account_number,
+                    fixed_asset.position_code,
+                ),
             )
+        account_index = self._asset_type_box.count() - 1
+
+        self._asset_type_box.setCurrentIndex(account_index)
 
         self._acquisition_date_entry.setText(
             fixed_asset.acquisition_date.strftime(
@@ -403,26 +429,17 @@ class NewFixedAssetDialog(QDialog):
                     "eine positive ganze Zahl sein."
                 )
 
-            asset_type = (
-                self._asset_type_box.currentText()
-            )
+            selected_account = self._asset_type_box.currentData()
 
-            if asset_type == _TECHNICAL_EQUIPMENT:
-                position_code = (
-                    "HGB.266.AKTIVA.A.II.2"
-                )
-                asset_account_number = "0200"
-
-            elif asset_type == _BUSINESS_EQUIPMENT:
-                position_code = (
-                    "HGB.266.AKTIVA.A.II.3"
-                )
-                asset_account_number = "0400"
-
-            else:
+            if (
+                not isinstance(selected_account, tuple)
+                or len(selected_account) != 2
+            ):
                 raise ValueError(
-                    "Die Anlagenart ist ungültig."
+                    "Bitte ein gültiges Anlagenkonto auswählen."
                 )
+
+            asset_account_number, position_code = selected_account
 
             fixed_asset_kwargs = {
                 "company_id": self._company_id,

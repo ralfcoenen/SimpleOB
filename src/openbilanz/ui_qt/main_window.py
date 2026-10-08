@@ -134,6 +134,10 @@ class MainWindow(QMainWindow):
         statement_builder: FinancialStatementBuilder,
         account_types: dict[str, AccountType],
         chart_of_accounts: ChartOfAccountsTemplate,
+        reload_chart_of_accounts: Callable[
+            [],
+            tuple[ChartOfAccountsTemplate, tuple[Account, ...]],
+        ],
         opening_balance_account_number: str,
         depreciation_expense_account_number: str,
         closing_accounts: ClosingAccounts,
@@ -162,6 +166,8 @@ class MainWindow(QMainWindow):
         self._financial_statement_builder = statement_builder
         self._account_types = account_types
         self._chart_of_accounts = chart_of_accounts
+        self._reload_chart_of_accounts = reload_chart_of_accounts
+        self._account_editing_mode = False
         self._account_mapper = account_mapper
         self._opening_balance_account_number = (
             opening_balance_account_number
@@ -214,21 +220,21 @@ class MainWindow(QMainWindow):
             "Einstellungen"
         )
 
-        elster_certificate_action = (
+        self._elster_certificate_action = (
             settings_menu.addAction(
                 "ELSTER-Zertifikat…"
             )
         )
-        elster_certificate_action.triggered.connect(
+        self._elster_certificate_action.triggered.connect(
             self._configure_elster_certificate
         )
 
-        elster_data_supplier_action = (
+        self._elster_data_supplier_action = (
             settings_menu.addAction(
                 "ELSTER-Datenlieferant…"
             )
         )
-        elster_data_supplier_action.triggered.connect(
+        self._elster_data_supplier_action.triggered.connect(
             self._configure_elster_data_supplier
         )
 
@@ -2479,6 +2485,42 @@ class MainWindow(QMainWindow):
         elif selected_action is disposal_action:
             self._open_link_fixed_asset_disposal()
 
+    def _fixed_asset_account_options(
+        self,
+    ) -> tuple[tuple[str, str, str], ...]:
+        """Ermittelt aktive Anlagenkonten mit ihrer Soll-HGB-Zuordnung."""
+
+        active_accounts = {
+            account.number: account
+            for account in self._accounts
+            if account.is_active
+        }
+
+        options = []
+
+        for rule in self._chart_of_accounts.account_mapping_rules:
+            account = active_accounts.get(rule.account_number)
+
+            if account is None or rule.debit_position is None:
+                continue
+
+            position_code = rule.debit_position.code
+
+            if not position_code.startswith("HGB.266.AKTIVA.A."):
+                continue
+
+            options.append(
+                (
+                    account.number,
+                    account.name,
+                    position_code,
+                )
+            )
+
+        return tuple(
+            sorted(options, key=lambda item: item[0])
+        )
+
     def _open_new_fixed_asset(self) -> None:
         """Öffnet den Dialog für ein neues Anlagegut."""
 
@@ -2493,6 +2535,7 @@ class MainWindow(QMainWindow):
             depreciation_expense_account_number=(
                 self._depreciation_expense_account_number
             ),
+            asset_account_options=self._fixed_asset_account_options(),
         )
 
         if dialog.exec() != QDialog.DialogCode.Accepted:
@@ -2564,6 +2607,7 @@ class MainWindow(QMainWindow):
             ),
             fixed_asset=fixed_asset,
             acquisition_linked=acquisition_linked,
+            asset_account_options=self._fixed_asset_account_options(),
         )
 
         if dialog.exec() != QDialog.DialogCode.Accepted:
@@ -4525,6 +4569,15 @@ class MainWindow(QMainWindow):
             )
             return
 
+        self._activate_account_editing_mode()
+
+        (
+            self._chart_of_accounts,
+            self._accounts,
+        ) = self._reload_chart_of_accounts()
+
+        self._refresh_accounts()
+
         QMessageBox.information(
             self,
             "Konto angelegt",
@@ -4761,12 +4814,13 @@ class MainWindow(QMainWindow):
             )
             return
 
-        self._accounts = tuple(
-            dialog.result.account
-            if item.number == account_number
-            else item
-            for item in self._accounts
-        )
+        self._activate_account_editing_mode()
+
+        (
+            self._chart_of_accounts,
+            self._accounts,
+        ) = self._reload_chart_of_accounts()
+
         self._refresh_accounts()
 
         QMessageBox.information(
@@ -5029,6 +5083,63 @@ class MainWindow(QMainWindow):
 
         self._e_bilanz_mapping_label.setText(
             f"Zuordnung: {label}"
+        )
+
+    def _activate_account_editing_mode(self) -> None:
+        """Sperrt die Buchhaltung bis zum erneuten Öffnen."""
+
+        if self._account_editing_mode:
+            return
+
+        self._account_editing_mode = True
+
+        # Nur die Kontenübersicht bleibt zugänglich.
+        for index in range(self._notebook.count()):
+            self._notebook.setTabEnabled(
+                index,
+                self._notebook.widget(index) is self._accounts_tab,
+            )
+
+        self._notebook.setCurrentWidget(self._accounts_tab)
+
+        # Mandantenbezogene Verwaltungsfunktionen sperren.
+        self._company_master_data_button.setEnabled(False)
+        self._shareholders_button.setEnabled(False)
+        self._account_configuration_button.setEnabled(False)
+        self._export_company_button.setEnabled(False)
+        self._opening_balance_button.setEnabled(False)
+
+        # ELSTER-Einstellungen sperren.
+        self._elster_certificate_action.setEnabled(False)
+        self._elster_data_supplier_action.setEnabled(False)
+
+        # E-Bilanz-Zuordnungen sperren.
+        self._e_bilanz_mapping_button.setEnabled(False)
+
+        # Buchhaltung wechseln bleibt verfügbar.
+        self._return_to_start_button.setEnabled(True)
+
+        self.statusBar().showMessage(
+            "Kontenrahmen geändert – bitte Buchhaltung "
+            "schließen und erneut öffnen."
+        )
+
+        QMessageBox.information(
+            self,
+            "Kontenrahmen geändert",
+            (
+                "Die Änderung am Kontenrahmen wurde gespeichert.\n\n"
+                "Damit keine Buchungen oder Auswertungen mit einem "
+                "teilweise aktualisierten Kontenrahmen erfolgen, "
+                "sind die übrigen Buchhaltungsfunktionen "
+                "vorübergehend gesperrt.\n\n"
+                "Sie können weiterhin Konten anlegen, bearbeiten, "
+                "aktivieren und deaktivieren.\n\n"
+                "Um die Änderungen vollständig wirksam zu machen "
+                "und alle Funktionen wieder freizugeben, klicken "
+                "Sie auf „Buchhaltung wechseln“ und öffnen "
+                "Sie den Mandanten erneut."
+            ),
         )
 
     def _refresh_accounts(self) -> None:
