@@ -465,6 +465,17 @@ class VatBookingFrame(QWidget):
             ):
                 valid = False
 
+            if (
+                account is not None
+                and invoice_type in (
+                    _OUTPUT_INVOICE,
+                    _CUSTOMER_CREDIT_NOTE,
+                )
+                and account.account_type
+                is not AccountType.REVENUE
+            ):
+                valid = False
+
             try:
                 self._parse_amount(
                     amount_entry.text()
