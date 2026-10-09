@@ -149,6 +149,51 @@ if [[ ! -s "${RELEASE_ARCHIVE}" ]]; then
     exit 1
 fi
 
+
+#
+# LGPL-Quellarchive vor der Veröffentlichung prüfen.
+#
+
+QT_SOURCE_DIR="${HOME}/SimpleOB-LGPL-Sources/Qt-6.11.2"
+GETTEXT_SOURCE_DIR="${HOME}/SimpleOB-LGPL-Sources/gettext-1.0"
+
+SOURCE_ARCHIVES=(
+    "${QT_SOURCE_DIR}/qtbase-everywhere-src-6.11.2.tar.xz"
+    "${QT_SOURCE_DIR}/qtsvg-everywhere-src-6.11.2.tar.xz"
+    "${QT_SOURCE_DIR}/pyside-setup-everywhere-src-6.11.2.zip"
+    "${GETTEXT_SOURCE_DIR}/gettext-1.0.tar.gz"
+)
+
+SOURCE_SHA256=(
+    "5b2e00eccaf5a4d8c14134ffa0ea8dfd0a35ae1ffc7f8d87fa4305a1ed23cf22"
+    "d594337feca84c26fb67fe87b85e6a5c12fda404b611d905f9d138210c311876"
+    "c0fdd62b91a1d36d5ee2e1fb71050a32fbc93fcdeef0fdcb41d29afaaf00d9b5"
+    "85d99b79c981a404874c02e0342176cf75c7698e2b51fe41031cf6526d974f1a"
+)
+
+for index in "${!SOURCE_ARCHIVES[@]}"; do
+    archive="${SOURCE_ARCHIVES[$index]}"
+    expected_sha="${SOURCE_SHA256[$index]}"
+
+    if [[ ! -s "${archive}" ]]; then
+        echo >&2 "Fehler: LGPL-Quellarchiv fehlt oder ist leer:"
+        echo >&2 "  ${archive}"
+        exit 1
+    fi
+
+    actual_sha="$(
+        shasum -a 256 "${archive}" | awk '{print $1}'
+    )"
+
+    if [[ "${actual_sha}" != "${expected_sha}" ]]; then
+        echo >&2 "Fehler: SHA-256 stimmt nicht überein:"
+        echo >&2 "  ${archive}"
+        exit 1
+    fi
+
+    echo "LGPL-Quellarchiv geprüft: $(basename "${archive}")"
+done
+
 #
 # Vorhandene Tags und Releases niemals überschreiben.
 #
@@ -226,11 +271,22 @@ RELEASE_NOTES_FILE="$(
     mktemp "${TMPDIR:-/tmp}/simpleob-release-notes.XXXXXX"
 )"
 
+CHECKSUM_FILE="$(
+    mktemp -d "${TMPDIR:-/tmp}/simpleob-checksums.XXXXXX"
+)/SHA256SUMS"
+
 cleanup() {
     rm -f "${RELEASE_NOTES_FILE}"
+    rm -rf "$(dirname "${CHECKSUM_FILE}")"
 }
 
 trap cleanup EXIT
+
+for index in "${!SOURCE_ARCHIVES[@]}"; do
+    printf '%s  %s\n' \
+        "${SOURCE_SHA256[$index]}" \
+        "$(basename "${SOURCE_ARCHIVES[$index]}")"
+done > "${CHECKSUM_FILE}"
 
 cat > "${RELEASE_NOTES_FILE}" <<EOF_NOTES
 ## SimpleOB ${RELEASE_TAG}
@@ -254,6 +310,15 @@ Benutzerhandbuch.
 Das mitgelieferte Testzertifikat ist ausschließlich für Testübermittlungen
 vorgesehen. Vor einer produktiven Übermittlung muss in SimpleOB das persönliche
 ELSTER-Zertifikat ausgewählt werden.
+
+### LGPL-Quellcode
+
+Die zu dieser Version gehörenden Quellarchive für Qt, PySide6,
+Shiboken6 und GNU gettext stehen als separate Downloads
+in diesem GitHub Release bereit.
+
+Die Lizenztexte sowie Hinweise zum Austausch LGPL-lizenzierter
+Bibliotheken befinden sich im SimpleOB-App-Bundle.
 EOF_NOTES
 
 #
@@ -284,6 +349,8 @@ git push origin "${RELEASE_TAG}"
 if ! gh release create \
     "${RELEASE_TAG}" \
     "${RELEASE_ARCHIVE}" \
+    "${SOURCE_ARCHIVES[@]}" \
+    "${CHECKSUM_FILE}" \
     --title "${RELEASE_TITLE}" \
     --notes-file "${RELEASE_NOTES_FILE}" \
     --latest

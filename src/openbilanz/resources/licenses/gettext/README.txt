@@ -39,9 +39,14 @@ SHA-256:
 
 The source archive is published by the GNU Project.
 
-Information about the SimpleOB-controlled download location for the
-corresponding source archive will be provided with the SimpleOB
-distribution or on the SimpleOB distribution website.
+The corresponding GNU gettext source archive is provided as a
+downloadable asset of the SimpleOB GitHub releases:
+
+https://github.com/ralfcoenen/OpenbilanzUG/releases
+
+Select the release matching the installed SimpleOB version.
+The source archive and its SHA-256 checksum are listed among
+the release assets.
 
 Library replacement
 -------------------

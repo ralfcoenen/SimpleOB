@@ -26,9 +26,14 @@ c0fdd62b91a1d36d5ee2e1fb71050a32fbc93fcdeef0fdcb41d29afaaf00d9b5
 These archives contain the relevant license information and source
 material supplied by the Qt Project.
 
-Information about the SimpleOB-controlled download location for these
-source archives is provided with the SimpleOB distribution or on the
-SimpleOB distribution website.
+The corresponding source archives are provided as downloadable assets
+of the SimpleOB GitHub releases:
+
+https://github.com/ralfcoenen/OpenbilanzUG/releases
+
+Select the release matching the installed SimpleOB version.
+The source archives and their SHA-256 checksums are listed among
+the release assets.
 
 2. Dynamic library use
 ----------------------
