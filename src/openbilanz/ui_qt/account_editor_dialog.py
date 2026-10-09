@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMessageBox,
+    QSizePolicy,
     QVBoxLayout,
 )
 
@@ -139,12 +140,22 @@ class AccountEditorDialog(QDialog):
         )
 
         self._debit_position_box = QComboBox()
+        self._debit_position_box.setMinimumWidth(450)
+        self._debit_position_box.setSizePolicy(
+            QSizePolicy.Policy.Ignored,
+            QSizePolicy.Policy.Fixed,
+        )
         form.addRow(
             "HGB-Zuordnung Soll",
             self._debit_position_box,
         )
 
         self._credit_position_box = QComboBox()
+        self._credit_position_box.setMinimumWidth(450)
+        self._credit_position_box.setSizePolicy(
+            QSizePolicy.Policy.Ignored,
+            QSizePolicy.Policy.Fixed,
+        )
         form.addRow(
             "HGB-Zuordnung Haben",
             self._credit_position_box,
