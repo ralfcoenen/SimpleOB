@@ -18,6 +18,9 @@ from openbilanz.database.chart_of_accounts_repository import (
     ChartOfAccountsRepository,
 )
 from openbilanz.database.company_repository import CompanyRepository
+from openbilanz.database.equity_contribution_repository import (
+    EquityContributionRepository,
+)
 from openbilanz.database.fixed_asset_depreciation_repository import (
     FixedAssetDepreciationRepository,
 )
@@ -27,17 +30,17 @@ from openbilanz.database.fixed_asset_movement_repository import (
 from openbilanz.database.fixed_asset_repository import (
     FixedAssetRepository,
 )
-from openbilanz.database.shareholder_repository import (
-    ShareholderRepository,
-)
-from openbilanz.database.tax_depreciation_adjustment_repository import (
-    TaxDepreciationAdjustmentRepository,
-)
 from openbilanz.database.profit_appropriation_annual_data_repository import (
     ProfitAppropriationAnnualDataRepository,
 )
 from openbilanz.database.profit_appropriation_posting_repository import (
     ProfitAppropriationPostingRepository,
+)
+from openbilanz.database.shareholder_repository import (
+    ShareholderRepository,
+)
+from openbilanz.database.tax_depreciation_adjustment_repository import (
+    TaxDepreciationAdjustmentRepository,
 )
 from openbilanz.domain.account import Account
 from openbilanz.domain.account_mapping_rule import (
@@ -66,20 +69,23 @@ from openbilanz.domain.depreciation_proposal import (
     DepreciationProposal,
 )
 from openbilanz.domain.entry_side import EntrySide
+from openbilanz.domain.equity_contribution_reference import (
+    EquityContributionReference,
+)
 from openbilanz.domain.fiscal_year import FiscalYear
 from openbilanz.domain.fiscal_year_status import FiscalYearStatus
 from openbilanz.domain.fixed_asset import FixedAsset
 from openbilanz.domain.fixed_asset_depreciation import (
     FixedAssetDepreciation,
 )
+from openbilanz.domain.fixed_asset_disposal_detail import (
+    FixedAssetDisposalDetail,
+)
 from openbilanz.domain.fixed_asset_disposal_preview import (
     FixedAssetDisposalPreview,
 )
 from openbilanz.domain.fixed_asset_movement import (
     FixedAssetMovement,
-)
-from openbilanz.domain.fixed_asset_disposal_detail import (
-    FixedAssetDisposalDetail,
 )
 from openbilanz.domain.fixed_asset_movement_type import (
     FixedAssetMovementType,
@@ -92,23 +98,20 @@ from openbilanz.domain.managed_fiscal_year import ManagedFiscalYear
 from openbilanz.domain.profit_appropriation_annual_data import (
     ProfitAppropriationAnnualData,
 )
-from openbilanz.domain.profit_appropriation_posting_type import (
-    ProfitAppropriationPostingType,
-)
-from openbilanz.domain.equity_contribution_reference import (
-    EquityContributionReference,
-)
-from openbilanz.domain.shareholder import Shareholder
-from openbilanz.domain.tax_depreciation_adjustment import (
-    TaxDepreciationAdjustment,
-)
-from openbilanz.domain.vat_accounts import VatAccounts
 from openbilanz.domain.profit_appropriation_posting import (
     ProfitAppropriationPosting,
 )
 from openbilanz.domain.profit_appropriation_posting_proposal import (
     ProfitAppropriationPostingProposal,
 )
+from openbilanz.domain.profit_appropriation_posting_type import (
+    ProfitAppropriationPostingType,
+)
+from openbilanz.domain.shareholder import Shareholder
+from openbilanz.domain.tax_depreciation_adjustment import (
+    TaxDepreciationAdjustment,
+)
+from openbilanz.domain.vat_accounts import VatAccounts
 from openbilanz.eric.bilanz_generation.bvv_value_builder import (
     BvvValueBuilder,
 )
@@ -118,9 +121,6 @@ from openbilanz.reporting.account_activity_report import (
 from openbilanz.reporting.journal_report import JournalReport
 from openbilanz.reporting.trial_balance_report import (
     TrialBalanceReport,
-)
-from openbilanz.database.equity_contribution_repository import (
-    EquityContributionRepository,
 )
 from openbilanz.services.closing_consistency_service import (
     ClosingConsistencyService,
@@ -156,19 +156,19 @@ from openbilanz.services.fixed_asset_schedule_service import (
     FixedAssetScheduleService,
 )
 from openbilanz.services.posting_service import PostingService
-from openbilanz.services.reporting_service import ReportingService
-from openbilanz.services.profit_appropriation_service import (
-    ProfitAppropriationService,
-)
-from openbilanz.services.taxonomy_management_service import (
-    TaxonomyManagementService,
-    TaxonomyStatus,
-)
 from openbilanz.services.profit_appropriation_posting_service import (
     ProfitAppropriationPostingService,
 )
 from openbilanz.services.profit_appropriation_posting_workflow import (
     ProfitAppropriationPostingWorkflow,
+)
+from openbilanz.services.profit_appropriation_service import (
+    ProfitAppropriationService,
+)
+from openbilanz.services.reporting_service import ReportingService
+from openbilanz.services.taxonomy_management_service import (
+    TaxonomyManagementService,
+    TaxonomyStatus,
 )
 from openbilanz.taxonomy.arelle_adapter import (
     ArelleValidationResult,
@@ -1817,6 +1817,7 @@ class FiscalYearWorkspace:
 
         return movement
 
+
     def link_fixed_asset_disposal(
         self,
         *,
@@ -1842,14 +1843,10 @@ class FiscalYearWorkspace:
             )
 
         if not isinstance(fixed_asset_id, UUID):
-            raise TypeError(
-                "fixed_asset_id must be a UUID"
-            )
+            raise TypeError("fixed_asset_id must be a UUID")
 
         if not isinstance(booking_id, UUID):
-            raise TypeError(
-                "booking_id must be a UUID"
-            )
+            raise TypeError("booking_id must be a UUID")
 
         if not isinstance(booking_line_position, int):
             raise TypeError(
@@ -1861,177 +1858,193 @@ class FiscalYearWorkspace:
                 "booking_line_position must not be negative"
             )
 
-        fixed_asset = self._fixed_asset_repository.get(
-            fixed_asset_id
-        )
 
-        if fixed_asset is None:
-            raise ValueError(
-                "Das Anlagegut ist nicht vorhanden."
+        try:
+            # Die Sperre muss vor sämtlichen Datenbankprüfungen
+            # erworben werden, damit konkurrierende Benutzer
+            # nicht denselben veralteten Anlagenstatus verwenden.
+            self._company_repository.lock_open_fiscal_year(
+                self._context.company.company_id,
+                self._context.fiscal_year,
             )
 
-        if (
-            fixed_asset.company_id
-            != self._context.company.company_id
-        ):
-            raise ValueError(
-                "Das Anlagegut gehört nicht zum "
-                "geöffneten Unternehmen."
+            fixed_asset = self._fixed_asset_repository.get(
+                fixed_asset_id
             )
 
-        if fixed_asset.status is not FixedAssetStatus.ACTIVE:
-            raise ValueError(
-                "Das Anlagegut ist bereits abgegangen."
+            if fixed_asset is None:
+                raise ValueError(
+                    "Das Anlagegut ist nicht vorhanden."
+                )
+
+            if (
+                fixed_asset.company_id
+                != self._context.company.company_id
+            ):
+                raise ValueError(
+                    "Das Anlagegut gehört nicht zum "
+                    "geöffneten Unternehmen."
+                )
+
+            if fixed_asset.status is not FixedAssetStatus.ACTIVE:
+                raise ValueError(
+                    "Das Anlagegut ist bereits abgegangen."
+                )
+
+            booking = self._booking_repository.get(
+                booking_id
             )
 
-        booking = self._booking_repository.get(
-            booking_id
-        )
+            if booking is None:
+                raise ValueError(
+                    "Die Buchung ist nicht vorhanden."
+                )
 
-        if booking is None:
-            raise ValueError(
-                "Die Buchung ist nicht vorhanden."
+            if not (
+                self._context.fiscal_year.start_date
+                <= booking.booking_date
+                <= self._context.fiscal_year.end_date
+            ):
+                raise ValueError(
+                    "Die Buchung gehört nicht zum "
+                    "geöffneten Geschäftsjahr."
+                )
+
+            if booking.booking_date < fixed_asset.acquisition_date:
+                raise ValueError(
+                    "Der Anlagenabgang kann nicht vor dem "
+                    "Anschaffungsdatum liegen."
+                )
+
+            if booking_line_position >= len(booking.lines):
+                raise ValueError(
+                    "Die Buchungszeile ist nicht vorhanden."
+                )
+
+            booking_line = booking.lines[
+                booking_line_position
+            ]
+
+            if (
+                booking_line.account_number
+                != fixed_asset.asset_account_number
+            ):
+                raise ValueError(
+                    "Die Buchungszeile gehört nicht zum "
+                    "Anlagenkonto des Anlageguts."
+                )
+
+            if booking_line.side is not EntrySide.CREDIT:
+                raise ValueError(
+                    "Die Abgangsbuchung muss das Anlagenkonto "
+                    "im Haben buchen."
+                )
+
+            existing_movements = (
+                self._fixed_asset_movement_repository
+                .list_for_fixed_asset(
+                    fixed_asset.fixed_asset_id
+                )
             )
 
-        if not (
-            self._context.fiscal_year.start_date
-            <= booking.booking_date
-            <= self._context.fiscal_year.end_date
-        ):
-            raise ValueError(
-                "Die Buchung gehört nicht zum "
-                "geöffneten Geschäftsjahr."
+            effective_movements = (
+                self._effective_fixed_asset_movements(
+                    existing_movements
+                )
             )
 
-        if booking.booking_date < fixed_asset.acquisition_date:
-            raise ValueError(
-                "Der Anlagenabgang kann nicht vor dem "
-                "Anschaffungsdatum liegen."
+            if not any(
+                movement.movement_type
+                is FixedAssetMovementType.ACQUISITION
+                for movement in effective_movements
+            ):
+                raise ValueError(
+                    "Dem Anlagegut ist noch keine "
+                    "Anschaffungsbuchung zugeordnet."
+                )
+
+            if any(
+                movement.movement_type
+                is FixedAssetMovementType.DISPOSAL
+                for movement in effective_movements
+            ):
+                raise ValueError(
+                    "Dem Anlagegut ist bereits eine "
+                    "Abgangsbuchung zugeordnet."
+                )
+
+            if self._fixed_asset_depreciation_repository is None:
+                raise RuntimeError(
+                    "Die Anlagenbuchhaltung ist nicht konfiguriert."
+                )
+
+            depreciations = (
+                self._fixed_asset_depreciation_repository
+                .list_for_fixed_asset(
+                    fixed_asset.fixed_asset_id
+                )
             )
 
-        if booking_line_position >= len(booking.lines):
-            raise ValueError(
-                "Die Buchungszeile ist nicht vorhanden."
+            effective_depreciations = (
+                self._effective_fixed_asset_depreciations(
+                    depreciations
+                )
             )
 
-        booking_line = booking.lines[
-            booking_line_position
-        ]
-
-        if (
-            booking_line.account_number
-            != fixed_asset.asset_account_number
-        ):
-            raise ValueError(
-                "Die Buchungszeile gehört nicht zum "
-                "Anlagenkonto des Anlageguts."
+            current_year_depreciations = tuple(
+                depreciation
+                for depreciation in effective_depreciations
+                if depreciation.fiscal_year_end
+                == self._context.fiscal_year.end_date
             )
 
-        if booking_line.side is not EntrySide.CREDIT:
-            raise ValueError(
-                "Die Abgangsbuchung muss das Anlagenkonto "
-                "im Haben buchen."
+            if current_year_depreciations:
+                raise ValueError(
+                    "Für das Anlagegut ist bereits eine "
+                    "Abschreibung für dieses Geschäftsjahr "
+                    "gebucht. Die Abschreibung muss vor "
+                    "Zuordnung des Anlagenabgangs storniert "
+                    "werden."
+                )
+
+            movement = FixedAssetMovement(
+                fixed_asset_id=fixed_asset.fixed_asset_id,
+                fiscal_year_end=(
+                    self._context.fiscal_year.end_date
+                ),
+                movement_date=booking.booking_date,
+                amount=booking_line.amount,
+                booking_id=booking.booking_id,
+                movement_type=FixedAssetMovementType.DISPOSAL,
             )
 
-        existing_movements = (
-            self._fixed_asset_movement_repository
-            .list_for_fixed_asset(
-                fixed_asset.fixed_asset_id
-            )
-        )
-
-        effective_movements = (
-            self._effective_fixed_asset_movements(
-                existing_movements
-            )
-        )
-
-        if not any(
-            movement.movement_type
-            is FixedAssetMovementType.ACQUISITION
-            for movement in effective_movements
-        ):
-            raise ValueError(
-                "Dem Anlagegut ist noch keine "
-                "Anschaffungsbuchung zugeordnet."
+            self._fixed_asset_movement_repository.add(
+                movement=movement,
+                booking_line_position=booking_line_position,
+                commit=False,
             )
 
-        if any(
-            movement.movement_type
-            is FixedAssetMovementType.DISPOSAL
-            for movement in effective_movements
-        ):
-            raise ValueError(
-                "Dem Anlagegut ist bereits eine "
-                "Abgangsbuchung zugeordnet."
+            disposed_fixed_asset = replace(
+                fixed_asset,
+                status=FixedAssetStatus.DISPOSED,
+                disposal_date=booking.booking_date,
             )
 
-        if self._fixed_asset_depreciation_repository is None:
-            raise RuntimeError(
-                "Die Anlagenbuchhaltung ist nicht konfiguriert."
+            self._fixed_asset_repository.update(
+                fixed_asset=disposed_fixed_asset,
+                commit=False,
             )
 
-        depreciations = (
-            self._fixed_asset_depreciation_repository
-            .list_for_fixed_asset(
-                fixed_asset.fixed_asset_id
-            )
-        )
+            # Anlagenbewegung und Anlagenstatus werden
+            # gemeinsam und atomar gespeichert.
+            self._booking_repository.commit()
 
-        effective_depreciations = (
-            self._effective_fixed_asset_depreciations(
-                depreciations
-            )
-        )
+            return movement
 
-        current_year_depreciations = tuple(
-            depreciation
-            for depreciation in effective_depreciations
-            if depreciation.fiscal_year_end
-            == self._context.fiscal_year.end_date
-        )
+        except Exception:
+            self._booking_repository.rollback()
+            raise
 
-        if current_year_depreciations:
-            raise ValueError(
-                "Für das Anlagegut ist bereits eine "
-                "Abschreibung für dieses Geschäftsjahr "
-                "gebucht. Die Abschreibung muss vor "
-                "Zuordnung des Anlagenabgangs storniert "
-                "werden."
-            )
-
-        movement = FixedAssetMovement(
-            fixed_asset_id=(
-                fixed_asset.fixed_asset_id
-            ),
-            fiscal_year_end=(
-                self._context.fiscal_year.end_date
-            ),
-            movement_date=booking.booking_date,
-            amount=booking_line.amount,
-            booking_id=booking.booking_id,
-            movement_type=(
-                FixedAssetMovementType.DISPOSAL
-            ),
-        )
-
-        self._fixed_asset_movement_repository.add(
-            movement=movement,
-            booking_line_position=booking_line_position,
-            commit=False,
-        )
-
-        disposed_fixed_asset = replace(
-            fixed_asset,
-            status=FixedAssetStatus.DISPOSED,
-            disposal_date=booking.booking_date,
-        )
-
-        self._fixed_asset_repository.update(
-            fixed_asset=disposed_fixed_asset,
-        )
-
-        return movement
 
     def build_fixed_asset_disposal_preview(
         self,

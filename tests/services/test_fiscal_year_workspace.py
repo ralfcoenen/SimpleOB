@@ -10,12 +10,12 @@ import pytest
 
 from openbilanz.accounting.account_balance import AccountBalance
 from openbilanz.accounting.balance_sheet import BalanceSheet
-from openbilanz.accounting.income_statement import IncomeStatement
-from openbilanz.accounting.ledger import Ledger
-from openbilanz.accounting.mapper import AccountMapper
 from openbilanz.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
+from openbilanz.accounting.income_statement import IncomeStatement
+from openbilanz.accounting.ledger import Ledger
+from openbilanz.accounting.mapper import AccountMapper
 from openbilanz.core.context import ApplicationContext
 from openbilanz.domain.accounting_account_roles import (
     AccountingAccountRoles,
@@ -447,7 +447,7 @@ def test_post_booking_does_not_change_workspace_when_persistence_fails(
     )
 
 
-def test_post_opening_balance_commits_all_bookings_and_reloads(
+def test_post_opening_balance_commits_bookings_and_updates_ledger(
     context: ApplicationContext,
 ) -> None:
     booking_repository = Mock()
@@ -3215,7 +3215,6 @@ def test_build_e_bilanz_passes_profit_appropriation_data(
 
     booking_repository = Mock()
     company_repository = Mock()
-    bvv_repository = Mock()
     profit_appropriation_repository = Mock()
     chart_of_accounts_repository = Mock()
     preparation_service = Mock()
@@ -3839,8 +3838,13 @@ def test_loads_and_updates_account_configuration(
     )
 
 
+@pytest.mark.parametrize(
+    "fail_on_update",
+    (False, True),
+)
 def test_links_fixed_asset_disposal_to_existing_booking(
     context: ApplicationContext,
+    fail_on_update: bool,
 ) -> None:
     booking_repository = Mock()
     company_repository = Mock()
@@ -3897,6 +3901,18 @@ def test_links_fixed_asset_disposal_to_existing_booking(
     fixed_asset_repository.get.return_value = fixed_asset
     booking_repository.get.return_value = disposal_booking
 
+    call_order = []
+
+    company_repository.lock_open_fiscal_year.side_effect = (
+        lambda *args: call_order.append("lock")
+    )
+    fixed_asset_repository.get.side_effect = (
+        lambda *args: (
+            call_order.append("read_asset"),
+            fixed_asset,
+        )[1]
+    )
+
     movement_repository.list_for_fixed_asset.return_value = (
         acquisition_movement,
     )
@@ -3919,6 +3935,32 @@ def test_links_fixed_asset_disposal_to_existing_booking(
             depreciation_repository
         ),
     )
+
+    if fail_on_update:
+        fixed_asset_repository.update.side_effect = RuntimeError(
+            "Simulierter Datenbankfehler"
+        )
+
+        with pytest.raises(
+            RuntimeError,
+            match="Simulierter Datenbankfehler",
+        ):
+            workspace.link_fixed_asset_disposal(
+                fixed_asset_id=fixed_asset.fixed_asset_id,
+                booking_id=disposal_booking.booking_id,
+                booking_line_position=1,
+            )
+
+        company_repository.lock_open_fiscal_year.assert_called_once_with(
+            context.company.company_id,
+            context.fiscal_year,
+        )
+        assert call_order == ["lock", "read_asset"]
+
+        movement_repository.add.assert_called_once()
+        booking_repository.commit.assert_not_called()
+        booking_repository.rollback.assert_called_once_with()
+        return
 
     movement = workspace.link_fixed_asset_disposal(
         fixed_asset_id=fixed_asset.fixed_asset_id,
@@ -3952,6 +3994,21 @@ def test_links_fixed_asset_disposal_to_existing_booking(
     assert updated_asset.fixed_asset_id == fixed_asset.fixed_asset_id
     assert updated_asset.status is FixedAssetStatus.DISPOSED
     assert updated_asset.disposal_date == date(2026, 8, 15)
+
+    assert call_order == ["lock", "read_asset"]
+
+    company_repository.lock_open_fiscal_year.assert_called_once_with(
+        context.company.company_id,
+        context.fiscal_year,
+    )
+
+    fixed_asset_repository.update.assert_called_once_with(
+        fixed_asset=updated_asset,
+        commit=False,
+    )
+
+    booking_repository.commit.assert_called_once_with()
+    booking_repository.rollback.assert_not_called()
 
 @pytest.mark.parametrize(
     (

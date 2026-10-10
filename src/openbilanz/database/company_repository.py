@@ -3,6 +3,10 @@
 from uuid import UUID
 
 from sqlalchemy.orm import Session
+from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
+
+from openbilanz.database.lock_error import DatabaseLockError
 
 from openbilanz.database.models import Mandant, Wirtschaftsjahr
 from openbilanz.domain.company import Company
@@ -292,7 +296,6 @@ class CompanyRepository:
         if commit:
             self._session.commit()
 
-
     def lock_open_fiscal_year(
         self,
         company_id: UUID,
@@ -313,6 +316,19 @@ class CompanyRepository:
                 "Unternehmen wurde nicht gefunden."
             )
 
+        is_postgresql = (
+            self._session.get_bind().dialect.name == "postgresql"
+        )
+
+        if is_postgresql:
+            # Gilt nur für die aktuelle Transaktion.
+            self._session.execute(
+                text(
+                    "SELECT set_config("
+                    "'lock_timeout', '3000ms', true)"
+                )
+            )
+
         query = (
             self._session.query(Wirtschaftsjahr)
             .filter(
@@ -322,14 +338,38 @@ class CompanyRepository:
             )
         )
 
-        if self._session.get_bind().dialect.name == "postgresql":
+        if is_postgresql:
             query = (
                 query
                 .with_for_update(of=Wirtschaftsjahr)
                 .populate_existing()
             )
 
-        fiscal_year_model = query.one_or_none()
+        try:
+            fiscal_year_model = query.one_or_none()
+
+        except OperationalError as exc:
+            sqlstate = getattr(
+                exc.orig,
+                "sqlstate",
+                None,
+            )
+
+            if is_postgresql and sqlstate == "55P03":
+                self._session.rollback()
+
+                raise DatabaseLockError(
+                    "Geschäftsjahr momentan gesperrt.\n\n"
+                    "Ein anderer Benutzer bearbeitet derzeit "
+                    "dieses Geschäftsjahr.\n\n"
+                    "Ihr Vorgang konnte nicht abgeschlossen "
+                    "werden. Es wurden keine Änderungen "
+                    "gespeichert.\n\n"
+                    "Bitte versuchen Sie es in einigen "
+                    "Sekunden erneut."
+                ) from exc
+
+            raise
 
         if fiscal_year_model is None:
             raise ValueError(
@@ -340,7 +380,6 @@ class CompanyRepository:
             raise ValueError(
                 "Geschäftsjahr ist bereits abgeschlossen."
             )
-
 
     def close_fiscal_year(
         self,
