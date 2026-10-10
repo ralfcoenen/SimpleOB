@@ -2,17 +2,19 @@
 """PostgreSQL-Konkurrenztest für BookingRepository."""
 
 import os
+import time
 from datetime import date
 from decimal import Decimal
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 
 from openbilanz.database.booking_repository import BookingRepository
 from openbilanz.database.company_repository import CompanyRepository
+from openbilanz.database.lock_error import DatabaseLockError
 from openbilanz.database.models import Mandant, Wirtschaftsjahr
 from openbilanz.domain.booking import Booking
 from openbilanz.domain.booking_line import BookingLine
@@ -81,10 +83,11 @@ def postgres_sessions():
         engine.dispose()
 
 
+
 def test_postgresql_booking_waits_for_fiscal_year_lock(
     postgres_sessions,
 ) -> None:
-    """BookingRepository muss eine bestehende Geschäftsjahressperre beachten."""
+    """Sperrkonflikt wird gemeldet; danach ist die Buchung möglich."""
 
     Session, company, fiscal_year = postgres_sessions
 
@@ -122,30 +125,32 @@ def test_postgresql_booking_waits_for_fiscal_year_lock(
 
             assert fiscal_year_model.status == "OPEN"
 
-            # Session B darf höchstens 500 ms auf die Sperre warten.
-            session_b.execute(
-                text("SET LOCAL lock_timeout = '500ms'")
-            )
-
             repository_b = BookingRepository(session_b)
 
-            with pytest.raises(
-                Exception,
-                match="lock timeout",
-            ):
+            # Session B erhält nach dem Timeout eine Fachmeldung.
+            start = time.monotonic()
+
+            with pytest.raises(DatabaseLockError) as error:
                 repository_b.add(
                     company_id=company.company_id,
                     fiscal_year=fiscal_year,
                     booking=booking,
                 )
 
-            # Der Timeout hat die Transaktion B abgebrochen.
-            session_b.rollback()
+            elapsed = time.monotonic() - start
+
+            assert 2.5 <= elapsed < 6.0
+
+            assert "Geschäftsjahr" in str(error.value)
+            assert "gesperrt" in str(error.value)
+            assert "Es wurden keine Änderungen gespeichert" in str(
+                error.value
+            )
 
             # Session A gibt die Sperre frei.
             session_a.commit()
 
-            # Jetzt muss derselbe Buchungsversuch gelingen.
+            # Derselbe Buchungsversuch muss jetzt gelingen.
             repository_b.add(
                 company_id=company.company_id,
                 fiscal_year=fiscal_year,

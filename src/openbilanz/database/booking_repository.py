@@ -2,8 +2,11 @@
 
 from uuid import UUID
 
+from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
+from openbilanz.database.lock_error import DatabaseLockError
 from openbilanz.database.models import (
     Buchung,
     Buchungszeile,
@@ -317,12 +320,36 @@ class BookingRepository:
             )
         )
 
-        if (
+        use_postgresql_lock = (
             for_update
             and self._session.get_bind().dialect.name == "postgresql"
-        ):
-            query = query.with_for_update(
-                of=Wirtschaftsjahr,
-            ).populate_existing()
+        )
+
+        if use_postgresql_lock:
+            try:
+                self._session.execute(
+                    text("SET LOCAL lock_timeout = '3000ms'")
+                )
+
+                return (
+                    query.with_for_update(of=Wirtschaftsjahr)
+                    .populate_existing()
+                    .one_or_none()
+                )
+
+            except OperationalError as exc:
+                sqlstate = getattr(exc.orig, "sqlstate", None)
+
+                if sqlstate != "55P03":
+                    raise
+
+                self._session.rollback()
+
+                raise DatabaseLockError(
+                    "Das Geschäftsjahr ist momentan durch einen "
+                    "anderen Vorgang gesperrt. "
+                    "Es wurden keine Änderungen gespeichert. "
+                    "Bitte versuchen Sie es erneut."
+                ) from exc
 
         return query.one_or_none()

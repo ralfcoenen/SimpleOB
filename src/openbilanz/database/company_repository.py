@@ -2,12 +2,11 @@
 
 from uuid import UUID
 
-from sqlalchemy.orm import Session
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
+from sqlalchemy.orm import Session
 
 from openbilanz.database.lock_error import DatabaseLockError
-
 from openbilanz.database.models import Mandant, Wirtschaftsjahr
 from openbilanz.domain.company import Company
 from openbilanz.domain.company_master_data import (
@@ -381,6 +380,7 @@ class CompanyRepository:
                 "Geschäftsjahr ist bereits abgeschlossen."
             )
 
+
     def close_fiscal_year(
         self,
         company_id: UUID,
@@ -390,59 +390,23 @@ class CompanyRepository:
     ) -> None:
         """Schließt ein Geschäftsjahr ab."""
 
-        company_model = (
-            self._session.query(Mandant)
-            .filter(
-                Mandant.company_id == str(company_id)
-            )
-            .one_or_none()
+        self.lock_open_fiscal_year(
+            company_id,
+            fiscal_year,
         )
 
-        if company_model is None:
-            raise ValueError(
-                "Unternehmen wurde nicht gefunden."
-            )
-
-        query = (
+        fiscal_year_model = (
             self._session.query(Wirtschaftsjahr)
+            .join(Mandant)
             .filter(
-                Wirtschaftsjahr.mandant_id
-                == company_model.id,
-                Wirtschaftsjahr.start_date
-                == fiscal_year.start_date,
-                Wirtschaftsjahr.end_date
-                == fiscal_year.end_date,
+                Mandant.company_id == str(company_id),
+                Wirtschaftsjahr.start_date == fiscal_year.start_date,
+                Wirtschaftsjahr.end_date == fiscal_year.end_date,
             )
+            .one()
         )
 
-        if (
-            self._session.get_bind().dialect.name
-            == "postgresql"
-        ):
-            query = (
-                query
-                .with_for_update(of=Wirtschaftsjahr)
-                .populate_existing()
-            )
-
-        fiscal_year_model = query.one_or_none()
-
-        if fiscal_year_model is None:
-            raise ValueError(
-                "Geschäftsjahr wurde nicht gefunden."
-            )
-
-        if (
-            fiscal_year_model.status
-            == FiscalYearStatus.CLOSED.value
-        ):
-            raise ValueError(
-                "Geschäftsjahr ist bereits abgeschlossen."
-            )
-
-        fiscal_year_model.status = (
-            FiscalYearStatus.CLOSED.value
-        )
+        fiscal_year_model.status = FiscalYearStatus.CLOSED.value
 
         if commit:
             self._session.commit()
