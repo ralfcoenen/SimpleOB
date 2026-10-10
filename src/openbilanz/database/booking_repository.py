@@ -40,6 +40,7 @@ class BookingRepository:
         fiscal_year_model = self._find_fiscal_year(
             company_id=company_id,
             fiscal_year=fiscal_year,
+            for_update=True,
         )
 
         if fiscal_year_model is None:
@@ -302,19 +303,26 @@ class BookingRepository:
         *,
         company_id: UUID,
         fiscal_year: FiscalYear,
+        for_update: bool = False,
     ) -> Wirtschaftsjahr | None:
-        """Findet das persistierte Geschäftsjahr."""
+        """Findet das persistierte Geschäftsjahr und sperrt es optional."""
 
-        return (
+        query = (
             self._session.query(Wirtschaftsjahr)
             .join(Mandant)
             .filter(
-                Mandant.company_id
-                == str(company_id),
-                Wirtschaftsjahr.start_date
-                == fiscal_year.start_date,
-                Wirtschaftsjahr.end_date
-                == fiscal_year.end_date,
+                Mandant.company_id == str(company_id),
+                Wirtschaftsjahr.start_date == fiscal_year.start_date,
+                Wirtschaftsjahr.end_date == fiscal_year.end_date,
             )
-            .one_or_none()
         )
+
+        if (
+            for_update
+            and self._session.get_bind().dialect.name == "postgresql"
+        ):
+            query = query.with_for_update(
+                of=Wirtschaftsjahr,
+            ).populate_existing()
+
+        return query.one_or_none()

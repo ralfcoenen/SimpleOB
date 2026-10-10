@@ -21,21 +21,36 @@ APPLICATION_DATA_DIRECTORY_NAME = "SimpleOB"
 
 @dataclass(frozen=True, slots=True)
 class ApplicationConfig:
-    """Technische Konfiguration der OpenBilanz-Anwendung."""
+    """Konfiguration der SimpleOB-Anwendung."""
 
     data_dir: Path
     database_file: Path
     taxonomy_dir: Path
     config_file: Path
+
     eric_lib_dir: Path | None = None
-    eric_data_supplier: str | None = None
+    eric_data_supplier: ElsterDataSupplier | None = None
     eric_certificate_path: Path | None = None
+
+    database_url_override: str | None = None
 
     @property
     def database_url(self) -> str:
-        """Liefert die SQLAlchemy-URL der SQLite-Datenbank."""
+        """Liefert die konfigurierte SQLAlchemy-Datenbank-URL."""
+
+        if self.database_url_override is not None:
+            return self.database_url_override
 
         return f"sqlite:///{self.database_file}"
+
+@property
+def database_url(self) -> str:
+    """Liefert die konfigurierte SQLAlchemy-Datenbank-URL."""
+
+    if self.database_url_override is not None:
+        return self.database_url_override
+
+    return f"sqlite:///{self.database_file}"
 
 
 def default_config() -> ApplicationConfig:
@@ -144,6 +159,7 @@ def load_config(
             database_file=effective_defaults.database_file,
             taxonomy_dir=effective_defaults.taxonomy_dir,
             config_file=path,
+            database_url_override=effective_defaults.database_url_override,
             eric_lib_dir=effective_defaults.eric_lib_dir,
             eric_data_supplier=effective_defaults.eric_data_supplier,
             eric_certificate_path=effective_defaults.eric_certificate_path,
@@ -161,6 +177,29 @@ def load_config(
         "database",
         {},
     )
+
+    database_url_override = database.get("url")
+
+    if database_url_override is not None:
+        if not isinstance(database_url_override, str):
+            raise ValueError(
+                "database.url muss eine Zeichenkette sein."
+            )
+
+        database_url_override = database_url_override.strip()
+
+        if not database_url_override:
+            raise ValueError(
+                "database.url darf nicht leer sein."
+            )
+
+        if not database_url_override.startswith(
+            ("sqlite:///", "postgresql+psycopg://")
+        ):
+            raise ValueError(
+                "Unterstützte Datenbank-URLs beginnen mit "
+                "'sqlite:///' oder 'postgresql+psycopg://'."
+            )
 
     taxonomy = data.get(
         "taxonomy",
@@ -278,9 +317,11 @@ def load_config(
         database_file=database_file,
         taxonomy_dir=taxonomy_dir,
         config_file=path,
+        database_url_override=database_url_override,
         eric_lib_dir=eric_lib_dir,
         eric_data_supplier=eric_data_supplier,
         eric_certificate_path=eric_certificate_path,
+
     )
 
 
@@ -299,6 +340,7 @@ def load_installed_config() -> ApplicationConfig:
         database_file=config.database_file,
         taxonomy_dir=config.taxonomy_dir,
         config_file=config.config_file,
+        database_url_override=config.database_url_override,
         eric_lib_dir=defaults.eric_lib_dir,
         eric_data_supplier=config.eric_data_supplier,
         eric_certificate_path=config.eric_certificate_path,

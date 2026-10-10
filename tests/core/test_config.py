@@ -20,7 +20,6 @@ from openbilanz.domain.elster_data_supplier import (
 )
 
 
-
 def test_default_config_uses_project_data_directory() -> None:
     config = default_config()
 
@@ -762,3 +761,81 @@ def test_load_installed_config_uses_bundled_eric_lib_directory(
     assert config.eric_certificate_path == Path(
         "/tmp/test.pfx"
     )
+
+
+def test_load_config_accepts_postgresql_url(
+    tmp_path: Path,
+) -> None:
+    config_file = tmp_path / "config.toml"
+
+    database_url = (
+        "postgresql+psycopg://simpleob@localhost:5432/simpleob"
+    )
+
+    config_file.write_text(
+        "[database]\n"
+        f'url = "{database_url}"\n',
+        encoding="utf-8",
+    )
+
+    config = load_config(config_file)
+
+    assert config.database_url == database_url
+    assert config.database_url_override == database_url
+
+
+def test_load_config_keeps_sqlite_as_default(
+    tmp_path: Path,
+) -> None:
+    config_file = tmp_path / "config.toml"
+
+    config_file.write_text(
+        "[database]\n"
+        'file = "test.db"\n',
+        encoding="utf-8",
+    )
+
+    config = load_config(config_file)
+
+    assert config.database_url_override is None
+    assert config.database_url == (
+        f"sqlite:///{config.database_file}"
+    )
+
+
+def test_load_config_rejects_empty_database_url(
+    tmp_path: Path,
+) -> None:
+    import pytest
+
+    config_file = tmp_path / "config.toml"
+
+    config_file.write_text(
+        '[database]\nurl = "   "\n',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="database.url darf nicht leer sein",
+    ):
+        load_config(config_file)
+
+
+def test_load_config_rejects_unsupported_database_url(
+    tmp_path: Path,
+) -> None:
+    import pytest
+
+    config_file = tmp_path / "config.toml"
+
+    config_file.write_text(
+        '[database]\nurl = "mysql://localhost/test"\n',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="Unterstützte Datenbank-URLs",
+    ):
+        load_config(config_file)

@@ -11,9 +11,9 @@ from alembic.config import Config
 from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine, inspect
+from sqlalchemy.engine import make_url
 
 from openbilanz.core.config import ApplicationConfig
-
 
 LEGACY_SCHEMA_REVISION = "f65c37865e28"
 
@@ -274,14 +274,29 @@ class DatabaseMigrationService:
 
         alembic_config = self._create_alembic_config()
 
-        database_file = self._application_config.database_file
+        database_url = make_url(
+            self._application_config.database_url
+        )
 
-        if not database_file.exists():
-            command.upgrade(
-                alembic_config,
-                "head",
+        is_sqlite = database_url.get_backend_name() == "sqlite"
+        is_postgresql = (
+            database_url.get_backend_name() == "postgresql"
+        )
+
+        if not (is_sqlite or is_postgresql):
+            raise RuntimeError(
+                "Nicht unterstütztes Datenbanksystem."
             )
-            return
+
+        if is_sqlite:
+            database_file = self._application_config.database_file
+
+            if not database_file.exists():
+                command.upgrade(
+                    alembic_config,
+                    "head",
+                )
+                return
 
         engine = create_engine(
             self._application_config.database_url
@@ -306,15 +321,20 @@ class DatabaseMigrationService:
             if "alembic_version" in table_names:
                 with engine.connect() as connection:
                     migration_context = (
-                        MigrationContext.configure(
-                            connection
-                        )
+                        MigrationContext.configure(connection)
                     )
 
                     current_revision = (
                         migration_context.get_current_revision()
                     )
             else:
+                if not is_sqlite:
+                    raise RuntimeError(
+                        "Die PostgreSQL-Datenbank enthält bereits "
+                        "Tabellen, aber keine Alembic-Versionsinformation. "
+                        "Die Datenbank wurde nicht verändert."
+                    )
+
                 if not self._matches_legacy_schema(
                     inspector=inspector,
                     table_names=table_names,
@@ -327,6 +347,7 @@ class DatabaseMigrationService:
                     )
 
                 is_legacy_database = True
+
         finally:
             engine.dispose()
 
@@ -338,7 +359,8 @@ class DatabaseMigrationService:
             if current_revision == head_revision:
                 return
 
-            self._backup_database()
+            if is_sqlite:
+                self._backup_database()
 
             command.upgrade(
                 alembic_config,
@@ -356,7 +378,7 @@ class DatabaseMigrationService:
         command.upgrade(
             alembic_config,
             "head",
-        )
+    )
 
     @staticmethod
     def _head_revision(

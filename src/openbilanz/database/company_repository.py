@@ -292,6 +292,56 @@ class CompanyRepository:
         if commit:
             self._session.commit()
 
+
+    def lock_open_fiscal_year(
+        self,
+        company_id: UUID,
+        fiscal_year: FiscalYear,
+    ) -> None:
+        """Sperrt ein offenes Geschäftsjahr für die laufende Transaktion."""
+
+        company_model = (
+            self._session.query(Mandant)
+            .filter(
+                Mandant.company_id == str(company_id)
+            )
+            .one_or_none()
+        )
+
+        if company_model is None:
+            raise ValueError(
+                "Unternehmen wurde nicht gefunden."
+            )
+
+        query = (
+            self._session.query(Wirtschaftsjahr)
+            .filter(
+                Wirtschaftsjahr.mandant_id == company_model.id,
+                Wirtschaftsjahr.start_date == fiscal_year.start_date,
+                Wirtschaftsjahr.end_date == fiscal_year.end_date,
+            )
+        )
+
+        if self._session.get_bind().dialect.name == "postgresql":
+            query = (
+                query
+                .with_for_update(of=Wirtschaftsjahr)
+                .populate_existing()
+            )
+
+        fiscal_year_model = query.one_or_none()
+
+        if fiscal_year_model is None:
+            raise ValueError(
+                "Geschäftsjahr wurde nicht gefunden."
+            )
+
+        if fiscal_year_model.status == FiscalYearStatus.CLOSED.value:
+            raise ValueError(
+                "Geschäftsjahr ist bereits abgeschlossen."
+            )
+
+
     def close_fiscal_year(
         self,
         company_id: UUID,
@@ -314,7 +364,7 @@ class CompanyRepository:
                 "Unternehmen wurde nicht gefunden."
             )
 
-        fiscal_year_model = (
+        query = (
             self._session.query(Wirtschaftsjahr)
             .filter(
                 Wirtschaftsjahr.mandant_id
@@ -324,8 +374,19 @@ class CompanyRepository:
                 Wirtschaftsjahr.end_date
                 == fiscal_year.end_date,
             )
-            .one_or_none()
         )
+
+        if (
+            self._session.get_bind().dialect.name
+            == "postgresql"
+        ):
+            query = (
+                query
+                .with_for_update(of=Wirtschaftsjahr)
+                .populate_existing()
+            )
+
+        fiscal_year_model = query.one_or_none()
 
         if fiscal_year_model is None:
             raise ValueError(
@@ -346,6 +407,7 @@ class CompanyRepository:
 
         if commit:
             self._session.commit()
+
 
     def get_master_data(
     self,

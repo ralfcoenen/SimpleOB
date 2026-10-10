@@ -98,3 +98,27 @@ def test_database_creates_session(
     finally:
         database.dispose()
 
+
+def test_database_uses_postgresql_configuration(
+    tmp_path: Path,
+) -> None:
+    config = ApplicationConfig(
+        data_dir=tmp_path,
+        database_file=tmp_path / "openbilanz.db",
+        taxonomy_dir=tmp_path / "taxonomy",
+        config_file=tmp_path / "config.toml",
+        database_url_override=(
+            "postgresql+psycopg://"
+            "simpleob@localhost:5432/simpleob"
+        ),
+    )
+
+    database = Database(config)
+
+    try:
+        assert database.engine.dialect.name == "postgresql"
+        assert database.engine.url.drivername == (
+            "postgresql+psycopg"
+        )
+    finally:
+        database.dispose()

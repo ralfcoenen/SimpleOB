@@ -21,14 +21,11 @@ from openbilanz.core.config import (
     load_installed_config,
     prepare_application_data_directories,
 )
-from openbilanz.core.product import ERIC_MANUFACTURER_ID
 from openbilanz.core.eric_privacy_acknowledgement import (
     is_eric_privacy_acknowledged,
     save_eric_privacy_acknowledgement,
 )
-from openbilanz.database.migration_service import (
-    DatabaseMigrationService,
-)
+from openbilanz.core.product import ERIC_MANUFACTURER_ID
 from openbilanz.database.booking_repository import BookingRepository
 from openbilanz.database.chart_of_accounts_repository import (
     ChartOfAccountsRepository,
@@ -45,6 +42,9 @@ from openbilanz.database.fixed_asset_movement_repository import (
     FixedAssetMovementRepository,
 )
 from openbilanz.database.fixed_asset_repository import FixedAssetRepository
+from openbilanz.database.migration_service import (
+    DatabaseMigrationService,
+)
 from openbilanz.database.profit_appropriation_annual_data_repository import (
     ProfitAppropriationAnnualDataRepository,
 )
@@ -592,12 +592,24 @@ def main() -> None:
                 closing_accounts=closing_accounts,
             )
 
+
             closing_workflow = FiscalYearClosingWorkflow(
                 session=session,
                 booking_repository=booking_repository,
                 company_repository=company_repository,
                 closing_service=closing_service,
+                posting_service=posting_service,
+                statement_builder=(
+                    financial_statement_context.statement_builder
+                ),
+                income_statement_position=(
+                    financial_statement_context.income_statement
+                ),
+                account_types=(
+                    financial_statement_context.account_types
+                ),
             )
+
 
             e_bilanz_preparation_service = EBilanzPreparationService(
                 statement_builder=(

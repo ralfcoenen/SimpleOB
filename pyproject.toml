@@ -25,6 +25,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+postgresql = [
+    "psycopg[binary]>=3.2,<4",
+]
 dev = [
     "pytest",
     "ruff",
