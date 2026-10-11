@@ -3,6 +3,10 @@
 from uuid import UUID
 
 from sqlalchemy.orm import Session
+from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
+
+from openbilanz.database.lock_error import DatabaseLockError
 
 from openbilanz.accounting.financial_statement_position_provider import (
     FinancialStatementPositionProvider,
@@ -218,14 +222,9 @@ class ChartOfAccountsRepository:
                 "nicht überein."
             )
 
-        company_model = self._find_company(
+        company_model = self._lock_company(
             company_id
         )
-
-        if company_model is None:
-            raise ValueError(
-                "Das Unternehmen ist nicht vorhanden."
-            )
 
         existing = (
             self._session.query(Konto)
@@ -316,14 +315,9 @@ class ChartOfAccountsRepository:
                 "nicht überein."
             )
 
-        company_model = self._find_company(
+        company_model = self._lock_company(
             company_id
         )
-
-        if company_model is None:
-            raise ValueError(
-                "Das Unternehmen ist nicht vorhanden."
-            )
 
         model = (
             self._session.query(Konto)
@@ -1214,6 +1208,8 @@ class ChartOfAccountsRepository:
     ) -> None:
         """Speichert die Kontenkonfiguration eines Mandanten atomar."""
 
+        self._lock_company(company_id)
+
         try:
             self.save_control_accounts(
                 company_id=company_id,
@@ -1319,6 +1315,75 @@ class ChartOfAccountsRepository:
                 general_rate_sales_accounts
             ),
         )
+
+    def _lock_company(
+        self,
+        company_id: UUID,
+    ) -> Mandant:
+        """Sperrt einen Mandanten für Änderungen am Kontenrahmen."""
+
+        if not isinstance(company_id, UUID):
+            raise TypeError("company_id must be a UUID")
+
+        is_postgresql = (
+            self._session.get_bind().dialect.name
+            == "postgresql"
+        )
+
+        if is_postgresql:
+            self._session.execute(
+                text(
+                    "SELECT set_config("
+                    "'lock_timeout', '3000ms', true)"
+                )
+            )
+
+        query = (
+            self._session.query(Mandant)
+            .filter(
+                Mandant.company_id == str(company_id)
+            )
+        )
+
+        if is_postgresql:
+            query = (
+                query
+                .with_for_update(of=Mandant)
+                .populate_existing()
+            )
+
+        try:
+            company_model = query.one_or_none()
+
+        except OperationalError as exc:
+            sqlstate = getattr(
+                exc.orig,
+                "sqlstate",
+                None,
+            )
+
+            if is_postgresql and sqlstate == "55P03":
+                self._session.rollback()
+
+                raise DatabaseLockError(
+                    "Kontenverwaltung momentan gesperrt.\n\n"
+                    "Ein anderer Benutzer bearbeitet derzeit "
+                    "die Konten dieses Mandanten.\n\n"
+                    "Ihr Vorgang konnte nicht abgeschlossen "
+                    "werden. Es wurden keine Änderungen "
+                    "gespeichert.\n\n"
+                    "Bitte versuchen Sie es in einigen "
+                    "Sekunden erneut."
+                ) from exc
+
+            raise
+
+        if company_model is None:
+            raise ValueError(
+                "Das Unternehmen ist nicht vorhanden."
+            )
+
+        return company_model
 
     def _find_company(
         self,
