@@ -3,6 +3,7 @@
 
 import os
 from datetime import date
+from dataclasses import replace
 from decimal import Decimal
 from uuid import uuid4
 
@@ -317,3 +318,70 @@ def test_depreciation_lock_timeout_and_retry(
         finally:
             session_a.rollback()
             session_b.rollback()
+
+
+def test_rejects_proposal_after_concurrent_asset_update(
+    postgres_depreciation_data,
+):
+    """Eine zwischenzeitliche Anlagenänderung macht den Vorschlag ungültig."""
+
+    (
+        Session,
+        company,
+        fiscal_year,
+        asset,
+        acquisition_booking,
+        proposal,
+    ) = postgres_depreciation_data
+
+    with Session() as session_a, Session() as session_b:
+        asset_repository_b = FixedAssetRepository(session_b)
+
+        # Session B lädt die Anlage vor der Änderung durch A.
+        loaded_asset_b = asset_repository_b.get(asset.fixed_asset_id)
+        assert loaded_asset_b is not None
+        assert loaded_asset_b.useful_life_months == 60
+
+        # Session A verändert die Nutzungsdauer und speichert sie.
+        updated_asset = replace(
+            asset,
+            useful_life_months=48,
+        )
+
+        FixedAssetRepository(session_a).update(
+            fixed_asset=updated_asset,
+        )
+
+        # Session B versucht, ihren alten Vorschlag zu bestätigen.
+        workflow_b = _workflow(session_b)
+
+        with pytest.raises(
+            ValueError,
+            match="nicht mehr aktuell",
+        ):
+            workflow_b.confirm(
+                company_id=company.company_id,
+                fiscal_year=fiscal_year,
+                proposal=proposal,
+                asset_code=asset.asset_code,
+                asset_description=asset.description,
+            )
+
+    # Der fehlgeschlagene Versuch darf nichts gebucht haben.
+    with Session() as check_session:
+        bookings = BookingRepository(
+            check_session
+        ).list_for_fiscal_year(
+            company_id=company.company_id,
+            fiscal_year=fiscal_year,
+        )
+
+        depreciations = (
+            FixedAssetDepreciationRepository(
+                check_session
+            ).list_for_fixed_asset(asset.fixed_asset_id)
+        )
+
+        assert len(bookings) == 1
+        assert bookings[0].booking_id == acquisition_booking.booking_id
+        assert depreciations == ()
