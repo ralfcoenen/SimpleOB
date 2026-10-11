@@ -56,6 +56,12 @@ from openbilanz.domain.fixed_asset import FixedAsset
 from openbilanz.domain.fixed_asset_depreciation import (
     FixedAssetDepreciation,
 )
+from openbilanz.domain.fixed_asset_disposal_calculation import (
+    FixedAssetDisposalCalculation,
+)
+from openbilanz.domain.fixed_asset_disposal_preview import (
+    FixedAssetDisposalPreview,
+)
 from openbilanz.domain.fixed_asset_movement import (
     FixedAssetMovement,
 )
@@ -2241,6 +2247,7 @@ def test_builds_open_depreciation_proposal(
         depreciation_end_date=None,
     )
 
+
 def test_builds_fixed_asset_disposal_preview(
     context: ApplicationContext,
 ) -> None:
@@ -2420,6 +2427,132 @@ def test_builds_fixed_asset_disposal_preview(
         voucher_no="V-001",
         description="Verkauf MacBook Pro",
     )
+
+
+def test_rejects_stale_fixed_asset_disposal_preview(
+    context: ApplicationContext,
+) -> None:
+    """Eine geänderte Anlage verhindert die Verkaufsbestätigung."""
+
+    from dataclasses import replace
+
+    booking_repository = Mock()
+    booking_repository.list_for_fiscal_year.return_value = ()
+    company_repository = Mock()
+    fixed_asset_repository = Mock()
+    disposal_workflow = Mock()
+
+    company_repository.get_managed_fiscal_years.return_value = (
+        ManagedFiscalYear(
+            fiscal_year=context.fiscal_year,
+            status=FiscalYearStatus.OPEN,
+            opening_source=None,
+        ),
+    )
+
+    asset = FixedAsset(
+        company_id=context.company.company_id,
+        asset_code="A-0001",
+        description="Testmaschine",
+        position_code="HGB.266.AKTIVA.A.II.3",
+        asset_account_number="0690",
+        depreciation_expense_account_number="4830",
+        acquisition_date=date(2026, 3, 15),
+        acquisition_cost=Decimal("2400.00"),
+        depreciation_start_date=date(2026, 3, 15),
+        useful_life_months=36,
+    )
+
+    changed_asset = replace(
+        asset,
+        useful_life_months=48,
+    )
+
+    booking = Booking(
+        booking_date=date(2026, 8, 15),
+        voucher_no="V-001",
+        description="Verkauf Testmaschine",
+        lines=(
+            BookingLine(
+                account_number="1200",
+                side=EntrySide.DEBIT,
+                amount=Decimal("2380.00"),
+            ),
+            BookingLine(
+                account_number="0690",
+                side=EntrySide.CREDIT,
+                amount=Decimal("2000.00"),
+            ),
+            BookingLine(
+                account_number="8500",
+                side=EntrySide.CREDIT,
+                amount=Decimal("380.00"),
+            ),
+        ),
+    )
+
+    calculation = FixedAssetDisposalCalculation(
+        acquisition_cost=Decimal("2400.00"),
+        accumulated_depreciation=Decimal("400.00"),
+        carrying_amount=Decimal("2000.00"),
+        gross_proceeds=Decimal("2380.00"),
+        net_proceeds=Decimal("2380.00"),
+        tax_amount=Decimal("0.00"),
+        gain=Decimal("380.00"),
+        loss=Decimal("0.00"),
+        booking=booking,
+    )
+
+    preview = FixedAssetDisposalPreview(
+        fixed_asset=asset,
+        previous_depreciation=Decimal("400.00"),
+        depreciation_proposal=None,
+        accumulated_depreciation=Decimal("400.00"),
+        disposal_calculation=calculation,
+        tax_rate=0,
+        counter_account_number="1200",
+    )
+
+    current_preview = replace(
+        preview,
+        fixed_asset=changed_asset,
+    )
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=company_repository,
+        posting_service=Mock(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
+        e_bilanz_export_service=Mock(),
+        taxonomy_management_service=Mock(),
+        fixed_asset_repository=fixed_asset_repository,
+        fixed_asset_disposal_workflow=disposal_workflow,
+    )
+
+    with patch.object(
+        workspace,
+        "build_fixed_asset_disposal_preview",
+        return_value=current_preview,
+    ):
+        with pytest.raises(
+            ValueError,
+            match="seit der Vorschau geändert",
+        ):
+            workspace.confirm_fixed_asset_disposal(preview)
+
+    company_repository.lock_open_fiscal_year.assert_called_once_with(
+        context.company.company_id,
+        context.fiscal_year,
+    )
+
+    disposal_workflow.confirm.assert_not_called()
+    booking_repository.rollback.assert_called_once_with()
+
 
 def test_confirmed_depreciation_is_not_proposed_again(
     context: ApplicationContext,

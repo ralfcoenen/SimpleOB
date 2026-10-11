@@ -2299,17 +2299,17 @@ class FiscalYearWorkspace:
             fixed_asset=fixed_asset,
             previous_depreciation=previous_depreciation,
             depreciation_proposal=depreciation_proposal,
-            accumulated_depreciation=(
-                accumulated_depreciation
-            ),
+            accumulated_depreciation=accumulated_depreciation,
             disposal_calculation=disposal_calculation,
+            tax_rate=tax_rate,
+            counter_account_number=counter_account_number,
         )
 
     def confirm_fixed_asset_disposal(
         self,
         preview: FixedAssetDisposalPreview,
     ) -> FixedAssetMovement:
-        """Bestätigt einen zuvor berechneten Anlagenverkauf."""
+        """Bestätigt einen Anlagenverkauf mit Aktualitätsprüfung."""
 
         if not self.is_open:
             raise ValueError(
@@ -2321,12 +2321,95 @@ class FiscalYearWorkspace:
                 "Der Anlagenabgang ist nicht konfiguriert."
             )
 
-        movement = self._fixed_asset_disposal_workflow.confirm(
-            company_id=self._context.company.company_id,
-            fiscal_year=self._context.fiscal_year,
-            fixed_asset=preview.fixed_asset,
-            calculation=preview.disposal_calculation,
-        )
+        original = preview.disposal_calculation
+        original_booking = original.booking
+
+        try:
+            # Sperre muss bis zum Commit der Verkaufsbuchung bestehen.
+            self._company_repository.lock_open_fiscal_year(
+                self._context.company.company_id,
+                self._context.fiscal_year,
+            )
+
+            current = self.build_fixed_asset_disposal_preview(
+                fixed_asset_id=preview.fixed_asset.fixed_asset_id,
+                disposal_date=original_booking.booking_date,
+                gross_proceeds=original.gross_proceeds,
+                tax_rate=preview.tax_rate,
+                counter_account_number=preview.counter_account_number,
+                voucher_no=original_booking.voucher_no,
+                description=original_booking.description,
+            )
+
+            current_calculation = current.disposal_calculation
+            current_booking = current_calculation.booking
+
+            # Ein inzwischen geänderter Anlagenstammsatz
+            # macht die ursprüngliche Bestätigung ungültig.
+            asset_changed = (
+                current.fixed_asset != preview.fixed_asset
+            )
+
+            # Die Abschreibungssituation muss unverändert sein.
+            depreciation_changed = (
+                current.previous_depreciation
+                != preview.previous_depreciation
+                or current.accumulated_depreciation
+                != preview.accumulated_depreciation
+                or current.depreciation_proposal
+                != preview.depreciation_proposal
+            )
+
+            # Fachliche Buchungswerte vergleichen, nicht die
+            # neu erzeugte Buchungs-ID.
+            calculation_changed = any(
+                (
+                    current_calculation.acquisition_cost
+                    != original.acquisition_cost,
+                    current_calculation.accumulated_depreciation
+                    != original.accumulated_depreciation,
+                    current_calculation.carrying_amount
+                    != original.carrying_amount,
+                    current_calculation.gross_proceeds
+                    != original.gross_proceeds,
+                    current_calculation.net_proceeds
+                    != original.net_proceeds,
+                    current_calculation.tax_amount
+                    != original.tax_amount,
+                    current_calculation.gain
+                    != original.gain,
+                    current_calculation.loss
+                    != original.loss,
+                    current_booking.lines
+                    != original_booking.lines,
+                )
+            )
+
+            if (
+                asset_changed
+                or depreciation_changed
+                or calculation_changed
+                or current.depreciation_proposal is not None
+            ):
+                raise ValueError(
+                    "Die Daten des Anlagenverkaufs haben sich "
+                    "seit der Vorschau geändert oder es ist "
+                    "noch eine Abschreibung erforderlich.\n\n"
+                    "Der Verkauf wurde nicht gebucht. "
+                    "Bitte erstellen und bestätigen Sie "
+                    "die Verkaufsvorschau erneut."
+                )
+
+            movement = self._fixed_asset_disposal_workflow.confirm(
+                company_id=self._context.company.company_id,
+                fiscal_year=self._context.fiscal_year,
+                fixed_asset=current.fixed_asset,
+                calculation=original,
+            )
+
+        except Exception:
+            self._booking_repository.rollback()
+            raise
 
         self.reload()
 

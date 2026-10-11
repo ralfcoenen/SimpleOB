@@ -21,3 +21,7 @@ class FixedAssetDisposalPreview:
     depreciation_proposal: DepreciationProposal | None
     accumulated_depreciation: Decimal
     disposal_calculation: FixedAssetDisposalCalculation
+
+    # Ursprüngliche Eingaben für die Aktualitätsprüfung.
+    tax_rate: int
+    counter_account_number: str
