@@ -4,7 +4,10 @@ from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy.orm import Session
+from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
 
+from openbilanz.database.lock_error import DatabaseLockError
 from openbilanz.database.models import (
     Anlageabschreibung,
     SteuerlicheAfaAbweichung,
@@ -55,14 +58,47 @@ class TaxDepreciationAdjustmentRepository:
                 "tax_amount must not be negative"
             )
 
-        depreciation = (
+        query = (
             self._session.query(Anlageabschreibung)
             .filter(
                 Anlageabschreibung.depreciation_id
                 == str(depreciation_id)
             )
-            .one_or_none()
         )
+
+        if self._session.bind.dialect.name == "postgresql":
+            try:
+                self._session.execute(
+                    text(
+                        "SELECT set_config("
+                        "'lock_timeout', '3000ms', true)"
+                    )
+                )
+
+                depreciation = (
+                    query
+                    .with_for_update()
+                    .populate_existing()
+                    .one_or_none()
+                )
+            except OperationalError as exc:
+                self._session.rollback()
+
+                if (
+                    getattr(exc.orig, "sqlstate", None)
+                    == "55P03"
+                ):
+                    raise DatabaseLockError(
+                        "Steuerliche AfA-Anpassung momentan gesperrt.\n\n"
+                        "Ein anderer Benutzer bearbeitet derzeit "
+                        "diese Anlagenabschreibung.\n\n"
+                        "Es wurden keine Änderungen gespeichert.\n\n"
+                        "Bitte versuchen Sie es in einigen Sekunden erneut."
+                    ) from exc
+
+                raise
+        else:
+            depreciation = query.one_or_none()
 
         if depreciation is None:
             raise ValueError(

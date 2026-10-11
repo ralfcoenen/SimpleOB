@@ -24,6 +24,17 @@ from openbilanz.database.fixed_asset_repository import (
 from openbilanz.database.tax_depreciation_adjustment_repository import (
     TaxDepreciationAdjustmentRepository,
 )
+from openbilanz.database.fixed_asset_movement_repository import (
+    FixedAssetMovementRepository,
+)
+from openbilanz.domain.booking import Booking
+from openbilanz.domain.booking_line import BookingLine
+from openbilanz.domain.entry_side import EntrySide
+from openbilanz.domain.fixed_asset_movement import FixedAssetMovement
+from openbilanz.domain.fixed_asset_movement_type import (
+    FixedAssetMovementType,
+)
+from openbilanz.services.depreciation_service import DepreciationService
 from openbilanz.domain.company import Company
 from openbilanz.domain.depreciation_proposal import (
     DepreciationProposal,
@@ -62,53 +73,79 @@ def _create_confirmed_depreciation(
         depreciation_expense_account_number="4830",
         acquisition_date=date(2026, 3, 15),
         acquisition_cost=Decimal("2400.00"),
-        depreciation_start_date=date(2026, 3, 15),
+        depreciation_start_date=date(2026, 4, 1),
         useful_life_months=36,
     )
 
-    company_repository = CompanyRepository(
-        session
-    )
-    booking_repository = BookingRepository(
-        session
-    )
-    asset_repository = FixedAssetRepository(
-        session
-    )
-    depreciation_repository = (
-        FixedAssetDepreciationRepository(
-            session
-        )
-    )
+    company_repository = CompanyRepository(session)
+    booking_repository = BookingRepository(session)
+    asset_repository = FixedAssetRepository(session)
+    depreciation_repository = FixedAssetDepreciationRepository(session)
+    movement_repository = FixedAssetMovementRepository(session)
+    depreciation_service = DepreciationService()
 
-    company_repository.add(
-        company
-    )
+    company_repository.add(company)
     company_repository.add_fiscal_year(
         company.company_id,
         fiscal_year,
     )
-    asset_repository.add(
-        fixed_asset=asset
+    asset_repository.add(fixed_asset=asset)
+
+    acquisition_booking = Booking(
+        booking_date=asset.acquisition_date,
+        description="Anschaffung MacBook Pro",
+        lines=(
+            BookingLine(
+                account_number=asset.asset_account_number,
+                side=EntrySide.DEBIT,
+                amount=asset.acquisition_cost,
+            ),
+            BookingLine(
+                account_number="1600",
+                side=EntrySide.CREDIT,
+                amount=asset.acquisition_cost,
+            ),
+        ),
     )
+
+    booking_repository.add(
+        company_id=company.company_id,
+        fiscal_year=fiscal_year,
+        booking=acquisition_booking,
+    )
+
+    movement_repository.add(
+        movement=FixedAssetMovement(
+            fixed_asset_id=asset.fixed_asset_id,
+            fiscal_year_end=fiscal_year.end_date,
+            movement_date=asset.acquisition_date,
+            amount=asset.acquisition_cost,
+            booking_id=acquisition_booking.booking_id,
+            movement_type=FixedAssetMovementType.ACQUISITION,
+        ),
+        booking_line_position=0,
+    )
+
+    proposal = depreciation_service.build_proposal(
+        fixed_asset=asset,
+        fiscal_year=fiscal_year,
+        previous_depreciation=Decimal("0.00"),
+        expense_account_number=asset.depreciation_expense_account_number,
+        asset_account_number=asset.asset_account_number,
+    )
+
+    assert proposal is not None
+    assert proposal.amount == Decimal("600.00")
 
     workflow = FixedAssetDepreciationWorkflow(
         session=session,
         booking_repository=booking_repository,
-        depreciation_repository=(
-            depreciation_repository
-        ),
-        booking_service=(
-            DepreciationBookingService()
-        ),
-    )
-
-    proposal = DepreciationProposal(
-        fixed_asset_id=asset.fixed_asset_id,
-        depreciation_date=date(2026, 12, 31),
-        amount=Decimal("600.00"),
-        expense_account_number="4830",
-        asset_account_number="0690",
+        depreciation_repository=depreciation_repository,
+        booking_service=DepreciationBookingService(),
+        company_repository=company_repository,
+        fixed_asset_repository=asset_repository,
+        movement_repository=movement_repository,
+        depreciation_service=depreciation_service,
     )
 
     return workflow.confirm(
