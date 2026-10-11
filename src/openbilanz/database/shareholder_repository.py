@@ -2,6 +2,11 @@
 
 from uuid import UUID
 
+
+from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
+
+from openbilanz.database.lock_error import DatabaseLockError
 from sqlalchemy.orm import Session
 
 from openbilanz.database.models import Gesellschafter, Mandant
@@ -16,6 +21,75 @@ class ShareholderRepository:
         session: Session,
     ) -> None:
         self._session = session
+
+    def _lock_company(
+        self,
+        company_id: UUID,
+    ) -> Mandant:
+        """Sperrt einen Mandanten für Gesellschafteränderungen."""
+
+        if not isinstance(company_id, UUID):
+            raise TypeError("company_id must be a UUID")
+
+        is_postgresql = (
+            self._session.get_bind().dialect.name
+            == "postgresql"
+        )
+
+        if is_postgresql:
+            self._session.execute(
+                text(
+                    "SELECT set_config("
+                    "'lock_timeout', '3000ms', true)"
+                )
+            )
+
+        query = (
+            self._session.query(Mandant)
+            .filter(
+                Mandant.company_id == str(company_id)
+            )
+        )
+
+        if is_postgresql:
+            query = (
+                query
+                .with_for_update(of=Mandant)
+                .populate_existing()
+            )
+
+        try:
+            company_model = query.one_or_none()
+
+        except OperationalError as exc:
+            sqlstate = getattr(
+                exc.orig,
+                "sqlstate",
+                None,
+            )
+
+            if is_postgresql and sqlstate == "55P03":
+                self._session.rollback()
+
+                raise DatabaseLockError(
+                    "Gesellschafterverwaltung momentan gesperrt.\n\n"
+                    "Ein anderer Benutzer bearbeitet derzeit "
+                    "die Gesellschafter dieses Mandanten.\n\n"
+                    "Ihr Vorgang konnte nicht abgeschlossen "
+                    "werden. Es wurden keine Änderungen "
+                    "gespeichert.\n\n"
+                    "Bitte versuchen Sie es in einigen "
+                    "Sekunden erneut."
+                ) from exc
+
+            raise
+
+        if company_model is None:
+            raise ValueError(
+                "Das Unternehmen ist nicht vorhanden."
+            )
+
+        return company_model
 
     def add(
         self,
@@ -33,19 +107,9 @@ class ShareholderRepository:
                 "shareholder must be a Shareholder"
             )
 
-        company_model = (
-            self._session.query(Mandant)
-            .filter(
-                Mandant.company_id
-                == str(shareholder.company_id)
-            )
-            .one_or_none()
+        company_model = self._lock_company(
+            shareholder.company_id
         )
-
-        if company_model is None:
-            raise ValueError(
-                "Das Unternehmen ist nicht vorhanden."
-            )
 
         existing_id = (
             self._session.query(Gesellschafter)
@@ -124,19 +188,9 @@ class ShareholderRepository:
                 "shareholder must be a Shareholder"
             )
 
-        company_model = (
-            self._session.query(Mandant)
-            .filter(
-                Mandant.company_id
-                == str(shareholder.company_id)
-            )
-            .one_or_none()
+        company_model = self._lock_company(
+            shareholder.company_id
         )
-
-        if company_model is None:
-            raise ValueError(
-                "Das Unternehmen ist nicht vorhanden."
-            )
 
         model = (
             self._session.query(Gesellschafter)
@@ -202,10 +256,7 @@ class ShareholderRepository:
     ) -> None:
         """Löscht einen vorhandenen Gesellschafter."""
 
-        if not isinstance(
-            shareholder_id,
-            UUID,
-        ):
+        if not isinstance(shareholder_id, UUID):
             raise TypeError(
                 "shareholder_id must be a UUID"
             )
@@ -216,6 +267,29 @@ class ShareholderRepository:
                 Gesellschafter.shareholder_id
                 == str(shareholder_id)
             )
+            .one_or_none()
+        )
+
+        if model is None:
+            raise ValueError(
+                "Der Gesellschafter ist nicht vorhanden."
+            )
+
+        company_id = UUID(model.mandant.company_id)
+
+        company_model = self._lock_company(
+            company_id
+        )
+
+        model = (
+            self._session.query(Gesellschafter)
+            .filter(
+                Gesellschafter.shareholder_id
+                == str(shareholder_id),
+                Gesellschafter.mandant_id
+                == company_model.id,
+            )
+            .populate_existing()
             .one_or_none()
         )
 
