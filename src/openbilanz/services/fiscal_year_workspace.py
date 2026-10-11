@@ -1651,6 +1651,7 @@ class FiscalYearWorkspace:
             fixed_asset_id=fixed_asset_id
         )
 
+
     def link_fixed_asset_acquisition(
         self,
         *,
@@ -1658,7 +1659,7 @@ class FiscalYearWorkspace:
         booking_id: UUID,
         booking_line_position: int,
     ) -> FixedAssetMovement:
-        """Ordnet eine Anschaffungsbuchung einem Anlagegut zu."""
+        """Ordnet eine Anschaffungsbuchung einem Anlagegut atomar zu."""
 
         if not self.is_open:
             raise ValueError(
@@ -1675,26 +1676,13 @@ class FiscalYearWorkspace:
                 "Anlagenbewegungen sind nicht konfiguriert."
             )
 
-        if not isinstance(
-            fixed_asset_id,
-            UUID,
-        ):
-            raise TypeError(
-                "fixed_asset_id must be a UUID"
-            )
+        if not isinstance(fixed_asset_id, UUID):
+            raise TypeError("fixed_asset_id must be a UUID")
 
-        if not isinstance(
-            booking_id,
-            UUID,
-        ):
-            raise TypeError(
-                "booking_id must be a UUID"
-            )
+        if not isinstance(booking_id, UUID):
+            raise TypeError("booking_id must be a UUID")
 
-        if not isinstance(
-            booking_line_position,
-            int,
-        ):
+        if not isinstance(booking_line_position, int):
             raise TypeError(
                 "booking_line_position must be an int"
             )
@@ -1704,118 +1692,125 @@ class FiscalYearWorkspace:
                 "booking_line_position must not be negative"
             )
 
-        fixed_asset = (
-            self._fixed_asset_repository.get(
+        try:
+            # Vor sämtlichen fachlichen Datenbankabfragen sperren.
+            self._company_repository.lock_open_fiscal_year(
+                self._context.company.company_id,
+                self._context.fiscal_year,
+            )
+
+            fixed_asset = self._fixed_asset_repository.get(
                 fixed_asset_id
             )
-        )
 
-        if fixed_asset is None:
-            raise ValueError(
-                "Das Anlagegut ist nicht vorhanden."
+            if fixed_asset is None:
+                raise ValueError(
+                    "Das Anlagegut ist nicht vorhanden."
+                )
+
+            if (
+                fixed_asset.company_id
+                != self._context.company.company_id
+            ):
+                raise ValueError(
+                    "Das Anlagegut gehört nicht zum "
+                    "geöffneten Unternehmen."
+                )
+
+            booking = self._booking_repository.get(
+                booking_id
             )
 
-        if (
-            fixed_asset.company_id
-            != self._context.company.company_id
-        ):
-            raise ValueError(
-                "Das Anlagegut gehört nicht zum "
-                "geöffneten Unternehmen."
+            if booking is None:
+                raise ValueError(
+                    "Die Buchung ist nicht vorhanden."
+                )
+
+            if not self._context.fiscal_year.contains(
+                booking.booking_date
+            ):
+                raise ValueError(
+                    "Die Buchung gehört nicht zum "
+                    "geöffneten Geschäftsjahr."
+                )
+
+            if booking_line_position >= len(booking.lines):
+                raise ValueError(
+                    "Die Buchungszeile ist nicht vorhanden."
+                )
+
+            booking_line = booking.lines[
+                booking_line_position
+            ]
+
+            if (
+                booking_line.account_number
+                != fixed_asset.asset_account_number
+            ):
+                raise ValueError(
+                    "Die Buchungszeile gehört nicht zum "
+                    "Anlagenkonto des Anlageguts."
+                )
+
+            if (
+                booking_line.amount
+                != fixed_asset.acquisition_cost
+            ):
+                raise ValueError(
+                    "Der Betrag der Buchungszeile stimmt "
+                    "nicht mit den Anschaffungskosten "
+                    "des Anlageguts überein."
+                )
+
+            existing_movements = (
+                self._fixed_asset_movement_repository
+                .list_for_fixed_asset(
+                    fixed_asset.fixed_asset_id
+                )
             )
 
-        booking = self._booking_repository.get(
-            booking_id
-        )
-
-        if booking is None:
-            raise ValueError(
-                "Die Buchung ist nicht vorhanden."
+            effective_movements = (
+                self._effective_fixed_asset_movements(
+                    existing_movements
+                )
             )
 
-        if not self._context.fiscal_year.contains(
-            booking.booking_date
-        ):
-            raise ValueError(
-                "Die Buchung gehört nicht zum "
-                "geöffneten Geschäftsjahr."
+            if any(
+                movement.movement_type
+                is FixedAssetMovementType.ACQUISITION
+                for movement in effective_movements
+            ):
+                raise ValueError(
+                    "Dem Anlagegut ist bereits eine "
+                    "Anschaffungsbuchung zugeordnet."
+                )
+
+            movement = FixedAssetMovement(
+                fixed_asset_id=fixed_asset.fixed_asset_id,
+                fiscal_year_end=(
+                    self._context.fiscal_year.end_date
+                ),
+                movement_date=booking.booking_date,
+                amount=booking_line.amount,
+                booking_id=booking.booking_id,
+                movement_type=(
+                    FixedAssetMovementType.ACQUISITION
+                ),
             )
 
-        if (
-            booking_line_position
-            >= len(booking.lines)
-        ):
-            raise ValueError(
-                "Die Buchungszeile ist nicht vorhanden."
+            self._fixed_asset_movement_repository.add(
+                movement=movement,
+                booking_line_position=booking_line_position,
+                commit=False,
             )
 
-        booking_line = booking.lines[
-            booking_line_position
-        ]
+            self._booking_repository.commit()
 
-        if (
-            booking_line.account_number
-            != fixed_asset.asset_account_number
-        ):
-            raise ValueError(
-                "Die Buchungszeile gehört nicht zum "
-                "Anlagenkonto des Anlageguts."
-            )
+            return movement
 
-        if (
-            booking_line.amount
-            != fixed_asset.acquisition_cost
-        ):
-            raise ValueError(
-                "Der Betrag der Buchungszeile stimmt "
-                "nicht mit den Anschaffungskosten "
-                "des Anlageguts überein."
-            )
-
-        existing_movements = (
-            self._fixed_asset_movement_repository
-            .list_for_fixed_asset(
-                fixed_asset.fixed_asset_id
-            )
-        )
-
-        effective_movements = (
-            self._effective_fixed_asset_movements(
-                existing_movements
-            )
-        )
-
-        if any(
-            movement.movement_type
-            is FixedAssetMovementType.ACQUISITION
-            for movement in effective_movements
-        ):
-            raise ValueError(
-                "Dem Anlagegut ist bereits eine "
-                "Anschaffungsbuchung zugeordnet."
-            )
-
-        movement = FixedAssetMovement(
-            fixed_asset_id=(
-                fixed_asset.fixed_asset_id
-            ),
-            fiscal_year_end=(
-                self._context.fiscal_year.end_date
-            ),
-            movement_date=booking.booking_date,
-            amount=booking_line.amount,
-            booking_id=booking.booking_id,
-            movement_type=(
-                FixedAssetMovementType.ACQUISITION
-            ),
-        )
-
-        self._fixed_asset_movement_repository.add(
-            movement=movement,
-            booking_line_position=booking_line_position,
-        )
-
-        return movement
+        except Exception:
+            self._booking_repository.rollback()
+            raise
 
 
     def link_fixed_asset_disposal(
