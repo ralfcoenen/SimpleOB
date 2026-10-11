@@ -1464,11 +1464,12 @@ class FiscalYearWorkspace:
             for movement in effective_movements
         )
 
+
     def update_fixed_asset(
         self,
         fixed_asset: FixedAsset,
     ) -> None:
-        """Aktualisiert ein noch änderbares Anlagegut."""
+        """Aktualisiert ein noch änderbares Anlagegut atomar."""
 
         if not self.is_open:
             raise ValueError(
@@ -1490,90 +1491,104 @@ class FiscalYearWorkspace:
                 "Anlagenbewegungen sind nicht konfiguriert."
             )
 
-        existing = self._fixed_asset_repository.get(
-            fixed_asset.fixed_asset_id
-        )
-
-        if existing is None:
-            raise ValueError(
-                "Das Anlagegut ist nicht vorhanden."
+        try:
+            self._company_repository.lock_open_fiscal_year(
+                self._context.company.company_id,
+                self._context.fiscal_year,
             )
 
-        if (
-            existing.company_id
-            != self._context.company.company_id
-            or fixed_asset.company_id
-            != self._context.company.company_id
-        ):
-            raise ValueError(
-                "Das Anlagegut gehört nicht zum "
-                "geöffneten Unternehmen."
-            )
-
-        if existing.status is not FixedAssetStatus.ACTIVE:
-            raise ValueError(
-                "Ein abgegangenes Anlagegut kann nicht "
-                "mehr bearbeitet werden."
-            )
-
-        depreciations = (
-            self._fixed_asset_depreciation_repository
-            .list_for_fixed_asset(
+            existing = self._fixed_asset_repository.get(
                 fixed_asset.fixed_asset_id
             )
-        )
 
-        if depreciations:
-            raise ValueError(
-                "Das Anlagegut kann nach der ersten "
-                "gebuchten Abschreibung nicht mehr "
-                "bearbeitet werden."
-            )
-
-        movements = (
-            self._fixed_asset_movement_repository
-            .list_for_fixed_asset(
-                fixed_asset.fixed_asset_id
-            )
-        )
-
-        effective_movements = (
-            self._effective_fixed_asset_movements(
-                movements
-            )
-        )
-
-        acquisition_linked = any(
-            movement.movement_type
-            is FixedAssetMovementType.ACQUISITION
-            for movement in effective_movements
-        )
-
-        if acquisition_linked:
-            if (
-                fixed_asset.asset_account_number
-                != existing.asset_account_number
-                or fixed_asset.acquisition_cost
-                != existing.acquisition_cost
-                or fixed_asset.acquisition_date
-                != existing.acquisition_date
-            ):
+            if existing is None:
                 raise ValueError(
-                    "Anlagenkonto, Anschaffungsdatum und "
-                    "Anschaffungskosten können nach der "
-                    "Zuordnung der Anschaffungsbuchung "
-                    "nicht mehr geändert werden."
+                    "Das Anlagegut ist nicht vorhanden."
                 )
 
-        self._fixed_asset_repository.update(
-            fixed_asset=fixed_asset
-        )
+            if (
+                existing.company_id
+                != self._context.company.company_id
+                or fixed_asset.company_id
+                != self._context.company.company_id
+            ):
+                raise ValueError(
+                    "Das Anlagegut gehört nicht zum "
+                    "geöffneten Unternehmen."
+                )
+
+            if existing.status is not FixedAssetStatus.ACTIVE:
+                raise ValueError(
+                    "Ein abgegangenes Anlagegut kann nicht "
+                    "mehr bearbeitet werden."
+                )
+
+            depreciations = (
+                self._fixed_asset_depreciation_repository
+                .list_for_fixed_asset(
+                    fixed_asset.fixed_asset_id
+                )
+            )
+
+            if depreciations:
+                raise ValueError(
+                    "Das Anlagegut kann nach der ersten "
+                    "gebuchten Abschreibung nicht mehr "
+                    "bearbeitet werden."
+                )
+
+            movements = (
+                self._fixed_asset_movement_repository
+                .list_for_fixed_asset(
+                    fixed_asset.fixed_asset_id
+                )
+            )
+
+            effective_movements = (
+                self._effective_fixed_asset_movements(
+                    movements
+                )
+            )
+
+            acquisition_linked = any(
+                movement.movement_type
+                is FixedAssetMovementType.ACQUISITION
+                for movement in effective_movements
+            )
+
+            if acquisition_linked:
+                if (
+                    fixed_asset.asset_account_number
+                    != existing.asset_account_number
+                    or fixed_asset.acquisition_cost
+                    != existing.acquisition_cost
+                    or fixed_asset.acquisition_date
+                    != existing.acquisition_date
+                ):
+                    raise ValueError(
+                        "Anlagenkonto, Anschaffungsdatum und "
+                        "Anschaffungskosten können nach der "
+                        "Zuordnung der Anschaffungsbuchung "
+                        "nicht mehr geändert werden."
+                    )
+
+            self._fixed_asset_repository.update(
+                fixed_asset=fixed_asset,
+                commit=False,
+            )
+
+            self._booking_repository.commit()
+
+        except Exception:
+            self._booking_repository.rollback()
+            raise
+
 
     def delete_fixed_asset(
         self,
         fixed_asset_id: UUID,
     ) -> None:
-        """Löscht ein noch nicht buchungswirksames Anlagegut."""
+        """Löscht ein noch nicht buchungswirksames Anlagegut atomar."""
 
         if not self.is_open:
             raise ValueError(
@@ -1595,61 +1610,74 @@ class FiscalYearWorkspace:
                 "Anlagenbewegungen sind nicht konfiguriert."
             )
 
-        fixed_asset = self._fixed_asset_repository.get(
-            fixed_asset_id
-        )
-
-        if fixed_asset is None:
-            raise ValueError(
-                "Das Anlagegut ist nicht vorhanden."
+        try:
+            self._company_repository.lock_open_fiscal_year(
+                self._context.company.company_id,
+                self._context.fiscal_year,
             )
 
-        if (
-            fixed_asset.company_id
-            != self._context.company.company_id
-        ):
-            raise ValueError(
-                "Das Anlagegut gehört nicht zum "
-                "geöffneten Unternehmen."
-            )
-
-        if fixed_asset.status is not FixedAssetStatus.ACTIVE:
-            raise ValueError(
-                "Ein abgegangenes Anlagegut kann nicht "
-                "gelöscht werden."
-            )
-
-        depreciations = (
-            self._fixed_asset_depreciation_repository
-            .list_for_fixed_asset(
+            fixed_asset = self._fixed_asset_repository.get(
                 fixed_asset_id
             )
-        )
 
-        if depreciations:
-            raise ValueError(
-                "Das Anlagegut kann nach der ersten "
-                "gebuchten Abschreibung nicht mehr "
-                "gelöscht werden."
+            if fixed_asset is None:
+                raise ValueError(
+                    "Das Anlagegut ist nicht vorhanden."
+                )
+
+            if (
+                fixed_asset.company_id
+                != self._context.company.company_id
+            ):
+                raise ValueError(
+                    "Das Anlagegut gehört nicht zum "
+                    "geöffneten Unternehmen."
+                )
+
+            if fixed_asset.status is not FixedAssetStatus.ACTIVE:
+                raise ValueError(
+                    "Ein abgegangenes Anlagegut kann nicht "
+                    "gelöscht werden."
+                )
+
+            depreciations = (
+                self._fixed_asset_depreciation_repository
+                .list_for_fixed_asset(
+                    fixed_asset_id
+                )
             )
 
-        movements = (
-            self._fixed_asset_movement_repository
-            .list_for_fixed_asset(
-                fixed_asset_id
-            )
-        )
+            if depreciations:
+                raise ValueError(
+                    "Das Anlagegut kann nach der ersten "
+                    "gebuchten Abschreibung nicht mehr "
+                    "gelöscht werden."
+                )
 
-        if movements:
-            raise ValueError(
-                "Das Anlagegut kann nach einer "
-                "buchungswirksamen Anlagenbewegung "
-                "nicht mehr gelöscht werden."
+            movements = (
+                self._fixed_asset_movement_repository
+                .list_for_fixed_asset(
+                    fixed_asset_id
+                )
             )
 
-        self._fixed_asset_repository.delete(
-            fixed_asset_id=fixed_asset_id
-        )
+            if movements:
+                raise ValueError(
+                    "Das Anlagegut kann nach einer "
+                    "buchungswirksamen Anlagenbewegung "
+                    "nicht mehr gelöscht werden."
+                )
+
+            self._fixed_asset_repository.delete(
+                fixed_asset_id=fixed_asset_id,
+                commit=False,
+            )
+
+            self._booking_repository.commit()
+
+        except Exception:
+            self._booking_repository.rollback()
+            raise
 
 
     def link_fixed_asset_acquisition(
