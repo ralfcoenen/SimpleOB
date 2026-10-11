@@ -3797,7 +3797,7 @@ class MainWindow(QMainWindow):
             self._workspace.post_booking(
                 reversal_booking
             )
-        except (TypeError, ValueError) as exc:
+        except (TypeError, ValueError, RuntimeError) as exc:
             QMessageBox.critical(
                 self,
                 "Buchung stornieren",

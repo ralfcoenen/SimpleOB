@@ -724,52 +724,57 @@ class FiscalYearWorkspace:
                 "Die Eröffnungsbilanz enthält keine Buchungen."
             )
 
-        managed_fiscal_year = self.managed_fiscal_year
-
-        if managed_fiscal_year.is_closed:
-            raise ValueError(
-                "Das Geschäftsjahr ist bereits abgeschlossen."
+        try:
+            self._company_repository.lock_open_fiscal_year(
+                self._context.company.company_id,
+                self._context.fiscal_year,
             )
 
-        if managed_fiscal_year.has_opening_source:
-            raise ValueError(
-                "Das Geschäftsjahr wurde bereits "
-                "aus einem Vorjahr eröffnet."
-            )
+            managed_fiscal_year = self.managed_fiscal_year
 
-        existing_bookings = (
-            self._booking_repository.list_for_fiscal_year(
-                company_id=self._context.company.company_id,
-                fiscal_year=self._context.fiscal_year,
-            )
-        )
-
-        if any(
-            booking.booking_type is BookingType.OPENING
-            for booking in existing_bookings
-        ):
-            raise ValueError(
-                "Für dieses Geschäftsjahr sind bereits "
-                "Eröffnungsbuchungen vorhanden."
-            )
-
-        for booking in bookings:
-            if booking.booking_type is not BookingType.OPENING:
+            if managed_fiscal_year.is_closed:
                 raise ValueError(
-                    "Es sind ausschließlich "
-                    "Eröffnungsbuchungen zulässig."
+                    "Das Geschäftsjahr ist bereits abgeschlossen."
                 )
 
-            if (
-                booking.booking_date
-                != self._context.fiscal_year.start_date
+            if managed_fiscal_year.has_opening_source:
+                raise ValueError(
+                    "Das Geschäftsjahr wurde bereits "
+                    "aus einem Vorjahr eröffnet."
+                )
+
+            existing_bookings = (
+                self._booking_repository.list_for_fiscal_year(
+                    company_id=self._context.company.company_id,
+                    fiscal_year=self._context.fiscal_year,
+                )
+            )
+
+            if any(
+                booking.booking_type is BookingType.OPENING
+                for booking in existing_bookings
             ):
                 raise ValueError(
-                    "Das Buchungsdatum muss dem Beginn "
-                    "des Geschäftsjahres entsprechen."
+                    "Für dieses Geschäftsjahr sind bereits "
+                    "Eröffnungsbuchungen vorhanden."
                 )
 
-        try:
+            for booking in bookings:
+                if booking.booking_type is not BookingType.OPENING:
+                    raise ValueError(
+                        "Es sind ausschließlich "
+                        "Eröffnungsbuchungen zulässig."
+                    )
+
+                if (
+                    booking.booking_date
+                    != self._context.fiscal_year.start_date
+                ):
+                    raise ValueError(
+                        "Das Buchungsdatum muss dem Beginn "
+                        "des Geschäftsjahres entsprechen."
+                    )
+
             for booking in bookings:
                 self._booking_repository.add(
                     company_id=self._context.company.company_id,
