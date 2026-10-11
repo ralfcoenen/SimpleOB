@@ -456,22 +456,91 @@ class CompanyRepository:
         master_data: CompanyMasterData,
         *,
         commit: bool = True,
+        expected_master_data: CompanyMasterData | None = None,
     ) -> None:
-        """Speichert die Stammdaten eines Unternehmens."""
+        """Speichert Stammdaten mit optionaler Konfliktprüfung."""
 
-        model = (
+        if (
+            expected_master_data is not None
+            and expected_master_data.company != master_data.company
+        ):
+            raise ValueError(
+                "Die erwarteten Stammdaten gehören zu einem "
+                "anderen Unternehmen."
+            )
+
+        query = (
             self._session.query(Mandant)
             .filter(
                 Mandant.company_id
                 == str(master_data.company.company_id)
             )
-            .one_or_none()
         )
+
+        if (
+            expected_master_data is not None
+            and self._session.bind.dialect.name == "postgresql"
+        ):
+            try:
+                self._session.execute(
+                    text(
+                        "SELECT set_config("
+                        "'lock_timeout', '3000ms', true)"
+                    )
+                )
+                model = (
+                    query.with_for_update()
+                    .populate_existing()
+                    .one_or_none()
+                )
+            except OperationalError as exc:
+                self._session.rollback()
+                if getattr(exc.orig, "sqlstate", None) == "55P03":
+                    raise DatabaseLockError(
+                        "Unternehmensstammdaten momentan gesperrt.\n\n"
+                        "Ein anderer Benutzer bearbeitet "
+                        "diese Stammdaten.\n\n"
+                        "Bitte versuchen Sie es später erneut."
+                    ) from exc
+                raise
+        else:
+            model = query.one_or_none()
 
         if model is None:
             raise ValueError(
                 "Unternehmen wurde nicht gefunden."
             )
+
+        if expected_master_data is not None:
+            current_master_data = CompanyMasterData(
+                company=Company(
+                    company_id=UUID(model.company_id),
+                    name=model.name,
+                ),
+                legal_form=model.rechtsform or "",
+                tax_number=model.steuernummer or "",
+                tax_office=model.finanzamt or "",
+                tax_id=model.steuer_id or "",
+                tax_economic_id=model.wirtschafts_id or "",
+                bf4=model.bf4 or "",
+                street=model.strasse or "",
+                house_number=model.hausnummer or "",
+                postal_code=model.plz or "",
+                city=model.ort or "",
+                country=model.land or "",
+                federal_state=model.bundesland or "",
+                business=model.geschaeftstaetigkeit or "",
+            )
+
+            if current_master_data != expected_master_data:
+                self._session.rollback()
+                raise ValueError(
+                    "Die Unternehmensstammdaten wurden "
+                    "zwischenzeitlich von einem anderen Benutzer "
+                    "geändert.\n\n"
+                    "Ihre Änderungen wurden nicht gespeichert. "
+                    "Bitte öffnen Sie die Stammdaten erneut."
+                )
 
         model.rechtsform = (
             master_data.legal_form or None

@@ -2849,13 +2849,26 @@ class FiscalYearWorkspace:
     def save_company_master_data(
         self,
         master_data: CompanyMasterData,
+        *,
+        expected_master_data: CompanyMasterData | None = None,
     ) -> None:
         """Speichert die Stammdaten des geöffneten Unternehmens."""
 
         if master_data.company != self._context.company:
-            raise ValueError("Die Stammdaten gehören nicht zum geöffneten Unternehmen.")
+            raise ValueError(
+                "Die Stammdaten gehören nicht zum "
+                "geöffneten Unternehmen."
+            )
 
-        self._company_repository.save_master_data(master_data)
+        if expected_master_data is None:
+            self._company_repository.save_master_data(
+                master_data
+            )
+        else:
+            self._company_repository.save_master_data(
+                master_data,
+                expected_master_data=expected_master_data,
+            )
 
     def prepare_e_bilanz(
         self,

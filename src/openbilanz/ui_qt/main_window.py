@@ -47,6 +47,7 @@ from openbilanz.core.config import (
     save_eric_data_supplier,
 )
 from openbilanz.core.context import ApplicationContext
+from openbilanz.database.lock_error import DatabaseLockError
 from openbilanz.date_input import parse_german_date
 from openbilanz.domain.account import Account
 from openbilanz.domain.account_type import AccountType
@@ -4910,9 +4911,10 @@ class MainWindow(QMainWindow):
 
         try:
             self._workspace.save_company_master_data(
-                dialog.result
+                dialog.result,
+                expected_master_data=master_data,
             )
-        except ValueError as exc:
+        except (ValueError, DatabaseLockError) as exc:
             QMessageBox.critical(
                 self,
                 "Unternehmensstammdaten",

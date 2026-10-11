@@ -1056,3 +1056,53 @@ def test_rejects_master_data_for_missing_company() -> None:
             repository.save_master_data(
                 master_data
             )
+
+
+def test_rejects_stale_company_master_data() -> None:
+    """Veraltete Stammdaten dürfen neuere Änderungen nicht überschreiben."""
+
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine)
+
+    with Session() as session:
+        repository = CompanyRepository(session)
+
+        company = Company(
+            company_id=uuid4(),
+            name="Muster UG",
+        )
+        repository.add(company)
+
+        original = CompanyMasterData(
+            company=company,
+            city="Musterstadt",
+        )
+        repository.save_master_data(original)
+
+        current = CompanyMasterData(
+            company=company,
+            city="Berlin",
+        )
+        repository.save_master_data(
+            current,
+            expected_master_data=original,
+        )
+
+        stale_change = CompanyMasterData(
+            company=company,
+            city="Hamburg",
+        )
+
+        with pytest.raises(
+            ValueError,
+            match="zwischenzeitlich",
+        ):
+            repository.save_master_data(
+                stale_change,
+                expected_master_data=original,
+            )
+
+        assert repository.get_master_data(
+            company.company_id
+        ) == current
