@@ -384,6 +384,7 @@ def main() -> None:
         depreciation_service = DepreciationService()
         depreciation_booking_service = DepreciationBookingService()
 
+
         fixed_asset_depreciation_workflow = (
             FixedAssetDepreciationWorkflow(
                 session=session,
@@ -392,8 +393,13 @@ def main() -> None:
                     fixed_asset_depreciation_repository
                 ),
                 booking_service=depreciation_booking_service,
+                company_repository=company_repository,
+                fixed_asset_repository=fixed_asset_repository,
+                movement_repository=fixed_asset_movement_repository,
+                depreciation_service=depreciation_service,
             )
         )
+
 
         fixed_asset_disposal_workflow = (
             FixedAssetDisposalWorkflow(
