@@ -17,7 +17,12 @@ from openbilanz.database.postgresql_migration_lock import (
 from openbilanz.database.postgresql_session_inspection import (
     inspect_postgresql_sessions,
 )
+from openbilanz.database.postgresql_migration_safety import (
+    PostgreSQLMigrationAction,
+    PostgreSQLMigrationApproval,
+    validate_postgresql_migration,
 
+)
 class PostgreSQLAdministrationService:
     """Prüft PostgreSQL unter einer exklusiven Migrationssperre."""
 
@@ -83,5 +88,58 @@ class PostgreSQLAdministrationService:
                         )
 
                     return inspection
+        finally:
+            engine.dispose()
+
+    def prepare_migration(
+        self,
+        *,
+        approval: PostgreSQLMigrationApproval,
+    ) -> PostgreSQLMigrationAction:
+        """Prüft die Voraussetzungen einer administrativen Migration.
+
+        Die Prüfungen erfolgen unter einer exklusiven
+        PostgreSQL-Migrationssperre.
+
+        Es werden keine Migrationen ausgeführt. Die zurückgegebene
+        Aktion ist keine dauerhaft gültige Freigabe.
+        """
+        database_url = self._application_config.database_url
+
+        if make_url(database_url).get_backend_name() != "postgresql":
+            raise ValueError(
+                "Die administrative Migrationsvorbereitung "
+                "ist nur für PostgreSQL vorgesehen."
+            )
+
+        engine = create_engine(database_url)
+
+        try:
+            with engine.connect() as connection:
+                with postgresql_migration_lock(connection):
+                    sessions = inspect_postgresql_sessions(
+                        connection
+                    )
+
+                    if sessions.has_other_sessions:
+                        raise RuntimeError(
+                            "Die PostgreSQL-Datenbank wird noch "
+                            "von anderen Sitzungen verwendet "
+                            f"({sessions.other_session_count}). "
+                            "Bitte alle anderen Datenbankverbindungen "
+                            "vor der administrativen Wartung beenden."
+                        )
+
+                    inspection = (
+                        self._migration_service
+                        .inspect_postgresql_schema_on_connection(
+                            connection
+                        )
+                    )
+
+                    return validate_postgresql_migration(
+                        inspection=inspection,
+                        approval=approval,
+                    )
         finally:
             engine.dispose()

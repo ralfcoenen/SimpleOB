@@ -18,6 +18,12 @@ from openbilanz.database.postgresql_administration_service import (
 from openbilanz.database.postgresql_migration_lock import (
     MIGRATION_LOCK_KEY,
 )
+from pathlib import Path
+
+from openbilanz.database.postgresql_migration_safety import (
+    PostgreSQLMigrationAction,
+    PostgreSQLMigrationApproval,
+)
 
 
 @pytest.fixture
@@ -140,3 +146,48 @@ def test_administrative_inspection_rejects_other_sessions(
                 _service(database_url).inspect_schema()
     finally:
         engine.dispose()
+
+
+def test_prepare_migration_current_schema(
+    database_url: str,
+) -> None:
+    """Ein aktuelles Schema benötigt keine Migration."""
+    result = _service(database_url).prepare_migration(
+        approval=PostgreSQLMigrationApproval()
+    )
+
+    assert result == PostgreSQLMigrationAction.NONE
+
+
+def test_prepare_migration_rejects_other_sessions(
+    database_url: str,
+) -> None:
+    """Andere Sitzungen verhindern die Migrationsvorbereitung."""
+    engine = create_engine(database_url)
+
+    try:
+        with engine.connect() as other_connection:
+            other_connection.execute(text("SELECT 1"))
+
+            with pytest.raises(
+                RuntimeError,
+                match="anderen Sitzungen",
+            ):
+                _service(database_url).prepare_migration(
+                    approval=PostgreSQLMigrationApproval()
+                )
+    finally:
+        engine.dispose()
+
+
+def test_prepare_migration_rejects_sqlite() -> None:
+    """Der administrative Ablauf ist ausschließlich für PostgreSQL."""
+    service = _service("sqlite:///:memory:")
+
+    with pytest.raises(
+        ValueError,
+        match="nur für PostgreSQL",
+    ):
+        service.prepare_migration(
+            approval=PostgreSQLMigrationApproval()
+        )
