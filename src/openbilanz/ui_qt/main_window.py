@@ -4639,7 +4639,7 @@ class MainWindow(QMainWindow):
                 self._workspace
                 .load_account_taxonomy_concepts()
             )
-        except ValueError as exc:
+        except (ValueError, DatabaseLockError) as exc:
             QMessageBox.critical(
                 self,
                 "E-Bilanz-Zuordnung",

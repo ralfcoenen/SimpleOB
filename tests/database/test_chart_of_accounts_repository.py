@@ -1191,3 +1191,129 @@ def test_loads_all_account_taxonomy_concepts() -> None:
             "1600": "concept.v2.liability",
         },
     }
+
+
+def test_single_account_taxonomy_concept_preserves_other_mappings() -> None:
+    """Einzeländerungen erhalten andere Konten und Taxonomieversionen."""
+
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine)
+
+    company = Company(
+        company_id=uuid4(),
+        name="Taxonomie-Einzelzuordnung Test",
+    )
+
+    templates = (
+        TemplateAccount(
+            account_number="1200",
+            name="Bank",
+            account_type=AccountType.ASSET,
+        ),
+        TemplateAccount(
+            account_number="1400",
+            name="Forderungen",
+            account_type=AccountType.ASSET,
+        ),
+    )
+
+    chart = ChartOfAccountsTemplate(
+        name="Testkontenrahmen",
+        accounts=templates,
+        account_mapping_rules=(),
+    )
+
+    try:
+        with Session() as session:
+            CompanyRepository(session).add(company)
+
+            repository = ChartOfAccountsRepository(session)
+
+            repository.save_for_company(
+                company_id=company.company_id,
+                chart_of_accounts=chart,
+                accounts=tuple(
+                    Account(template=template)
+                    for template in templates
+                ),
+            )
+
+            repository.save_account_taxonomy_concepts(
+                company_id=company.company_id,
+                taxonomy_version="6.9",
+                account_taxonomy_concepts={
+                    "1200": "concept.bank",
+                    "1400": "concept.receivable",
+                },
+            )
+
+            repository.save_account_taxonomy_concepts(
+                company_id=company.company_id,
+                taxonomy_version="6.10",
+                account_taxonomy_concepts={
+                    "1200": "concept.bank.610",
+                },
+            )
+
+            # Vorhandene Einzelzuordnung ändern.
+            repository.save_single_account_taxonomy_concept(
+                company_id=company.company_id,
+                taxonomy_version="6.9",
+                account_number="1400",
+                concept_name="concept.receivable.new",
+            )
+
+            assert repository.load_all_account_taxonomy_concepts(
+                company.company_id
+            ) == {
+                "6.9": {
+                    "1200": "concept.bank",
+                    "1400": "concept.receivable.new",
+                },
+                "6.10": {
+                    "1200": "concept.bank.610",
+                },
+            }
+
+            # Nur die Zuordnung von Konto 1400 entfernen.
+            repository.save_single_account_taxonomy_concept(
+                company_id=company.company_id,
+                taxonomy_version="6.9",
+                account_number="1400",
+                concept_name=None,
+            )
+
+            assert repository.load_account_taxonomy_concepts(
+                company.company_id,
+                taxonomy_version="6.9",
+            ) == {
+                "1200": "concept.bank",
+            }
+
+            # Neue Zuordnung desselben Kontos wieder anlegen.
+            repository.save_single_account_taxonomy_concept(
+                company_id=company.company_id,
+                taxonomy_version="6.9",
+                account_number="1400",
+                concept_name="concept.receivable.restored",
+            )
+
+        # Persistenz unabhängig von der ursprünglichen Session prüfen.
+        with Session() as session:
+            repository = ChartOfAccountsRepository(session)
+
+            assert repository.load_all_account_taxonomy_concepts(
+                company.company_id
+            ) == {
+                "6.9": {
+                    "1200": "concept.bank",
+                    "1400": "concept.receivable.restored",
+                },
+                "6.10": {
+                    "1200": "concept.bank.610",
+                },
+            }
+
+    finally:
+        engine.dispose()

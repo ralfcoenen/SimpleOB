@@ -3375,25 +3375,11 @@ class FiscalYearWorkspace:
                 "Kontenrahmen-Repository ist nicht verfügbar."
             )
 
-        mappings = self.load_account_taxonomy_concepts()
-
-        if concept_name is None:
-            mappings.pop(
-                account_number,
-                None,
-            )
-        else:
-            mappings[account_number] = concept_name
-
-        (
-            self._chart_of_accounts_repository
-            .save_account_taxonomy_concepts(
-                company_id=(
-                    self._context.company.company_id
-                ),
-                taxonomy_version="6.9",
-                account_taxonomy_concepts=mappings,
-            )
+        self._chart_of_accounts_repository.save_single_account_taxonomy_concept(
+            company_id=self._context.company.company_id,
+            taxonomy_version="6.9",
+            account_number=account_number,
+            concept_name=concept_name,
         )
 
     def account_taxonomy_choices(

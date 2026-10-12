@@ -13,7 +13,11 @@ from openbilanz.database.chart_of_accounts_repository import (
 )
 from openbilanz.database.company_repository import CompanyRepository
 from openbilanz.database.lock_error import DatabaseLockError
-from openbilanz.database.models import Mandant
+from openbilanz.database.models import (
+    Konto,
+    KontenTaxonomieZuordnung,
+    Mandant,
+)
 from openbilanz.domain.company import Company
 
 
@@ -62,6 +66,17 @@ def postgres_chart_of_accounts_data():
                 )
 
                 if company_model is not None:
+                    session.query(
+                        KontenTaxonomieZuordnung
+                    ).filter(
+                        KontenTaxonomieZuordnung.mandant_id
+                        == company_model.id
+                    ).delete(synchronize_session=False)
+
+                    session.query(Konto).filter(
+                        Konto.mandant_id == company_model.id
+                    ).delete(synchronize_session=False)
+
                     session.delete(company_model)
                     session.commit()
         finally:
@@ -279,3 +294,69 @@ def test_account_configuration_lock_conflict(
                 vat_accounts=vat_accounts,
                 account_roles=account_roles,
             )
+
+
+def test_single_taxonomy_mapping_lock_conflict_and_retry(
+    postgres_chart_of_accounts_data,
+) -> None:
+    """Sperrkonflikt verhindert Änderungen; Wiederholung gelingt."""
+
+    from openbilanz.domain.account import Account
+    from openbilanz.domain.account_type import AccountType
+    from openbilanz.domain.template_account import TemplateAccount
+
+    Session, company = postgres_chart_of_accounts_data
+
+    with Session() as session:
+        repository = ChartOfAccountsRepository(session)
+
+        repository.add_account(
+            company_id=company.company_id,
+            account=Account(
+                template=TemplateAccount(
+                    account_number="1400",
+                    name="Forderungen",
+                    account_type=AccountType.ASSET,
+                )
+            ),
+            mapping_rule=None,
+        )
+
+    with Session() as session_a, Session() as session_b:
+        repository_a = ChartOfAccountsRepository(session_a)
+        repository_b = ChartOfAccountsRepository(session_b)
+
+        repository_a.lock_company(company.company_id)
+
+        try:
+            with pytest.raises(
+                DatabaseLockError,
+                match="Kontenverwaltung momentan gesperrt",
+            ):
+                repository_b.save_single_account_taxonomy_concept(
+                    company_id=company.company_id,
+                    taxonomy_version="6.9",
+                    account_number="1400",
+                    concept_name="concept.receivable",
+                )
+
+        finally:
+            session_a.rollback()
+
+        # Dieselbe Session muss nach dem Sperrfehler erneut nutzbar sein.
+        repository_b.save_single_account_taxonomy_concept(
+            company_id=company.company_id,
+            taxonomy_version="6.9",
+            account_number="1400",
+            concept_name="concept.receivable",
+        )
+
+    with Session() as session:
+        repository = ChartOfAccountsRepository(session)
+
+        assert repository.load_account_taxonomy_concepts(
+            company.company_id,
+            taxonomy_version="6.9",
+        ) == {
+            "1400": "concept.receivable",
+        }

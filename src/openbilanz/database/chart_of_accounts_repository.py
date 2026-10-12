@@ -855,6 +855,95 @@ class ChartOfAccountsRepository:
             output_tax_19=model.output_tax_19,
         )
 
+    def save_single_account_taxonomy_concept(
+        self,
+        *,
+        company_id: UUID,
+        taxonomy_version: str,
+        account_number: str,
+        concept_name: str | None,
+    ) -> None:
+        """Speichert oder entfernt die Taxonomiezuordnung eines einzelnen Kontos."""
+
+        if not isinstance(company_id, UUID):
+            raise TypeError("company_id must be a UUID")
+
+        if not isinstance(taxonomy_version, str):
+            raise TypeError("taxonomy_version must be a str")
+
+        if not isinstance(account_number, str):
+            raise TypeError("account_number must be a str")
+
+        if concept_name is not None and not isinstance(concept_name, str):
+            raise TypeError("concept_name must be a str or None")
+
+        taxonomy_version = taxonomy_version.strip()
+        account_number = account_number.strip()
+
+        if not taxonomy_version:
+            raise ValueError("taxonomy_version must not be empty")
+
+        if not account_number:
+            raise ValueError("account_number must not be empty")
+
+        if concept_name is not None:
+            concept_name = concept_name.strip()
+
+            if not concept_name:
+                raise ValueError("concept_name must not be empty")
+
+        try:
+            company_model = self._lock_company(company_id)
+
+            account_exists = (
+                self._session.query(Konto.id)
+                .filter(
+                    Konto.mandant_id == company_model.id,
+                    Konto.account_number == account_number,
+                )
+                .first()
+                is not None
+            )
+
+            if not account_exists:
+                raise ValueError(
+                    f"Konto {account_number} ist im Kontenrahmen "
+                    "nicht vorhanden."
+                )
+
+            existing_mapping = (
+                self._session.query(KontenTaxonomieZuordnung)
+                .filter(
+                    KontenTaxonomieZuordnung.mandant_id == company_model.id,
+                    KontenTaxonomieZuordnung.taxonomy_version == taxonomy_version,
+                    KontenTaxonomieZuordnung.account_number == account_number,
+                )
+                .one_or_none()
+            )
+
+            if concept_name is None:
+                if existing_mapping is not None:
+                    self._session.delete(existing_mapping)
+
+            elif existing_mapping is None:
+                self._session.add(
+                    KontenTaxonomieZuordnung(
+                        mandant_id=company_model.id,
+                        account_number=account_number,
+                        taxonomy_version=taxonomy_version,
+                        concept_name=concept_name,
+                    )
+                )
+
+            else:
+                existing_mapping.concept_name = concept_name
+
+            self._session.commit()
+
+        except Exception:
+            self._session.rollback()
+            raise
+
     def save_account_taxonomy_concepts(
         self,
         *,
