@@ -753,6 +753,119 @@ def test_direct_postgresql_upgrade_is_rejected(
     upgrade_mock.assert_not_called()
 
 
+def test_postgresql_connection_upgrade_rejects_sqlite(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """Die administrative PostgreSQL-Methode lehnt SQLite ab."""
+    from unittest.mock import Mock
+
+    from sqlalchemy import create_engine
+
+    from openbilanz.database import migration_service
+
+    database_file = tmp_path / "rejected_upgrade.db"
+    service = DatabaseMigrationService(
+        application_config=_application_config(database_file)
+    )
+
+    upgrade_mock = Mock()
+    monkeypatch.setattr(
+        migration_service.command,
+        "upgrade",
+        upgrade_mock,
+    )
+
+    engine = create_engine(f"sqlite:///{database_file}")
+
+    try:
+        with engine.connect() as connection:
+            with pytest.raises(ValueError, match="ausschließlich"):
+                service.upgrade_postgresql_on_connection(connection)
+    finally:
+        engine.dispose()
+
+    upgrade_mock.assert_not_called()
+
+
+def test_postgresql_connection_upgrade_rejects_wrong_database(
+    monkeypatch,
+) -> None:
+    """Eine andere konfigurierte Datenbank ist unzulässig."""
+    from unittest.mock import Mock
+
+    from openbilanz.database import migration_service
+
+    application_config = Mock()
+    application_config.database_url = (
+        "postgresql+psycopg://ralf@localhost:5432/"
+        "simpleob_other_database"
+    )
+
+    service = DatabaseMigrationService(
+        application_config=application_config
+    )
+
+    upgrade_mock = Mock()
+    monkeypatch.setattr(
+        migration_service.command,
+        "upgrade",
+        upgrade_mock,
+    )
+
+    connection = Mock()
+
+    with pytest.raises(ValueError, match="ausschließlich"):
+        service.upgrade_postgresql_on_connection(connection)
+
+    upgrade_mock.assert_not_called()
+
+
+def test_postgresql_connection_upgrade_rejects_wrong_connection(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """Eine SQLite-Verbindung darf nicht als PG-Verbindung dienen."""
+    from unittest.mock import Mock
+
+    from sqlalchemy import create_engine
+
+    from openbilanz.database import migration_service
+
+    application_config = Mock()
+    application_config.database_url = (
+        "postgresql+psycopg://ralf@localhost:5432/"
+        "simpleob_migration_test"
+    )
+
+    service = DatabaseMigrationService(
+        application_config=application_config
+    )
+
+    upgrade_mock = Mock()
+    monkeypatch.setattr(
+        migration_service.command,
+        "upgrade",
+        upgrade_mock,
+    )
+
+    engine = create_engine(
+        f"sqlite:///{tmp_path / 'wrong_connection.db'}"
+    )
+
+    try:
+        with engine.connect() as connection:
+            with pytest.raises(
+                ValueError,
+                match="offene PostgreSQL-Verbindung",
+            ):
+                service.upgrade_postgresql_on_connection(connection)
+    finally:
+        engine.dispose()
+
+    upgrade_mock.assert_not_called()
+
+
 def test_postgresql_schema_inspection_uses_existing_connection(
     monkeypatch,
 ) -> None:
@@ -812,3 +925,48 @@ def test_postgresql_schema_inspection_uses_existing_connection(
 
     finally:
         engine.dispose()
+
+
+def test_postgresql_connection_upgrade_checks_actual_database(
+    monkeypatch,
+) -> None:
+    """Die tatsächliche Datenbank wird vor Alembic geprüft."""
+    from unittest.mock import Mock
+
+    from openbilanz.database import migration_service
+
+    application_config = Mock()
+    application_config.database_url = (
+        "postgresql+psycopg://ralf@localhost:5432/"
+        "simpleob_migration_test"
+    )
+
+    service = DatabaseMigrationService(
+        application_config=application_config,
+    )
+
+    connection = Mock()
+    connection.closed = False
+    connection.dialect.name = "postgresql"
+    connection.engine.url.database = "simpleob_migration_test"
+    connection.exec_driver_sql.return_value.scalar_one.return_value = (
+        "unexpected_database"
+    )
+
+    upgrade_mock = Mock()
+    monkeypatch.setattr(
+        migration_service.command,
+        "upgrade",
+        upgrade_mock,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="tatsächliche Migrationsverbindung",
+    ):
+        service.upgrade_postgresql_on_connection(connection)
+
+    connection.exec_driver_sql.assert_called_once_with(
+        "SELECT current_database()"
+    )
+    upgrade_mock.assert_not_called()

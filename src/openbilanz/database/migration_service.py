@@ -462,6 +462,58 @@ class DatabaseMigrationService:
         finally:
             engine.dispose()
 
+    def upgrade_postgresql_on_connection(
+        self,
+        connection: Connection,
+    ) -> None:
+        """Führt Alembic über eine bestehende PostgreSQL-Verbindung aus.
+
+        Die Methode öffnet keine eigene Datenbankverbindung.
+        Sie darf ausschließlich vom administrativen
+        Migrationsablauf aufgerufen werden.
+        """
+        database_url = make_url(
+            self._application_config.database_url
+        )
+
+        if (
+            database_url.get_backend_name() != "postgresql"
+            or database_url.database != "simpleob_migration_test"
+        ):
+            raise ValueError(
+                "Die PostgreSQL-Migration ist ausschließlich "
+                "für 'simpleob_migration_test' zugelassen."
+            )
+
+        if connection.closed or connection.dialect.name != "postgresql":
+            raise ValueError(
+                "Eine offene PostgreSQL-Verbindung ist erforderlich."
+            )
+
+        if connection.engine.url.database != "simpleob_migration_test":
+            raise ValueError(
+                "Die Migrationsverbindung verweist auf "
+                "eine unerwartete Datenbank."
+            )
+
+        actual_database = connection.exec_driver_sql(
+            "SELECT current_database()"
+        ).scalar_one()
+
+        if actual_database != "simpleob_migration_test":
+            raise ValueError(
+                "Die tatsächliche Migrationsverbindung verweist "
+                "nicht auf 'simpleob_migration_test'."
+            )
+
+        alembic_config = self._create_alembic_config()
+        alembic_config.attributes["connection"] = connection
+
+        command.upgrade(
+            alembic_config,
+            "head",
+        )
+
     def upgrade_to_head(self) -> None:
         """Bringt die konfigurierte Datenbank sicher auf Alembic-Head."""
 
