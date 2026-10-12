@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 from PySide6.QtWidgets import QApplication, QDialog
+from PySide6.QtWidgets import QApplication, QDialog, QMessageBox
 
 from openbilanz.accounting.financial_statement_context import (
     create_financial_statement_context,
@@ -20,6 +21,7 @@ from openbilanz.core.config import (
     load_config,
     load_installed_config,
     prepare_application_data_directories,
+    save_database_configuration,
 )
 from openbilanz.core.eric_privacy_acknowledgement import (
     is_eric_privacy_acknowledged,
@@ -132,6 +134,9 @@ from openbilanz.taxonomy.taxonomy_installation_service import (
 from openbilanz.ui_qt.eric_privacy_dialog import EricPrivacyDialog
 from openbilanz.ui_qt.main_window import MainWindow
 from openbilanz.ui_qt.start_dialog import StartDialog
+from openbilanz.ui_qt.database_configuration_dialog import (
+    DatabaseConfigurationDialog,
+)
 
 
 def _load_application_config():
@@ -180,6 +185,77 @@ def _ensure_eric_privacy_acknowledgement(
 
     return True
 
+
+def _prepare_database_connection(
+    config: ApplicationConfig,
+) -> ApplicationConfig | None:
+    """Prüft die Datenbank und ermöglicht bei Fehlern eine Korrektur."""
+
+    def check_database(
+        candidate: ApplicationConfig,
+    ) -> None:
+        migration_service = DatabaseMigrationService(
+            application_config=candidate
+        )
+
+        if candidate.database_url.startswith(
+            "postgresql+psycopg://"
+        ):
+            migration_service.check_ready_for_start()
+        else:
+            migration_service.upgrade_to_head()
+
+    try:
+        check_database(config)
+        return config
+    except Exception as exc:
+        error_message = str(exc)
+
+    while True:
+        result = QMessageBox.question(
+            None,
+            "SimpleOB – Datenbankverbindung",
+            "Die Datenbank konnte nicht geöffnet werden:\n\n"
+            f"{error_message}\n\n"
+            "Möchten Sie die Datenbankverbindung ändern?",
+            QMessageBox.StandardButton.Yes
+            | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes,
+        )
+
+        if result != QMessageBox.StandardButton.Yes:
+            return None
+
+        dialog = DatabaseConfigurationDialog(
+            config=config
+        )
+
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return None
+
+        from dataclasses import replace
+
+        candidate = replace(
+            config,
+            database_url_override=(
+                dialog.selected_database_url
+            ),
+        )
+
+        try:
+            check_database(candidate)
+
+            save_database_configuration(
+                config,
+                dialog.selected_database_url,
+            )
+
+            return candidate
+
+        except Exception as exc:
+            error_message = str(exc)
+
+
 def main() -> None:
     """Startet die PySide6-Oberfläche von SimpleOB."""
 
@@ -216,16 +292,10 @@ def main() -> None:
             )
         )
 
-        migration_service = DatabaseMigrationService(
-            application_config=config
-        )
+    config = _prepare_database_connection(config)
 
-        if config.database_url.startswith(
-            "postgresql+psycopg://"
-        ):
-            migration_service.check_ready_for_start()
-        else:
-            migration_service.upgrade_to_head()
+    if config is None:
+        return
 
     database = Database(config)
 
