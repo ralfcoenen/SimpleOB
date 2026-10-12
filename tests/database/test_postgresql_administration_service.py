@@ -652,3 +652,352 @@ def test_migration_failure_releases_maintenance_isolation(
     finally:
         database_engine.dispose()
         admin_engine.dispose()
+
+
+def test_execute_migration_rejects_sqlite(
+    tmp_path: Path,
+) -> None:
+    """SQLite darf nicht administrativ migriert werden."""
+    service = _service("sqlite:///:memory:")
+
+    with pytest.raises(
+        ValueError,
+        match="ausschließlich",
+    ):
+        service.execute_migration(
+            approval=PostgreSQLMigrationApproval(),
+            backup_path=tmp_path / "sqlite.dump",
+        )
+
+
+def test_execute_migration_current_schema_is_noop(
+    database_url: str,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """Ein aktuelles Schema löst weder Backup noch Migration aus."""
+    service = _service(database_url)
+
+    def unexpected_migration(connection):
+        pytest.fail("Alembic darf nicht ausgeführt werden.")
+
+    monkeypatch.setattr(
+        service,
+        "_execute_migration_on_connection",
+        unexpected_migration,
+    )
+
+    backup_path = tmp_path / "unnecessary_backup.dump"
+
+    result = service.execute_migration(
+        approval=PostgreSQLMigrationApproval(),
+        backup_path=backup_path,
+    )
+
+    assert result.action == PostgreSQLMigrationAction.NONE
+    assert result.backup_path is None
+    assert not backup_path.exists()
+
+
+def test_execute_migration_empty_requires_approval(
+    database_url: str,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """Ein leeres Schema darf nicht ohne Zustimmung initialisiert werden."""
+    from openbilanz.database.migration_service import (
+        PostgreSQLSchemaInspection,
+    )
+
+    service = _service(database_url)
+    head = service._migration_service.inspect_postgresql_schema().head_revision
+
+    monkeypatch.setattr(
+        service._migration_service,
+        "inspect_postgresql_schema_on_connection",
+        lambda connection: PostgreSQLSchemaInspection(
+            status=PostgreSQLSchemaStatus.EMPTY,
+            current_revision=None,
+            head_revision=head,
+        ),
+    )
+
+    backup_path = tmp_path / "unapproved_initialization.dump"
+
+    with pytest.raises(RuntimeError):
+        service.execute_migration(
+            approval=PostgreSQLMigrationApproval(),
+            backup_path=backup_path,
+        )
+
+    assert not backup_path.exists()
+
+
+def test_execute_migration_outdated_requires_approval(
+    database_url: str,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """Ein veraltetes Schema darf nicht ohne Zustimmung migriert werden."""
+    from openbilanz.database.migration_service import (
+        PostgreSQLSchemaInspection,
+    )
+
+    service = _service(database_url)
+    head = service._migration_service.inspect_postgresql_schema().head_revision
+
+    monkeypatch.setattr(
+        service._migration_service,
+        "inspect_postgresql_schema_on_connection",
+        lambda connection: PostgreSQLSchemaInspection(
+            status=PostgreSQLSchemaStatus.OUTDATED,
+            current_revision="simulated_old_revision",
+            head_revision=head,
+        ),
+    )
+
+    backup_path = tmp_path / "unapproved_upgrade.dump"
+
+    with pytest.raises(RuntimeError, match="bestätigt"):
+        service.execute_migration(
+            approval=PostgreSQLMigrationApproval(),
+            backup_path=backup_path,
+        )
+
+    assert not backup_path.exists()
+
+
+def test_execute_migration_outdated_success_simulated(
+    database_url: str,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """Simulierte Migration: Backup, Wartung, Alembic und Endprüfung."""
+    from openbilanz.database import postgresql_administration_service as module
+    from openbilanz.database.migration_service import PostgreSQLSchemaInspection
+
+    service = _service(database_url)
+    head = service._migration_service.inspect_postgresql_schema().head_revision
+
+    outdated = PostgreSQLSchemaInspection(
+        status=PostgreSQLSchemaStatus.OUTDATED,
+        current_revision="simulated_old_revision",
+        head_revision=head,
+    )
+    current = PostgreSQLSchemaInspection(
+        status=PostgreSQLSchemaStatus.CURRENT,
+        current_revision=head,
+        head_revision=head,
+    )
+
+    migrated = False
+    upgrade_calls = []
+
+    def simulated_inspection(connection):
+        return current if migrated else outdated
+
+    def simulated_upgrade(connection):
+        nonlocal migrated
+        assert connection.in_transaction()
+        assert connection.exec_driver_sql(
+            "SELECT current_database()"
+        ).scalar_one() == "simpleob_migration_test"
+
+        # Während der Migration dürfen keine neuen Verbindungen
+        # zur Testdatenbank zugelassen sein.
+        admin_engine = create_engine(
+            make_url(database_url).set(database="postgres")
+        )
+        try:
+            with admin_engine.connect() as admin_connection:
+                assert admin_connection.execute(
+                    text(
+                        "SELECT datallowconn FROM pg_database "
+                        "WHERE datname = 'simpleob_migration_test'"
+                    )
+                ).scalar_one() is False
+        finally:
+            admin_engine.dispose()
+
+        upgrade_calls.append(True)
+        migrated = True
+
+    monkeypatch.setattr(
+        service._migration_service,
+        "inspect_postgresql_schema_on_connection",
+        simulated_inspection,
+    )
+    monkeypatch.setattr(
+        service._migration_service,
+        "upgrade_postgresql_on_connection",
+        simulated_upgrade,
+    )
+
+    backup_path = tmp_path / "simulated_upgrade.dump"
+
+    result = service.execute_migration(
+        approval=PostgreSQLMigrationApproval(
+            migration_confirmed=True,
+            maintenance_confirmed=True,
+        ),
+        backup_path=backup_path,
+    )
+
+    assert result.action == PostgreSQLMigrationAction.UPGRADE
+    assert result.backup_path == backup_path.resolve()
+    assert result.backup_size > 0
+    assert result.restored_table_count > 0
+    assert upgrade_calls == [True]
+
+    _assert_migration_lock_available(database_url)
+
+
+def test_execute_migration_failure_releases_isolation(
+    database_url: str,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """Simulierter Alembic-Fehler hebt die Wartungssperre auf."""
+    from openbilanz.database.migration_service import PostgreSQLSchemaInspection
+
+    service = _service(database_url)
+    head = service._migration_service.inspect_postgresql_schema().head_revision
+
+    outdated = PostgreSQLSchemaInspection(
+        status=PostgreSQLSchemaStatus.OUTDATED,
+        current_revision="simulated_old_revision",
+        head_revision=head,
+    )
+
+    monkeypatch.setattr(
+        service._migration_service,
+        "inspect_postgresql_schema_on_connection",
+        lambda connection: outdated,
+    )
+
+    def failing_upgrade(connection):
+        assert connection.in_transaction()
+        raise RuntimeError("Simulierter Alembic-Fehler")
+
+    monkeypatch.setattr(
+        service._migration_service,
+        "upgrade_postgresql_on_connection",
+        failing_upgrade,
+    )
+
+    backup_path = tmp_path / "simulated_failure.dump"
+
+    with pytest.raises(
+        RuntimeError,
+        match="Simulierter Alembic-Fehler",
+    ):
+        service.execute_migration(
+            approval=PostgreSQLMigrationApproval(
+                migration_confirmed=True,
+                maintenance_confirmed=True,
+            ),
+            backup_path=backup_path,
+        )
+
+    assert backup_path.is_file()
+
+    admin_engine = create_engine(
+        make_url(database_url).set(database="postgres")
+    )
+    try:
+        with admin_engine.connect() as connection:
+            assert connection.execute(
+                text(
+                    "SELECT datallowconn FROM pg_database "
+                    "WHERE datname = 'simpleob_migration_test'"
+                )
+            ).scalar_one() is True
+    finally:
+        admin_engine.dispose()
+
+    _assert_migration_lock_available(database_url)
+
+
+def test_execute_migration_empty_success_simulated(
+    database_url: str,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """Bestätigte Initialisierung eines simuliert leeren Schemas."""
+    from openbilanz.database.migration_service import (
+        PostgreSQLSchemaInspection,
+    )
+
+    service = _service(database_url)
+    head = service._migration_service.inspect_postgresql_schema().head_revision
+
+    empty = PostgreSQLSchemaInspection(
+        status=PostgreSQLSchemaStatus.EMPTY,
+        current_revision=None,
+        head_revision=head,
+    )
+    current = PostgreSQLSchemaInspection(
+        status=PostgreSQLSchemaStatus.CURRENT,
+        current_revision=head,
+        head_revision=head,
+    )
+
+    migrated = False
+    upgrade_calls = []
+
+    def simulated_inspection(connection):
+        return current if migrated else empty
+
+    def simulated_upgrade(connection):
+        nonlocal migrated
+        assert connection.in_transaction()
+        upgrade_calls.append(True)
+        migrated = True
+
+    monkeypatch.setattr(
+        service._migration_service,
+        "inspect_postgresql_schema_on_connection",
+        simulated_inspection,
+    )
+    monkeypatch.setattr(
+        service._migration_service,
+        "upgrade_postgresql_on_connection",
+        simulated_upgrade,
+    )
+
+    backup_path = tmp_path / "simulated_initialization.dump"
+
+    result = service.execute_migration(
+        approval=PostgreSQLMigrationApproval(
+            initialize_confirmed=True,
+            maintenance_confirmed=True,
+        ),
+        backup_path=backup_path,
+    )
+
+    assert result.action == PostgreSQLMigrationAction.INITIALIZE
+    assert result.backup_path == backup_path.resolve()
+    assert result.backup_size > 0
+    assert upgrade_calls == [True]
+
+    _assert_migration_lock_available(database_url)
+
+
+def test_execute_migration_rejects_unknown_schema(
+    database_url: str,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """Ein unbekannter Schemazustand verhindert die Migration."""
+    from openbilanz.database.migration_service import (
+        PostgreSQLSchemaInspection,
+    )
+
+    service = _service(database_url)
+    head = service._migration_service.inspect_postgresql_schema().head_revision
+
+    unknown = PostgreSQLSchemaInspection(
+        status=PostgreSQLSchemaStatus.UNKNOWN,
+        current_revision="unknown_revision",
+        head_revision=head,
+    )

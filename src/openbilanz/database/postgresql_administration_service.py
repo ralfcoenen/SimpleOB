@@ -530,3 +530,168 @@ class PostgreSQLAdministrationService:
         except Exception:
             migration_connection.rollback()
             raise
+
+    def execute_migration(
+        self,
+        *,
+        approval: PostgreSQLMigrationApproval,
+        backup_path: Path,
+    ) -> PostgreSQLMigrationDryRunResult:
+        """Führt eine ausdrücklich freigegebene PostgreSQL-Migration aus.
+
+        Ausschließlich simpleob_migration_test.
+        Alle SimpleOB-Clients müssen zuvor beendet worden sein.
+        """
+        url = make_url(self._application_config.database_url)
+
+        if (
+            url.get_backend_name() != "postgresql"
+            or url.database != "simpleob_migration_test"
+        ):
+            raise ValueError(
+                "Die administrative Migration ist ausschließlich für "
+                "'simpleob_migration_test' zugelassen."
+            )
+
+        if url.password is not None:
+            raise ValueError(
+                "Passwörter in der Datenbank-URL werden nicht unterstützt."
+            )
+
+        admin_engine = create_engine(
+            url.set(database="postgres"),
+            isolation_level="AUTOCOMMIT",
+        )
+        database_engine = create_engine(
+            self._application_config.database_url
+        )
+
+        try:
+            with admin_engine.connect() as admin_connection:
+                with postgresql_migration_lock(admin_connection):
+                    with database_engine.connect() as migration_connection:
+                        sessions = inspect_postgresql_sessions(
+                            migration_connection
+                        )
+
+                        if sessions.has_other_sessions:
+                            raise RuntimeError(
+                                "Die administrative Migration wurde "
+                                "abgebrochen: Weitere PostgreSQL-Sitzungen "
+                                "sind aktiv."
+                            )
+
+                        inspection = (
+                            self._migration_service
+                            .inspect_postgresql_schema_on_connection(
+                                migration_connection
+                            )
+                        )
+
+                        if inspection.status == PostgreSQLSchemaStatus.OUTDATED:
+                            if not approval.migration_confirmed:
+                                raise RuntimeError(
+                                    "Die Migration muss ausdrücklich "
+                                    "bestätigt werden."
+                                )
+
+                            if not approval.maintenance_confirmed:
+                                raise RuntimeError(
+                                    "Der Wartungsbetrieb muss ausdrücklich "
+                                    "bestätigt werden."
+                                )
+                        else:
+                            validate_postgresql_migration(
+                                inspection=inspection,
+                                approval=approval,
+                            )
+
+                        if inspection.status == PostgreSQLSchemaStatus.CURRENT:
+                            return PostgreSQLMigrationDryRunResult(
+                                action=PostgreSQLMigrationAction.NONE,
+                                backup_path=None,
+                                backup_size=0,
+                                restored_table_count=0,
+                            )
+
+                        backup_result = PostgreSQLBackupService(
+                            application_config=self._application_config
+                        ).create_backup(
+                            backup_path=backup_path
+                        )
+
+                        restore_result = (
+                            PostgreSQLRestoreVerificationService(
+                                application_config=self._application_config
+                            ).verify_backup(
+                                backup_path=backup_result.backup_path
+                            )
+                        )
+
+                        effective_approval = PostgreSQLMigrationApproval(
+                            initialize_confirmed=approval.initialize_confirmed,
+                            migration_confirmed=approval.migration_confirmed,
+                            maintenance_confirmed=approval.maintenance_confirmed,
+                            backup_path=backup_result.backup_path,
+                        )
+
+                        action = validate_postgresql_migration(
+                            inspection=inspection,
+                            approval=effective_approval,
+                        )
+
+                        migration_connection.rollback()
+
+                        with postgresql_maintenance_isolation(
+                            application_config=self._application_config,
+                            admin_connection=admin_connection,
+                            migration_connection=migration_connection,
+                        ):
+                            current_inspection = (
+                                self._migration_service
+                                .inspect_postgresql_schema_on_connection(
+                                    migration_connection
+                                )
+                            )
+
+                            if current_inspection != inspection:
+                                raise RuntimeError(
+                                    "Der PostgreSQL-Schemazustand hat sich "
+                                    "während der Vorbereitung verändert."
+                                )
+
+                            migration_connection.rollback()
+
+                            self._execute_migration_on_connection(
+                                migration_connection
+                            )
+
+                            final_inspection = (
+                                self._migration_service
+                                .inspect_postgresql_schema_on_connection(
+                                    migration_connection
+                                )
+                            )
+
+                            if (
+                                final_inspection.status
+                                != PostgreSQLSchemaStatus.CURRENT
+                            ):
+                                raise RuntimeError(
+                                    "Die PostgreSQL-Migration hat nicht "
+                                    "die erwartete Alembic-Revision erreicht."
+                                )
+
+                            migration_connection.rollback()
+
+                        return PostgreSQLMigrationDryRunResult(
+                            action=action,
+                            backup_path=backup_result.backup_path,
+                            backup_size=backup_result.backup_size,
+                            restored_table_count=(
+                                restore_result.restored_table_count
+                            ),
+                        )
+        finally:
+            database_engine.dispose()
+            admin_engine.dispose()
