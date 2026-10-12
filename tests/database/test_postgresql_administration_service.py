@@ -461,3 +461,66 @@ def test_verify_maintenance_isolation_rejects_other_sessions(
             ).scalar_one() is True
     finally:
         admin_engine.dispose()
+
+
+def test_maintenance_dry_run(
+    database_url: str,
+    tmp_path: Path,
+) -> None:
+    """Backup, Restore und Wartungsisolierung funktionieren gemeinsam."""
+    backup_path = tmp_path / "maintenance_dry_run.dump"
+
+    result = _service(database_url).run_maintenance_dry_run(
+        approval=PostgreSQLMigrationApproval(),
+        backup_path=backup_path,
+    )
+
+    assert result.action == PostgreSQLMigrationAction.NONE
+    assert result.backup_path == backup_path
+    assert result.backup_size > 0
+    assert result.restored_table_count > 0
+
+    admin_engine = create_engine(
+        make_url(database_url).set(database="postgres")
+    )
+
+    try:
+        with admin_engine.connect() as connection:
+            assert connection.execute(
+                text(
+                    "SELECT datallowconn FROM pg_database "
+                    "WHERE datname = :database_name"
+                ),
+                {"database_name": "simpleob_migration_test"},
+            ).scalar_one() is True
+    finally:
+        admin_engine.dispose()
+
+    _assert_migration_lock_available(database_url)
+
+
+def test_maintenance_dry_run_rejects_other_sessions(
+    database_url: str,
+    tmp_path: Path,
+) -> None:
+    """Fremde Datenbanksitzungen verhindern den Probelauf."""
+    backup_path = tmp_path / "blocked_maintenance.dump"
+    database_engine = create_engine(database_url)
+
+    try:
+        with database_engine.connect() as other_connection:
+            other_connection.execute(text("SELECT 1"))
+
+            with pytest.raises(
+                RuntimeError,
+                match="Sitzungen",
+            ):
+                _service(database_url).run_maintenance_dry_run(
+                    approval=PostgreSQLMigrationApproval(),
+                    backup_path=backup_path,
+                )
+    finally:
+        database_engine.dispose()
+
+    assert not backup_path.exists()
+    _assert_migration_lock_available(database_url)

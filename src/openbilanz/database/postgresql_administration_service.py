@@ -182,6 +182,7 @@ class PostgreSQLAdministrationService:
         finally:
             database_engine.dispose()
             admin_engine.dispose()
+
     def run_migration_dry_run(
         self,
         *,
@@ -364,6 +365,152 @@ class PostgreSQLAdministrationService:
             with database_engine.connect() as connection:
                 connection.execute(text("SELECT 1")).scalar_one()
 
+        finally:
+            database_engine.dispose()
+            admin_engine.dispose()
+
+    def run_maintenance_dry_run(
+        self,
+        *,
+        approval: PostgreSQLMigrationApproval,
+        backup_path: Path,
+    ) -> PostgreSQLMigrationDryRunResult:
+        """Prüft Backup und Wartungsisolierung ohne Alembic-Migration.
+
+        Ausschließlich für simpleob_migration_test.
+        """
+        database_url = self._application_config.database_url
+        url = make_url(database_url)
+
+        if (
+            url.get_backend_name() != "postgresql"
+            or url.database != "simpleob_migration_test"
+        ):
+            raise ValueError(
+                "Der Wartungsprobelauf ist ausschließlich für "
+                "'simpleob_migration_test' zugelassen."
+            )
+
+        if url.password is not None:
+            raise ValueError(
+                "Passwörter in der Datenbank-URL "
+                "werden nicht unterstützt."
+            )
+
+        admin_engine = create_engine(
+            url.set(database="postgres"),
+            isolation_level="AUTOCOMMIT",
+        )
+        database_engine = create_engine(database_url)
+
+        try:
+            with admin_engine.connect() as admin_connection:
+                with postgresql_migration_lock(admin_connection):
+                    with database_engine.connect() as migration_connection:
+                        sessions = inspect_postgresql_sessions(
+                            migration_connection
+                        )
+
+                        if sessions.has_other_sessions:
+                            raise RuntimeError(
+                                "Der Wartungsprobelauf wurde abgebrochen: "
+                                "Weitere PostgreSQL-Sitzungen sind aktiv."
+                            )
+
+                        inspection = (
+                            self._migration_service
+                            .inspect_postgresql_schema_on_connection(
+                                migration_connection
+                            )
+                        )
+
+                        if (
+                            inspection.status
+                            == PostgreSQLSchemaStatus.OUTDATED
+                        ):
+                            if not approval.migration_confirmed:
+                                raise RuntimeError(
+                                    "Die Migration muss ausdrücklich "
+                                    "bestätigt werden."
+                                )
+
+                            if not approval.maintenance_confirmed:
+                                raise RuntimeError(
+                                    "Der Wartungsbetrieb muss "
+                                    "ausdrücklich bestätigt werden."
+                                )
+
+                        else:
+                            validate_postgresql_migration(
+                                inspection=inspection,
+                                approval=approval,
+                            )
+
+                        backup_result = PostgreSQLBackupService(
+                            application_config=self._application_config
+                        ).create_backup(
+                            backup_path=backup_path
+                        )
+
+                        restore_result = (
+                            PostgreSQLRestoreVerificationService(
+                                application_config=self._application_config
+                            ).verify_backup(
+                                backup_path=backup_result.backup_path
+                            )
+                        )
+
+                        effective_approval = PostgreSQLMigrationApproval(
+                            initialize_confirmed=(
+                                approval.initialize_confirmed
+                            ),
+                            migration_confirmed=(
+                                approval.migration_confirmed
+                            ),
+                            maintenance_confirmed=(
+                                approval.maintenance_confirmed
+                            ),
+                            backup_path=backup_result.backup_path,
+                        )
+
+                        action = validate_postgresql_migration(
+                            inspection=inspection,
+                            approval=effective_approval,
+                        )
+
+                        # Die Schemaprüfung hat eine Lesetransaktion
+                        # eröffnet. Diese wird vor der späteren
+                        # Wartungsphase ausdrücklich beendet.
+                        migration_connection.rollback()
+
+                        with postgresql_maintenance_isolation(
+                            application_config=self._application_config,
+                            admin_connection=admin_connection,
+                            migration_connection=migration_connection,
+                        ):
+                            actual_database = (
+                                migration_connection.exec_driver_sql(
+                                    "SELECT current_database()"
+                                ).scalar_one()
+                            )
+
+                            if actual_database != "simpleob_migration_test":
+                                raise RuntimeError(
+                                    "Die Migrationsverbindung verweist "
+                                    "auf eine unerwartete Datenbank."
+                                )
+
+                            # Noch keine Alembic-Migration.
+                            migration_connection.rollback()
+
+                        return PostgreSQLMigrationDryRunResult(
+                            action=action,
+                            backup_path=backup_result.backup_path,
+                            backup_size=backup_result.backup_size,
+                            restored_table_count=(
+                                restore_result.restored_table_count
+                            ),
+                        )
         finally:
             database_engine.dispose()
             admin_engine.dispose()
