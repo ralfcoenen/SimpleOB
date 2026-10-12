@@ -13,6 +13,7 @@ from openbilanz.core.config import ApplicationConfig
 from openbilanz.database.migration_service import (
     LEGACY_SCHEMA_REVISION,
     DatabaseMigrationService,
+    PostgreSQLSchemaStatus,
 )
 
 
@@ -434,3 +435,240 @@ def test_postgresql_start_check_accepts_current_schema(
 
     finally:
         engine.dispose()
+
+def test_postgresql_inspection_rejects_sqlite(
+    tmp_path: Path,
+) -> None:
+    service = DatabaseMigrationService(
+        application_config=_application_config(
+            tmp_path / "test.db"
+        )
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="nur für PostgreSQL",
+    ):
+        service.inspect_postgresql_schema()
+
+
+@pytest.mark.parametrize(
+    ("tables", "expected_status"),
+    [
+        ([], PostgreSQLSchemaStatus.EMPTY),
+        (
+            ["fremde_tabelle"],
+            PostgreSQLSchemaStatus.UNKNOWN,
+        ),
+    ],
+)
+def test_postgresql_inspection_without_alembic_version(
+    monkeypatch,
+    tmp_path: Path,
+    tables,
+    expected_status,
+) -> None:
+    from dataclasses import replace
+    from unittest.mock import MagicMock
+
+    import openbilanz.database.migration_service as module
+
+    config = replace(
+        _application_config(tmp_path / "unused.db"),
+        database_url_override=(
+            "postgresql+psycopg://"
+            "testuser@localhost:5432/simpleob_migration_test"
+        ),
+    )
+
+    engine = MagicMock()
+    connection = engine.connect.return_value.__enter__.return_value
+    inspector = MagicMock()
+    inspector.get_table_names.return_value = tables
+
+    monkeypatch.setattr(
+        module,
+        "create_engine",
+        lambda url: engine,
+    )
+    monkeypatch.setattr(
+        module,
+        "inspect",
+        lambda value: inspector,
+    )
+
+    service = DatabaseMigrationService(
+        application_config=config
+    )
+
+    result = service.inspect_postgresql_schema()
+
+    assert result.status == expected_status
+    assert result.current_revision is None
+    assert result.head_revision == HEAD_REVISION
+
+    engine.dispose.assert_called_once()
+
+
+def test_postgresql_inspection_current_schema(
+    tmp_path: Path,
+) -> None:
+    """Erkennt die aktuelle Revision ohne Schemaänderung."""
+    import os
+    from dataclasses import replace
+
+    from sqlalchemy.engine import make_url
+
+    database_url = os.environ.get(
+        "SIMPLEOB_POSTGRES_TEST_URL"
+    )
+
+    if not database_url:
+        pytest.skip(
+            "SIMPLEOB_POSTGRES_TEST_URL ist nicht gesetzt."
+        )
+
+    parsed_url = make_url(database_url)
+
+    if (
+        parsed_url.get_backend_name() != "postgresql"
+        or parsed_url.database != "simpleob_migration_test"
+    ):
+        pytest.fail(
+            "Nur simpleob_migration_test ist zugelassen."
+        )
+
+    config = replace(
+        _application_config(tmp_path / "unused.db"),
+        database_url_override=database_url,
+    )
+
+    result = DatabaseMigrationService(
+        application_config=config
+    ).inspect_postgresql_schema()
+
+    assert result.status == PostgreSQLSchemaStatus.CURRENT
+    assert result.current_revision == HEAD_REVISION
+    assert result.head_revision == HEAD_REVISION
+
+
+def test_postgresql_inspection_outdated_schema(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    """Erkennt eine bekannte ältere Revision."""
+    from dataclasses import replace
+    from unittest.mock import MagicMock
+
+    import openbilanz.database.migration_service as module
+
+    config = replace(
+        _application_config(tmp_path / "unused.db"),
+        database_url_override=(
+            "postgresql+psycopg://"
+            "testuser@localhost:5432/simpleob_migration_test"
+        ),
+    )
+
+    engine = MagicMock()
+    connection = (
+        engine.connect.return_value.__enter__.return_value
+    )
+
+    inspector = MagicMock()
+    inspector.get_table_names.return_value = [
+        "alembic_version",
+        "mandanten",
+    ]
+
+    migration_context = MagicMock()
+    migration_context.get_current_revision.return_value = (
+        BASELINE_REVISION
+    )
+
+    monkeypatch.setattr(
+        module,
+        "create_engine",
+        lambda url: engine,
+    )
+    monkeypatch.setattr(
+        module,
+        "inspect",
+        lambda value: inspector,
+    )
+    monkeypatch.setattr(
+        module.MigrationContext,
+        "configure",
+        lambda value: migration_context,
+    )
+
+    result = DatabaseMigrationService(
+        application_config=config
+    ).inspect_postgresql_schema()
+
+    assert result.status == PostgreSQLSchemaStatus.OUTDATED
+    assert result.current_revision == BASELINE_REVISION
+    assert result.head_revision == HEAD_REVISION
+
+    engine.dispose.assert_called_once()
+
+
+def test_postgresql_inspection_unknown_revision(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    """Verweigert eine unbekannte Alembic-Revision."""
+    from dataclasses import replace
+    from unittest.mock import MagicMock
+
+    import openbilanz.database.migration_service as module
+
+    config = replace(
+        _application_config(tmp_path / "unused.db"),
+        database_url_override=(
+            "postgresql+psycopg://"
+            "testuser@localhost:5432/simpleob_migration_test"
+        ),
+    )
+
+    engine = MagicMock()
+    connection = (
+        engine.connect.return_value.__enter__.return_value
+    )
+
+    inspector = MagicMock()
+    inspector.get_table_names.return_value = [
+        "alembic_version",
+        "mandanten",
+    ]
+
+    migration_context = MagicMock()
+    migration_context.get_current_revision.return_value = (
+        "unbekannte_revision_123"
+    )
+
+    monkeypatch.setattr(
+        module,
+        "create_engine",
+        lambda url: engine,
+    )
+    monkeypatch.setattr(
+        module,
+        "inspect",
+        lambda value: inspector,
+    )
+    monkeypatch.setattr(
+        module.MigrationContext,
+        "configure",
+        lambda value: migration_context,
+    )
+
+    result = DatabaseMigrationService(
+        application_config=config
+    ).inspect_postgresql_schema()
+
+    assert result.status == PostgreSQLSchemaStatus.UNKNOWN
+    assert result.current_revision == "unbekannte_revision_123"
+    assert result.head_revision == HEAD_REVISION
+
+    engine.dispose.assert_called_once()

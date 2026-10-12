@@ -5,11 +5,14 @@ from __future__ import annotations
 import sqlite3
 import sys
 from pathlib import Path
+from dataclasses import dataclass
+from enum import Enum
 
 from alembic import command
 from alembic.config import Config
 from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
+from alembic.util import CommandError
 from sqlalchemy import create_engine, inspect
 from sqlalchemy.engine import make_url
 
@@ -259,6 +262,20 @@ LEGACY_UNIQUES = {
 }
 
 
+class PostgreSQLSchemaStatus(str, Enum):
+    EMPTY = "empty"
+    CURRENT = "current"
+    OUTDATED = "outdated"
+    UNKNOWN = "unknown"
+
+
+@dataclass(frozen=True, slots=True)
+class PostgreSQLSchemaInspection:
+    status: PostgreSQLSchemaStatus
+    current_revision: str | None
+    head_revision: str
+
+
 class DatabaseMigrationService:
     """Führt die Alembic-Migrationen einer SimpleOB-Datenbank aus."""
 
@@ -268,6 +285,106 @@ class DatabaseMigrationService:
         application_config: ApplicationConfig,
     ) -> None:
         self._application_config = application_config
+
+    def inspect_postgresql_schema(
+        self,
+    ) -> PostgreSQLSchemaInspection:
+        """Prüft den PostgreSQL-Schemazustand ohne Änderungen."""
+
+        database_url = make_url(
+            self._application_config.database_url
+        )
+
+        if database_url.get_backend_name() != "postgresql":
+            raise ValueError(
+                "Die Schemaprüfung ist nur für PostgreSQL vorgesehen."
+            )
+
+        alembic_config = self._create_alembic_config()
+
+        script_directory = ScriptDirectory.from_config(
+            alembic_config
+        )
+
+        head_revision = self._head_revision(
+            alembic_config
+        )
+
+        engine = create_engine(
+            self._application_config.database_url
+        )
+
+        try:
+            with engine.connect() as connection:
+                inspector = inspect(connection)
+
+                table_names = set(
+                    inspector.get_table_names()
+                )
+
+                if not table_names:
+                    return PostgreSQLSchemaInspection(
+                        status=PostgreSQLSchemaStatus.EMPTY,
+                        current_revision=None,
+                        head_revision=head_revision,
+                    )
+
+                if "alembic_version" not in table_names:
+                    return PostgreSQLSchemaInspection(
+                        status=PostgreSQLSchemaStatus.UNKNOWN,
+                        current_revision=None,
+                        head_revision=head_revision,
+                    )
+
+                migration_context = (
+                    MigrationContext.configure(connection)
+                )
+
+                current_revision = (
+                    migration_context.get_current_revision()
+                )
+
+                if current_revision == head_revision:
+                    status = PostgreSQLSchemaStatus.CURRENT
+
+                elif current_revision is None:
+                    status = PostgreSQLSchemaStatus.UNKNOWN
+
+                else:
+                    try:
+                        revision = script_directory.get_revision(
+                            current_revision
+                        )
+                    except CommandError:
+                        revision = None
+
+                    if revision is None:
+                        status = PostgreSQLSchemaStatus.UNKNOWN
+
+                    else:
+                        ancestors = {
+                            ancestor.revision
+                            for ancestor in (
+                                script_directory.iterate_revisions(
+                                    head_revision,
+                                    "base",
+                                )
+                            )
+                        }
+
+                        if current_revision in ancestors:
+                            status = PostgreSQLSchemaStatus.OUTDATED
+                        else:
+                            status = PostgreSQLSchemaStatus.UNKNOWN
+
+                return PostgreSQLSchemaInspection(
+                    status=status,
+                    current_revision=current_revision,
+                    head_revision=head_revision,
+                )
+
+        finally:
+            engine.dispose()
 
     def check_ready_for_start(self) -> None:
         """Prüft PostgreSQL vor dem Start ohne Schemaänderungen."""
