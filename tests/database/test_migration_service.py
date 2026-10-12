@@ -713,3 +713,38 @@ def test_alembic_uses_provided_connection(
 
     finally:
         engine.dispose()
+
+
+def test_direct_postgresql_upgrade_is_rejected(
+    monkeypatch,
+) -> None:
+    """Der bisherige Migrationsweg darf PostgreSQL nicht verändern."""
+    from unittest.mock import Mock
+
+    from openbilanz.database import migration_service
+
+    application_config = Mock()
+    application_config.database_url = (
+        "postgresql+psycopg://ralf@localhost:5432/"
+        "simpleob_migration_test"
+    )
+
+    upgrade_mock = Mock()
+
+    monkeypatch.setattr(
+        migration_service.command,
+        "upgrade",
+        upgrade_mock,
+    )
+
+    service = DatabaseMigrationService(
+        application_config=application_config,
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="administrativen Migrationsdienst",
+    ):
+        service.upgrade_to_head()
+
+    upgrade_mock.assert_not_called()

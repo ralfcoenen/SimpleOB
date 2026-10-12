@@ -464,6 +464,13 @@ class DatabaseMigrationService:
                 "Nicht unterstütztes Datenbanksystem."
             )
 
+        if is_postgresql:
+            raise RuntimeError(
+                "PostgreSQL-Migrationen dürfen ausschließlich "
+                "über den administrativen Migrationsdienst "
+                "ausgeführt werden."
+            )
+
         if is_sqlite:
             database_file = self._application_config.database_file
 
