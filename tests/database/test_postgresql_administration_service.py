@@ -704,7 +704,7 @@ def test_execute_migration_empty_requires_approval(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
-    """Ein leeres Schema darf nicht ohne Zustimmung initialisiert werden."""
+    """Ein leeres Schema benötigt Initialisierungs- und Wartungsfreigabe."""
     from openbilanz.database.migration_service import (
         PostgreSQLSchemaInspection,
     )
@@ -724,6 +724,7 @@ def test_execute_migration_empty_requires_approval(
 
     backup_path = tmp_path / "unapproved_initialization.dump"
 
+    # Fall 1: Keine Initialisierungsfreigabe.
     with pytest.raises(RuntimeError):
         service.execute_migration(
             approval=PostgreSQLMigrationApproval(),
@@ -731,6 +732,23 @@ def test_execute_migration_empty_requires_approval(
         )
 
     assert not backup_path.exists()
+
+    # Fall 2: Initialisierung bestätigt, Wartungsbetrieb nicht.
+    with pytest.raises(
+        RuntimeError,
+        match="Wartungsbetrieb muss ausdrücklich",
+    ):
+        service.execute_migration(
+            approval=PostgreSQLMigrationApproval(
+                initialize_confirmed=True,
+                maintenance_confirmed=False,
+            ),
+            backup_path=backup_path,
+        )
+
+    assert not backup_path.exists()
+
+    _assert_migration_lock_available(database_url)
 
 
 def test_execute_migration_outdated_requires_approval(

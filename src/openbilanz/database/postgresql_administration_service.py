@@ -595,15 +595,23 @@ class PostgreSQLAdministrationService:
                                     "bestätigt werden."
                                 )
 
-                            if not approval.maintenance_confirmed:
-                                raise RuntimeError(
-                                    "Der Wartungsbetrieb muss ausdrücklich "
-                                    "bestätigt werden."
-                                )
                         else:
                             validate_postgresql_migration(
                                 inspection=inspection,
                                 approval=approval,
+                            )
+
+                        if (
+                            inspection.status
+                            in (
+                                PostgreSQLSchemaStatus.EMPTY,
+                                PostgreSQLSchemaStatus.OUTDATED,
+                            )
+                            and not approval.maintenance_confirmed
+                        ):
+                            raise RuntimeError(
+                                "Der Wartungsbetrieb muss ausdrücklich "
+                                "bestätigt werden."
                             )
 
                         if inspection.status == PostgreSQLSchemaStatus.CURRENT:
