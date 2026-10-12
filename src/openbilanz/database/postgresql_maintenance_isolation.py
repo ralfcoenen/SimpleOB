@@ -17,6 +17,19 @@ from openbilanz.database.postgresql_migration_lock import (
 TEST_DATABASE = "simpleob_migration_test"
 
 
+def _count_test_database_sessions(connection) -> int:
+    """Zählt bestehende Sitzungen der PostgreSQL-Testdatenbank."""
+    return int(
+        connection.execute(
+            text(
+                "SELECT COUNT(*) "
+                "FROM pg_stat_activity "
+                "WHERE datname = :database_name"
+            ),
+            {"database_name": TEST_DATABASE},
+        ).scalar_one()
+    )
+
 @contextmanager
 def postgresql_maintenance_isolation(
     *,
@@ -82,6 +95,14 @@ def postgresql_maintenance_isolation(
                         "für neue Verbindungen gesperrt. "
                         "Der Wartungszustand ist ungeklärt."
                     )
+                sessions_before = _count_test_database_sessions(connection)
+
+                if sessions_before:
+                    raise RuntimeError(
+                        "Die PostgreSQL-Testdatenbank wird noch "
+                        f"von {sessions_before} Sitzung(en) verwendet. "
+                        "Die Wartungsisolierung wurde nicht aktiviert."
+                    )
 
                 connection.execute(
                     text(
@@ -89,6 +110,15 @@ def postgresql_maintenance_isolation(
                         "WITH ALLOW_CONNECTIONS false"
                     )
                 )
+
+                sessions_after = _count_test_database_sessions(connection)
+
+                if sessions_after:
+                    raise RuntimeError(
+                        "Nach Aktivierung der Verbindungssperre "
+                        f"bestehen noch {sessions_after} Sitzung(en). "
+                        "Die Wartungsisolierung wird abgebrochen."
+                    )
 
                 try:
                     yield

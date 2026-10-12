@@ -218,3 +218,32 @@ def test_maintenance_isolation_restores_connections_after_error(
             raise RuntimeError("Simulierter Wartungsfehler")
 
     assert _connections_allowed(database_url) is True
+
+
+def test_rejects_existing_database_session(
+    database_url: str,
+) -> None:
+    """Eine bestehende Sitzung verhindert die Wartungsisolierung."""
+    assert _connections_allowed(database_url) is True
+
+    engine = create_engine(database_url)
+
+    try:
+        with engine.connect() as other_connection:
+            other_connection.execute(text("SELECT 1"))
+
+            with pytest.raises(
+                RuntimeError,
+                match="Sitzung",
+            ):
+                with postgresql_maintenance_isolation(
+                    application_config=_config(database_url),
+                ):
+                    pytest.fail(
+                        "Wartungsisolierung trotz bestehender "
+                        "Datenbanksitzung aktiviert."
+                    )
+    finally:
+        engine.dispose()
+
+    assert _connections_allowed(database_url) is True
