@@ -483,6 +483,7 @@ def test_postgresql_inspection_without_alembic_version(
 
     engine = MagicMock()
     connection = engine.connect.return_value.__enter__.return_value
+    connection.dialect.name = "postgresql"
     inspector = MagicMock()
     inspector.get_table_names.return_value = tables
 
@@ -574,6 +575,7 @@ def test_postgresql_inspection_outdated_schema(
     connection = (
         engine.connect.return_value.__enter__.return_value
     )
+    connection.dialect.name = "postgresql"
 
     inspector = MagicMock()
     inspector.get_table_names.return_value = [
@@ -635,6 +637,7 @@ def test_postgresql_inspection_unknown_revision(
     connection = (
         engine.connect.return_value.__enter__.return_value
     )
+    connection.dialect.name = "postgresql"
 
     inspector = MagicMock()
     inspector.get_table_names.return_value = [
@@ -748,3 +751,64 @@ def test_direct_postgresql_upgrade_is_rejected(
         service.upgrade_to_head()
 
     upgrade_mock.assert_not_called()
+
+
+def test_postgresql_schema_inspection_uses_existing_connection(
+    monkeypatch,
+) -> None:
+    """Die Schemaprüfung verwendet die übergebene Verbindung."""
+    import os
+
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.engine import make_url
+
+    database_url = os.environ.get(
+        "SIMPLEOB_POSTGRES_TEST_URL"
+    )
+
+    if not database_url:
+        pytest.skip(
+            "SIMPLEOB_POSTGRES_TEST_URL ist nicht gesetzt."
+        )
+
+    if make_url(database_url).database != "simpleob_migration_test":
+        pytest.fail(
+            "Der Test darf ausschließlich "
+            "'simpleob_migration_test' verwenden."
+        )
+
+    from unittest.mock import Mock
+
+    application_config = Mock()
+    application_config.database_url = database_url
+
+    service = DatabaseMigrationService(
+        application_config=application_config,
+    )
+
+    engine = create_engine(database_url)
+
+    try:
+        with engine.connect() as connection:
+            # Eine bereits bestehende Transaktion bleibt
+            # unter der Kontrolle des Aufrufers.
+            connection.execute(text("SELECT 1"))
+
+            assert connection.in_transaction()
+
+            inspection = (
+                service.inspect_postgresql_schema_on_connection(
+                    connection
+                )
+            )
+
+            assert inspection.status == (
+                PostgreSQLSchemaStatus.CURRENT
+            )
+
+            assert connection.in_transaction()
+
+            connection.rollback()
+
+    finally:
+        engine.dispose()
