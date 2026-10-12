@@ -672,3 +672,44 @@ def test_postgresql_inspection_unknown_revision(
     assert result.head_revision == HEAD_REVISION
 
     engine.dispose.assert_called_once()
+
+
+def test_alembic_uses_provided_connection(
+    tmp_path: Path,
+) -> None:
+    """Alembic verwendet eine extern bereitgestellte Verbindung."""
+    from sqlalchemy import create_engine, inspect
+
+    database_file = tmp_path / "external_connection.db"
+
+    service = DatabaseMigrationService(
+        application_config=_application_config(
+            database_file
+        )
+    )
+
+    alembic_config = service._create_alembic_config()
+
+    engine = create_engine(
+        f"sqlite:///{database_file}"
+    )
+
+    try:
+        with engine.begin() as connection:
+            alembic_config.attributes["connection"] = connection
+
+            command.upgrade(
+                alembic_config,
+                "head",
+            )
+
+        assert "alembic_version" in (
+            inspect(engine).get_table_names()
+        )
+
+        assert _current_revision(database_file) == (
+            HEAD_REVISION
+        )
+
+    finally:
+        engine.dispose()
