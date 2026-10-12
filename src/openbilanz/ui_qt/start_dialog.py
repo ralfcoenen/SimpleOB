@@ -26,6 +26,13 @@ from openbilanz.ui_qt.new_company_dialog import NewCompanyDialog
 from openbilanz.ui_qt.new_fiscal_year_dialog import (
     NewFiscalYearDialog,
 )
+from openbilanz.core.config import (
+    ApplicationConfig,
+    save_database_configuration,
+)
+from openbilanz.ui_qt.database_configuration_dialog import (
+    DatabaseConfigurationDialog,
+)
 
 
 class StartDialog(QDialog):
@@ -35,11 +42,14 @@ class StartDialog(QDialog):
         self,
         *,
         repository: CompanyRepository,
+        config: ApplicationConfig,
         import_client_transfer: (
             Callable[[ClientTransfer], None] | None
         ) = None,
     ) -> None:
         super().__init__()
+
+        self._config = config
 
         self._repository = repository
         self._import_client_transfer = import_client_transfer
@@ -140,6 +150,17 @@ class StartDialog(QDialog):
         )
         button_box.addButton(
             self._new_fiscal_year_button,
+            QDialogButtonBox.ButtonRole.ActionRole,
+        )
+
+        database_button = QPushButton(
+            "Datenbank wechseln …"
+        )
+        database_button.clicked.connect(
+            self._change_database
+        )
+        button_box.addButton(
+            database_button,
             QDialogButtonBox.ButtonRole.ActionRole,
         )
 
@@ -376,3 +397,45 @@ class StartDialog(QDialog):
         )
 
         self.accept()
+
+    def _change_database(self) -> None:
+        """Wechselt die Datenbank nach Prüfung und Bestätigung."""
+
+        dialog = DatabaseConfigurationDialog(
+            config=self._config
+        )
+
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        selected_url = dialog.selected_database_url
+
+        if (
+            selected_url
+            == self._config.database_url_override
+        ):
+            return
+
+        try:
+            save_database_configuration(
+                self._config,
+                selected_url,
+            )
+        except (OSError, ValueError) as exc:
+            QMessageBox.warning(
+                self,
+                "Datenbankwechsel",
+                "Die Datenbankkonfiguration konnte "
+                f"nicht gespeichert werden:\n\n{exc}",
+            )
+            return
+
+        QMessageBox.information(
+            self,
+            "Datenbankwechsel",
+            "Die neue Datenbankverbindung wurde gespeichert.\n\n"
+            "SimpleOB wird jetzt beendet. "
+            "Bitte starten Sie die Anwendung erneut.",
+        )
+
+        self.reject()

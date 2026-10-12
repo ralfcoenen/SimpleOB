@@ -508,6 +508,7 @@ def main() -> None:
         while True:
             dialog = StartDialog(
                 repository=company_repository,
+                config=config,
                 import_client_transfer=(
                     import_client_transfer
                 ),
