@@ -839,3 +839,112 @@ def test_load_config_rejects_unsupported_database_url(
         match="Unterstützte Datenbank-URLs",
     ):
         load_config(config_file)
+
+
+def test_save_database_configuration_persists_postgresql(
+    tmp_path,
+) -> None:
+    from openbilanz.core.config import (
+        default_config,
+        load_config,
+        save_database_configuration,
+    )
+
+    config_file = tmp_path / "config.toml"
+
+    config_file.write_text(
+        '[application]\ndata_dir = "/tmp/simpleob-test"\n'
+        '\n[database]\nfile = "/tmp/existing.db"\n'
+        '\n[taxonomy]\nroot = "/tmp/taxonomy"\n',
+        encoding="utf-8",
+    )
+
+    config = load_config(
+        config_file,
+        defaults=default_config(),
+    )
+
+    url = (
+        "postgresql+psycopg://"
+        "ralf@localhost:5432/simpleob_migration_test"
+    )
+
+    save_database_configuration(
+        config,
+        url,
+    )
+
+    reloaded = load_config(
+        config_file,
+        defaults=default_config(),
+    )
+
+    assert reloaded.database_url == url
+    assert reloaded.database_file.as_posix() == "/tmp/existing.db"
+    assert reloaded.taxonomy_dir.as_posix() == "/tmp/taxonomy"
+
+
+def test_save_database_configuration_restores_sqlite(
+    tmp_path,
+) -> None:
+    from openbilanz.core.config import (
+        default_config,
+        load_config,
+        save_database_configuration,
+    )
+
+    config_file = tmp_path / "config.toml"
+
+    config_file.write_text(
+        '[database]\n'
+        'file = "/tmp/existing.db"\n'
+        'url = "postgresql+psycopg://ralf@localhost:5432/test"\n',
+        encoding="utf-8",
+    )
+
+    config = load_config(
+        config_file,
+        defaults=default_config(),
+    )
+
+    save_database_configuration(
+        config,
+        None,
+    )
+
+    reloaded = load_config(
+        config_file,
+        defaults=default_config(),
+    )
+
+    assert reloaded.database_url == "sqlite:////tmp/existing.db"
+    assert "url =" not in config_file.read_text(
+        encoding="utf-8",
+    )
+
+
+def test_save_database_configuration_rejects_password(
+    tmp_path,
+) -> None:
+    import pytest
+
+    from openbilanz.core.config import (
+        default_config,
+        load_config,
+        save_database_configuration,
+    )
+
+    config_file = tmp_path / "config.toml"
+
+    config = load_config(
+        config_file,
+        defaults=default_config(),
+    )
+
+    with pytest.raises(ValueError, match="passwörter"):
+        save_database_configuration(
+            config,
+            "postgresql+psycopg://user:secret@localhost/test",
+        )
+
+    assert not config_file.exists()

@@ -613,6 +613,127 @@ def save_eric_data_supplier(
         encoding="utf-8",
     )
 
+def save_database_configuration(
+    config: ApplicationConfig,
+    database_url: str | None,
+) -> None:
+    """Speichert die ausgewählte Datenbankverbindung.
+
+    None bedeutet: SQLite-Standardkonfiguration verwenden.
+    """
+
+    from sqlalchemy.engine import make_url
+
+    if database_url is not None:
+        if not isinstance(database_url, str):
+            raise TypeError(
+                "database_url muss eine Zeichenkette sein."
+            )
+
+        database_url = database_url.strip()
+
+        if not database_url:
+            raise ValueError(
+                "Die Datenbank-URL darf nicht leer sein."
+            )
+
+        if not database_url.startswith(
+            ("sqlite:///", "postgresql+psycopg://")
+        ):
+            raise ValueError(
+                "Nicht unterstützte Datenbank-URL."
+            )
+
+        parsed_url = make_url(database_url)
+
+        if parsed_url.password is not None:
+            raise ValueError(
+                "Datenbankpasswörter dürfen nicht "
+                "in der Konfiguration gespeichert werden."
+            )
+
+    config_file = config.config_file
+
+    if config_file.is_file():
+        text = config_file.read_text(
+            encoding="utf-8",
+        )
+    else:
+        text = ""
+
+    lines = text.splitlines()
+
+    section_start: int | None = None
+    section_end = len(lines)
+
+    for index, line in enumerate(lines):
+        stripped = line.strip()
+
+        if stripped == "[database]":
+            section_start = index
+            continue
+
+        if (
+            section_start is not None
+            and index > section_start
+            and stripped.startswith("[")
+            and stripped.endswith("]")
+        ):
+            section_end = index
+            break
+
+    if section_start is not None:
+        section_lines = lines[
+            section_start + 1:section_end
+        ]
+
+        preserved_lines = []
+
+        for line in section_lines:
+            stripped = line.strip()
+            key, separator, _ = stripped.partition("=")
+
+            if separator and key.strip() == "url":
+                continue
+
+            preserved_lines.append(line)
+
+        lines[
+            section_start + 1:section_end
+        ] = preserved_lines
+
+    if database_url is not None:
+        escaped_url = (
+            database_url
+            .replace("\\", "\\\\")
+            .replace('"', '\\"')
+        )
+
+        url_line = f'url = "{escaped_url}"'
+
+        if section_start is not None:
+            lines.insert(
+                section_start + 1,
+                url_line,
+            )
+        else:
+            if lines and lines[-1].strip():
+                lines.append("")
+
+            lines.extend([
+                "[database]",
+                url_line,
+            ])
+
+    config_file.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    config_file.write_text(
+        "\n".join(lines) + "\n",
+        encoding="utf-8",
+    )
 
 def prepare_application_data_directories(
     config: ApplicationConfig,
