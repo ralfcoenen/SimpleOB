@@ -191,3 +191,48 @@ def test_prepare_migration_rejects_sqlite() -> None:
         service.prepare_migration(
             approval=PostgreSQLMigrationApproval()
         )
+
+
+def test_migration_dry_run_current_schema(
+    database_url: str,
+    tmp_path: Path,
+) -> None:
+    """Der Probelauf erstellt und prüft ein Backup ohne Migration."""
+    backup_path = tmp_path / "administrative_dry_run.dump"
+
+    result = _service(database_url).run_migration_dry_run(
+        approval=PostgreSQLMigrationApproval(),
+        backup_path=backup_path,
+    )
+
+    assert result.action == PostgreSQLMigrationAction.NONE
+    assert result.backup_path == backup_path.resolve()
+    assert result.backup_size > 0
+    assert result.restored_table_count > 0
+    assert backup_path.is_file()
+
+
+def test_migration_dry_run_rejects_other_sessions(
+    database_url: str,
+    tmp_path: Path,
+) -> None:
+    """Bei weiteren Sitzungen wird kein Backup erstellt."""
+    backup_path = tmp_path / "blocked_dry_run.dump"
+    engine = create_engine(database_url)
+
+    try:
+        with engine.connect() as other_connection:
+            other_connection.execute(text("SELECT 1"))
+
+            with pytest.raises(
+                RuntimeError,
+                match="Weitere PostgreSQL-Sitzungen",
+            ):
+                _service(database_url).run_migration_dry_run(
+                    approval=PostgreSQLMigrationApproval(),
+                    backup_path=backup_path,
+                )
+    finally:
+        engine.dispose()
+
+    assert not backup_path.exists()

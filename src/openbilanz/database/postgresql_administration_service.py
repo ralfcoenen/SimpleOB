@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from pathlib import Path
+
 from sqlalchemy import create_engine
 from sqlalchemy.engine import make_url
 
@@ -21,8 +24,25 @@ from openbilanz.database.postgresql_migration_safety import (
     PostgreSQLMigrationAction,
     PostgreSQLMigrationApproval,
     validate_postgresql_migration,
-
 )
+from openbilanz.database.postgresql_backup_service import (
+    PostgreSQLBackupService,
+)
+from openbilanz.database.postgresql_restore_verification import (
+    PostgreSQLRestoreVerificationService,
+)
+
+
+@dataclass(frozen=True, slots=True)
+class PostgreSQLMigrationDryRunResult:
+    """Ergebnis eines administrativen Probelaufs."""
+
+    action: PostgreSQLMigrationAction
+    backup_path: Path | None
+    backup_size: int
+    restored_table_count: int
+
+
 class PostgreSQLAdministrationService:
     """Prüft PostgreSQL unter einer exklusiven Migrationssperre."""
 
@@ -140,6 +160,126 @@ class PostgreSQLAdministrationService:
                     return validate_postgresql_migration(
                         inspection=inspection,
                         approval=approval,
+                    )
+        finally:
+            engine.dispose()
+
+    def run_migration_dry_run(
+        self,
+        *,
+        approval: PostgreSQLMigrationApproval,
+        backup_path: Path,
+    ) -> PostgreSQLMigrationDryRunResult:
+        """Prüft den administrativen Ablauf ohne Migration.
+
+        Ausschließlich simpleob_migration_test ist zugelassen.
+        Die exklusive Migrationssperre bleibt während des
+        gesamten Probelaufs bestehen.
+        """
+        database_url = make_url(
+            self._application_config.database_url
+        )
+
+        if (
+            database_url.get_backend_name() != "postgresql"
+            or database_url.database != "simpleob_migration_test"
+        ):
+            raise ValueError(
+                "Der administrative Probelauf ist ausschließlich "
+                "für die PostgreSQL-Datenbank "
+                "'simpleob_migration_test' zugelassen."
+            )
+
+        engine = create_engine(
+            self._application_config.database_url
+        )
+
+        try:
+            with engine.connect() as connection:
+                with postgresql_migration_lock(connection):
+                    sessions = inspect_postgresql_sessions(
+                        connection
+                    )
+
+                    if sessions.has_other_sessions:
+                        raise RuntimeError(
+                            "Der Probelauf wurde abgebrochen: "
+                            "Weitere PostgreSQL-Sitzungen sind aktiv."
+                        )
+
+                    inspection = (
+                        self._migration_service
+                        .inspect_postgresql_schema_on_connection(
+                            connection
+                        )
+                    )
+
+                    # Für OUTDATED wird die frisch zu erzeugende
+                    # Sicherung erst nach erfolgreicher Prüfung
+                    # als Backup-Nachweis verwendet.
+                    if (
+                        inspection.status
+                        == PostgreSQLSchemaStatus.OUTDATED
+                    ):
+                        if not approval.migration_confirmed:
+                            raise RuntimeError(
+                                "Die Migration muss ausdrücklich "
+                                "bestätigt werden."
+                            )
+
+                        if not approval.maintenance_confirmed:
+                            raise RuntimeError(
+                                "Der Wartungsbetrieb muss "
+                                "ausdrücklich bestätigt werden."
+                            )
+
+                    else:
+                        validate_postgresql_migration(
+                            inspection=inspection,
+                            approval=approval,
+                        )
+
+                    backup_result = PostgreSQLBackupService(
+                        application_config=self._application_config
+                    ).create_backup(
+                        backup_path=backup_path
+                    )
+
+                    restore_result = (
+                        PostgreSQLRestoreVerificationService(
+                            application_config=self._application_config
+                        ).verify_backup(
+                            backup_path=backup_result.backup_path
+                        )
+                    )
+
+                    effective_approval = (
+                        PostgreSQLMigrationApproval(
+                            initialize_confirmed=(
+                                approval.initialize_confirmed
+                            ),
+                            migration_confirmed=(
+                                approval.migration_confirmed
+                            ),
+                            maintenance_confirmed=(
+                                approval.maintenance_confirmed
+                            ),
+                            backup_path=backup_result.backup_path,
+                        )
+                    )
+
+                    action = validate_postgresql_migration(
+                        inspection=inspection,
+                        approval=effective_approval,
+                    )
+
+                    return PostgreSQLMigrationDryRunResult(
+                        action=action,
+                        backup_path=backup_result.backup_path,
+                        backup_size=backup_result.backup_size,
+                        restored_table_count=(
+                            restore_result.restored_table_count
+                        ),
                     )
         finally:
             engine.dispose()
