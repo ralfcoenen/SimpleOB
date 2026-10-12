@@ -4228,7 +4228,7 @@ class MainWindow(QMainWindow):
                 income_statement=self._current_income_statement,
                 chart_of_accounts=self._chart_of_accounts,
             )
-        except ValueError as exc:
+        except (ValueError, DatabaseLockError) as exc:
             QMessageBox.critical(
                 self,
                 "Jahresabschluss fehlgeschlagen",
