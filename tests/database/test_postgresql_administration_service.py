@@ -121,3 +121,22 @@ def test_administrative_inspection_rejects_sqlite() -> None:
         match="nur für PostgreSQL",
     ):
         service.inspect_schema()
+
+
+def test_administrative_inspection_rejects_other_sessions(
+    database_url: str,
+) -> None:
+    """Andere Datenbanksitzungen verhindern die administrative Prüfung."""
+    engine = create_engine(database_url)
+
+    try:
+        with engine.connect() as other_connection:
+            other_connection.execute(text("SELECT 1"))
+
+            with pytest.raises(
+                RuntimeError,
+                match="anderen Sitzungen",
+            ):
+                _service(database_url).inspect_schema()
+    finally:
+        engine.dispose()

@@ -14,7 +14,9 @@ from openbilanz.database.migration_service import (
 from openbilanz.database.postgresql_migration_lock import (
     postgresql_migration_lock,
 )
-
+from openbilanz.database.postgresql_session_inspection import (
+    inspect_postgresql_sessions,
+)
 
 class PostgreSQLAdministrationService:
     """Prüft PostgreSQL unter einer exklusiven Migrationssperre."""
@@ -34,8 +36,8 @@ class PostgreSQLAdministrationService:
     ) -> PostgreSQLSchemaInspection:
         """Prüft das Schema unter exklusiver administrativer Sperre.
 
-        Unbekannte Schemazustände werden abgewiesen.
-        Es werden keine Migrationen ausgeführt.
+        Weitere Datenbanksitzungen und unbekannte Schemazustände
+        führen zum Abbruch. Es werden keine Migrationen ausgeführt.
         """
         database_url = self._application_config.database_url
 
@@ -50,6 +52,19 @@ class PostgreSQLAdministrationService:
         try:
             with engine.connect() as connection:
                 with postgresql_migration_lock(connection):
+                    sessions = inspect_postgresql_sessions(
+                        connection
+                    )
+
+                    if sessions.has_other_sessions:
+                        raise RuntimeError(
+                            "Die PostgreSQL-Datenbank wird noch "
+                            "von anderen Sitzungen verwendet "
+                            f"({sessions.other_session_count}). "
+                            "Bitte alle anderen Datenbankverbindungen "
+                            "vor der administrativen Wartung beenden."
+                        )
+
                     inspection = (
                         self._migration_service
                         .inspect_postgresql_schema_on_connection(
