@@ -401,3 +401,63 @@ def test_migration_dry_run_rejects_administrative_lock_on_postgres(
         admin_engine.dispose()
 
     assert not backup_path.exists()
+
+
+def test_verify_maintenance_isolation(
+    database_url: str,
+) -> None:
+    """Wartungsisolierung erlaubt bestehende Migrationsverbindung."""
+    service = _service(database_url)
+
+    service.verify_maintenance_isolation()
+
+    admin_engine = create_engine(
+        make_url(database_url).set(database="postgres")
+    )
+
+    try:
+        with admin_engine.connect() as connection:
+            assert connection.execute(
+                text(
+                    "SELECT datallowconn FROM pg_database "
+                    "WHERE datname = :database_name"
+                ),
+                {"database_name": "simpleob_migration_test"},
+            ).scalar_one() is True
+    finally:
+        admin_engine.dispose()
+
+
+def test_verify_maintenance_isolation_rejects_other_sessions(
+    database_url: str,
+) -> None:
+    """Eine weitere Datenbanksitzung verhindert die Wartung."""
+    database_engine = create_engine(database_url)
+
+    try:
+        with database_engine.connect() as other_connection:
+            other_connection.execute(text("SELECT 1"))
+
+            with pytest.raises(
+                RuntimeError,
+                match="Sitzung",
+            ):
+                _service(database_url).verify_maintenance_isolation()
+    finally:
+        database_engine.dispose()
+
+    admin_engine = create_engine(
+        make_url(database_url).set(database="postgres")
+    )
+
+    try:
+        with admin_engine.connect() as connection:
+            assert connection.execute(
+                text(
+                    "SELECT datallowconn FROM pg_database "
+                    "WHERE datname = :database_name"
+                ),
+                {"database_name": "simpleob_migration_test"},
+            ).scalar_one() is True
+    finally:
+        admin_engine.dispose()

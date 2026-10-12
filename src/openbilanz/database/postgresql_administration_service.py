@@ -5,8 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
+
 
 from openbilanz.core.config import ApplicationConfig
 from openbilanz.database.migration_service import (
@@ -30,6 +31,9 @@ from openbilanz.database.postgresql_backup_service import (
 )
 from openbilanz.database.postgresql_restore_verification import (
     PostgreSQLRestoreVerificationService,
+)
+from openbilanz.database.postgresql_maintenance_isolation import (
+    postgresql_maintenance_isolation,
 )
 
 
@@ -299,6 +303,67 @@ class PostgreSQLAdministrationService:
                                 restore_result.restored_table_count
                             ),
                         )
+        finally:
+            database_engine.dispose()
+            admin_engine.dispose()
+
+
+    def verify_maintenance_isolation(self) -> None:
+        """Prüft die Wartungsisolierung ohne Schemaänderungen.
+
+        Ausschließlich simpleob_migration_test.
+        Die administrative Sperre wird während der gesamten
+        Prüfung auf der Datenbank 'postgres' gehalten.
+        """
+        database_url = self._application_config.database_url
+        url = make_url(database_url)
+
+        if (
+            url.get_backend_name() != "postgresql"
+            or url.database != "simpleob_migration_test"
+        ):
+            raise ValueError(
+                "Die Prüfung der Wartungsisolierung ist "
+                "ausschließlich für die PostgreSQL-Testdatenbank "
+                "'simpleob_migration_test' zugelassen."
+            )
+
+        if url.password is not None:
+            raise ValueError(
+                "Passwörter in der Datenbank-URL "
+                "werden nicht unterstützt."
+            )
+
+        admin_engine = create_engine(
+            url.set(database="postgres"),
+            isolation_level="AUTOCOMMIT",
+        )
+        database_engine = create_engine(database_url)
+
+        try:
+            with admin_engine.connect() as admin_connection:
+                with postgresql_migration_lock(admin_connection):
+                    with database_engine.connect() as migration_connection:
+                        with postgresql_maintenance_isolation(
+                            application_config=self._application_config,
+                            admin_connection=admin_connection,
+                            migration_connection=migration_connection,
+                        ):
+                            database_name = migration_connection.execute(
+                                text("SELECT current_database()")
+                            ).scalar_one()
+
+                            if database_name != "simpleob_migration_test":
+                                raise RuntimeError(
+                                    "Die bestehende Migrationsverbindung "
+                                    "verweist auf eine unerwartete Datenbank."
+                                )
+
+            # Erst nach Aufhebung der Verbindungssperre wird
+            # eine neue Verbindung zur Testdatenbank geöffnet.
+            with database_engine.connect() as connection:
+                connection.execute(text("SELECT 1")).scalar_one()
+
         finally:
             database_engine.dispose()
             admin_engine.dispose()
