@@ -44,6 +44,29 @@ def database_url() -> str:
     return url
 
 
+def _assert_migration_lock_available(database_url: str) -> None:
+    """Prüft die Freigabe der exklusiven administrativen Sperre."""
+    engine = create_engine(database_url)
+
+    try:
+        with engine.connect() as connection:
+            acquired = connection.execute(
+                text("SELECT pg_try_advisory_lock(:key)"),
+                {"key": MIGRATION_LOCK_KEY},
+            ).scalar_one()
+
+            try:
+                assert acquired is True
+            finally:
+                if acquired:
+                    connection.execute(
+                        text("SELECT pg_advisory_unlock(:key)"),
+                        {"key": MIGRATION_LOCK_KEY},
+                    )
+                    connection.rollback()
+    finally:
+        engine.dispose()
+
 def _service(database_url: str) -> PostgreSQLAdministrationService:
     config = Mock()
     config.database_url = database_url
@@ -236,3 +259,64 @@ def test_migration_dry_run_rejects_other_sessions(
         engine.dispose()
 
     assert not backup_path.exists()
+
+
+def test_migration_dry_run_releases_lock_after_backup_failure(
+    database_url: str,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """Ein Backupfehler beendet den Probelauf und gibt die Sperre frei."""
+    from openbilanz.database import postgresql_administration_service as module
+
+    def failing_backup(self, *, backup_path):
+        raise RuntimeError("Simulierter Backupfehler")
+
+    monkeypatch.setattr(
+        module.PostgreSQLBackupService,
+        "create_backup",
+        failing_backup,
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="Simulierter Backupfehler",
+    ):
+        _service(database_url).run_migration_dry_run(
+            approval=PostgreSQLMigrationApproval(),
+            backup_path=tmp_path / "failed_backup.dump",
+        )
+
+    _assert_migration_lock_available(database_url)
+
+
+def test_migration_dry_run_releases_lock_after_restore_failure(
+    database_url: str,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """Ein Restorefehler beendet den Probelauf und gibt die Sperre frei."""
+    from openbilanz.database import postgresql_administration_service as module
+
+    def failing_restore(self, *, backup_path):
+        raise RuntimeError("Simulierter Restorefehler")
+
+    monkeypatch.setattr(
+        module.PostgreSQLRestoreVerificationService,
+        "verify_backup",
+        failing_restore,
+    )
+
+    backup_path = tmp_path / "failed_restore.dump"
+
+    with pytest.raises(
+        RuntimeError,
+        match="Simulierter Restorefehler",
+    ):
+        _service(database_url).run_migration_dry_run(
+            approval=PostgreSQLMigrationApproval(),
+            backup_path=backup_path,
+        )
+
+    assert backup_path.is_file()
+    _assert_migration_lock_available(database_url)
