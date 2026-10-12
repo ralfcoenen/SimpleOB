@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QVBoxLayout,
 )
-
+from openbilanz.database.lock_error import DatabaseLockError
 from openbilanz.database.company_repository import CompanyRepository
 from openbilanz.domain.company import Company
 from openbilanz.domain.fiscal_year import FiscalYear
@@ -278,7 +278,7 @@ class NewFiscalYearDialog(QDialog):
                 fiscal_year,
             )
 
-        except ValueError as exc:
+        except (ValueError, DatabaseLockError) as exc:
             QMessageBox.critical(
                 self,
                 "Geschäftsjahr kann nicht angelegt werden",

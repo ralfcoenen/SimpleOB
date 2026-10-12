@@ -75,13 +75,48 @@ class CompanyRepository:
     ) -> None:
         """Speichert ein Geschäftsjahr für ein Unternehmen."""
 
-        company_model = (
-            self._session.query(Mandant)
-            .filter(
-                Mandant.company_id == str(company_id)
-            )
-            .one_or_none()
+        is_postgresql = (
+            self._session.get_bind().dialect.name == "postgresql"
         )
+
+        if is_postgresql:
+            self._session.execute(
+                text(
+                    "SELECT set_config("
+                    "'lock_timeout', '3000ms', true)"
+                )
+            )
+
+        query = (
+            self._session.query(Mandant)
+            .filter(Mandant.company_id == str(company_id))
+        )
+
+        if is_postgresql:
+            query = (
+                query
+                .with_for_update(of=Mandant)
+                .populate_existing()
+            )
+
+        try:
+            company_model = query.one_or_none()
+
+        except OperationalError as exc:
+            sqlstate = getattr(exc.orig, "sqlstate", None)
+
+            if is_postgresql and sqlstate == "55P03":
+                self._session.rollback()
+
+                raise DatabaseLockError(
+                    "Mandant momentan gesperrt.\n\n"
+                    "Ein anderer Benutzer bearbeitet derzeit "
+                    "die Geschäftsjahre dieses Mandanten.\n\n"
+                    "Bitte versuchen Sie es in einigen "
+                    "Sekunden erneut."
+                ) from exc
+
+            raise
 
         if company_model is None:
             raise ValueError(
@@ -91,12 +126,9 @@ class CompanyRepository:
         overlapping_model = (
             self._session.query(Wirtschaftsjahr)
             .filter(
-                Wirtschaftsjahr.mandant_id
-                == company_model.id,
-                Wirtschaftsjahr.start_date
-                <= fiscal_year.end_date,
-                Wirtschaftsjahr.end_date
-                >= fiscal_year.start_date,
+                Wirtschaftsjahr.mandant_id == company_model.id,
+                Wirtschaftsjahr.start_date <= fiscal_year.end_date,
+                Wirtschaftsjahr.end_date >= fiscal_year.start_date,
             )
             .first()
         )
@@ -118,7 +150,6 @@ class CompanyRepository:
 
         if commit:
             self._session.commit()
-
 
     def get_fiscal_years(
         self,
