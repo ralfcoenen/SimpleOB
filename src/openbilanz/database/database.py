@@ -11,6 +11,9 @@ from openbilanz.core.config import (
     ApplicationConfig,
     load_config,
 )
+from openbilanz.database.postgresql_maintenance_guard import (
+    install_postgresql_maintenance_guard,
+)
 
 Base = declarative_base()
 
@@ -30,6 +33,14 @@ class Database:
         self._engine = create_engine(
             config.database_url,
             echo=False,
+        )
+
+        install_postgresql_maintenance_guard(
+            self._engine
+        )
+
+        self._session_factory = sessionmaker(
+            bind=self._engine,
         )
 
         self._session_factory = sessionmaker(
