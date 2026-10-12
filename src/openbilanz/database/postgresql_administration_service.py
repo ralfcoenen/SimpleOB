@@ -59,57 +59,67 @@ class PostgreSQLAdministrationService:
     def inspect_schema(
         self,
     ) -> PostgreSQLSchemaInspection:
-        """Prüft das Schema unter exklusiver administrativer Sperre.
+        """Prüft das Schema unter einer administrativen PostgreSQL-Sperre.
 
-        Weitere Datenbanksitzungen und unbekannte Schemazustände
-        führen zum Abbruch. Es werden keine Migrationen ausgeführt.
+        Die exklusive Sperre wird über die Datenbank 'postgres'
+        gehalten. Die Schemaprüfung erfolgt über die eigentliche
+        Anwendungsdatenbank.
+
+        Andere Sitzungen und unbekannte Schemazustände
+        führen zum Abbruch. Es erfolgt keine Migration.
         """
         database_url = self._application_config.database_url
+        url = make_url(database_url)
 
-        if make_url(database_url).get_backend_name() != "postgresql":
+        if url.get_backend_name() != "postgresql":
             raise ValueError(
                 "Die administrative Schemaprüfung "
                 "ist nur für PostgreSQL vorgesehen."
             )
 
-        engine = create_engine(database_url)
+        admin_engine = create_engine(
+            url.set(database="postgres")
+        )
+        database_engine = create_engine(database_url)
 
         try:
-            with engine.connect() as connection:
-                with postgresql_migration_lock(connection):
-                    sessions = inspect_postgresql_sessions(
-                        connection
-                    )
-
-                    if sessions.has_other_sessions:
-                        raise RuntimeError(
-                            "Die PostgreSQL-Datenbank wird noch "
-                            "von anderen Sitzungen verwendet "
-                            f"({sessions.other_session_count}). "
-                            "Bitte alle anderen Datenbankverbindungen "
-                            "vor der administrativen Wartung beenden."
-                        )
-
-                    inspection = (
-                        self._migration_service
-                        .inspect_postgresql_schema_on_connection(
+            with admin_engine.connect() as admin_connection:
+                with postgresql_migration_lock(admin_connection):
+                    with database_engine.connect() as connection:
+                        sessions = inspect_postgresql_sessions(
                             connection
                         )
-                    )
 
-                    if (
-                        inspection.status
-                        == PostgreSQLSchemaStatus.UNKNOWN
-                    ):
-                        raise RuntimeError(
-                            "Der PostgreSQL-Schemazustand ist unbekannt. "
-                            "Eine administrative Migration "
-                            "ist nicht zulässig."
+                        if sessions.has_other_sessions:
+                            raise RuntimeError(
+                                "Die PostgreSQL-Datenbank wird noch "
+                                "von anderen Sitzungen verwendet "
+                                f"({sessions.other_session_count}). "
+                                "Bitte alle anderen Datenbankverbindungen "
+                                "vor der administrativen Wartung beenden."
+                            )
+
+                        inspection = (
+                            self._migration_service
+                            .inspect_postgresql_schema_on_connection(
+                                connection
+                            )
                         )
 
-                    return inspection
+                        if (
+                            inspection.status
+                            == PostgreSQLSchemaStatus.UNKNOWN
+                        ):
+                            raise RuntimeError(
+                                "Der PostgreSQL-Schemazustand ist unbekannt. "
+                                "Eine administrative Migration "
+                                "ist nicht zulässig."
+                            )
+
+                        return inspection
         finally:
-            engine.dispose()
+            database_engine.dispose()
+            admin_engine.dispose()
 
     def prepare_migration(
         self,

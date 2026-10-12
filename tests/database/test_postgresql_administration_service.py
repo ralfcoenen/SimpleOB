@@ -89,8 +89,9 @@ def test_administrative_inspection_rejects_existing_lock(
     database_url: str,
 ) -> None:
     """Eine bereits aktive administrative Sperre verhindert die Prüfung."""
-    engine = create_engine(database_url)
-
+    engine = create_engine(
+        make_url(database_url).set(database="postgres")
+    )
     try:
         with engine.connect() as connection:
             connection.execute(
@@ -320,3 +321,40 @@ def test_migration_dry_run_releases_lock_after_restore_failure(
 
     assert backup_path.is_file()
     _assert_migration_lock_available(database_url)
+
+
+def test_inspect_schema_rejects_administrative_lock_on_postgres(
+    database_url: str,
+) -> None:
+    """Eine Sperre auf 'postgres' verhindert die Schemaprüfung."""
+    url = make_url(database_url)
+
+    admin_engine = create_engine(
+        url.set(database="postgres")
+    )
+
+    try:
+        with admin_engine.connect() as connection:
+            acquired = connection.execute(
+                text("SELECT pg_try_advisory_lock(:key)"),
+                {"key": MIGRATION_LOCK_KEY},
+            ).scalar_one()
+
+            connection.commit()
+
+            assert acquired is True
+
+            try:
+                with pytest.raises(
+                    RuntimeError,
+                    match="andere administrative PostgreSQL-Migration",
+                ):
+                    _service(database_url).inspect_schema()
+            finally:
+                connection.execute(
+                    text("SELECT pg_advisory_unlock(:key)"),
+                    {"key": MIGRATION_LOCK_KEY},
+                )
+                connection.rollback()
+    finally:
+        admin_engine.dispose()
