@@ -247,3 +247,106 @@ def test_rejects_existing_database_session(
         engine.dispose()
 
     assert _connections_allowed(database_url) is True
+
+
+
+def test_accepts_existing_administrative_and_migration_connections(
+    database_url: str,
+) -> None:
+    """Die vorhandene Sperre und Migrationsverbindung werden übernommen."""
+    from openbilanz.database.postgresql_migration_lock import (
+        postgresql_migration_lock,
+    )
+
+    url = make_url(database_url)
+    admin_engine = create_engine(
+        url.set(database="postgres"),
+        isolation_level="AUTOCOMMIT",
+    )
+    database_engine = create_engine(database_url)
+
+    try:
+        with admin_engine.connect() as admin_connection:
+            with postgresql_migration_lock(admin_connection):
+                with database_engine.connect() as migration_connection:
+                    with postgresql_maintenance_isolation(
+                        application_config=_config(database_url),
+                        admin_connection=admin_connection,
+                        migration_connection=migration_connection,
+                    ):
+                        assert _connections_allowed(database_url) is False
+                        assert (
+                            migration_connection.execute(
+                                text("SELECT current_database()")
+                            ).scalar_one()
+                            == TEST_DATABASE
+                        )
+
+                    assert _connections_allowed(database_url) is True
+    finally:
+        database_engine.dispose()
+        admin_engine.dispose()
+
+
+def test_rejects_unlocked_administrative_connection(
+    database_url: str,
+) -> None:
+    """Eine übergebene Admin-Verbindung ohne Sperre ist unzulässig."""
+    url = make_url(database_url)
+    admin_engine = create_engine(url.set(database="postgres"))
+
+    try:
+        with admin_engine.connect() as admin_connection:
+            with pytest.raises(
+                RuntimeError,
+                match="erforderliche PostgreSQL-Sperre",
+            ):
+                with postgresql_maintenance_isolation(
+                    application_config=_config(database_url),
+                    admin_connection=admin_connection,
+                ):
+                    pytest.fail(
+                        "Ungesperrte administrative Verbindung akzeptiert."
+                    )
+    finally:
+        admin_engine.dispose()
+
+    assert _connections_allowed(database_url) is True
+
+
+def test_rejects_other_sessions_with_migration_connection(
+    database_url: str,
+) -> None:
+    """Nur die ausdrücklich übergebene Migrationssitzung ist erlaubt."""
+    from openbilanz.database.postgresql_migration_lock import (
+        postgresql_migration_lock,
+    )
+
+    url = make_url(database_url)
+    admin_engine = create_engine(url.set(database="postgres"))
+    database_engine = create_engine(database_url)
+
+    try:
+        with admin_engine.connect() as admin_connection:
+            with postgresql_migration_lock(admin_connection):
+                with database_engine.connect() as migration_connection:
+                    with database_engine.connect() as other_connection:
+                        other_connection.execute(text("SELECT 1"))
+
+                        with pytest.raises(
+                            RuntimeError,
+                            match="Sitzung",
+                        ):
+                            with postgresql_maintenance_isolation(
+                                application_config=_config(database_url),
+                                admin_connection=admin_connection,
+                                migration_connection=migration_connection,
+                            ):
+                                pytest.fail(
+                                    "Fremde Sitzung wurde nicht erkannt."
+                                )
+    finally:
+        database_engine.dispose()
+        admin_engine.dispose()
+
+    assert _connections_allowed(database_url) is True
