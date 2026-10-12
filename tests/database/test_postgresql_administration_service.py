@@ -524,3 +524,131 @@ def test_maintenance_dry_run_rejects_other_sessions(
 
     assert not backup_path.exists()
     _assert_migration_lock_available(database_url)
+
+
+def test_execute_migration_on_connection_commits(
+    database_url: str,
+    monkeypatch,
+) -> None:
+    """Erfolgreiche simulierte Migration beendet die Transaktion."""
+    from openbilanz.database import postgresql_administration_service as module
+
+    service = _service(database_url)
+    calls = []
+
+    def simulated_upgrade(connection):
+        calls.append(connection.in_transaction())
+
+    monkeypatch.setattr(
+        service._migration_service,
+        "upgrade_postgresql_on_connection",
+        simulated_upgrade,
+    )
+
+    engine = create_engine(database_url)
+
+    try:
+        with engine.connect() as connection:
+            service._execute_migration_on_connection(connection)
+
+            assert calls == [True]
+            assert not connection.in_transaction()
+    finally:
+        engine.dispose()
+
+
+def test_execute_migration_on_connection_rolls_back(
+    database_url: str,
+    monkeypatch,
+) -> None:
+    """Ein simulierter Alembic-Fehler führt zum Rollback."""
+    service = _service(database_url)
+
+    def failing_upgrade(connection):
+        connection.execute(
+            text("SELECT 1")
+        )
+        raise RuntimeError("Simulierter Alembic-Fehler")
+
+    monkeypatch.setattr(
+        service._migration_service,
+        "upgrade_postgresql_on_connection",
+        failing_upgrade,
+    )
+
+    engine = create_engine(database_url)
+
+    try:
+        with engine.connect() as connection:
+            with pytest.raises(
+                RuntimeError,
+                match="Simulierter Alembic-Fehler",
+            ):
+                service._execute_migration_on_connection(connection)
+
+            assert not connection.in_transaction()
+    finally:
+        engine.dispose()
+
+
+def test_migration_failure_releases_maintenance_isolation(
+    database_url: str,
+    monkeypatch,
+) -> None:
+    """Ein Migrationsfehler gibt Wartungsisolierung und Sperre frei."""
+    from openbilanz.database import postgresql_administration_service as module
+
+    service = _service(database_url)
+
+    def failing_upgrade(connection):
+        assert connection.in_transaction()
+        raise RuntimeError("Simulierter Alembic-Fehler")
+
+    monkeypatch.setattr(
+        service._migration_service,
+        "upgrade_postgresql_on_connection",
+        failing_upgrade,
+    )
+
+    admin_engine = create_engine(
+        make_url(database_url).set(database="postgres"),
+        isolation_level="AUTOCOMMIT",
+    )
+    database_engine = create_engine(database_url)
+
+    try:
+        with admin_engine.connect() as admin_connection:
+            with module.postgresql_migration_lock(admin_connection):
+                with database_engine.connect() as migration_connection:
+                    with pytest.raises(
+                        RuntimeError,
+                        match="Simulierter Alembic-Fehler",
+                    ):
+                        with module.postgresql_maintenance_isolation(
+                            application_config=service._application_config,
+                            admin_connection=admin_connection,
+                            migration_connection=migration_connection,
+                        ):
+                            service._execute_migration_on_connection(
+                                migration_connection
+                            )
+
+                    assert not migration_connection.in_transaction()
+
+        with admin_engine.connect() as connection:
+            assert connection.execute(
+                text(
+                    "SELECT datallowconn FROM pg_database "
+                    "WHERE datname = :database_name"
+                ),
+                {"database_name": "simpleob_migration_test"},
+            ).scalar_one() is True
+
+        with database_engine.connect() as connection:
+            assert connection.execute(
+                text("SELECT 1")
+            ).scalar_one() == 1
+
+    finally:
+        database_engine.dispose()
+        admin_engine.dispose()

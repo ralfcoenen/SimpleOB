@@ -514,3 +514,19 @@ class PostgreSQLAdministrationService:
         finally:
             database_engine.dispose()
             admin_engine.dispose()
+
+    def _execute_migration_on_connection(
+        self,
+        migration_connection,
+    ) -> None:
+        """Führt Alembic auf der bestehenden Verbindung transaktional aus."""
+        migration_connection.rollback()
+
+        try:
+            with migration_connection.begin():
+                self._migration_service.upgrade_postgresql_on_connection(
+                    migration_connection
+                )
+        except Exception:
+            migration_connection.rollback()
+            raise
