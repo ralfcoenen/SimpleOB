@@ -3082,30 +3082,58 @@ class FiscalYearWorkspace:
     def save_profit_appropriation_annual_data(
         self,
         data: ProfitAppropriationAnnualData,
+        *,
+        expected_data: ProfitAppropriationAnnualData | None,
     ) -> None:
-        """Speichert die Ergebnisverwendung des aktuellen Geschäftsjahres."""
+        """Speichert den Beschluss mit Sperre und Aktualitätsprüfung."""
 
         if self._profit_appropriation_annual_data_repository is None:
             raise RuntimeError(
                 "Die Ergebnisverwendungsverwaltung ist nicht konfiguriert."
             )
 
-        if self.has_effective_profit_appropriation_postings():
-            raise ValueError(
-                "Der Ergebnisverwendungsbeschluss kann nicht geändert "
-                "werden, solange wirksame Umsetzungsbuchungen vorhanden "
-                "sind. Stornieren Sie diese Buchungen zunächst."
+        try:
+            self._company_repository.lock_fiscal_year(
+                self._context.company.company_id,
+                self._context.fiscal_year,
             )
 
-        self._profit_appropriation_annual_data_repository.save_for_fiscal_year(
-            company_id=(
-                self._context.company.company_id
-            ),
-            fiscal_year=(
-                self._context.fiscal_year
-            ),
-            data=data,
-        )
+            current_data = (
+                self._profit_appropriation_annual_data_repository
+                .get_for_fiscal_year(
+                    company_id=self._context.company.company_id,
+                    fiscal_year=self._context.fiscal_year,
+                )
+            )
+
+            if current_data != expected_data:
+                raise ValueError(
+                    "Der Ergebnisverwendungsbeschluss wurde "
+                    "zwischenzeitlich von einem anderen Benutzer "
+                    "geändert. Ihre Änderungen wurden nicht "
+                    "gespeichert. Bitte öffnen Sie den Beschluss "
+                    "erneut."
+                )
+
+            if self.has_effective_profit_appropriation_postings():
+                raise ValueError(
+                    "Der Ergebnisverwendungsbeschluss kann nicht geändert "
+                    "werden, solange wirksame Umsetzungsbuchungen vorhanden "
+                    "sind. Stornieren Sie diese Buchungen zunächst."
+                )
+
+            self._profit_appropriation_annual_data_repository.save_for_fiscal_year(
+                company_id=self._context.company.company_id,
+                fiscal_year=self._context.fiscal_year,
+                data=data,
+                commit=False,
+            )
+
+            self._company_repository.commit()
+
+        except Exception:
+            self._company_repository.rollback()
+            raise
 
     def previous_profit_loss_carryforward(
         self,

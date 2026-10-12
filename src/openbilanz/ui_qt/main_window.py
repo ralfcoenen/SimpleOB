@@ -3907,9 +3907,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(
                 self,
                 "Ergebnisverwendungsbeschluss",
-                (
-                    "Das Jahresergebnis konnte nicht ermittelt werden."
-                ),
+                "Das Jahresergebnis konnte nicht ermittelt werden.",
             )
             return
 
@@ -3957,9 +3955,7 @@ class MainWindow(QMainWindow):
         try:
             validation_result = (
                 self._workspace.validate_profit_appropriation(
-                    net_income=(
-                        self._current_closing_result.net_income
-                    ),
+                    net_income=self._current_closing_result.net_income,
                     data=dialog.result,
                 )
             )
@@ -3979,8 +3975,10 @@ class MainWindow(QMainWindow):
                 return
 
             self._workspace.save_profit_appropriation_annual_data(
-                dialog.result
+                dialog.result,
+                expected_data=initial_data,
             )
+
         except (ValueError, RuntimeError) as exc:
             QMessageBox.critical(
                 self,
@@ -3999,10 +3997,7 @@ class MainWindow(QMainWindow):
         QMessageBox.information(
             self,
             "Ergebnisverwendungsbeschluss",
-            (
-                "Der Ergebnisverwendungsbeschluss wurde "
-                "gespeichert."
-            ),
+            "Der Ergebnisverwendungsbeschluss wurde gespeichert.",
         )
 
     def _post_previous_profit_appropriation(self) -> None:

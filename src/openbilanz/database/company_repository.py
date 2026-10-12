@@ -295,6 +295,82 @@ class CompanyRepository:
         if commit:
             self._session.commit()
 
+    def lock_fiscal_year(
+        self,
+        company_id: UUID,
+        fiscal_year: FiscalYear,
+    ) -> None:
+        """Sperrt ein Geschäftsjahr unabhängig vom Abschlussstatus."""
+
+        company_model = (
+            self._session.query(Mandant)
+            .filter(
+                Mandant.company_id == str(company_id)
+            )
+            .one_or_none()
+        )
+
+        if company_model is None:
+            raise ValueError(
+                "Unternehmen wurde nicht gefunden."
+            )
+
+        is_postgresql = (
+            self._session.get_bind().dialect.name == "postgresql"
+        )
+
+        if is_postgresql:
+            self._session.execute(
+                text(
+                    "SELECT set_config("
+                    "'lock_timeout', '3000ms', true)"
+                )
+            )
+
+        query = (
+            self._session.query(Wirtschaftsjahr)
+            .filter(
+                Wirtschaftsjahr.mandant_id == company_model.id,
+                Wirtschaftsjahr.start_date == fiscal_year.start_date,
+                Wirtschaftsjahr.end_date == fiscal_year.end_date,
+            )
+        )
+
+        if is_postgresql:
+            query = (
+                query
+                .with_for_update(of=Wirtschaftsjahr)
+                .populate_existing()
+            )
+
+        try:
+            fiscal_year_model = query.one_or_none()
+
+        except OperationalError as exc:
+            sqlstate = getattr(
+                exc.orig,
+                "sqlstate",
+                None,
+            )
+
+            if is_postgresql and sqlstate == "55P03":
+                self._session.rollback()
+
+                raise DatabaseLockError(
+                    "Geschäftsjahr momentan gesperrt.\n\n"
+                    "Ein anderer Benutzer bearbeitet derzeit "
+                    "dieses Geschäftsjahr.\n\n"
+                    "Bitte versuchen Sie es in einigen "
+                    "Sekunden erneut."
+                ) from exc
+
+            raise
+
+        if fiscal_year_model is None:
+            raise ValueError(
+                "Geschäftsjahr wurde nicht gefunden."
+            )
+
     def lock_open_fiscal_year(
         self,
         company_id: UUID,

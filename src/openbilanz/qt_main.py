@@ -108,6 +108,9 @@ from openbilanz.services.fixed_asset_schedule_service import (
 )
 from openbilanz.services.pdf_reporting_service import PdfReportingService
 from openbilanz.services.posting_service import PostingService
+from openbilanz.services.profit_appropriation_posting_service import (
+    ProfitAppropriationPostingService,
+)
 from openbilanz.services.profit_appropriation_booking_service import (
     ProfitAppropriationBookingService,
 )
@@ -652,6 +655,7 @@ def main() -> None:
                 ),
             )
 
+
             profit_appropriation_posting_workflow = (
                 ProfitAppropriationPostingWorkflow(
                     session=session,
@@ -660,11 +664,15 @@ def main() -> None:
                     posting_repository=(
                         profit_appropriation_posting_repository
                     ),
-                    booking_service=(
-                        ProfitAppropriationBookingService()
+                    booking_service=ProfitAppropriationBookingService(),
+                    chart_of_accounts_repository=chart_of_accounts_repository,
+                    annual_data_repository=(
+                        profit_appropriation_annual_data_repository
                     ),
+                    posting_service=ProfitAppropriationPostingService(),
                 )
             )
+
 
             workspace = FiscalYearWorkspace(
                 context=context,

@@ -4693,24 +4693,19 @@ def test_profit_appropriation_annual_data_cannot_be_changed_with_effective_posti
             posting_date=date(2027, 3, 15),
             amount=Decimal("5000.00"),
             booking_id=booking_id,
-            posting_type=(
-                ProfitAppropriationPostingType.DISTRIBUTION
-            ),
+            posting_type=ProfitAppropriationPostingType.DISTRIBUTION,
         ),
     )
 
     booking_repository.is_reversed.return_value = False
+    annual_data_repository.get_for_fiscal_year.return_value = None
 
     workspace = FiscalYearWorkspace(
         context=context,
         booking_repository=booking_repository,
         company_repository=company_repository,
-        profit_appropriation_annual_data_repository=(
-            annual_data_repository
-        ),
-        profit_appropriation_posting_repository=(
-            appropriation_posting_repository
-        ),
+        profit_appropriation_annual_data_repository=annual_data_repository,
+        profit_appropriation_posting_repository=appropriation_posting_repository,
         posting_service=Mock(),
         closing_workflow=Mock(),
         closing_consistency_service=Mock(),
@@ -4735,8 +4730,19 @@ def test_profit_appropriation_annual_data_cannot_be_changed_with_effective_posti
         match="wirksame Umsetzungsbuchungen",
     ):
         workspace.save_profit_appropriation_annual_data(
-            data
+            data,
+            expected_data=None,
         )
+
+    company_repository.lock_fiscal_year.assert_called_once_with(
+        company.company_id,
+        fiscal_year,
+    )
+
+    annual_data_repository.get_for_fiscal_year.assert_called_once_with(
+        company_id=company.company_id,
+        fiscal_year=fiscal_year,
+    )
 
     annual_data_repository.save_for_fiscal_year.assert_not_called()
 
@@ -4745,9 +4751,10 @@ def test_profit_appropriation_annual_data_cannot_be_changed_with_effective_posti
         source_fiscal_year_end=fiscal_year.end_date,
     )
 
-    booking_repository.is_reversed.assert_called_once_with(
-        booking_id
-    )
+    booking_repository.is_reversed.assert_called_once_with(booking_id)
+
+    company_repository.rollback.assert_called_once_with()
+    company_repository.commit.assert_not_called()
 
 
 def test_profit_appropriation_annual_data_can_be_changed_after_reversal(
@@ -4787,24 +4794,19 @@ def test_profit_appropriation_annual_data_can_be_changed_after_reversal(
             posting_date=date(2027, 3, 15),
             amount=Decimal("5000.00"),
             booking_id=booking_id,
-            posting_type=(
-                ProfitAppropriationPostingType.DISTRIBUTION
-            ),
+            posting_type=ProfitAppropriationPostingType.DISTRIBUTION,
         ),
     )
 
     booking_repository.is_reversed.return_value = True
+    annual_data_repository.get_for_fiscal_year.return_value = None
 
     workspace = FiscalYearWorkspace(
         context=context,
         booking_repository=booking_repository,
         company_repository=company_repository,
-        profit_appropriation_annual_data_repository=(
-            annual_data_repository
-        ),
-        profit_appropriation_posting_repository=(
-            appropriation_posting_repository
-        ),
+        profit_appropriation_annual_data_repository=annual_data_repository,
+        profit_appropriation_posting_repository=appropriation_posting_repository,
         posting_service=Mock(),
         closing_workflow=Mock(),
         closing_consistency_service=Mock(),
@@ -4825,18 +4827,123 @@ def test_profit_appropriation_annual_data_can_be_changed_after_reversal(
     )
 
     workspace.save_profit_appropriation_annual_data(
-        data
+        data,
+        expected_data=None,
+    )
+
+    company_repository.lock_fiscal_year.assert_called_once_with(
+        company.company_id,
+        fiscal_year,
+    )
+
+    annual_data_repository.get_for_fiscal_year.assert_called_once_with(
+        company_id=company.company_id,
+        fiscal_year=fiscal_year,
     )
 
     annual_data_repository.save_for_fiscal_year.assert_called_once_with(
         company_id=company.company_id,
         fiscal_year=fiscal_year,
         data=data,
+        commit=False,
     )
 
-    booking_repository.is_reversed.assert_called_once_with(
-        booking_id
+    booking_repository.is_reversed.assert_called_once_with(booking_id)
+
+    company_repository.commit.assert_called_once_with()
+    company_repository.rollback.assert_not_called()
+
+
+def test_profit_appropriation_annual_data_rejects_stale_snapshot(
+    company: Company,
+) -> None:
+    """Zwischenzeitliche Änderungen dürfen nicht überschrieben werden."""
+
+    fiscal_year = FiscalYear(
+        start_date=date(2026, 1, 1),
+        end_date=date(2026, 12, 31),
     )
+    context = ApplicationContext(
+        company=company,
+        fiscal_year=fiscal_year,
+    )
+
+    booking_repository = Mock()
+    company_repository = Mock()
+    annual_data_repository = Mock()
+    appropriation_posting_repository = Mock()
+
+    company_repository.get_managed_fiscal_years.return_value = (
+        ManagedFiscalYear(
+            fiscal_year=fiscal_year,
+            status=FiscalYearStatus.CLOSED,
+            opening_source=None,
+        ),
+    )
+
+    booking_repository.list_for_fiscal_year.return_value = ()
+
+    current_data = ProfitAppropriationAnnualData(
+        statutory_reserve_addition=Decimal("1000.00"),
+        other_revenue_reserves_addition=Decimal("0.00"),
+        statutory_reserve_release=Decimal("0.00"),
+        other_revenue_reserves_release=Decimal("0.00"),
+        distribution=Decimal("5000.00"),
+        profit_loss_carryforward=Decimal("9007.01"),
+    )
+
+    new_data = ProfitAppropriationAnnualData(
+        statutory_reserve_addition=Decimal("2000.00"),
+        other_revenue_reserves_addition=Decimal("0.00"),
+        statutory_reserve_release=Decimal("0.00"),
+        other_revenue_reserves_release=Decimal("0.00"),
+        distribution=Decimal("4000.00"),
+        profit_loss_carryforward=Decimal("9007.01"),
+    )
+
+    annual_data_repository.get_for_fiscal_year.return_value = current_data
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=company_repository,
+        profit_appropriation_annual_data_repository=annual_data_repository,
+        profit_appropriation_posting_repository=appropriation_posting_repository,
+        posting_service=Mock(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
+        e_bilanz_export_service=Mock(),
+        taxonomy_management_service=Mock(),
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="zwischenzeitlich",
+    ):
+        workspace.save_profit_appropriation_annual_data(
+            new_data,
+            expected_data=None,
+        )
+
+    company_repository.lock_fiscal_year.assert_called_once_with(
+        company.company_id,
+        fiscal_year,
+    )
+
+    annual_data_repository.get_for_fiscal_year.assert_called_once_with(
+        company_id=company.company_id,
+        fiscal_year=fiscal_year,
+    )
+
+    annual_data_repository.save_for_fiscal_year.assert_not_called()
+
+    appropriation_posting_repository.list_for_source_fiscal_year.assert_not_called()
+
+    company_repository.rollback.assert_called_once_with()
+    company_repository.commit.assert_not_called()
 
 
 def test_effective_withdrawal_distributions_sums_distributions(

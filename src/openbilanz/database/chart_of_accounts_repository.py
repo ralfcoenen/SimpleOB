@@ -1316,6 +1316,14 @@ class ChartOfAccountsRepository:
             ),
         )
 
+    def lock_company(
+        self,
+        company_id: UUID,
+    ) -> None:
+        """Sperrt den Mandanten für eine gemeinsame Transaktion."""
+
+        self._lock_company(company_id)
+
     def _lock_company(
         self,
         company_id: UUID,
