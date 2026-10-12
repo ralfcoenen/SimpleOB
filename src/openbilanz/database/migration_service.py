@@ -269,6 +269,65 @@ class DatabaseMigrationService:
     ) -> None:
         self._application_config = application_config
 
+    def check_ready_for_start(self) -> None:
+        """Prüft PostgreSQL vor dem Start ohne Schemaänderungen."""
+
+        alembic_config = self._create_alembic_config()
+        database_url = make_url(
+            self._application_config.database_url
+        )
+
+        if database_url.get_backend_name() != "postgresql":
+            raise ValueError(
+                "Die Startprüfung ist nur für PostgreSQL vorgesehen."
+            )
+
+        engine = create_engine(
+            self._application_config.database_url
+        )
+
+        try:
+            inspector = inspect(engine)
+            table_names = set(inspector.get_table_names())
+
+            if not table_names:
+                raise RuntimeError(
+                    "Die PostgreSQL-Datenbank ist noch nicht "
+                    "für SimpleOB eingerichtet. "
+                    "Eine administrative Initialisierung "
+                    "ist erforderlich."
+                )
+
+            if "alembic_version" not in table_names:
+                raise RuntimeError(
+                    "Die PostgreSQL-Datenbank besitzt keine "
+                    "Alembic-Versionsinformation. "
+                    "Die Datenbank wurde nicht verändert."
+                )
+
+            with engine.connect() as connection:
+                migration_context = (
+                    MigrationContext.configure(connection)
+                )
+                current_revision = (
+                    migration_context.get_current_revision()
+                )
+
+            head_revision = self._head_revision(
+                alembic_config
+            )
+
+            if current_revision != head_revision:
+                raise RuntimeError(
+                    "Die PostgreSQL-Datenbank besitzt nicht "
+                    "die aktuelle SimpleOB-Schemaversion. "
+                    "Eine administrative Migration "
+                    "ist erforderlich."
+                )
+
+        finally:
+            engine.dispose()
+
     def upgrade_to_head(self) -> None:
         """Bringt die konfigurierte Datenbank sicher auf Alembic-Head."""
 

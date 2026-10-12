@@ -309,3 +309,128 @@ def test_unknown_unversioned_database_is_rejected(
     assert "fremde_tabelle" in tables
     assert value == "unverändert"
     assert not _backup_file(database_file).exists()
+
+
+def test_postgresql_start_check_rejects_sqlite(
+    tmp_path: Path,
+) -> None:
+    service = DatabaseMigrationService(
+        application_config=_application_config(
+            tmp_path / "test.db"
+        )
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="nur für PostgreSQL",
+    ):
+        service.check_ready_for_start()
+
+
+def test_postgresql_start_check_rejects_empty_database(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    from dataclasses import replace
+    from unittest.mock import MagicMock
+
+    import openbilanz.database.migration_service as module
+
+    config = replace(
+        _application_config(tmp_path / "test.db"),
+        database_url_override=(
+            "postgresql+psycopg://"
+            "ralf@localhost:5432/simpleob_migration_test"
+        ),
+    )
+
+    engine = MagicMock()
+    inspector = MagicMock()
+    inspector.get_table_names.return_value = []
+
+    monkeypatch.setattr(
+        module,
+        "create_engine",
+        lambda url: engine,
+    )
+    monkeypatch.setattr(
+        module,
+        "inspect",
+        lambda engine: inspector,
+    )
+
+    service = DatabaseMigrationService(
+        application_config=config
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="noch nicht",
+    ):
+        service.check_ready_for_start()
+
+    engine.dispose.assert_called_once()
+
+def test_postgresql_start_check_accepts_current_schema(
+    tmp_path: Path,
+) -> None:
+    import os
+    from dataclasses import replace
+
+    from sqlalchemy import create_engine, text
+
+    database_url = os.environ.get(
+        "SIMPLEOB_POSTGRES_TEST_URL"
+    )
+
+    if not database_url:
+        pytest.skip(
+            "SIMPLEOB_POSTGRES_TEST_URL ist nicht gesetzt."
+        )
+
+    from sqlalchemy.engine import make_url
+
+    parsed_url = make_url(database_url)
+
+    if (
+        parsed_url.get_backend_name() != "postgresql"
+        or parsed_url.database != "simpleob_migration_test"
+    ):
+        pytest.fail(
+            "Der Test darf ausschließlich die Datenbank "
+            "'simpleob_migration_test' verwenden."
+        )
+
+    config = replace(
+        _application_config(tmp_path / "unused.db"),
+        database_url_override=database_url,
+    )
+
+    engine = create_engine(database_url)
+
+    try:
+        with engine.connect() as connection:
+            revision_before = connection.execute(
+                text(
+                    "SELECT version_num "
+                    "FROM alembic_version"
+                )
+            ).scalar_one()
+
+        DatabaseMigrationService(
+            application_config=config
+        ).check_ready_for_start()
+
+        with engine.connect() as connection:
+            revision_after = connection.execute(
+                text(
+                    "SELECT version_num "
+                    "FROM alembic_version"
+                )
+            ).scalar_one()
+
+        assert revision_before == HEAD_REVISION
+        assert revision_after == revision_before
+
+    finally:
+        engine.dispose()

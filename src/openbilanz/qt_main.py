@@ -216,9 +216,16 @@ def main() -> None:
             )
         )
 
-    DatabaseMigrationService(
-        application_config=config
-    ).upgrade_to_head()
+        migration_service = DatabaseMigrationService(
+            application_config=config
+        )
+
+        if config.database_url.startswith(
+            "postgresql+psycopg://"
+        ):
+            migration_service.check_ready_for_start()
+        else:
+            migration_service.upgrade_to_head()
 
     database = Database(config)
 
