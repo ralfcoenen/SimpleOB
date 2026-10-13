@@ -1,3 +1,4 @@
+
 """PySide6-Dialog zur Auswahl der SimpleOB-Datenbank."""
 
 from __future__ import annotations
@@ -19,18 +20,22 @@ from PySide6.QtWidgets import (
 from sqlalchemy.engine import URL, make_url
 
 from openbilanz.core.config import ApplicationConfig
+from openbilanz.database.connection_credentials import (
+    PostgreSQLCredentials,
+)
 from openbilanz.database.migration_service import (
     DatabaseMigrationService,
 )
-from openbilanz.database.connection_credentials import (
-    PostgreSQLCredentials,
+from openbilanz.database.postgresql_initialization_service import (
+    PostgreSQLInitializationService,
 )
 from openbilanz.ui_qt.postgresql_password_dialog import (
     PostgreSQLPasswordDialog,
 )
 
+
 class DatabaseConfigurationDialog(QDialog):
-    """Wählt und prüft eine Datenbankverbindung."""
+    """Wählt, prüft und gegebenenfalls initialisiert eine Datenbank."""
 
     def __init__(
         self,
@@ -94,6 +99,16 @@ class DatabaseConfigurationDialog(QDialog):
         form.addRow("Benutzer", self._user_edit)
         form.addRow("Datenbank", self._database_edit)
 
+        for edit in (
+            self._host_edit,
+            self._port_edit,
+            self._user_edit,
+            self._database_edit,
+        ):
+            edit.textChanged.connect(
+                self._invalidate_connection_check
+            )
+
         layout.addLayout(form)
 
         self._status_label = QLabel()
@@ -108,6 +123,14 @@ class DatabaseConfigurationDialog(QDialog):
             self._test_connection
         )
         buttons.addWidget(self._test_button)
+
+        self._initialize_button = QPushButton(
+            "Neue PostgreSQL-Datenbank anlegen …"
+        )
+        self._initialize_button.clicked.connect(
+            self._initialize_postgresql_database
+        )
+        buttons.addWidget(self._initialize_button)
 
         buttons.addStretch()
 
@@ -148,6 +171,11 @@ class DatabaseConfigurationDialog(QDialog):
 
         self._update_fields()
 
+    def _invalidate_connection_check(self) -> None:
+        self._checked_database_url = None
+        self._checked_credentials = None
+        self._status_label.clear()
+
     def _update_fields(self) -> None:
         is_postgresql = (
             self._backend_box.currentData()
@@ -162,9 +190,11 @@ class DatabaseConfigurationDialog(QDialog):
         ):
             widget.setEnabled(is_postgresql)
 
-        self._checked_database_url = None
-        self._checked_credentials = None
-        self._status_label.clear()
+        self._initialize_button.setEnabled(
+            is_postgresql
+        )
+
+        self._invalidate_connection_check()
 
     def _selected_url(self) -> str | None:
         if self._backend_box.currentData() == "sqlite":
@@ -258,6 +288,130 @@ class DatabaseConfigurationDialog(QDialog):
 
         self._status_label.setText(
             "Datenbankprüfung erfolgreich."
+        )
+
+    def _initialize_postgresql_database(self) -> None:
+        try:
+            database_url = self._selected_url()
+        except ValueError as exc:
+            QMessageBox.warning(
+                self,
+                "PostgreSQL-Ersteinrichtung",
+                str(exc),
+            )
+            return
+
+        if database_url is None:
+            return
+
+        target_url = make_url(database_url)
+        database_name = target_url.database or ""
+        owner_role = target_url.username or ""
+
+        answer = QMessageBox.question(
+            self,
+            "Neue PostgreSQL-Datenbank anlegen",
+            (
+                "Soll die folgende neue PostgreSQL-Datenbank "
+                "angelegt und initialisiert werden?\n\n"
+                f"Datenbank: {database_name}\n"
+                f"Eigentümer: {owner_role}\n"
+                f"Server: {target_url.host}:{target_url.port}\n\n"
+                "Eine bereits vorhandene Datenbank wird "
+                "nicht überschrieben.\n\n"
+                "Die Anlage erfordert eine administrative "
+                "PostgreSQL-Rolle mit CREATEDB-Berechtigung."
+            ),
+            QMessageBox.StandardButton.Yes
+            | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+
+        admin_username, accepted = self._request_admin_username()
+        if not accepted:
+            return
+
+        admin_username = admin_username.strip()
+        if not admin_username:
+            QMessageBox.warning(
+                self,
+                "PostgreSQL-Ersteinrichtung",
+                "Die administrative Rolle darf nicht leer sein.",
+            )
+            return
+
+        admin_url = target_url.set(
+            username=admin_username,
+            database="postgres",
+        ).render_as_string(hide_password=False)
+
+        admin_credentials = self._request_credentials(
+            admin_url
+        )
+        if admin_credentials is None:
+            return
+
+        application_credentials = self._request_credentials(
+            database_url
+        )
+        if application_credentials is None:
+            return
+
+        self._invalidate_connection_check()
+
+        test_config = replace(
+            self._config,
+            database_url_override=database_url,
+        )
+
+        try:
+            PostgreSQLInitializationService().initialize_database(
+                application_config=test_config,
+                admin_username=admin_username,
+                admin_credentials=admin_credentials,
+                application_credentials=application_credentials,
+                confirmed=True,
+            )
+        except Exception as exc:
+            self._status_label.setText(
+                "PostgreSQL-Ersteinrichtung fehlgeschlagen."
+            )
+            QMessageBox.warning(
+                self,
+                "PostgreSQL-Ersteinrichtung",
+                str(exc),
+            )
+            return
+
+        self._checked_database_url = database_url
+        self._checked_credentials = application_credentials
+        self._status_label.setText(
+            "Neue PostgreSQL-Datenbank erfolgreich eingerichtet."
+        )
+
+        QMessageBox.information(
+            self,
+            "PostgreSQL-Ersteinrichtung",
+            (
+                f"Die Datenbank „{database_name}“ wurde "
+                "angelegt und erfolgreich initialisiert.\n\n"
+                "Die Konfiguration kann jetzt mit "
+                "„OK“ übernommen werden."
+            ),
+        )
+
+    def _request_admin_username(self) -> tuple[str, bool]:
+        from PySide6.QtWidgets import QInputDialog
+
+        return QInputDialog.getText(
+            self,
+            "Administrative PostgreSQL-Rolle",
+            "PostgreSQL-Rolle mit CREATEDB-Berechtigung:",
+            QLineEdit.EchoMode.Normal,
+            "",
         )
 
     def _accept_configuration(self) -> None:
