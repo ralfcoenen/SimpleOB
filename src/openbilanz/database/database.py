@@ -14,6 +14,10 @@ from openbilanz.core.config import (
 from openbilanz.database.postgresql_maintenance_guard import (
     install_postgresql_maintenance_guard,
 )
+from openbilanz.database.connection_credentials import (
+    PostgreSQLCredentials,
+    database_connect_args,
+)
 
 Base = declarative_base()
 
@@ -27,20 +31,22 @@ class Database:
     def __init__(
         self,
         config: ApplicationConfig,
+        *,
+        credentials: PostgreSQLCredentials | None = None,
     ) -> None:
         self._config = config
 
         self._engine = create_engine(
             config.database_url,
             echo=False,
+            connect_args=database_connect_args(
+                config.database_url,
+                credentials,
+            ),
         )
 
         install_postgresql_maintenance_guard(
             self._engine
-        )
-
-        self._session_factory = sessionmaker(
-            bind=self._engine,
         )
 
         self._session_factory = sessionmaker(

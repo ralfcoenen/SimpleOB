@@ -2,6 +2,7 @@
 
 import sys
 from pathlib import Path
+from dataclasses import replace
 
 from PySide6.QtWidgets import QApplication, QDialog
 from PySide6.QtWidgets import QApplication, QDialog, QMessageBox
@@ -52,6 +53,9 @@ from openbilanz.database.profit_appropriation_annual_data_repository import (
 )
 from openbilanz.database.profit_appropriation_posting_repository import (
     ProfitAppropriationPostingRepository,
+)
+from openbilanz.database.connection_credentials import (
+    PostgreSQLCredentials,
 )
 from openbilanz.database.shareholder_repository import ShareholderRepository
 from openbilanz.database.tax_depreciation_adjustment_repository import (
@@ -137,7 +141,11 @@ from openbilanz.ui_qt.start_dialog import StartDialog
 from openbilanz.ui_qt.database_configuration_dialog import (
     DatabaseConfigurationDialog,
 )
-
+from openbilanz.ui_qt.postgresql_password_dialog import (
+    PostgreSQLPasswordDialog,
+)
+from sqlalchemy.engine import make_url
+from sqlalchemy.exc import DBAPIError
 
 def _load_application_config():
     """Lädt die Konfiguration passend zur Ausführungsumgebung."""
@@ -185,33 +193,125 @@ def _ensure_eric_privacy_acknowledgement(
 
     return True
 
+def _request_postgresql_credentials(
+    config: ApplicationConfig,
+) -> PostgreSQLCredentials | None:
+    """Fragt das PostgreSQL-Passwort für die laufende Sitzung ab."""
+
+    url = make_url(config.database_url)
+
+    if url.get_backend_name() != "postgresql":
+        return None
+
+    dialog = PostgreSQLPasswordDialog(
+        username=url.username or "",
+        host=url.host or "",
+        database=url.database or "",
+    )
+
+    if dialog.exec() != QDialog.DialogCode.Accepted:
+        return None
+
+    return PostgreSQLCredentials(
+        password=dialog.password,
+    )
+
+def _is_postgresql_authentication_error(
+    error: Exception,
+) -> bool:
+    """Erkennt fehlgeschlagene PostgreSQL-Passwortanmeldungen."""
+
+    current: BaseException | None = error
+    visited: set[int] = set()
+
+    while current is not None and id(current) not in visited:
+        visited.add(id(current))
+
+        if getattr(current, "sqlstate", None) == "28P01":
+            return True
+
+        if isinstance(current, DBAPIError):
+            original = current.orig
+
+            if getattr(original, "sqlstate", None) == "28P01":
+                return True
+
+            message = str(original).lower()
+
+            if "password authentication failed" in message:
+                return True
+
+        current = current.__cause__ or current.__context__
+
+    return False
 
 def _prepare_database_connection(
     config: ApplicationConfig,
-) -> ApplicationConfig | None:
-    """Prüft die Datenbank und ermöglicht bei Fehlern eine Korrektur."""
+) -> tuple[
+    ApplicationConfig,
+    PostgreSQLCredentials | None,
+] | None:
+    """Prüft die Datenbank und ermöglicht eine Korrektur."""
+
+    def is_postgresql(
+        candidate: ApplicationConfig,
+    ) -> bool:
+        return (
+            make_url(candidate.database_url).get_backend_name()
+            == "postgresql"
+        )
 
     def check_database(
         candidate: ApplicationConfig,
+        credentials: PostgreSQLCredentials | None,
     ) -> None:
         migration_service = DatabaseMigrationService(
-            application_config=candidate
+            application_config=candidate,
+            credentials=credentials,
         )
 
-        if candidate.database_url.startswith(
-            "postgresql+psycopg://"
-        ):
+        if is_postgresql(candidate):
             migration_service.check_ready_for_start()
         else:
             migration_service.upgrade_to_head()
 
-    try:
-        check_database(config)
-        return config
-    except Exception as exc:
-        error_message = str(exc)
+    credentials = _request_postgresql_credentials(config)
+
+    if is_postgresql(config) and credentials is None:
+        return None
 
     while True:
+        try:
+            check_database(config, credentials)
+            return config, credentials
+
+        except Exception as exc:
+            if (
+                is_postgresql(config)
+                and _is_postgresql_authentication_error(exc)
+            ):
+                result = QMessageBox.question(
+                    None,
+                    "SimpleOB – PostgreSQL-Anmeldung",
+                    "Die PostgreSQL-Anmeldung ist fehlgeschlagen.\n\n"
+                    "Möchten Sie das Passwort erneut eingeben?",
+                    QMessageBox.StandardButton.Yes
+                    | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.Yes,
+                )
+
+                if result == QMessageBox.StandardButton.Yes:
+                    credentials = _request_postgresql_credentials(
+                        config
+                    )
+
+                    if credentials is None:
+                        return None
+
+                    continue
+
+            error_message = str(exc)
+
         result = QMessageBox.question(
             None,
             "SimpleOB – Datenbankverbindung",
@@ -227,34 +327,34 @@ def _prepare_database_connection(
             return None
 
         dialog = DatabaseConfigurationDialog(
-            config=config
+            config=config,
         )
 
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return None
 
-        from dataclasses import replace
-
         candidate = replace(
             config,
-            database_url_override=(
-                dialog.selected_database_url
-            ),
+            database_url_override=dialog.selected_database_url,
         )
 
+        candidate_credentials = dialog.checked_credentials
+
+        if is_postgresql(candidate) and candidate_credentials is None:
+            return None
+
         try:
-            check_database(candidate)
+            check_database(candidate, candidate_credentials)
 
             save_database_configuration(
                 config,
                 dialog.selected_database_url,
             )
 
-            return candidate
+            return candidate, candidate_credentials
 
         except Exception as exc:
             error_message = str(exc)
-
 
 def main() -> None:
     """Startet die PySide6-Oberfläche von SimpleOB."""
@@ -292,12 +392,17 @@ def main() -> None:
             )
         )
 
-    config = _prepare_database_connection(config)
+    prepared_connection = _prepare_database_connection(config)
 
-    if config is None:
+    if prepared_connection is None:
         return
 
-    database = Database(config)
+    config, credentials = prepared_connection
+
+    database = Database(
+        config,
+        credentials=credentials,
+    )
 
     standard_financial_statement_context = (
         create_standard_financial_statement_context()

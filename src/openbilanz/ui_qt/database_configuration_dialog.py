@@ -22,7 +22,18 @@ from openbilanz.core.config import ApplicationConfig
 from openbilanz.database.migration_service import (
     DatabaseMigrationService,
 )
+from openbilanz.database.connection_credentials import (
+    PostgreSQLCredentials,
+)
+from openbilanz.ui_qt.postgresql_password_dialog import (
+    PostgreSQLPasswordDialog,
+)
 
+@property
+def checked_credentials(
+    self,
+) -> PostgreSQLCredentials | None:
+    return self._checked_credentials
 
 class DatabaseConfigurationDialog(QDialog):
     """Wählt und prüft eine Datenbankverbindung."""
@@ -36,6 +47,9 @@ class DatabaseConfigurationDialog(QDialog):
 
         self._config = config
         self.selected_database_url: str | None = None
+
+        self._checked_database_url: str | None = None
+        self._checked_credentials: PostgreSQLCredentials | None = None
 
         self.setWindowTitle(
             "SimpleOB – Datenbank konfigurieren"
@@ -146,6 +160,8 @@ class DatabaseConfigurationDialog(QDialog):
         ):
             widget.setEnabled(is_postgresql)
 
+        self._checked_database_url = None
+        self._checked_credentials = None
         self._status_label.clear()
 
     def _selected_url(self) -> str | None:
@@ -187,9 +203,27 @@ class DatabaseConfigurationDialog(QDialog):
         database_url = self._selected_url()
 
         if database_url is None:
-            # SQLite wird weiterhin beim normalen Start
-            # über die bestehende Migration initialisiert.
+            self._checked_database_url = None
+            self._checked_credentials = None
             return None
+
+        if (
+            database_url == self._checked_database_url
+            and self._checked_credentials is not None
+        ):
+            return database_url
+
+        self._checked_database_url = None
+        self._checked_credentials = None
+
+        credentials = self._request_credentials(
+            database_url
+        )
+
+        if credentials is None:
+            raise RuntimeError(
+                "Die Passwortabfrage wurde abgebrochen."
+            )
 
         test_config = replace(
             self._config,
@@ -197,8 +231,12 @@ class DatabaseConfigurationDialog(QDialog):
         )
 
         DatabaseMigrationService(
-            application_config=test_config
+            application_config=test_config,
+            credentials=credentials,
         ).check_ready_for_start()
+
+        self._checked_database_url = database_url
+        self._checked_credentials = credentials
 
         return database_url
 
@@ -233,3 +271,23 @@ class DatabaseConfigurationDialog(QDialog):
 
         self.selected_database_url = database_url
         self.accept()
+
+    def _request_credentials(
+        self,
+        database_url: str,
+    ) -> PostgreSQLCredentials | None:
+        url = make_url(database_url)
+
+        dialog = PostgreSQLPasswordDialog(
+            username=url.username or "",
+            host=url.host or "",
+            database=url.database or "",
+            parent=self,
+        )
+
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return None
+
+        return PostgreSQLCredentials(
+            password=dialog.password,
+        )

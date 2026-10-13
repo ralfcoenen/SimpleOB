@@ -1,32 +1,64 @@
-from sqlalchemy import inspect
-from sqlalchemy.orm import Session
+"""Tests für die grundlegenden Datenbankfunktionen."""
 
-from openbilanz.database.database import (
-    create_database,
-    create_session,
-    engine,
-)
+from sqlalchemy import create_engine, inspect
+from sqlalchemy.orm import Session, sessionmaker
+
+from openbilanz.database.models import Base
 
 
-def test_database():
-    create_database()
+def test_database(tmp_path):
+    """Eine neue SQLite-Datenbank kann angelegt werden."""
 
-    assert True
+    database_file = tmp_path / "test_database.db"
 
-
-def test_database_creation():
-    create_database()
-
-    tables = inspect(engine).get_table_names()
-
-    assert "mandanten" in tables
-    assert "wirtschaftsjahre" in tables
-
-
-def test_create_session() -> None:
-    session = create_session()
+    engine = create_engine(
+        f"sqlite:///{database_file}"
+    )
 
     try:
-        assert isinstance(session, Session)
+        Base.metadata.create_all(engine)
+
+        assert database_file.exists()
     finally:
-        session.close()
+        engine.dispose()
+
+
+def test_database_creation(tmp_path):
+    """Die erwarteten Tabellen werden angelegt."""
+
+    database_file = tmp_path / "test_database.db"
+
+    engine = create_engine(
+        f"sqlite:///{database_file}"
+    )
+
+    try:
+        Base.metadata.create_all(engine)
+
+        tables = inspect(engine).get_table_names()
+
+        assert "mandanten" in tables
+        assert "wirtschaftsjahre" in tables
+    finally:
+        engine.dispose()
+
+
+def test_create_session(tmp_path) -> None:
+    """Eine SQLAlchemy-Session kann erstellt werden."""
+
+    database_file = tmp_path / "test_database.db"
+
+    engine = create_engine(
+        f"sqlite:///{database_file}"
+    )
+
+    try:
+        session_factory = sessionmaker(bind=engine)
+        session = session_factory()
+
+        try:
+            assert isinstance(session, Session)
+        finally:
+            session.close()
+    finally:
+        engine.dispose()

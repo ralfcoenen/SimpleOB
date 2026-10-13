@@ -17,6 +17,10 @@ from sqlalchemy import create_engine, inspect
 from sqlalchemy.engine import Connection, make_url
 
 from openbilanz.core.config import ApplicationConfig
+from openbilanz.database.connection_credentials import (
+    PostgreSQLCredentials,
+    database_connect_args,
+)
 
 LEGACY_SCHEMA_REVISION = "f65c37865e28"
 
@@ -283,8 +287,10 @@ class DatabaseMigrationService:
         self,
         *,
         application_config: ApplicationConfig,
+        credentials: PostgreSQLCredentials | None = None,
     ) -> None:
         self._application_config = application_config
+        self._credentials = credentials
 
     def inspect_postgresql_schema(
         self,
@@ -301,7 +307,11 @@ class DatabaseMigrationService:
             )
 
         engine = create_engine(
-            self._application_config.database_url
+            self._application_config.database_url,
+            connect_args=database_connect_args(
+                self._application_config.database_url,
+                self._credentials,
+            ),
         )
 
         try:
@@ -417,7 +427,11 @@ class DatabaseMigrationService:
             )
 
         engine = create_engine(
-            self._application_config.database_url
+            self._application_config.database_url,
+            connect_args=database_connect_args(
+                self._application_config.database_url,
+                self._credentials,
+            ),
         )
 
         try:
