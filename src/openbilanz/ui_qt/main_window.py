@@ -428,6 +428,10 @@ class MainWindow(QMainWindow):
             self._refresh_bvv_evaluation()
             self._refresh_e_bilanz()
 
+        self._notebook.currentChanged.connect(
+            self._reload_bookkeeping_data
+        )
+
     def closeEvent(self, event) -> None:
         """Kehrt beim Schließen des Hauptfensters zur Buchhaltungsauswahl zurück."""
 
@@ -4949,6 +4953,40 @@ class MainWindow(QMainWindow):
             self,
             "Unternehmensstammdaten",
             "Die Unternehmensstammdaten wurden gespeichert.",
+        )
+
+    def _reload_bookkeeping_data(
+        self,
+        _tab_index: int | None = None,
+    ) -> None:
+        """Aktualisiert gespeicherte Buchhaltungsdaten."""
+
+        try:
+            self._workspace.reload()
+
+            self._refresh_accounts()
+            self._refresh_journal()
+            self._refresh_balance_sheet()
+
+            self._journal_status.setText(
+                f"Journal: {len(self._workspace.journal)} Buchungen"
+            )
+
+        except Exception as exc:
+            QMessageBox.critical(
+                self,
+                "Aktualisierung fehlgeschlagen",
+                (
+                    "Die Buchhaltungsdaten konnten nicht "
+                    "vollständig aktualisiert werden.\n\n"
+                    f"{exc}"
+                ),
+            )
+            return
+
+        self.statusBar().showMessage(
+            "Buchhaltungsdaten wurden aktualisiert.",
+            5000,
         )
 
     def _open_shareholders(self) -> None:
