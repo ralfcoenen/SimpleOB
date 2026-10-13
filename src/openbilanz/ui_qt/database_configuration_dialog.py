@@ -29,12 +29,6 @@ from openbilanz.ui_qt.postgresql_password_dialog import (
     PostgreSQLPasswordDialog,
 )
 
-@property
-def checked_credentials(
-    self,
-) -> PostgreSQLCredentials | None:
-    return self._checked_credentials
-
 class DatabaseConfigurationDialog(QDialog):
     """Wählt und prüft eine Datenbankverbindung."""
 
@@ -58,6 +52,14 @@ class DatabaseConfigurationDialog(QDialog):
 
         self._create_ui()
         self._load_current_configuration()
+
+    @property
+    def checked_credentials(
+        self,
+    ) -> PostgreSQLCredentials | None:
+        """Liefert die erfolgreich geprüften PostgreSQL-Zugangsdaten."""
+
+        return self._checked_credentials
 
     def _create_ui(self) -> None:
         layout = QVBoxLayout(self)
