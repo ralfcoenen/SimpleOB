@@ -6,6 +6,8 @@ from decimal import Decimal
 from pathlib import Path
 from uuid import UUID
 
+from sqlalchemy.engine import make_url
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -117,6 +119,7 @@ from openbilanz.ui_qt.tax_depreciation_adjustment_dialog import (
 )
 from openbilanz.ui_qt.vat_booking_frame import VatBookingFrame
 
+
 ZERO = Decimal("0.00")
 
 
@@ -211,9 +214,20 @@ class MainWindow(QMainWindow):
         self._company_master_data = (
             self._workspace.load_company_master_data()
         )
-        self.setWindowTitle(
-            f"SimpleOB – {self._context.company.name}"
-        )
+        window_title = f"SimpleOB – {self._context.company.name}"
+
+        if self._application_config is not None:
+            database_url = make_url(
+                self._application_config.database_url
+            )
+
+            if database_url.get_backend_name() == "postgresql":
+                database_user = database_url.username
+
+                if database_user:
+                    window_title += f" – {database_user}"
+
+        self.setWindowTitle(window_title)
         self.resize(1300, 800)
         self.setMinimumSize(1100, 700)
 

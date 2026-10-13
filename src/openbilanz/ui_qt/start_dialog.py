@@ -2,9 +2,12 @@
 
 from collections.abc import Callable
 
+from sqlalchemy.engine import make_url
+
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
+    QHBoxLayout,
     QDialogButtonBox,
     QFileDialog,
     QFormLayout,
@@ -66,8 +69,17 @@ class StartDialog(QDialog):
             FiscalYear,
         ] = {}
 
-        self.setWindowTitle("SimpleOB – Buchhaltung öffnen")
-        self.setFixedSize(800, 320)
+        window_title = "SimpleOB – Buchhaltung öffnen"
+
+        database_url = make_url(self._config.database_url)
+
+        if database_url.get_backend_name() == "postgresql":
+            if database_url.username:
+                window_title += f" – {database_url.username}"
+
+        self.setWindowTitle(window_title)
+        self.resize(850, 360)
+        self.setMinimumSize(750, 340)
 
         self._create_ui()
         self._load_companies()
@@ -75,21 +87,25 @@ class StartDialog(QDialog):
     def _create_ui(self) -> None:
         """Erzeugt die Benutzeroberfläche."""
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(12)
+        main_layout = QHBoxLayout(self)
+        main_layout.setContentsMargins(24, 24, 24, 24)
+        main_layout.setSpacing(24)
+
+        # Linker Bereich: Mandanten- und Geschäftsjahrauswahl
+        content_layout = QVBoxLayout()
+        content_layout.setSpacing(12)
 
         title_label = QLabel("SimpleOB")
         title_label.setStyleSheet(
             "font-size: 22px; font-weight: bold;"
         )
-        layout.addWidget(title_label)
+        content_layout.addWidget(title_label)
 
         subtitle_label = QLabel("Buchhaltung öffnen")
         subtitle_label.setStyleSheet(
             "font-size: 14px; font-weight: bold;"
         )
-        layout.addWidget(subtitle_label)
+        content_layout.addWidget(subtitle_label)
 
         form_layout = QFormLayout()
 
@@ -108,14 +124,18 @@ class StartDialog(QDialog):
             self._fiscal_year_box,
         )
 
-        layout.addLayout(form_layout)
+        content_layout.addLayout(form_layout)
 
         self._status_label = QLabel()
-        layout.addWidget(self._status_label)
+        content_layout.addWidget(self._status_label)
 
-        layout.addStretch()
+        content_layout.addStretch()
 
-        button_box = QDialogButtonBox()
+        main_layout.addLayout(content_layout, 1)
+
+        # Rechter Bereich: Aktionen untereinander
+        button_layout = QVBoxLayout()
+        button_layout.setSpacing(8)
 
         new_company_button = QPushButton(
             "Neue Buchhaltung anlegen"
@@ -123,10 +143,7 @@ class StartDialog(QDialog):
         new_company_button.clicked.connect(
             self._create_new_company
         )
-        button_box.addButton(
-            new_company_button,
-            QDialogButtonBox.ButtonRole.ActionRole,
-        )
+        button_layout.addWidget(new_company_button)
 
         self._import_company_button = QPushButton(
             "Mandant importieren …"
@@ -137,9 +154,8 @@ class StartDialog(QDialog):
         self._import_company_button.clicked.connect(
             self._import_company
         )
-        button_box.addButton(
-            self._import_company_button,
-            QDialogButtonBox.ButtonRole.ActionRole,
+        button_layout.addWidget(
+            self._import_company_button
         )
 
         self._new_fiscal_year_button = QPushButton(
@@ -148,9 +164,8 @@ class StartDialog(QDialog):
         self._new_fiscal_year_button.clicked.connect(
             self._create_new_fiscal_year
         )
-        button_box.addButton(
-            self._new_fiscal_year_button,
-            QDialogButtonBox.ButtonRole.ActionRole,
+        button_layout.addWidget(
+            self._new_fiscal_year_button
         )
 
         database_button = QPushButton(
@@ -159,30 +174,36 @@ class StartDialog(QDialog):
         database_button.clicked.connect(
             self._change_database
         )
-        button_box.addButton(
-            database_button,
-            QDialogButtonBox.ButtonRole.ActionRole,
+        button_layout.addWidget(database_button)
+
+        refresh_button = QPushButton("Aktualisieren")
+        refresh_button.clicked.connect(
+            self._load_companies
         )
+        button_layout.addWidget(refresh_button)
+
+        button_layout.addStretch()
 
         self._open_button = QPushButton("Öffnen")
         self._open_button.setEnabled(False)
         self._open_button.clicked.connect(self._open)
-        button_box.addButton(
-            self._open_button,
-            QDialogButtonBox.ButtonRole.AcceptRole,
-        )
+        button_layout.addWidget(self._open_button)
 
         cancel_button = QPushButton("Abbrechen")
         cancel_button.clicked.connect(self.reject)
-        button_box.addButton(
-            cancel_button,
-            QDialogButtonBox.ButtonRole.RejectRole,
-        )
+        button_layout.addWidget(cancel_button)
 
-        layout.addWidget(button_box)
+        main_layout.addLayout(button_layout)
 
     def _load_companies(self) -> None:
-        """Lädt die vorhandenen Unternehmen."""
+        """Lädt die Mandanten und erhält möglichst die Auswahl."""
+
+        selected_company = self._selected_company()
+        selected_company_id = (
+            selected_company.company_id
+            if selected_company is not None
+            else None
+        )
 
         self._companies = self._repository.list_companies()
 
@@ -196,6 +217,20 @@ class StartDialog(QDialog):
         self._company_box.addItems(
             tuple(self._company_by_display_name)
         )
+
+        selected_index = 0
+
+        if selected_company_id is not None:
+            for index, company in enumerate(self._companies):
+                if company.company_id == selected_company_id:
+                    selected_index = index
+                    break
+
+        if self._companies:
+            self._company_box.setCurrentIndex(
+                selected_index
+            )
+
         self._company_box.blockSignals(False)
 
         if not self._companies:
@@ -203,12 +238,15 @@ class StartDialog(QDialog):
                 "Es ist noch keine Buchhaltung vorhanden."
             )
             self._fiscal_year_box.clear()
+            self._fiscal_year_by_display_name = {}
             self._new_fiscal_year_button.setEnabled(False)
             self._open_button.setEnabled(False)
             return
 
         self._new_fiscal_year_button.setEnabled(True)
-        self._load_fiscal_years(self._companies[0])
+        self._load_fiscal_years(
+            self._companies[selected_index]
+        )
 
     def _on_company_selected(
         self,
