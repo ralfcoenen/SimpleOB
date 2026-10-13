@@ -4959,14 +4959,37 @@ class MainWindow(QMainWindow):
         self,
         _tab_index: int | None = None,
     ) -> None:
-        """Aktualisiert gespeicherte Buchhaltungsdaten."""
+        """Aktualisiert Buchhaltung und Mandantenstammdaten."""
 
         try:
-            self._workspace.reload()
+            master_data = self._workspace.load_company_master_data()
 
+            master_data_changed = (
+                master_data != self._company_master_data
+            )
+
+            if master_data_changed:
+                self._company_master_data = master_data
+
+                self._current_e_bilanz_preparation = None
+                self._current_e_bilanz_document = None
+                self._current_e_bilanz_arelle_valid = False
+
+            self._workspace.reload()
             self._refresh_accounts()
             self._refresh_journal()
             self._refresh_balance_sheet()
+            self._update_editing_state()
+            self._refresh_closing()
+
+            self._refresh_e_bilanz_availability()
+
+            if self._company_master_data.supports_e_bilanz:
+                self._refresh_taxonomy_status()
+                self._refresh_bvv_evaluation()
+                self._refresh_e_bilanz()
+            else:
+                self._e_bilanz_frame.clear_bvv_evaluation()
 
             self._journal_status.setText(
                 f"Journal: {len(self._workspace.journal)} Buchungen"
