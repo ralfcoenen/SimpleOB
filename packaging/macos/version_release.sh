@@ -119,7 +119,7 @@ case "${confirmation}" in
         ;;
     *)
         echo "Abgebrochen."
-        exit 0
+        exit 1
         ;;
 esac
 
@@ -209,7 +209,7 @@ case "${commit_confirmation}" in
         echo
         echo "Kein Commit erstellt."
         echo "pyproject.toml enthält jetzt Version ${NEW_VERSION}."
-        exit 0
+        exit 1
         ;;
 esac
 
