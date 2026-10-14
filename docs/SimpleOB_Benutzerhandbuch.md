@@ -41,156 +41,237 @@ verantwortlich.
 
 SimpleOB wird als macOS-Anwendung `SimpleOB.app` bereitgestellt.
 
-Die Anwendung kann beispielsweise in den Ordner `Programme` kopiert und
-von dort gestartet werden.
+Die Anwendung kann in den Ordner **Programme** kopiert und von dort gestartet werden.
 
-Die persönlichen Anwendungs- und Buchhaltungsdaten befinden sich nicht
-innerhalb von `SimpleOB.app`. Eine vorhandene Datenbank wird deshalb beim
-Austausch der Anwendung gegen eine neuere Programmversion nicht durch das
-App-Bundle ersetzt.
+Die persönlichen Anwendungsdaten befinden sich außerhalb von `SimpleOB.app`. Eine vorhandene Datenbank wird deshalb beim Austausch der Anwendung gegen eine neuere Programmversion nicht durch das App-Bundle ersetzt.
+
+SimpleOB unterstützt zwei Datenbanksysteme:
+
+- **SQLite:** lokale Datenbank ohne gesonderte Installation eines Datenbankservers.
+- **PostgreSQL:** Datenbank auf einem bereits installierten und eingerichteten PostgreSQL-Server.
+
+Für die gewöhnliche Einzelplatznutzung ist SQLite die einfachere Variante.
 
 ### 2.2 SimpleOB beim ersten Start unter macOS freigeben
 
-SimpleOB wird derzeit nicht über den Mac App Store vertrieben und ist nicht von Apple notarisiert.
+SimpleOB wird nicht über den Mac App Store vertrieben.
 
-macOS kann deshalb beim ersten Start verhindern, dass `SimpleOB.app` unmittelbar geöffnet wird. Dies ist eine Schutzfunktion von macOS (Gatekeeper) und bedeutet für sich allein nicht, dass die Anwendung beschädigt ist.
+Abhängig von der Signierung und Notarisierung der ausgelieferten Anwendung kann macOS beim ersten Start eine Sicherheitsprüfung durchführen oder das unmittelbare Öffnen verhindern.
 
-SimpleOB sollte nur freigegeben werden, wenn die Anwendung aus der vorgesehenen und vertrauenswürdigen Bezugsquelle stammt.
+SimpleOB sollte ausschließlich aus einer vertrauenswürdigen Bezugsquelle installiert werden.
 
-Gehen Sie beim ersten Start wie folgt vor:
+Falls macOS das Öffnen blockiert:
 
-1. Verschieben Sie `SimpleOB.app` in den Ordner **Programme**, sofern dies noch nicht geschehen ist.
+1. Verschieben Sie `SimpleOB.app` in den Ordner **Programme**.
+2. Versuchen Sie, SimpleOB zu starten.
+3. Öffnen Sie bei einer Sicherheitswarnung die **Systemeinstellungen**.
+4. Wählen Sie **Datenschutz & Sicherheit**.
+5. Prüfen Sie, ob macOS die Möglichkeit **Dennoch öffnen** anbietet.
+6. Bestätigen Sie das Öffnen nur, wenn Sie die Herkunft der Anwendung überprüft haben.
 
-2. Versuchen Sie, **SimpleOB** zu öffnen.
+Die Möglichkeit **Dennoch öffnen** erscheint gegebenenfalls erst nach einem zuvor blockierten Startversuch.
 
-3. Wenn macOS den Start aus Sicherheitsgründen verhindert, schließen Sie die angezeigte Meldung.
+> **Wichtig:** Es ist nicht erforderlich, Gatekeeper generell zu deaktivieren oder die Sicherheitseinstellungen von macOS dauerhaft herabzusetzen.
 
-4. Öffnen Sie über das Apple-Menü die **Systemeinstellungen**.
+Auf zentral verwalteten Macs können zusätzliche Sicherheitsvorgaben gelten.
 
-5. Wählen Sie **Datenschutz & Sicherheit**.
+### 2.3 Datenbank beim ersten Programmstart
 
-6. Scrollen Sie im Fenster nach unten zum Bereich **Sicherheit**.
+Bei einer neuen Installation verwendet SimpleOB standardmäßig SQLite.
 
-7. Dort sollte ein Hinweis erscheinen, dass das Öffnen von SimpleOB blockiert wurde. Wählen Sie **Dennoch öffnen**.
+Die dafür benötigte Datenbank wird beim Programmstart im Anwendungsdatenverzeichnis eingerichtet.
 
-8. macOS zeigt erneut eine Sicherheitsabfrage an. Prüfen Sie, dass sich diese auf SimpleOB bezieht, und wählen Sie **Öffnen**, wenn Sie die Anwendung aus der vorgesehenen vertrauenswürdigen Quelle erhalten haben.
+Ein gesonderter Datenbankserver ist hierfür nicht erforderlich.
 
-macOS speichert diese Entscheidung als Ausnahme für die betreffende Anwendung. SimpleOB kann anschließend normalerweise wie andere Anwendungen durch Doppelklick gestartet werden.
+Soll stattdessen PostgreSQL verwendet werden, muss bereits ein erreichbarer PostgreSQL-Server vorhanden sein.
 
-> **Wichtig:** Für die Verwendung von SimpleOB ist es nicht erforderlich, Gatekeeper generell zu deaktivieren oder die Sicherheitseinstellungen von macOS dauerhaft herabzusetzen.
+Die Auswahl beziehungsweise Änderung der Datenbank erfolgt über den Dialog **Datenbank konfigurieren**. Im Startdialog steht dafür die Funktion **Datenbank wechseln …** zur Verfügung.
 
-Die Möglichkeit **Dennoch öffnen** erscheint erst, nachdem zuvor versucht wurde, die von macOS blockierte Anwendung zu starten.
+Kann SimpleOB die aktuell konfigurierte Datenbank nicht öffnen, bietet die Anwendung ebenfalls die Möglichkeit, die Datenbankverbindung zu ändern.
 
-Auf zentral verwalteten Macs kann die Freigabe nicht verfügbar sein, wenn die Sicherheitseinstellungen durch eine Organisation oder einen Administrator vorgegeben werden. In diesem Fall ist die zuständige Administration zu kontaktieren.
+### 2.4 PostgreSQL verwenden
 
+Für die Nutzung von PostgreSQL werden benötigt:
+
+- ein installierter und gestarteter PostgreSQL-Server,
+- der Servername beziehungsweise die Netzwerkadresse,
+- die Portnummer, üblicherweise `5432`,
+- eine PostgreSQL-Anwendungsrolle mit Zugangsdaten,
+- eine bereits eingerichtete SimpleOB-Datenbank oder die Berechtigung, eine neue Datenbank anzulegen.
+
+SimpleOB installiert und konfiguriert den PostgreSQL-Server nicht selbst.
+
+Der Datenbankserver kann auf demselben Computer oder auf einem anderen erreichbaren Rechner betrieben werden.
+
+Für die Einrichtung einer neuen SimpleOB-Datenbank ist zusätzlich eine administrative PostgreSQL-Rolle erforderlich, die Datenbanken anlegen darf.
+
+### 2.5 Neue PostgreSQL-Datenbank anlegen
+
+Öffnen Sie den Dialog **Datenbank konfigurieren** und wählen Sie **PostgreSQL**.
+
+Tragen Sie die Verbindungsdaten ein:
+
+1. **Server:** Name oder Adresse des PostgreSQL-Servers.
+2. **Port:** Portnummer des Servers.
+3. **Benutzer:** PostgreSQL-Rolle, die SimpleOB später verwendet.
+4. **Datenbank:** Name der neu anzulegenden Datenbank.
+
+Wählen Sie anschließend **Neue PostgreSQL-Datenbank anlegen …**.
+
+SimpleOB zeigt die vorgesehenen Datenbankdaten zur Bestätigung an.
+
+Nach Ihrer Bestätigung werden die administrative PostgreSQL-Rolle und deren Passwort sowie das Passwort der Anwendungsrolle abgefragt.
+
+Die administrative Rolle benötigt die Berechtigung `CREATEDB` oder entsprechende weitergehende Rechte. Die angegebene Anwendungsrolle muss bereits auf dem PostgreSQL-Server existieren.
+
+SimpleOB legt die neue Datenbank mit der Anwendungsrolle als Eigentümer an und richtet anschließend das benötigte Datenbankschema ein.
+
+Nach erfolgreicher Einrichtung kann die Verbindungskonfiguration übernommen werden.
+
+> **Wichtig:** Die Funktion dient ausschließlich zur Anlage einer neuen Datenbank. Eine bereits vorhandene PostgreSQL-Datenbank wird nicht überschrieben.
+
+Schlägt die Einrichtung nach der Datenbankanlage fehl, wird die angelegte Datenbank nicht automatisch gelöscht. In diesem Fall sollte die Ursache administrativ geprüft werden, bevor weitere Maßnahmen erfolgen.
+
+### 2.6 Vorhandene PostgreSQL-Datenbank verwenden
+
+Ist eine für die installierte SimpleOB-Version geeignete PostgreSQL-Datenbank bereits vorhanden, tragen Sie deren Verbindungsdaten ein.
+
+Wählen Sie **Verbindung prüfen** und geben Sie das Passwort der Anwendungsrolle ein.
+
+SimpleOB prüft die Erreichbarkeit und den Datenbankzustand.
+
+Nur wenn die Prüfung erfolgreich ist, sollte die Konfiguration übernommen werden.
+
+Eine vorhandene PostgreSQL-Datenbank wird beim normalen Programmstart nicht automatisch migriert.
 
 ## 3. Anwendungsdaten und Datensicherung
 
 ### 3.1 Speicherort
 
-SimpleOB speichert seine Anwendungsdaten unter macOS im Benutzerverzeichnis:
+SimpleOB verwendet unter macOS das benutzerspezifische Anwendungsdatenverzeichnis:
 
 `~/Library/Application Support/SimpleOB/`
 
-Dort befinden sich insbesondere die Datenbank und die
-Anwendungskonfiguration.
+Dort befinden sich unter anderem die Anwendungskonfiguration und bei SQLite die lokale Buchhaltungsdatenbank.
 
-Die Daten liegen damit getrennt von `SimpleOB.app`.
+Die Anwendungsdaten liegen getrennt von `SimpleOB.app`.
 
-### 3.2 Datenbank
+### 3.2 SQLite-Datenbank
 
-Die Buchhaltungsdaten werden gegenwärtig in einer lokalen SQLite-Datenbank
-gespeichert:
+Bei Verwendung von SQLite werden die Buchhaltungsdaten in folgender Datei gespeichert:
 
 `~/Library/Application Support/SimpleOB/openbilanz.db`
 
-Diese Datei enthält die für SimpleOB gespeicherten Buchhaltungsdaten und
-sollte in eine regelmäßige persönliche Datensicherung einbezogen werden.
+Diese Datei sollte regelmäßig gesichert werden.
 
-### 3.3 Konfiguration
+Eine Sicherung der SQLite-Datenbank sollte bei vollständig beendetem SimpleOB erfolgen, damit während des Kopiervorgangs keine Buchungen oder sonstigen Datenbankänderungen stattfinden.
 
-Anwendungseinstellungen werden unter anderem in
+### 3.3 PostgreSQL-Datenbank
+
+Bei Verwendung von PostgreSQL befinden sich die Buchhaltungsdaten auf dem PostgreSQL-Server.
+
+Sie werden nicht in der lokalen Datei `openbilanz.db` gespeichert.
+
+Das Sichern des lokalen SimpleOB-Anwendungsdatenverzeichnisses reicht deshalb bei PostgreSQL **nicht** aus, um die Buchhaltungsdaten zu sichern.
+
+Für PostgreSQL muss eine geeignete serverseitige Datensicherung eingerichtet werden, beispielsweise mit den von PostgreSQL bereitgestellten Sicherungswerkzeugen.
+
+Die Verantwortung für Einrichtung, Durchführung und Prüfung dieser Sicherungen liegt bei der zuständigen Datenbankadministration beziehungsweise beim Anwender.
+
+### 3.4 Konfiguration
+
+Anwendungseinstellungen werden unter anderem in folgender Datei gespeichert:
 
 `~/Library/Application Support/SimpleOB/config.toml`
 
-gespeichert.
+Dazu gehört auch die Auswahl der verwendeten Datenbankverbindung.
 
-Dazu gehören beispielsweise die für die ELSTER-Anbindung benötigten
-gespeicherten Einstellungen.
+Bei PostgreSQL werden die Zugangsdaten während der Anmeldung abgefragt.
 
-Die PIN des ELSTER-Zertifikats wird von SimpleOB nicht dauerhaft in dieser
-Konfigurationsdatei gespeichert.
+Die PIN des ELSTER-Zertifikats wird von SimpleOB nicht dauerhaft in dieser Konfigurationsdatei gespeichert.
 
-### 3.4 Eigene Datensicherung
+### 3.5 Eigene Datensicherung
 
-Die automatische Sicherung vor einer notwendigen Datenbankmigration
-ersetzt keine regelmäßige Datensicherung durch den Anwender.
+Eine regelmäßige Datensicherung ist unabhängig vom verwendeten Datenbanksystem erforderlich.
 
-Insbesondere vor größeren Änderungen oder Programmaktualisierungen ist
-eine zusätzliche Sicherung des Verzeichnisses
+Bei SQLite sollte die lokale Datenbankdatei in die persönliche Datensicherung einbezogen werden.
 
-`~/Library/Application Support/SimpleOB/`
+Bei PostgreSQL muss die Datensicherung auf Ebene des Datenbankservers erfolgen.
 
-empfehlenswert.
+Zusätzlich sollten die Anwendungskonfiguration, benötigte Zertifikate und gegebenenfalls exportierte Mandantensicherungen berücksichtigt werden.
 
+Die automatische Sicherung vor einer SQLite-Datenbankmigration ersetzt keine regelmäßige Datensicherung.
+
+Vor größeren Programmaktualisierungen sollte eine zusätzliche, überprüfte Sicherung vorhanden sein.
 
 ## 4. Programmaktualisierungen
 
-Eine neue Version von SimpleOB kann das bisherige `SimpleOB.app` ersetzen.
-Die vorhandenen Anwendungsdaten befinden sich außerhalb des App-Bundles
-und werden dadurch nicht ersetzt.
+Eine neue SimpleOB-Version kann das bisherige `SimpleOB.app` ersetzen.
 
-### 4.1 Datenbankaktualisierung
+Die Anwendungsdaten befinden sich außerhalb des App-Bundles und werden dadurch nicht unmittelbar ersetzt.
 
-Benötigt eine neue SimpleOB-Version eine Änderung der Datenbankstruktur,
-wird die Datenbank beim Programmstart auf die benötigte Struktur
-aktualisiert.
+### 4.1 Aktualisierung bei SQLite
 
-Vor einer tatsächlich erforderlichen Datenbankmigration erstellt SimpleOB
-automatisch eine Sicherung der bestehenden SQLite-Datenbank.
+Benötigt eine neue SimpleOB-Version eine Änderung der SQLite-Datenbankstruktur, wird diese beim Programmstart auf die benötigte Struktur aktualisiert.
 
-Die Sicherungsdatei befindet sich neben der eigentlichen Datenbank und
-trägt den Namen:
+Vor einer tatsächlich erforderlichen Datenbankmigration erstellt SimpleOB automatisch eine Sicherung der bestehenden SQLite-Datenbank.
+
+Die Sicherungsdatei befindet sich neben der eigentlichen Datenbank und trägt den Namen:
 
 `openbilanz-before-migration.db`
 
-Ist die Datenbank bereits auf dem von der installierten SimpleOB-Version
-benötigten Stand, wird keine unnötige Migrationssicherung erzeugt.
+Ist die Datenbank bereits auf dem benötigten Stand, wird keine unnötige Migrationssicherung erzeugt.
 
-### 4.2 Wenn ein Update der Datenbank nicht erfolgreich abgeschlossen wird
+### 4.2 Aktualisierung bei PostgreSQL
 
-Kann die Sicherung nicht erfolgreich erstellt werden, beginnt SimpleOB
-die Datenbankmigration nicht.
+Bei PostgreSQL unterscheidet sich der Ablauf von SQLite.
 
-Erkennt SimpleOB eine ältere Datenbank ohne Versionsinformation, wird
-diese nur dann automatisch übernommen, wenn ihre Struktur einer
-bekannten älteren SimpleOB-Datenbank entspricht. Eine unbekannte
-Datenbankstruktur wird nicht automatisch verändert.
+SimpleOB prüft beim Programmstart, ob das vorhandene PostgreSQL-Datenbankschema zur installierten Anwendung passt.
 
-Tritt während eines Programmupdates ein Fehler bei der
-Datenbankmigration auf, sollten keine manuellen Änderungen an
-`openbilanz.db` vorgenommen werden.
+Eine automatische Migration vorhandener PostgreSQL-Datenbanken erfolgt beim normalen Programmstart nicht.
 
-Insbesondere sollte
-`openbilanz-before-migration.db` nicht vorschnell über
-`openbilanz.db` kopiert werden.
+Ist die Datenbank nicht auf dem erforderlichen Stand, muss die Aktualisierung zunächst administrativ geklärt und durchgeführt werden.
 
-Stattdessen sollten zunächst beide Datenbankdateien sowie die übrigen
-Anwendungsdaten gesichert werden. Danach kann anhand der konkreten
-Fehlermeldung beziehungsweise der Ausgabe beim Programmstart geklärt
-werden, an welcher Stelle die Migration fehlgeschlagen ist.
+Vor einer solchen Aktualisierung ist eine geeignete PostgreSQL-Datensicherung erforderlich.
 
-> **Wichtig:** Die Datei `openbilanz-before-migration.db` ist eine
-> Sicherheitskopie des Datenbestands unmittelbar vor der vorgesehenen
-> Datenbankmigration. Sie sollte bei einem Migrationsproblem zunächst
-> unverändert aufbewahrt werden.
+Die Funktion **Neue PostgreSQL-Datenbank anlegen …** darf nicht verwendet werden, um eine bestehende Datenbank zu aktualisieren.
 
-Eine gezielte Wiederherstellung aus dieser Sicherung sollte erst
-erfolgen, wenn geklärt ist, welche Programmversion und welcher
-Datenbankstand zusammengehören.
+### 4.3 Wenn eine SQLite-Datenbankaktualisierung fehlschlägt
 
-Weitere Hinweise zum Vorgehen bei Start- und Datenbankproblemen enthält
-Kapitel 15.
+Kann die erforderliche Sicherung nicht erfolgreich erstellt werden, beginnt SimpleOB die Datenbankmigration nicht.
+
+Erkennt SimpleOB eine ältere Datenbank ohne Versionsinformation, wird diese nur dann automatisch übernommen, wenn ihre Struktur einer bekannten älteren SimpleOB-Datenbank entspricht.
+
+Eine unbekannte Datenbankstruktur wird nicht automatisch verändert.
+
+Tritt während der Migration ein Fehler auf, sollten keine manuellen Änderungen an `openbilanz.db` vorgenommen werden.
+
+Insbesondere sollte `openbilanz-before-migration.db` nicht vorschnell über `openbilanz.db` kopiert werden.
+
+Stattdessen sollten zunächst beide Datenbankdateien sowie die übrigen Anwendungsdaten gesichert werden.
+
+> **Wichtig:** `openbilanz-before-migration.db` enthält den Datenbestand unmittelbar vor der vorgesehenen Migration. Diese Datei sollte bei einem Migrationsproblem zunächst unverändert aufbewahrt werden.
+
+Eine Wiederherstellung sollte erst erfolgen, wenn geklärt ist, welche Programmversion und welcher Datenbankstand zusammengehören.
+
+### 4.4 Wenn eine PostgreSQL-Datenbankprüfung fehlschlägt
+
+Kann SimpleOB eine PostgreSQL-Datenbank nicht öffnen, sollten zunächst die folgenden Angaben geprüft werden:
+
+- Erreichbarkeit des PostgreSQL-Servers,
+- Servername und Port,
+- PostgreSQL-Benutzer und Passwort,
+- Zugriffsberechtigungen der Anwendungsrolle,
+- Existenz und Zustand der ausgewählten Datenbank,
+- Kompatibilität des Datenbankschemas mit der SimpleOB-Version.
+
+Eine bestehende Datenbank sollte nicht gelöscht oder neu angelegt werden, um einen Verbindungs- oder Versionsfehler zu beheben.
+
+Insbesondere dürfen keine unkontrollierten Änderungen am Datenbankschema vorgenommen werden.
+
+Bei einem nicht eindeutig lösbaren Problem sollte die Datenbankadministration hinzugezogen werden.
+
+Weitere Hinweise zu Start- und Datenbankproblemen enthält Kapitel 15.
 
 
 ## 5. ELSTER einrichten
@@ -2601,25 +2682,23 @@ Sicherungsmedium.
 Eine `.simpleob`-Datei sichert einen einzelnen Mandanten in einem
 portablen SimpleOB-Format.
 
-Davon zu unterscheiden ist eine Sicherung der vollständigen lokalen
-SimpleOB-Anwendungsdaten.
+Davon zu unterscheiden ist die Sicherung der vollständigen SimpleOB-Datenbank.
 
-Wie in Kapitel 3 beschrieben, befinden sich die lokalen
-Anwendungsdaten unter macOS im Verzeichnis
+Bei Verwendung von **SQLite** befindet sich die Datenbank im lokalen Anwendungsverzeichnis:
 
 `~/Library/Application Support/SimpleOB/`
 
-Eine Sicherung dieses Verzeichnisses beziehungsweise insbesondere der
-darin enthaltenen Datenbank schützt den gesamten lokalen
-SimpleOB-Datenbestand.
+Eine Sicherung dieses Verzeichnisses bei beendetem SimpleOB kann sowohl die lokale Datenbank als auch die Anwendungskonfiguration erfassen.
 
-Die beiden Sicherungsarten haben daher unterschiedliche Zwecke:
+Bei Verwendung von **PostgreSQL** liegen die Buchhaltungsdaten dagegen auf dem PostgreSQL-Server. Die Sicherung des lokalen Anwendungsverzeichnisses umfasst dann nicht die eigentliche Buchhaltungsdatenbank. Hierfür ist eine gesonderte PostgreSQL-Datensicherung erforderlich.
 
-- **`.simpleob`-Mandantensicherung:** portabler Export eines einzelnen
-  Mandanten einschließlich seiner Geschäftsjahre und
-  Buchhaltungsdaten.
-- **Sicherung der lokalen Anwendungsdaten:** Sicherung des gesamten
-  lokalen SimpleOB-Datenbestands und der lokalen Konfiguration.
+Die Sicherungsarten haben unterschiedliche Zwecke:
+
+- **`.simpleob`-Mandantensicherung:** Portabler Export eines einzelnen Mandanten einschließlich seiner Geschäftsjahre und Buchhaltungsdaten.
+- **SQLite-Datenbanksicherung:** Sicherung des gesamten lokalen Buchhaltungsdatenbestands.
+- **PostgreSQL-Datenbanksicherung:** Sicherung des Datenbestands auf dem PostgreSQL-Server.
+- **Sicherung der lokalen Anwendungsdaten:** Sicherung der lokalen Konfiguration und gegebenenfalls weiterer Anwendungsdateien.x
+
 
 Für eine belastbare Datensicherungsstrategie empfiehlt es sich, nicht
 ausschließlich auf eine einzige Sicherungsart zu vertrauen.
@@ -2670,58 +2749,47 @@ SimpleOB-Datenbank manuell zu verändern.
 
 ### 15.1 SimpleOB startet nicht
 
-Startet SimpleOB nach einer Installation oder einem Update nicht,
-kommen unterschiedliche Ursachen in Betracht.
+Startet SimpleOB nach einer Installation oder einem Update nicht, kommen unterschiedliche Ursachen in Betracht.
 
-Insbesondere nach einem Programmupdate kann beim Start eine Anpassung
-der Datenbankstruktur erforderlich sein.
+SimpleOB prüft beim Programmstart, ob die konfigurierte Datenbank erreichbar ist und zur installierten Programmversion passt.
 
-SimpleOB prüft beim Start automatisch, ob die vorhandene Datenbank zur
-installierten Programmversion passt.
+Bei einem Datenbankproblem bietet SimpleOB die Möglichkeit, die Datenbankverbindung zu ändern.
 
-Ist keine Änderung erforderlich, wird die Datenbank unverändert
-verwendet.
+**Bei Verwendung von SQLite**
 
-Ist eine Datenbankmigration erforderlich, legt SimpleOB vor der
-Schemaänderung automatisch eine Sicherung der vorhandenen
-SQLite-Datenbank an.
+Ist eine Anpassung der SQLite-Datenbankstruktur erforderlich, führt SimpleOB diese beim Programmstart automatisch durch.
 
-Diese Sicherungsdatei befindet sich im selben Verzeichnis wie die
-Datenbank und trägt den Zusatz
+Vor einer erforderlichen Datenbankmigration wird eine Sicherung der vorhandenen SQLite-Datenbank angelegt.
 
-`-before-migration`
-
-im Dateinamen.
-
-Bei der standardmäßigen Datenbankdatei `openbilanz.db` lautet der Name
-der Sicherung daher:
+Bei der standardmäßigen Datenbankdatei `openbilanz.db` lautet der Name der Sicherung:
 
 `openbilanz-before-migration.db`
 
-Kann die Sicherung nicht erstellt werden, wird die Migration nicht
-durchgeführt.
+Kann die Sicherung nicht erstellt werden, wird die Migration nicht durchgeführt.
 
-Erkennt SimpleOB eine vorhandene Datenbank ohne Versionsinformation,
-die nicht einer bekannten älteren SimpleOB-Datenbankstruktur
-entspricht, wird die Datenbank ebenfalls nicht automatisch verändert.
+Eine ältere Datenbank ohne Versionsinformation wird nur dann automatisch übernommen, wenn ihre Struktur einer bekannten älteren SimpleOB-Datenbank entspricht.
 
-> **Wichtig:** Wenn SimpleOB nach einem Update bereits beim Start
-> scheitert, sollte die Datenbank nicht manuell bearbeitet und eine
-> vorhandene Sicherungsdatei nicht vorschnell über die aktuelle
-> Datenbank kopiert werden.
+**Bei Verwendung von PostgreSQL**
 
-In diesem Fall sollten zunächst die vorhandenen Dateien im
-SimpleOB-Anwendungsdatenverzeichnis gesichert werden.
+Bei PostgreSQL prüft SimpleOB die Verbindung und den Datenbankschemastand.
 
-Unter macOS befindet sich dieses Verzeichnis standardmäßig unter:
+Kann die Verbindung nicht hergestellt werden, sollten insbesondere Servername, Port, Benutzername, Passwort und Erreichbarkeit des PostgreSQL-Servers geprüft werden.
+
+Ist das Datenbankschema nicht mit der installierten SimpleOB-Version kompatibel, erfolgt beim normalen Programmstart keine automatische PostgreSQL-Migration.
+
+Die erforderliche Aktualisierung muss zunächst administrativ geklärt werden.
+
+**Allgemeine Hinweise**
+
+> **Wichtig:** Bei einem Datenbankfehler sollten weder die Datenbank noch vorhandene Sicherungen vorschnell verändert, überschrieben oder gelöscht werden.
+
+Bei SQLite sollten zunächst die vorhandenen Dateien im Anwendungsdatenverzeichnis gesichert werden:
 
 `~/Library/Application Support/SimpleOB/`
 
-Insbesondere sollten `openbilanz.db`, eine gegebenenfalls vorhandene
-`openbilanz-before-migration.db` und `config.toml` erhalten bleiben.
+Bei PostgreSQL sollte der Zustand der Datenbank auf dem Server geprüft und vor Änderungen eine geeignete Datensicherung erstellt werden.
 
-Anschließend sollte die konkrete Fehlermeldung beziehungsweise die
-Ausgabe beim Programmstart zur Fehleranalyse herangezogen werden.
+Weitere Hinweise enthält Kapitel 4.
 
 ### 15.2 Buchungen oder Änderungen sind nicht möglich
 
@@ -2968,22 +3036,35 @@ wurde.
 
 ### 15.13 Grundregel bei Datenbankproblemen
 
-Die Datei `openbilanz.db` enthält den lokalen SimpleOB-Datenbestand.
+Bei Datenbankproblemen sollten zunächst die vorhandenen Daten gesichert und anschließend die Ursachen untersucht werden.
 
-Sie sollte nicht mit einem SQLite-Werkzeug oder einem anderen
-Datenbankprogramm verändert werden, sofern dies nicht im Rahmen einer
-gezielten und fachkundig begleiteten Wiederherstellung geschieht.
+**SQLite**
 
-Auch die automatische Datei
+Die Datei `openbilanz.db` enthält bei Verwendung von SQLite den lokalen SimpleOB-Datenbestand.
+
+Sie sollte nicht mit einem SQLite-Werkzeug oder einem anderen Datenbankprogramm verändert werden, sofern dies nicht im Rahmen einer gezielten und fachkundig begleiteten Wiederherstellung geschieht.
+
+Auch die gegebenenfalls vorhandene Sicherungsdatei
 
 `openbilanz-before-migration.db`
 
 sollte zunächst unverändert aufbewahrt werden.
 
-Bei einem Datenbankproblem ist es in der Regel sicherer, zuerst Kopien
-der vorhandenen Dateien anzulegen und anschließend die Ursache zu
-untersuchen, als unmittelbar Änderungen am Originalbestand
-vorzunehmen.
+**PostgreSQL**
+
+Bei PostgreSQL befinden sich die Buchhaltungsdaten auf dem PostgreSQL-Server.
+
+Die lokale Datei `openbilanz.db` ist in diesem Fall nicht die verwendete Buchhaltungsdatenbank.
+
+Bei Verbindungsproblemen sollten zunächst die Verbindungseinstellungen und die Erreichbarkeit des Servers überprüft werden.
+
+Bei Problemen mit dem Datenbankschema dürfen keine unkontrollierten Änderungen an Tabellen, Datenbankversionen oder anderen Datenbankobjekten vorgenommen werden.
+
+Vor administrativen Eingriffen ist eine geeignete Sicherung der PostgreSQL-Datenbank erforderlich.
+
+**Grundsatz**
+
+Es ist in der Regel sicherer, zuerst eine überprüfbare Sicherung anzulegen und anschließend die Fehlerursache zu ermitteln, als unmittelbar Änderungen am vorhandenen Datenbestand vorzunehmen.
 
 
 ## 16. Datenschutz, Lizenzen und rechtliche Hinweise
