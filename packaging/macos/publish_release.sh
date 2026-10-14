@@ -282,11 +282,16 @@ cleanup() {
 
 trap cleanup EXIT
 
-for index in "${!SOURCE_ARCHIVES[@]}"; do
-    printf '%s  %s\n' \
-        "${SOURCE_SHA256[$index]}" \
-        "$(basename "${SOURCE_ARCHIVES[$index]}")"
-done > "${CHECKSUM_FILE}"
+{
+    shasum -a 256 "${RELEASE_ARCHIVE}" | \
+        awk '{print $1 "  " "SimpleOB-'"${PROJECT_VERSION}"'-macOS.zip"}'
+
+    for index in "${!SOURCE_ARCHIVES[@]}"; do
+        printf '%s  %s\n' \
+            "${SOURCE_SHA256[$index]}" \
+            "$(basename "${SOURCE_ARCHIVES[$index]}")"
+    done
+} > "${CHECKSUM_FILE}"
 
 cat > "${RELEASE_NOTES_FILE}" <<EOF_NOTES
 ## SimpleOB ${RELEASE_TAG}
