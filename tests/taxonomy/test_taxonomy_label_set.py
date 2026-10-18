@@ -1,10 +1,10 @@
 """Tests für die Abfrage von Taxonomie-Labels."""
 
-from openbilanz.taxonomy.label import (
+from simpleob.taxonomy.label import (
     TaxonomyLabel,
     TaxonomyLabelRole,
 )
-from openbilanz.taxonomy.label_set import TaxonomyLabelSet
+from simpleob.taxonomy.label_set import TaxonomyLabelSet
 
 
 def test_labels_for_concept_returns_all_matching_labels() -> None:

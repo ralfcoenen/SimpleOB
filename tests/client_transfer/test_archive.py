@@ -10,12 +10,12 @@ from zipfile import (
 
 import pytest
 
-from openbilanz.client_transfer.archive import (
+from simpleob.client_transfer.archive import (
     CLIENT_TRANSFER_ARCHIVE_MEMBER,
     read_client_transfer_archive,
     write_client_transfer_archive,
 )
-from openbilanz.client_transfer.model import (
+from simpleob.client_transfer.model import (
     ClientTransfer,
     ClientTransferAccountRoles,
     ClientTransferApplication,

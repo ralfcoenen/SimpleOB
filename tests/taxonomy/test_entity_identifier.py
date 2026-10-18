@@ -2,8 +2,8 @@
 
 from uuid import UUID
 
-from openbilanz.domain.company import Company
-from openbilanz.taxonomy.entity_identifier import (
+from simpleob.domain.company import Company
+from simpleob.taxonomy.entity_identifier import (
     EntityIdentifier,
 )
 

@@ -2,10 +2,10 @@
 
 from decimal import Decimal
 
-from openbilanz.domain.profit_appropriation_annual_data import (
+from simpleob.domain.profit_appropriation_annual_data import (
     ProfitAppropriationAnnualData,
 )
-from openbilanz.eric.bilanz_generation.gaap_ci_6_9_profit_appropriation_values import (
+from simpleob.eric.bilanz_generation.gaap_ci_6_9_profit_appropriation_values import (
     GaapCi69ProfitAppropriationValueBuilder,
 )
 

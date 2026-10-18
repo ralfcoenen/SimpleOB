@@ -8,24 +8,24 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from openbilanz.database.booking_repository import (
+from simpleob.database.booking_repository import (
     BookingRepository,
 )
-from openbilanz.database.company_repository import (
+from simpleob.database.company_repository import (
     CompanyRepository,
 )
-from openbilanz.database.database import Base
-from openbilanz.database.equity_contribution_repository import (
+from simpleob.database.database import Base
+from simpleob.database.equity_contribution_repository import (
     EquityContributionRepository,
 )
-from openbilanz.domain.booking import Booking
-from openbilanz.domain.booking_line import BookingLine
-from openbilanz.domain.company import Company
-from openbilanz.domain.entry_side import EntrySide
-from openbilanz.domain.equity_contribution_reference import (
+from simpleob.domain.booking import Booking
+from simpleob.domain.booking_line import BookingLine
+from simpleob.domain.company import Company
+from simpleob.domain.entry_side import EntrySide
+from simpleob.domain.equity_contribution_reference import (
     EquityContributionReference,
 )
-from openbilanz.domain.fiscal_year import FiscalYear
+from simpleob.domain.fiscal_year import FiscalYear
 
 
 def _fiscal_year() -> FiscalYear:

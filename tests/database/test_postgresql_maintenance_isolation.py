@@ -9,7 +9,7 @@ import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 
-from openbilanz.database.postgresql_maintenance_isolation import (
+from simpleob.database.postgresql_maintenance_isolation import (
     postgresql_maintenance_isolation,
 )
 
@@ -138,7 +138,7 @@ def test_rejects_concurrent_administrative_lock(
     database_url: str,
 ) -> None:
     """Eine bereits gehaltene Administrationssperre verhindert Wartung."""
-    from openbilanz.database.postgresql_migration_lock import (
+    from simpleob.database.postgresql_migration_lock import (
         MIGRATION_LOCK_KEY,
     )
 
@@ -254,7 +254,7 @@ def test_accepts_existing_administrative_and_migration_connections(
     database_url: str,
 ) -> None:
     """Die vorhandene Sperre und Migrationsverbindung werden übernommen."""
-    from openbilanz.database.postgresql_migration_lock import (
+    from simpleob.database.postgresql_migration_lock import (
         postgresql_migration_lock,
     )
 
@@ -318,7 +318,7 @@ def test_rejects_other_sessions_with_migration_connection(
     database_url: str,
 ) -> None:
     """Nur die ausdrücklich übergebene Migrationssitzung ist erlaubt."""
-    from openbilanz.database.postgresql_migration_lock import (
+    from simpleob.database.postgresql_migration_lock import (
         postgresql_migration_lock,
     )
 

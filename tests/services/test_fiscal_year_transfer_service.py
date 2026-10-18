@@ -3,16 +3,16 @@
 from datetime import date
 from decimal import Decimal
 
-from openbilanz.accounting.ledger import Ledger
-from openbilanz.domain.account_type import AccountType
-from openbilanz.domain.booking import Booking
-from openbilanz.domain.booking_line import BookingLine
-from openbilanz.domain.entry_side import EntrySide
-from openbilanz.domain.journal import Journal
-from openbilanz.services.fiscal_year_transfer_service import (
+from simpleob.accounting.ledger import Ledger
+from simpleob.domain.account_type import AccountType
+from simpleob.domain.booking import Booking
+from simpleob.domain.booking_line import BookingLine
+from simpleob.domain.entry_side import EntrySide
+from simpleob.domain.journal import Journal
+from simpleob.services.fiscal_year_transfer_service import (
     FiscalYearTransferService,
 )
-from openbilanz.services.posting_service import PostingService
+from simpleob.services.posting_service import PostingService
 
 
 def test_creates_opening_bookings_for_balance_sheet_accounts() -> None:

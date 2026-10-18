@@ -7,11 +7,11 @@ from uuid import uuid4
 import pytest
 from PySide6.QtWidgets import QApplication
 
-from openbilanz.core.config import ApplicationConfig
-from openbilanz.domain.company import Company
-from openbilanz.services.client_deletion_service import ClientDeletionCommitUnknown
-from openbilanz.ui_qt import start_dialog as module
-from openbilanz.ui_qt.start_dialog import StartDialog
+from simpleob.core.config import ApplicationConfig
+from simpleob.domain.company import Company
+from simpleob.services.client_deletion_service import ClientDeletionCommitUnknown
+from simpleob.ui_qt import start_dialog as module
+from simpleob.ui_qt.start_dialog import StartDialog
 
 
 @pytest.fixture

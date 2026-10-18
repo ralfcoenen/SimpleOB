@@ -4,7 +4,7 @@ from decimal import Decimal
 
 import pytest
 
-from openbilanz.accounting import Ledger, TrialBalance, TrialBalanceRow
+from simpleob.accounting import Ledger, TrialBalance, TrialBalanceRow
 
 
 def create_sample_ledger() -> Ledger:

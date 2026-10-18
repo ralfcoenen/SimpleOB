@@ -5,14 +5,14 @@ from decimal import Decimal
 
 import pytest
 
-from openbilanz.taxonomy.concept import (
+from simpleob.taxonomy.concept import (
     TaxonomyBalance,
     TaxonomyConcept,
     TaxonomyPeriodType,
 )
-from openbilanz.taxonomy.context import TaxonomyContext
-from openbilanz.taxonomy.fact import TaxonomyFact
-from openbilanz.taxonomy.unit import TaxonomyUnit
+from simpleob.taxonomy.context import TaxonomyContext
+from simpleob.taxonomy.fact import TaxonomyFact
+from simpleob.taxonomy.unit import TaxonomyUnit
 
 TEST_ENTITY_SCHEME = "http://www.bundesfinanzministerium.de"
 

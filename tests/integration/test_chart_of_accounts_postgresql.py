@@ -8,17 +8,17 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 
-from openbilanz.database.chart_of_accounts_repository import (
+from simpleob.database.chart_of_accounts_repository import (
     ChartOfAccountsRepository,
 )
-from openbilanz.database.company_repository import CompanyRepository
-from openbilanz.database.lock_error import DatabaseLockError
-from openbilanz.database.models import (
+from simpleob.database.company_repository import CompanyRepository
+from simpleob.database.lock_error import DatabaseLockError
+from simpleob.database.models import (
     Konto,
     KontenTaxonomieZuordnung,
     Mandant,
 )
-from openbilanz.domain.company import Company
+from simpleob.domain.company import Company
 
 
 @pytest.fixture
@@ -139,10 +139,10 @@ def test_add_account_lock_conflict_and_retry(
 ):
     """Ein Konto wird erst nach Freigabe der Mandantensperre angelegt."""
 
-    from openbilanz.database.models import Konto
-    from openbilanz.domain.account import Account
-    from openbilanz.domain.account_type import AccountType
-    from openbilanz.domain.template_account import TemplateAccount
+    from simpleob.database.models import Konto
+    from simpleob.domain.account import Account
+    from simpleob.domain.account_type import AccountType
+    from simpleob.domain.template_account import TemplateAccount
 
     Session, company = postgres_chart_of_accounts_data
 
@@ -221,13 +221,13 @@ def test_account_configuration_lock_conflict(
 ):
     """Die Kontenkonfiguration respektiert die Mandantensperre."""
 
-    from openbilanz.domain.accounting_account_roles import (
+    from simpleob.domain.accounting_account_roles import (
         AccountingAccountRoles,
     )
-    from openbilanz.domain.accounting_control_accounts import (
+    from simpleob.domain.accounting_control_accounts import (
         AccountingControlAccounts,
     )
-    from openbilanz.domain.vat_accounts import VatAccounts
+    from simpleob.domain.vat_accounts import VatAccounts
 
     Session, company = postgres_chart_of_accounts_data
 
@@ -301,9 +301,9 @@ def test_single_taxonomy_mapping_lock_conflict_and_retry(
 ) -> None:
     """Sperrkonflikt verhindert Änderungen; Wiederholung gelingt."""
 
-    from openbilanz.domain.account import Account
-    from openbilanz.domain.account_type import AccountType
-    from openbilanz.domain.template_account import TemplateAccount
+    from simpleob.domain.account import Account
+    from simpleob.domain.account_type import AccountType
+    from simpleob.domain.template_account import TemplateAccount
 
     Session, company = postgres_chart_of_accounts_data
 

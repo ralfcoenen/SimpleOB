@@ -8,108 +8,108 @@ from uuid import uuid4
 
 import pytest
 
-from openbilanz.accounting.account_balance import AccountBalance
-from openbilanz.accounting.balance_sheet import BalanceSheet
-from openbilanz.accounting.financial_statement_position import (
+from simpleob.accounting.account_balance import AccountBalance
+from simpleob.accounting.balance_sheet import BalanceSheet
+from simpleob.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
-from openbilanz.accounting.income_statement import IncomeStatement
-from openbilanz.accounting.ledger import Ledger
-from openbilanz.accounting.mapper import AccountMapper
-from openbilanz.core.context import ApplicationContext
-from openbilanz.domain.accounting_account_roles import (
+from simpleob.accounting.income_statement import IncomeStatement
+from simpleob.accounting.ledger import Ledger
+from simpleob.accounting.mapper import AccountMapper
+from simpleob.core.context import ApplicationContext
+from simpleob.domain.accounting_account_roles import (
     AccountingAccountRoles,
 )
-from openbilanz.domain.accounting_control_accounts import (
+from simpleob.domain.accounting_control_accounts import (
     AccountingControlAccounts,
 )
-from openbilanz.domain.booking import Booking
-from openbilanz.domain.booking_line import BookingLine
-from openbilanz.domain.booking_type import BookingType
-from openbilanz.domain.bvv_evaluation import BvvEvaluation
-from openbilanz.domain.chart_of_accounts_template import (
+from simpleob.domain.booking import Booking
+from simpleob.domain.booking_line import BookingLine
+from simpleob.domain.booking_type import BookingType
+from simpleob.domain.bvv_evaluation import BvvEvaluation
+from simpleob.domain.chart_of_accounts_template import (
     ChartOfAccountsTemplate,
 )
-from openbilanz.domain.closing_consistency_result import (
+from simpleob.domain.closing_consistency_result import (
     ClosingConsistencyResult,
 )
-from openbilanz.domain.company import Company
-from openbilanz.domain.company_master_data import (
+from simpleob.domain.company import Company
+from simpleob.domain.company_master_data import (
     CompanyMasterData,
 )
-from openbilanz.domain.depreciation_kind import (
+from simpleob.domain.depreciation_kind import (
     DepreciationKind,
 )
-from openbilanz.domain.depreciation_proposal import (
+from simpleob.domain.depreciation_proposal import (
     DepreciationProposal,
 )
-from openbilanz.domain.depreciation_source import (
+from simpleob.domain.depreciation_source import (
     DepreciationSource,
 )
-from openbilanz.domain.entry_side import EntrySide
-from openbilanz.domain.equity_contribution_reference import (
+from simpleob.domain.entry_side import EntrySide
+from simpleob.domain.equity_contribution_reference import (
     EquityContributionReference,
 )
-from openbilanz.domain.fiscal_year import FiscalYear
-from openbilanz.domain.fiscal_year_status import FiscalYearStatus
-from openbilanz.domain.fixed_asset import FixedAsset
-from openbilanz.domain.fixed_asset_depreciation import (
+from simpleob.domain.fiscal_year import FiscalYear
+from simpleob.domain.fiscal_year_status import FiscalYearStatus
+from simpleob.domain.fixed_asset import FixedAsset
+from simpleob.domain.fixed_asset_depreciation import (
     FixedAssetDepreciation,
 )
-from openbilanz.domain.fixed_asset_disposal_calculation import (
+from simpleob.domain.fixed_asset_disposal_calculation import (
     FixedAssetDisposalCalculation,
 )
-from openbilanz.domain.fixed_asset_disposal_preview import (
+from simpleob.domain.fixed_asset_disposal_preview import (
     FixedAssetDisposalPreview,
 )
-from openbilanz.domain.fixed_asset_movement import (
+from simpleob.domain.fixed_asset_movement import (
     FixedAssetMovement,
 )
-from openbilanz.domain.fixed_asset_movement_type import (
+from simpleob.domain.fixed_asset_movement_type import (
     FixedAssetMovementType,
 )
-from openbilanz.domain.fixed_asset_status import (
+from simpleob.domain.fixed_asset_status import (
     FixedAssetStatus,
 )
-from openbilanz.domain.journal import Journal
-from openbilanz.domain.managed_fiscal_year import ManagedFiscalYear
-from openbilanz.domain.profit_appropriation_annual_data import (
+from simpleob.domain.journal import Journal
+from simpleob.domain.managed_fiscal_year import ManagedFiscalYear
+from simpleob.domain.profit_appropriation_annual_data import (
     ProfitAppropriationAnnualData,
 )
-from openbilanz.domain.profit_appropriation_posting import (
+from simpleob.domain.profit_appropriation_posting import (
     ProfitAppropriationPosting,
 )
-from openbilanz.domain.profit_appropriation_posting_proposal import (
+from simpleob.domain.profit_appropriation_posting_proposal import (
     ProfitAppropriationPostingProposal,
 )
-from openbilanz.domain.profit_appropriation_posting_type import (
+from simpleob.domain.profit_appropriation_posting_type import (
     ProfitAppropriationPostingType,
 )
-from openbilanz.domain.shareholder import Shareholder
-from openbilanz.domain.tax_depreciation_adjustment import (
+from simpleob.domain.shareholder import Shareholder
+from simpleob.domain.tax_depreciation_adjustment import (
     TaxDepreciationAdjustment,
 )
-from openbilanz.domain.vat_accounts import VatAccounts
-from openbilanz.services.closing_result import ClosingResult
-from openbilanz.services.e_bilanz_export_service import (
+from simpleob.domain.vat_accounts import VatAccounts
+from simpleob.services.closing_result import ClosingResult
+from simpleob.services.e_bilanz_export_service import (
     EBilanzExportService,
 )
-from openbilanz.services.e_bilanz_preparation_service import (
+from simpleob.services.e_bilanz_preparation_service import (
     EBilanzPreparationResult,
 )
-from openbilanz.services.fiscal_year_workspace import FiscalYearWorkspace
-from openbilanz.services.posting_service import PostingService
-from openbilanz.services.taxonomy_management_service import (
+from simpleob.services.fiscal_year_workspace import FiscalYearWorkspace
+from simpleob.services.posting_service import PostingService
+from simpleob.services.taxonomy_management_service import (
     TaxonomyManagementService,
     TaxonomyStatus,
 )
-from openbilanz.taxonomy.arelle_adapter import (
+from simpleob.taxonomy.arelle_adapter import (
     ArelleValidationResult,
 )
-from openbilanz.taxonomy.e_bilanz_builder import (
+from simpleob.taxonomy.e_bilanz_builder import (
     EBilanzDocument,
 )
-from openbilanz.taxonomy.taxonomy import TaxonomyVersion
+from simpleob.taxonomy.taxonomy import TaxonomyVersion
 
 
 @pytest.fixture

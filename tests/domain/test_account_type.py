@@ -1,4 +1,4 @@
-from openbilanz.domain.account_type import AccountType
+from simpleob.domain.account_type import AccountType
 
 
 def test_account_type_contains_all_business_account_categories() -> None:

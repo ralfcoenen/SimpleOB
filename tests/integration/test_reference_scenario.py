@@ -7,57 +7,57 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from openbilanz.accounting.balance_sheet import BalanceSheet
-from openbilanz.accounting.financial_statement_builder import (
+from simpleob.accounting.balance_sheet import BalanceSheet
+from simpleob.accounting.financial_statement_builder import (
     FinancialStatementBuilder,
 )
-from openbilanz.accounting.hgb_financial_statement_position_provider import (
+from simpleob.accounting.hgb_financial_statement_position_provider import (
     HgbFinancialStatementPositionProvider,
 )
-from openbilanz.accounting.income_statement import IncomeStatement
-from openbilanz.accounting.ledger import Ledger
-from openbilanz.accounting.mapper import AccountMapper
-from openbilanz.accounting.trial_balance import TrialBalance
-from openbilanz.database.booking_repository import BookingRepository
-from openbilanz.database.company_repository import CompanyRepository
-from openbilanz.database.database import Base
-from openbilanz.demo.reference_scenario import (
+from simpleob.accounting.income_statement import IncomeStatement
+from simpleob.accounting.ledger import Ledger
+from simpleob.accounting.mapper import AccountMapper
+from simpleob.accounting.trial_balance import TrialBalance
+from simpleob.database.booking_repository import BookingRepository
+from simpleob.database.company_repository import CompanyRepository
+from simpleob.database.database import Base
+from simpleob.demo.reference_scenario import (
     REFERENCE_COMPANY_ID,
     create_reference_scenario,
     persist_reference_scenario,
 )
-from openbilanz.domain.account_type import AccountType
-from openbilanz.domain.fiscal_year_status import FiscalYearStatus
-from openbilanz.domain.journal import Journal
-from openbilanz.hgb.balance_sheet_structure import (
+from simpleob.domain.account_type import AccountType
+from simpleob.domain.fiscal_year_status import FiscalYearStatus
+from simpleob.domain.journal import Journal
+from simpleob.hgb.balance_sheet_structure import (
     create_hgb_balance_sheet_structure,
 )
-from openbilanz.hgb.income_statement_structure import (
+from simpleob.hgb.income_statement_structure import (
     create_hgb_income_statement_structure,
 )
-from openbilanz.importers.csv_chart_of_accounts_importer import (
+from simpleob.importers.csv_chart_of_accounts_importer import (
     CsvChartOfAccountsImporter,
 )
-from openbilanz.services.closing_accounts import ClosingAccounts
-from openbilanz.services.closing_service import ClosingService
-from openbilanz.services.fiscal_year_closing_workflow import (
+from simpleob.services.closing_accounts import ClosingAccounts
+from simpleob.services.closing_service import ClosingService
+from simpleob.services.fiscal_year_closing_workflow import (
     FiscalYearClosingWorkflow,
 )
-from openbilanz.services.posting_service import PostingService
-from openbilanz.taxonomy.arelle_adapter import ArelleAdapter
-from openbilanz.taxonomy.e_bilanz_builder import EBilanzBuilder
-from openbilanz.taxonomy.entry_point import TaxonomyEntryPoint
-from openbilanz.taxonomy.gcd_company_data import GcdCompanyData
-from openbilanz.taxonomy.gcd_company_identifiers import (
+from simpleob.services.posting_service import PostingService
+from simpleob.taxonomy.arelle_adapter import ArelleAdapter
+from simpleob.taxonomy.e_bilanz_builder import EBilanzBuilder
+from simpleob.taxonomy.entry_point import TaxonomyEntryPoint
+from simpleob.taxonomy.gcd_company_data import GcdCompanyData
+from simpleob.taxonomy.gcd_company_identifiers import (
     GcdCompanyIdentifiers,
 )
-from openbilanz.taxonomy.resolver import TaxonomyResolver
-from openbilanz.taxonomy.taxonomy import TaxonomyVersion
+from simpleob.taxonomy.resolver import TaxonomyResolver
+from simpleob.taxonomy.taxonomy import TaxonomyVersion
 
 STANDARD_CHART_PATH = (
     Path(__file__).resolve().parents[2]
     / "src"
-    / "openbilanz"
+    / "simpleob"
     / "resources"
     / "chart_of_accounts"
     / "openbilanz_standard.csv"

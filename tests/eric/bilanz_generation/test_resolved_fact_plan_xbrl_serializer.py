@@ -5,27 +5,27 @@ from decimal import Decimal
 
 import pytest
 
-from openbilanz.eric.bilanz_generation.fact_plan import (
+from simpleob.eric.bilanz_generation.fact_plan import (
     FactPlanNode,
     FactPlanState,
 )
-from openbilanz.eric.bilanz_generation.fact_plan_resolver import (
+from simpleob.eric.bilanz_generation.fact_plan_resolver import (
     ResolvedFactPlan,
     ResolvedFactPlanNode,
 )
-from openbilanz.eric.bilanz_generation.resolved_fact_plan_xbrl_serializer import (
+from simpleob.eric.bilanz_generation.resolved_fact_plan_xbrl_serializer import (
     ResolvedFactPlanXbrlSerializer,
 )
-from openbilanz.taxonomy.concept import (
+from simpleob.taxonomy.concept import (
     TaxonomyBalance,
     TaxonomyConcept,
     TaxonomyPeriodType,
 )
-from openbilanz.taxonomy.context import TaxonomyContext
-from openbilanz.taxonomy.fact import TaxonomyFact
-from openbilanz.taxonomy.nil_fact import TaxonomyNilFact
-from openbilanz.taxonomy.text_fact import TaxonomyTextFact
-from openbilanz.taxonomy.unit import TaxonomyUnit
+from simpleob.taxonomy.context import TaxonomyContext
+from simpleob.taxonomy.fact import TaxonomyFact
+from simpleob.taxonomy.nil_fact import TaxonomyNilFact
+from simpleob.taxonomy.text_fact import TaxonomyTextFact
+from simpleob.taxonomy.unit import TaxonomyUnit
 
 GCD_NAMESPACE = (
     "http://www.xbrl.de/taxonomies/"

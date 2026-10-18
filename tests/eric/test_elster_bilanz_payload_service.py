@@ -4,11 +4,11 @@ from datetime import date
 from uuid import uuid4
 from xml.etree import ElementTree as ET
 
-import openbilanz.eric.elster_bilanz_payload_service as service_module
-from openbilanz.domain.company import Company
-from openbilanz.domain.company_master_data import CompanyMasterData
-from openbilanz.eric.elster_bilanz_payload import XBRL_NAMESPACE
-from openbilanz.eric.elster_bilanz_payload_service import (
+import simpleob.eric.elster_bilanz_payload_service as service_module
+from simpleob.domain.company import Company
+from simpleob.domain.company_master_data import CompanyMasterData
+from simpleob.eric.elster_bilanz_payload import XBRL_NAMESPACE
+from simpleob.eric.elster_bilanz_payload_service import (
     ElsterBilanzPayloadService,
 )
 

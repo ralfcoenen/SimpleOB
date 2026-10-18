@@ -1,13 +1,13 @@
 """Tests für den gemeinsamen Abschlusskontext."""
 
-from openbilanz.accounting.financial_statement_builder import (
+from simpleob.accounting.financial_statement_builder import (
     FinancialStatementBuilder,
 )
-from openbilanz.accounting.financial_statement_context import (
+from simpleob.accounting.financial_statement_context import (
     FinancialStatementContext,
     create_standard_financial_statement_context,
 )
-from openbilanz.accounting.mapper import AccountMapper
+from simpleob.accounting.mapper import AccountMapper
 
 
 def test_creates_standard_financial_statement_context(

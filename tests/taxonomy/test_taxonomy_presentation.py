@@ -3,7 +3,7 @@
 from decimal import Decimal
 from pathlib import Path
 
-from openbilanz.taxonomy.presentation import (
+from simpleob.taxonomy.presentation import (
     TaxonomyPresentationRelation,
 )
 

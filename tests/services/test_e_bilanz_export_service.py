@@ -4,10 +4,10 @@ from pathlib import Path
 
 import pytest
 
-from openbilanz.services.e_bilanz_export_service import (
+from simpleob.services.e_bilanz_export_service import (
     EBilanzExportService,
 )
-from openbilanz.taxonomy.e_bilanz_builder import (
+from simpleob.taxonomy.e_bilanz_builder import (
     EBilanzDocument,
 )
 

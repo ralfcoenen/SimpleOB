@@ -1,17 +1,17 @@
 from datetime import date
 from decimal import Decimal
 
-from openbilanz.accounting.ledger import Ledger
-from openbilanz.domain.account import Account
-from openbilanz.domain.account_type import AccountType
-from openbilanz.domain.journal import Journal
-from openbilanz.domain.opening_balance import OpeningBalance
-from openbilanz.domain.opening_balance_item import OpeningBalanceItem
-from openbilanz.domain.template_account import TemplateAccount
-from openbilanz.services.opening_balance_service import (
+from simpleob.accounting.ledger import Ledger
+from simpleob.domain.account import Account
+from simpleob.domain.account_type import AccountType
+from simpleob.domain.journal import Journal
+from simpleob.domain.opening_balance import OpeningBalance
+from simpleob.domain.opening_balance_item import OpeningBalanceItem
+from simpleob.domain.template_account import TemplateAccount
+from simpleob.services.opening_balance_service import (
     OpeningBalanceService,
 )
-from openbilanz.services.posting_service import PostingService
+from simpleob.services.posting_service import PostingService
 
 
 def _account(

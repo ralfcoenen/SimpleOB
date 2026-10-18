@@ -5,18 +5,18 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from openbilanz.database.company_repository import (
+from simpleob.database.company_repository import (
     CompanyRepository,
 )
-from openbilanz.database.database import Base
-from openbilanz.database.models import Wirtschaftsjahr
-from openbilanz.domain.company import Company
-from openbilanz.domain.company_master_data import (
+from simpleob.database.database import Base
+from simpleob.database.models import Wirtschaftsjahr
+from simpleob.domain.company import Company
+from simpleob.domain.company_master_data import (
     CompanyMasterData,
 )
-from openbilanz.domain.fiscal_year import FiscalYear
-from openbilanz.domain.fiscal_year_status import FiscalYearStatus
-from openbilanz.domain.managed_fiscal_year import ManagedFiscalYear
+from simpleob.domain.fiscal_year import FiscalYear
+from simpleob.domain.fiscal_year_status import FiscalYearStatus
+from simpleob.domain.managed_fiscal_year import ManagedFiscalYear
 
 
 def test_adds_and_loads_company() -> None:

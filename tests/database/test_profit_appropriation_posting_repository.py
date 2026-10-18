@@ -8,25 +8,25 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from openbilanz.database.booking_repository import (
+from simpleob.database.booking_repository import (
     BookingRepository,
 )
-from openbilanz.database.company_repository import (
+from simpleob.database.company_repository import (
     CompanyRepository,
 )
-from openbilanz.database.database import Base
-from openbilanz.database.profit_appropriation_posting_repository import (
+from simpleob.database.database import Base
+from simpleob.database.profit_appropriation_posting_repository import (
     ProfitAppropriationPostingRepository,
 )
-from openbilanz.domain.booking import Booking
-from openbilanz.domain.booking_line import BookingLine
-from openbilanz.domain.company import Company
-from openbilanz.domain.entry_side import EntrySide
-from openbilanz.domain.fiscal_year import FiscalYear
-from openbilanz.domain.profit_appropriation_posting import (
+from simpleob.domain.booking import Booking
+from simpleob.domain.booking_line import BookingLine
+from simpleob.domain.company import Company
+from simpleob.domain.entry_side import EntrySide
+from simpleob.domain.fiscal_year import FiscalYear
+from simpleob.domain.profit_appropriation_posting import (
     ProfitAppropriationPosting,
 )
-from openbilanz.domain.profit_appropriation_posting_type import (
+from simpleob.domain.profit_appropriation_posting_type import (
     ProfitAppropriationPostingType,
 )
 

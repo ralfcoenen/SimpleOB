@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from openbilanz.eric.eric_create_th_adapter import (
+from simpleob.eric.eric_create_th_adapter import (
     EricCreateThAdapter,
     EricCreateThError,
 )

@@ -8,43 +8,43 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from openbilanz.database.booking_repository import (
+from simpleob.database.booking_repository import (
     BookingRepository,
 )
-from openbilanz.database.company_repository import (
+from simpleob.database.company_repository import (
     CompanyRepository,
 )
-from openbilanz.database.database import Base
-from openbilanz.database.fixed_asset_depreciation_repository import (
+from simpleob.database.database import Base
+from simpleob.database.fixed_asset_depreciation_repository import (
     FixedAssetDepreciationRepository,
 )
-from openbilanz.database.fixed_asset_repository import (
+from simpleob.database.fixed_asset_repository import (
     FixedAssetRepository,
 )
-from openbilanz.database.tax_depreciation_adjustment_repository import (
+from simpleob.database.tax_depreciation_adjustment_repository import (
     TaxDepreciationAdjustmentRepository,
 )
-from openbilanz.database.fixed_asset_movement_repository import (
+from simpleob.database.fixed_asset_movement_repository import (
     FixedAssetMovementRepository,
 )
-from openbilanz.domain.booking import Booking
-from openbilanz.domain.booking_line import BookingLine
-from openbilanz.domain.entry_side import EntrySide
-from openbilanz.domain.fixed_asset_movement import FixedAssetMovement
-from openbilanz.domain.fixed_asset_movement_type import (
+from simpleob.domain.booking import Booking
+from simpleob.domain.booking_line import BookingLine
+from simpleob.domain.entry_side import EntrySide
+from simpleob.domain.fixed_asset_movement import FixedAssetMovement
+from simpleob.domain.fixed_asset_movement_type import (
     FixedAssetMovementType,
 )
-from openbilanz.services.depreciation_service import DepreciationService
-from openbilanz.domain.company import Company
-from openbilanz.domain.depreciation_proposal import (
+from simpleob.services.depreciation_service import DepreciationService
+from simpleob.domain.company import Company
+from simpleob.domain.depreciation_proposal import (
     DepreciationProposal,
 )
-from openbilanz.domain.fiscal_year import FiscalYear
-from openbilanz.domain.fixed_asset import FixedAsset
-from openbilanz.services.depreciation_booking_service import (
+from simpleob.domain.fiscal_year import FiscalYear
+from simpleob.domain.fixed_asset import FixedAsset
+from simpleob.services.depreciation_booking_service import (
     DepreciationBookingService,
 )
-from openbilanz.services.fixed_asset_depreciation_workflow import (
+from simpleob.services.fixed_asset_depreciation_workflow import (
     FixedAssetDepreciationWorkflow,
 )
 

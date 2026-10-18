@@ -6,7 +6,7 @@ from uuid import UUID
 
 import pytest
 
-from openbilanz.client_transfer.model import (
+from simpleob.client_transfer.model import (
     ClientTransfer,
     ClientTransferAccount,
     ClientTransferAccountRoles,
@@ -31,7 +31,7 @@ from openbilanz.client_transfer.model import (
     ClientTransferTaxonomyMapping,
     ClientTransferVatAccounts,
 )
-from openbilanz.client_transfer.serialization import (
+from simpleob.client_transfer.serialization import (
     client_transfer_from_json,
     client_transfer_to_dict,
     client_transfer_to_json,

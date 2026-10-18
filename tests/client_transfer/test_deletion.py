@@ -8,13 +8,13 @@ from sqlalchemy import create_engine, event, select, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
-from openbilanz.client_transfer import archive
-from openbilanz.client_transfer.archive import read_client_transfer_archive
-from openbilanz.client_transfer.importer import ClientTransferImporter
-from openbilanz.database.client_deletion_repository import ClientDeletionRepository
-from openbilanz.database.database import Base
-from openbilanz.services import client_deletion_service as module
-from openbilanz.services.client_deletion_service import (
+from simpleob.client_transfer import archive
+from simpleob.client_transfer.archive import read_client_transfer_archive
+from simpleob.client_transfer.importer import ClientTransferImporter
+from simpleob.database.client_deletion_repository import ClientDeletionRepository
+from simpleob.database.database import Base
+from simpleob.services import client_deletion_service as module
+from simpleob.services.client_deletion_service import (
     ClientDeletionService,
     _transfer_repositories,
 )
@@ -45,7 +45,7 @@ def populated(tmp_path, request):
             position_provider=provider,
         )
         # Zweiter vollständiger Mandant, mit unabhängigen fachlichen UUIDs.
-        from openbilanz.client_transfer.serialization import (
+        from simpleob.client_transfer.serialization import (
             client_transfer_from_json,
             client_transfer_to_json,
         )

@@ -12,15 +12,15 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
-from openbilanz.client_transfer.archive import read_client_transfer_archive
-from openbilanz.client_transfer.importer import ClientTransferImporter
-from openbilanz.database.client_deletion_repository import ClientDeletionRepository
-from openbilanz.database.database import Base
-from openbilanz.database.postgresql_maintenance_guard import (
+from simpleob.client_transfer.archive import read_client_transfer_archive
+from simpleob.client_transfer.importer import ClientTransferImporter
+from simpleob.database.client_deletion_repository import ClientDeletionRepository
+from simpleob.database.database import Base
+from simpleob.database.postgresql_maintenance_guard import (
     install_postgresql_maintenance_guard,
 )
-from openbilanz.services import client_deletion_service as module
-from openbilanz.services.client_deletion_service import (
+from simpleob.services import client_deletion_service as module
+from simpleob.services.client_deletion_service import (
     ClientDeletionCommitUnknown,
     ClientDeletionService,
     _transfer_repositories,

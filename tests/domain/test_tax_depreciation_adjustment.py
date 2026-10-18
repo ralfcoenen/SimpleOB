@@ -5,7 +5,7 @@ from uuid import uuid4
 
 import pytest
 
-from openbilanz.domain.tax_depreciation_adjustment import (
+from simpleob.domain.tax_depreciation_adjustment import (
     TaxDepreciationAdjustment,
 )
 

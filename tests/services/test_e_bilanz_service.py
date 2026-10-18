@@ -8,46 +8,46 @@ from uuid import uuid4
 
 import pytest
 
-from openbilanz.accounting.balance_sheet import BalanceSheet
-from openbilanz.accounting.financial_statement_position import (
+from simpleob.accounting.balance_sheet import BalanceSheet
+from simpleob.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
-from openbilanz.accounting.income_statement import IncomeStatement
-from openbilanz.domain.accounting_account_roles import (
+from simpleob.accounting.income_statement import IncomeStatement
+from simpleob.domain.accounting_account_roles import (
     AccountingAccountRoles,
 )
-from openbilanz.domain.company import Company
-from openbilanz.domain.company_master_data import (
+from simpleob.domain.company import Company
+from simpleob.domain.company_master_data import (
     CompanyMasterData,
 )
-from openbilanz.domain.fiscal_year import FiscalYear
-from openbilanz.domain.profit_appropriation_annual_data import (
+from simpleob.domain.fiscal_year import FiscalYear
+from simpleob.domain.profit_appropriation_annual_data import (
     ProfitAppropriationAnnualData,
 )
-from openbilanz.domain.shareholder import Shareholder
-from openbilanz.domain.vat_accounts import VatAccounts
-from openbilanz.eric.bilanz_generation.fact_plan import (
+from simpleob.domain.shareholder import Shareholder
+from simpleob.domain.vat_accounts import VatAccounts
+from simpleob.eric.bilanz_generation.fact_plan import (
     FactPlanState,
 )
-from openbilanz.services.e_bilanz_service import (
+from simpleob.services.e_bilanz_service import (
     APPROPRIATION_PROFITS_ROLE,
     BALANCE_SHEET_ROLE,
     EBilanzService,
     INCOME_STATEMENT_ROLE,
 )
-from openbilanz.taxonomy.arelle_adapter import (
+from simpleob.taxonomy.arelle_adapter import (
     ArelleValidationResult,
 )
-from openbilanz.taxonomy.e_bilanz_builder import (
+from simpleob.taxonomy.e_bilanz_builder import (
     EBilanzDocument,
 )
-from openbilanz.taxonomy.entry_point import (
+from simpleob.taxonomy.entry_point import (
     TaxonomyEntryPoint,
 )
-from openbilanz.taxonomy.gcd_company_data_mapper import (
+from simpleob.taxonomy.gcd_company_data_mapper import (
     GcdCompanyDataMapper,
 )
-from openbilanz.taxonomy.taxonomy import TaxonomyVersion
+from simpleob.taxonomy.taxonomy import TaxonomyVersion
 
 
 class FakeResolver:
@@ -423,7 +423,7 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
 
     with (
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "TaxonomyEntryPoint.from_file",
             side_effect=(
                 gcd_entry_point,
@@ -431,92 +431,92 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
             ),
         ),
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "TaxonomyConceptSet",
             return_value=concepts,
         ) as concept_set_class,
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "ClosingService",
             return_value=closing_service,
         ),
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "GaapCi69ValueCalculator.calculate",
             return_value=gaap_ci_values,
         ) as gaap_ci_calculate,
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "create_profile_6_9",
             return_value=profile,
         ),
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "GaapCi69BalanceSheetValueBuilder.build",
             return_value=balance_sheet_values,
         ) as balance_sheet_builder,
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "GaapCi69IncomeStatementValueBuilder.build",
             return_value=income_statement_values,
         ) as income_statement_builder,
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "GaapCi69ProfitAppropriationValueBuilder.build",
             return_value=profit_appropriation_values,
         ) as profit_appropriation_builder,
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "GaapCi69AccountDetailValueBuilder.build",
             return_value=account_detail_values,
         ) as account_detail_builder,
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "Taxonomy69ValueBuilder.build",
             return_value={},
         ) as value_builder,
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "FactPlanResolver.resolve",
             return_value=resolved_fact_plan,
         ) as fact_plan_resolver,
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "FiscalRequirementReader",
             return_value=requirement_reader,
         ),
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "GaapCiMandatoryFactCompleter",
             return_value=mandatory_completer,
         ),
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "GcdFactBuilder",
             return_value=gcd_fact_builder,
         ),
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "create_hgb_gaap_ci_mapping",
             return_value=Mock(),
         ),
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "TaxonomyMapper",
             return_value=taxonomy_mapper,
         ),
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "FixedAssetScheduleBuilder",
             return_value=fixed_asset_schedule_builder,
         ) as fixed_asset_schedule_builder_class,
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "AccountBalanceBuilder",
             return_value=account_balance_builder,
         ),
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "Taxonomy69XbrlDocumentBuilder",
             return_value=document_builder,
         ),
@@ -850,7 +850,7 @@ def test_e_bilanz_service_rejects_account_taxonomy_concept_with_wrong_parent(
 
     with (
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "TaxonomyEntryPoint.from_file",
             side_effect=(
                 gcd_entry_point,
@@ -858,47 +858,47 @@ def test_e_bilanz_service_rejects_account_taxonomy_concept_with_wrong_parent(
             ),
         ),
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "TaxonomyConceptSet",
             return_value=Mock(),
         ),
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "ClosingService",
             return_value=closing_service,
         ),
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "GaapCi69ValueCalculator.calculate",
             return_value=Mock(),
         ),
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "create_profile_6_9",
             return_value=profile,
         ),
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "GaapCi69BalanceSheetValueBuilder.build",
             return_value={},
         ),
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "GaapCi69IncomeStatementValueBuilder.build",
             return_value={},
         ),
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "GaapCi69AccountDetailValueBuilder.build",
             return_value={},
         ),
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "create_hgb_gaap_ci_mapping",
             return_value=Mock(),
         ),
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "TaxonomyMapper",
             return_value=taxonomy_mapper,
         ),
@@ -1157,7 +1157,7 @@ def test_hgbm_builders_integrate_bvv_book_value_differences(
 
     with (
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "TaxonomyEntryPoint.from_file",
             side_effect=(
                 gcd_entry_point,
@@ -1165,102 +1165,102 @@ def test_hgbm_builders_integrate_bvv_book_value_differences(
             ),
         ),
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "TaxonomyConceptSet",
             return_value=concepts,
         ),
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "ClosingService",
             return_value=closing_service,
         ),
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "GaapCi69ValueCalculator.calculate",
             return_value=gaap_ci_values,
         ),
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "create_profile_6_9",
             return_value=profile,
         ),
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "GaapCi69BalanceSheetValueBuilder.build",
             return_value=balance_sheet_values,
         ),
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "GaapCi69IncomeStatementValueBuilder.build",
             return_value=income_statement_values,
         ),
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "GaapCi69AccountDetailValueBuilder.build",
             return_value=account_detail_values,
         ),
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "HgbmFixedAssetScheduleBuilder.build",
             return_value=hgbm_schedule,
         ) as hgbm_builder,
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "TaxDepreciationReconciliationBuilder.build",
             return_value=tax_reconciliation,
         ) as reconciliation_builder,
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "BvvValueBuilder.build",
             return_value=bvv_values,
         ) as bvv_builder,
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "Taxonomy69ValueBuilder.build",
             return_value={},
         ) as value_builder,
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "FactPlanResolver.resolve",
             return_value=resolved_fact_plan,
         ) as fact_plan_resolver,
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "FiscalRequirementReader",
             return_value=requirement_reader,
         ),
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "GaapCiMandatoryFactCompleter",
             return_value=mandatory_completer,
         ),
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "GcdFactBuilder",
             return_value=gcd_fact_builder,
         ),
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "create_hgb_gaap_ci_mapping",
             return_value=Mock(),
         ),
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "TaxonomyMapper",
             return_value=taxonomy_mapper,
         ),
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "FixedAssetScheduleBuilder",
             return_value=fixed_asset_schedule_builder,
         ),
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "AccountBalanceBuilder",
             return_value=account_balance_builder,
         ),
         patch(
-            "openbilanz.services.e_bilanz_service."
+            "simpleob.services.e_bilanz_service."
             "Taxonomy69XbrlDocumentBuilder",
             return_value=document_builder,
         ),

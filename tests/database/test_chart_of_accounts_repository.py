@@ -6,36 +6,36 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from openbilanz.accounting.financial_statement_position import (
+from simpleob.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
-from openbilanz.accounting.hgb_financial_statement_position_provider import (
+from simpleob.accounting.hgb_financial_statement_position_provider import (
     HgbFinancialStatementPositionProvider,
 )
-from openbilanz.database.chart_of_accounts_repository import (
+from simpleob.database.chart_of_accounts_repository import (
     ChartOfAccountsRepository,
 )
-from openbilanz.database.company_repository import (
+from simpleob.database.company_repository import (
     CompanyRepository,
 )
-from openbilanz.database.database import Base
-from openbilanz.domain.account import Account
-from openbilanz.domain.account_mapping_rule import (
+from simpleob.database.database import Base
+from simpleob.domain.account import Account
+from simpleob.domain.account_mapping_rule import (
     AccountMappingRule,
 )
-from openbilanz.domain.account_type import AccountType
-from openbilanz.domain.accounting_account_roles import (
+from simpleob.domain.account_type import AccountType
+from simpleob.domain.accounting_account_roles import (
     AccountingAccountRoles,
 )
-from openbilanz.domain.accounting_control_accounts import (
+from simpleob.domain.accounting_control_accounts import (
     AccountingControlAccounts,
 )
-from openbilanz.domain.chart_of_accounts_template import (
+from simpleob.domain.chart_of_accounts_template import (
     ChartOfAccountsTemplate,
 )
-from openbilanz.domain.company import Company
-from openbilanz.domain.template_account import TemplateAccount
-from openbilanz.domain.vat_accounts import VatAccounts
+from simpleob.domain.company import Company
+from simpleob.domain.template_account import TemplateAccount
+from simpleob.domain.vat_accounts import VatAccounts
 
 
 def test_saves_and_loads_chart_of_accounts() -> None:

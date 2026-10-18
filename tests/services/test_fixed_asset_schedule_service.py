@@ -5,26 +5,26 @@ from decimal import Decimal
 from unittest.mock import Mock
 from uuid import uuid4
 
-from openbilanz.domain.depreciation_kind import (
+from simpleob.domain.depreciation_kind import (
     DepreciationKind,
 )
-from openbilanz.domain.depreciation_source import (
+from simpleob.domain.depreciation_source import (
     DepreciationSource,
 )
-from openbilanz.domain.fixed_asset import FixedAsset
-from openbilanz.domain.fixed_asset_depreciation import (
+from simpleob.domain.fixed_asset import FixedAsset
+from simpleob.domain.fixed_asset_depreciation import (
     FixedAssetDepreciation,
 )
-from openbilanz.domain.fixed_asset_movement import (
+from simpleob.domain.fixed_asset_movement import (
     FixedAssetMovement,
 )
-from openbilanz.domain.fixed_asset_movement_type import (
+from simpleob.domain.fixed_asset_movement_type import (
     FixedAssetMovementType,
 )
-from openbilanz.domain.fixed_asset_status import (
+from simpleob.domain.fixed_asset_status import (
     FixedAssetStatus,
 )
-from openbilanz.services.fixed_asset_schedule_service import (
+from simpleob.services.fixed_asset_schedule_service import (
     FixedAssetScheduleService,
 )
 

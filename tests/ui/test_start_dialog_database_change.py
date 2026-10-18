@@ -8,9 +8,9 @@ from unittest.mock import MagicMock
 import pytest
 from PySide6.QtWidgets import QApplication, QDialog
 
-from openbilanz.core.config import ApplicationConfig
-from openbilanz.ui_qt import start_dialog as module
-from openbilanz.ui_qt.start_dialog import StartDialog
+from simpleob.core.config import ApplicationConfig
+from simpleob.ui_qt import start_dialog as module
+from simpleob.ui_qt.start_dialog import StartDialog
 
 
 POSTGRES_URL = (

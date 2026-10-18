@@ -5,7 +5,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from openbilanz.ui_qt import main_window as module
+from simpleob.ui_qt import main_window as module
 
 
 @pytest.mark.parametrize(

@@ -1,7 +1,7 @@
 from decimal import Decimal
 
-from openbilanz.accounting.balance_sheet import BalanceSheet
-from openbilanz.accounting.financial_statement_position import (
+from simpleob.accounting.balance_sheet import BalanceSheet
+from simpleob.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
 

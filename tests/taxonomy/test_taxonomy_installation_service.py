@@ -6,16 +6,16 @@ from zipfile import ZipFile
 
 import pytest
 
-from openbilanz.taxonomy.taxonomy import (
+from simpleob.taxonomy.taxonomy import (
     TaxonomyVersion,
 )
-from openbilanz.taxonomy.taxonomy_catalog import (
+from simpleob.taxonomy.taxonomy_catalog import (
     TaxonomyCatalog,
 )
-from openbilanz.taxonomy.taxonomy_download_catalog import (
+from simpleob.taxonomy.taxonomy_download_catalog import (
     TaxonomyDownloadCatalog,
 )
-from openbilanz.taxonomy.taxonomy_installation_service import (
+from simpleob.taxonomy.taxonomy_installation_service import (
     TaxonomyInstallationService,
 )
 

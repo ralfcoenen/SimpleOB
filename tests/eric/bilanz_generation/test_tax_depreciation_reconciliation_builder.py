@@ -4,10 +4,10 @@ from decimal import Decimal
 
 import pytest
 
-from openbilanz.eric.bilanz_generation.tax_depreciation_reconciliation_builder import (
+from simpleob.eric.bilanz_generation.tax_depreciation_reconciliation_builder import (
     TaxDepreciationReconciliationBuilder,
 )
-from openbilanz.eric.bilanz_generation.tax_reconciliation import (
+from simpleob.eric.bilanz_generation.tax_reconciliation import (
     TaxReconciliationKind,
 )
 

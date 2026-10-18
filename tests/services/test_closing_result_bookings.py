@@ -2,10 +2,10 @@ from dataclasses import is_dataclass
 from datetime import date
 from decimal import Decimal
 
-from openbilanz.domain.booking import Booking
-from openbilanz.domain.booking_line import BookingLine
-from openbilanz.domain.entry_side import EntrySide
-from openbilanz.services.closing_result import ClosingResult
+from simpleob.domain.booking import Booking
+from simpleob.domain.booking_line import BookingLine
+from simpleob.domain.entry_side import EntrySide
+from simpleob.services.closing_result import ClosingResult
 
 
 def test_closing_result_can_contain_bookings() -> None:

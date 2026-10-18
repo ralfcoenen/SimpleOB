@@ -3,8 +3,8 @@ from datetime import date
 
 import pytest
 
-from openbilanz.domain.fiscal_year import FiscalYear
-from openbilanz.taxonomy.taxonomy import (
+from simpleob.domain.fiscal_year import FiscalYear
+from simpleob.taxonomy.taxonomy import (
     TaxonomyVersion,
     taxonomy_version_for,
 )

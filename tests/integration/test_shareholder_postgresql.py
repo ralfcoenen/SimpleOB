@@ -8,12 +8,12 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 
-from openbilanz.database.company_repository import CompanyRepository
-from openbilanz.database.lock_error import DatabaseLockError
-from openbilanz.database.models import Gesellschafter, Mandant
-from openbilanz.database.shareholder_repository import ShareholderRepository
-from openbilanz.domain.company import Company
-from openbilanz.domain.shareholder import Shareholder
+from simpleob.database.company_repository import CompanyRepository
+from simpleob.database.lock_error import DatabaseLockError
+from simpleob.database.models import Gesellschafter, Mandant
+from simpleob.database.shareholder_repository import ShareholderRepository
+from simpleob.domain.company import Company
+from simpleob.domain.shareholder import Shareholder
 
 
 @pytest.fixture

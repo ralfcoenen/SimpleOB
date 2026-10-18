@@ -1,14 +1,14 @@
 """Tests für das ERiC-E-Bilanz-Profil der Taxonomie 6.9."""
 
-from openbilanz.eric.bilanz_generation.fact_plan import (
+from simpleob.eric.bilanz_generation.fact_plan import (
     FactPlanState,
 )
-from openbilanz.eric.bilanz_generation.taxonomy_6_9 import (
+from simpleob.eric.bilanz_generation.taxonomy_6_9 import (
     ERIC_REQUIRED_BALANCE_SHEET_CONCEPTS,
     TAXONOMY_VERSION,
     create_profile_6_9,
 )
-from openbilanz.eric.bilanz_generation.taxonomy_6_9_balance_sheet import (
+from simpleob.eric.bilanz_generation.taxonomy_6_9_balance_sheet import (
     BALANCE_SHEET_CONCEPTS as TAXONOMY_BALANCE_SHEET_CONCEPTS,
 )
 

@@ -1,4 +1,4 @@
-from openbilanz.database.connection_credentials import (
+from simpleob.database.connection_credentials import (
     PostgreSQLCredentials,
     database_connect_args,
 )

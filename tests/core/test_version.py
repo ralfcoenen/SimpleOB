@@ -2,7 +2,7 @@
 
 from importlib.metadata import PackageNotFoundError
 
-import openbilanz.core.version as version_module
+import simpleob.core.version as version_module
 
 
 def test_get_application_version_uses_distribution_version(

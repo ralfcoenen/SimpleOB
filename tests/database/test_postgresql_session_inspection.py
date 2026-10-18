@@ -8,7 +8,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.engine import make_url
 
-from openbilanz.database.postgresql_session_inspection import (
+from simpleob.database.postgresql_session_inspection import (
     inspect_postgresql_sessions,
 )
 

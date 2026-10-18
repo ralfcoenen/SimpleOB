@@ -4,7 +4,7 @@ from decimal import Decimal
 
 import pytest
 
-from openbilanz.amount_input import (
+from simpleob.amount_input import (
     format_german_amount,
     normalize_german_amount,
     parse_german_amount,

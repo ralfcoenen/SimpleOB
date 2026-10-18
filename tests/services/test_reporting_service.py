@@ -6,15 +6,15 @@ from uuid import uuid4
 
 import pytest
 
-from openbilanz.accounting.ledger import Ledger
-from openbilanz.accounting.ledger_entry import LedgerEntry
-from openbilanz.domain.booking import Booking
-from openbilanz.domain.booking_line import BookingLine
-from openbilanz.domain.booking_type import BookingType
-from openbilanz.domain.entry_side import EntrySide
-from openbilanz.domain.journal import Journal
-from openbilanz.reporting.account_statement import AccountStatement
-from openbilanz.services.reporting_service import ReportingService
+from simpleob.accounting.ledger import Ledger
+from simpleob.accounting.ledger_entry import LedgerEntry
+from simpleob.domain.booking import Booking
+from simpleob.domain.booking_line import BookingLine
+from simpleob.domain.booking_type import BookingType
+from simpleob.domain.entry_side import EntrySide
+from simpleob.domain.journal import Journal
+from simpleob.reporting.account_statement import AccountStatement
+from simpleob.services.reporting_service import ReportingService
 
 
 def test_reporting_service_returns_entries_for_account() -> None:

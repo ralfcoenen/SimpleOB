@@ -4,13 +4,13 @@ from pathlib import Path
 
 import pytest
 
-from openbilanz.accounting.financial_statement_position import (
+from simpleob.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
-from openbilanz.accounting.statement_category import StatementCategory
-from openbilanz.taxonomy.arelle_adapter import ArelleAdapter
-from openbilanz.taxonomy.mapping import TaxonomyMappingRule
-from openbilanz.taxonomy.mapping_set import TaxonomyMappingSet
+from simpleob.accounting.statement_category import StatementCategory
+from simpleob.taxonomy.arelle_adapter import ArelleAdapter
+from simpleob.taxonomy.mapping import TaxonomyMappingRule
+from simpleob.taxonomy.mapping_set import TaxonomyMappingSet
 
 
 def test_mapping_is_valid_for_taxonomy_6_8_and_6_9() -> None:

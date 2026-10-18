@@ -4,12 +4,12 @@ from importlib.metadata import version
 import os
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_data_files
+from PyInstaller.utils.hooks import collect_data_files, copy_metadata
 
 
 PROJECT_ROOT = Path(SPECPATH).resolve().parents[1]
 SRC_ROOT = PROJECT_ROOT / "src"
-APPLICATION_VERSION = version("openbilanz")
+APPLICATION_VERSION = version("simpleob")
 
 eric_sdk_root_value = os.environ.get("SIMPLEOB_ERIC_SDK_ROOT")
 
@@ -100,55 +100,55 @@ a = Analysis(
         (
             str(
                 SRC_ROOT
-                / "openbilanz/resources/chart_of_accounts/"
+                / "simpleob/resources/chart_of_accounts/"
                 "openbilanz_standard.csv"
             ),
-            "openbilanz/resources/chart_of_accounts",
+            "simpleob/resources/chart_of_accounts",
         ),
         (
             str(
                 SRC_ROOT
-                / "openbilanz/resources/e_bilanz/account_mappings/6.9/"
+                / "simpleob/resources/e_bilanz/account_mappings/6.9/"
                 "openbilanz_standard.csv"
             ),
-            "openbilanz/resources/e_bilanz/account_mappings/6.9",
+            "simpleob/resources/e_bilanz/account_mappings/6.9",
         ),
         (
             str(
                 SRC_ROOT
-                / "openbilanz/resources/eric/"
+                / "simpleob/resources/eric/"
                 "privacy_notice.txt"
             ),
-            "openbilanz/resources/eric",
+            "simpleob/resources/eric",
         ),
         (
             str(
                 SRC_ROOT
-                / "openbilanz/resources/eric/"
+                / "simpleob/resources/eric/"
                 "privacy_information.txt"
             ),
-            "openbilanz/resources/eric",
+            "simpleob/resources/eric",
         ),
         (
             str(
                 SRC_ROOT
-                / "openbilanz/resources/licenses/qt"
+                / "simpleob/resources/licenses/qt"
             ),
-            "openbilanz/resources/licenses/qt",
+            "simpleob/resources/licenses/qt",
         ),
         (
             str(
                 SRC_ROOT
-                / "openbilanz/resources/licenses/eric"
+                / "simpleob/resources/licenses/eric"
             ),
-            "openbilanz/resources/licenses/eric",
+            "simpleob/resources/licenses/eric",
         ),
         (
             str(
                 SRC_ROOT
-                / "openbilanz/resources/licenses/gettext"
+                / "simpleob/resources/licenses/gettext"
             ),
-            "openbilanz/resources/licenses/gettext",
+            "simpleob/resources/licenses/gettext",
         ),
         (
             str(PROJECT_ROOT / "alembic.ini"),
@@ -158,6 +158,7 @@ a = Analysis(
             str(PROJECT_ROOT / "migrations"),
             "migrations",
         ),
+        *copy_metadata("simpleob"),
         *arelle_datas,
         *eric_wrapper_datas,
     ],

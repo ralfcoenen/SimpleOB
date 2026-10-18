@@ -1,26 +1,26 @@
 from datetime import date
 from decimal import Decimal
 
-from openbilanz.accounting.financial_statement_position import (
+from simpleob.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
-from openbilanz.accounting.income_statement import IncomeStatement
-from openbilanz.accounting.ledger import Ledger
-from openbilanz.accounting.statement_category import StatementCategory
-from openbilanz.domain.account_type import AccountType
-from openbilanz.domain.booking_line import BookingLine
-from openbilanz.domain.booking_type import BookingType
-from openbilanz.domain.chart_of_accounts_template import (
+from simpleob.accounting.income_statement import IncomeStatement
+from simpleob.accounting.ledger import Ledger
+from simpleob.accounting.statement_category import StatementCategory
+from simpleob.domain.account_type import AccountType
+from simpleob.domain.booking_line import BookingLine
+from simpleob.domain.booking_type import BookingType
+from simpleob.domain.chart_of_accounts_template import (
     ChartOfAccountsTemplate,
 )
-from openbilanz.domain.entry_side import EntrySide
-from openbilanz.domain.template_account import TemplateAccount
-from openbilanz.hgb.income_statement_structure import (
+from simpleob.domain.entry_side import EntrySide
+from simpleob.domain.template_account import TemplateAccount
+from simpleob.hgb.income_statement_structure import (
     create_hgb_income_statement_structure,
 )
-from openbilanz.services.closing_accounts import ClosingAccounts
-from openbilanz.services.closing_result import ClosingResult
-from openbilanz.services.closing_service import ClosingService
+from simpleob.services.closing_accounts import ClosingAccounts
+from simpleob.services.closing_result import ClosingResult
+from simpleob.services.closing_service import ClosingService
 
 
 def test_calculates_net_income_from_income_and_expenses() -> None:

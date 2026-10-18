@@ -3,17 +3,17 @@ from datetime import date
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from openbilanz.domain.fiscal_year import FiscalYear
-from openbilanz.services.taxonomy_management_service import (
+from simpleob.domain.fiscal_year import FiscalYear
+from simpleob.services.taxonomy_management_service import (
     TaxonomyManagementService,
 )
-from openbilanz.taxonomy.taxonomy import (
+from simpleob.taxonomy.taxonomy import (
     TaxonomyVersion,
 )
-from openbilanz.taxonomy.taxonomy_catalog import (
+from simpleob.taxonomy.taxonomy_catalog import (
     TaxonomyCatalog,
 )
-from openbilanz.taxonomy.taxonomy_installation_service import (
+from simpleob.taxonomy.taxonomy_installation_service import (
     TaxonomyInstallationService,
 )
 

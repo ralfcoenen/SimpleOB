@@ -3,12 +3,12 @@ from decimal import Decimal
 
 import pytest
 
-from openbilanz.domain.account import Account
-from openbilanz.domain.account_type import AccountType
-from openbilanz.domain.opening_balance import OpeningBalance
-from openbilanz.domain.opening_balance_item import OpeningBalanceItem
-from openbilanz.domain.template_account import TemplateAccount
-from openbilanz.services.opening_balance_service import (
+from simpleob.domain.account import Account
+from simpleob.domain.account_type import AccountType
+from simpleob.domain.opening_balance import OpeningBalance
+from simpleob.domain.opening_balance_item import OpeningBalanceItem
+from simpleob.domain.template_account import TemplateAccount
+from simpleob.services.opening_balance_service import (
     OpeningBalanceService,
 )
 

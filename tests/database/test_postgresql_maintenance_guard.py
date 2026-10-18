@@ -6,13 +6,13 @@ import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 
-from openbilanz.database.postgresql_maintenance_guard import (
+from simpleob.database.postgresql_maintenance_guard import (
     install_postgresql_maintenance_guard,
 )
-from openbilanz.database.postgresql_migration_lock import (
+from simpleob.database.postgresql_migration_lock import (
     postgresql_migration_lock,
 )
-from openbilanz.database.lock_error import DatabaseLockError
+from simpleob.database.lock_error import DatabaseLockError
 
 @pytest.fixture
 def database_url() -> str:

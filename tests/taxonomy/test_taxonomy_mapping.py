@@ -1,10 +1,10 @@
 """Tests für die Zuordnung interner Abschlusspositionen zur Taxonomie."""
 
-from openbilanz.accounting.financial_statement_position import (
+from simpleob.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
-from openbilanz.accounting.statement_category import StatementCategory
-from openbilanz.taxonomy.mapping import TaxonomyMappingRule
+from simpleob.accounting.statement_category import StatementCategory
+from simpleob.taxonomy.mapping import TaxonomyMappingRule
 
 
 def test_taxonomy_mapping_rule_stores_position_and_concept_name() -> None:

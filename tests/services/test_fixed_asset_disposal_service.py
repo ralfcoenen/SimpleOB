@@ -5,12 +5,12 @@ from decimal import Decimal
 
 import pytest
 
-from openbilanz.domain.accounting_control_accounts import (
+from simpleob.domain.accounting_control_accounts import (
     AccountingControlAccounts,
 )
-from openbilanz.domain.entry_side import EntrySide
-from openbilanz.domain.vat_accounts import VatAccounts
-from openbilanz.services.fixed_asset_disposal_service import (
+from simpleob.domain.entry_side import EntrySide
+from simpleob.domain.vat_accounts import VatAccounts
+from simpleob.services.fixed_asset_disposal_service import (
     FixedAssetDisposalService,
 )
 

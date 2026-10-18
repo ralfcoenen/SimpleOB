@@ -6,21 +6,21 @@ from pathlib import Path
 
 import pytest
 
-from openbilanz.taxonomy.arelle_adapter import ArelleAdapter
-from openbilanz.taxonomy.concept import TaxonomyPeriodType
-from openbilanz.taxonomy.context import TaxonomyContext
-from openbilanz.taxonomy.entry_point import TaxonomyEntryPoint
-from openbilanz.taxonomy.fact import TaxonomyFact
-from openbilanz.taxonomy.fiscal_requirement_reader import (
+from simpleob.taxonomy.arelle_adapter import ArelleAdapter
+from simpleob.taxonomy.concept import TaxonomyPeriodType
+from simpleob.taxonomy.context import TaxonomyContext
+from simpleob.taxonomy.entry_point import TaxonomyEntryPoint
+from simpleob.taxonomy.fact import TaxonomyFact
+from simpleob.taxonomy.fiscal_requirement_reader import (
     FiscalRequirement,
     FiscalRequirementReader,
 )
-from openbilanz.taxonomy.gaap_ci_mandatory_fact_completer import (
+from simpleob.taxonomy.gaap_ci_mandatory_fact_completer import (
     GaapCiMandatoryFactCompleter,
 )
-from openbilanz.taxonomy.resolver import TaxonomyResolver
-from openbilanz.taxonomy.taxonomy import TaxonomyVersion
-from openbilanz.taxonomy.unit import TaxonomyUnit
+from simpleob.taxonomy.resolver import TaxonomyResolver
+from simpleob.taxonomy.taxonomy import TaxonomyVersion
+from simpleob.taxonomy.unit import TaxonomyUnit
 
 TAXONOMY_ROOT = Path(
     "data/taxonomy"

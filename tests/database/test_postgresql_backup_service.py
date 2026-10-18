@@ -9,7 +9,7 @@ from unittest.mock import Mock
 import pytest
 from sqlalchemy.engine import make_url
 
-from openbilanz.database.postgresql_backup_service import (
+from simpleob.database.postgresql_backup_service import (
     PostgreSQLBackupService,
 )
 

@@ -6,35 +6,35 @@ from uuid import uuid4
 
 from unittest.mock import Mock
 
-from openbilanz.domain.profit_appropriation_annual_data import (
+from simpleob.domain.profit_appropriation_annual_data import (
     ProfitAppropriationAnnualData,
 )
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from openbilanz.database.booking_repository import (
+from simpleob.database.booking_repository import (
     BookingRepository,
 )
-from openbilanz.database.company_repository import (
+from simpleob.database.company_repository import (
     CompanyRepository,
 )
-from openbilanz.database.database import Base
-from openbilanz.database.profit_appropriation_posting_repository import (
+from simpleob.database.database import Base
+from simpleob.database.profit_appropriation_posting_repository import (
     ProfitAppropriationPostingRepository,
 )
-from openbilanz.domain.company import Company
-from openbilanz.domain.fiscal_year import FiscalYear
-from openbilanz.domain.profit_appropriation_posting_proposal import (
+from simpleob.domain.company import Company
+from simpleob.domain.fiscal_year import FiscalYear
+from simpleob.domain.profit_appropriation_posting_proposal import (
     ProfitAppropriationPostingProposal,
 )
-from openbilanz.domain.profit_appropriation_posting_type import (
+from simpleob.domain.profit_appropriation_posting_type import (
     ProfitAppropriationPostingType,
 )
-from openbilanz.services.profit_appropriation_booking_service import (
+from simpleob.services.profit_appropriation_booking_service import (
     ProfitAppropriationBookingService,
 )
-from openbilanz.services.profit_appropriation_posting_workflow import (
+from simpleob.services.profit_appropriation_posting_workflow import (
     ProfitAppropriationPostingWorkflow,
 )
 

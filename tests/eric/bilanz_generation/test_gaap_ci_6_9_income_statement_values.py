@@ -2,10 +2,10 @@
 
 from decimal import Decimal
 
-from openbilanz.domain.fixed_asset_disposal_detail import (
+from simpleob.domain.fixed_asset_disposal_detail import (
     FixedAssetDisposalDetail,
 )
-from openbilanz.eric.bilanz_generation.gaap_ci_6_9_income_statement_values import (
+from simpleob.eric.bilanz_generation.gaap_ci_6_9_income_statement_values import (
     GaapCi69IncomeStatementValueBuilder,
 )
 

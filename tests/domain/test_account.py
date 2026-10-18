@@ -1,6 +1,6 @@
-from openbilanz.domain.account import Account
-from openbilanz.domain.account_type import AccountType
-from openbilanz.domain.template_account import TemplateAccount
+from simpleob.domain.account import Account
+from simpleob.domain.account_type import AccountType
+from simpleob.domain.template_account import TemplateAccount
 
 
 def test_account_exposes_number_name_and_type_from_template() -> None:

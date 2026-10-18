@@ -2,7 +2,7 @@
 
 import pytest
 
-from openbilanz.domain.fiscal_year_status import FiscalYearStatus
+from simpleob.domain.fiscal_year_status import FiscalYearStatus
 
 
 def test_fiscal_year_status_contains_open_and_closed() -> None:

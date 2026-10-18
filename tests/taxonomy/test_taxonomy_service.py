@@ -3,14 +3,14 @@
 from datetime import date
 from pathlib import Path
 
-from openbilanz.domain.fiscal_year import FiscalYear
-from openbilanz.taxonomy.concept_set import TaxonomyConceptSet
-from openbilanz.taxonomy.label_set import TaxonomyLabelSet
-from openbilanz.taxonomy.model import TaxonomyModel
-from openbilanz.taxonomy.presentation_set import (
+from simpleob.domain.fiscal_year import FiscalYear
+from simpleob.taxonomy.concept_set import TaxonomyConceptSet
+from simpleob.taxonomy.label_set import TaxonomyLabelSet
+from simpleob.taxonomy.model import TaxonomyModel
+from simpleob.taxonomy.presentation_set import (
     TaxonomyPresentationSet,
 )
-from openbilanz.taxonomy.service import TaxonomyService
+from simpleob.taxonomy.service import TaxonomyService
 
 
 class FakeResolver:

@@ -2,7 +2,7 @@
 
 from decimal import Decimal
 
-from openbilanz.eric.bilanz_generation.bvv_value_builder import (
+from simpleob.eric.bilanz_generation.bvv_value_builder import (
     BvvValueBuilder,
 )
 

@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 
 [project]
-name = "openbilanz"
+name = "simpleob"
 version = "0.50.0"
 description = "Lokale Buchhaltungs- und E-Bilanz-Software"
 requires-python = ">=3.12,<3.13"
@@ -38,6 +38,9 @@ dev = [
 where = [
     "src"
 ]
+include = [
+    "simpleob*"
+]
 
 
 [tool.pytest.ini_options]
@@ -49,7 +52,7 @@ markers = [
 ]
 
 [project.scripts]
-openbilanz = "openbilanz.qt_main:main"
+simpleob = "simpleob.qt_main:main"
 
 
 [tool.ruff]

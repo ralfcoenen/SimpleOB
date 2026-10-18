@@ -6,41 +6,41 @@ from xml.etree import ElementTree as ET
 
 import pytest
 
-from openbilanz.taxonomy.account_balance_tuple import (
+from simpleob.taxonomy.account_balance_tuple import (
     TaxonomyAccountBalance,
 )
-from openbilanz.taxonomy.concept import (
+from simpleob.taxonomy.concept import (
     TaxonomyBalance,
     TaxonomyConcept,
     TaxonomyPeriodType,
 )
-from openbilanz.taxonomy.context import (
+from simpleob.taxonomy.context import (
     TaxonomyContext,
     TaxonomyDimension,
 )
-from openbilanz.taxonomy.entry_point import TaxonomyEntryPoint
-from openbilanz.taxonomy.fact import TaxonomyFact
-from openbilanz.taxonomy.gcd_company_id_no import (
+from simpleob.taxonomy.entry_point import TaxonomyEntryPoint
+from simpleob.taxonomy.fact import TaxonomyFact
+from simpleob.taxonomy.gcd_company_id_no import (
     GcdCompanyIdNo,
 )
-from openbilanz.taxonomy.gcd_domestic_branch_of_foreign_company import (
+from simpleob.taxonomy.gcd_domestic_branch_of_foreign_company import (
     GcdDomesticBranchOfForeignCompany,
 )
-from openbilanz.taxonomy.gcd_entity_with_taxable_purpose_business import (
+from simpleob.taxonomy.gcd_entity_with_taxable_purpose_business import (
     GcdEntityWithTaxablePurposeBusiness,
 )
-from openbilanz.taxonomy.gcd_report_element import (
+from simpleob.taxonomy.gcd_report_element import (
     GcdReportElement,
 )
-from openbilanz.taxonomy.gcd_shareholder_tuple import (
+from simpleob.taxonomy.gcd_shareholder_tuple import (
     GcdShareDivideKeyTuple,
     GcdShareholderLegalStatusTuple,
     GcdShareholderTuple,
 )
-from openbilanz.taxonomy.nil_fact import TaxonomyNilFact
-from openbilanz.taxonomy.text_fact import TaxonomyTextFact
-from openbilanz.taxonomy.unit import TaxonomyUnit
-from openbilanz.taxonomy.xbrl_writer import TaxonomyXbrlWriter
+from simpleob.taxonomy.nil_fact import TaxonomyNilFact
+from simpleob.taxonomy.text_fact import TaxonomyTextFact
+from simpleob.taxonomy.unit import TaxonomyUnit
+from simpleob.taxonomy.xbrl_writer import TaxonomyXbrlWriter
 
 DE_GAAP_CI_NAMESPACE = (
     "http://www.xbrl.de/taxonomies/"

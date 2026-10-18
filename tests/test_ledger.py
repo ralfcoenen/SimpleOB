@@ -6,9 +6,9 @@ from uuid import uuid4
 
 import pytest
 
-from openbilanz.accounting import Ledger
-from openbilanz.accounting.ledger_entry import LedgerEntry
-from openbilanz.domain.entry_side import EntrySide
+from simpleob.accounting import Ledger
+from simpleob.accounting.ledger_entry import LedgerEntry
+from simpleob.domain.entry_side import EntrySide
 
 
 def test_new_ledger_is_empty() -> None:

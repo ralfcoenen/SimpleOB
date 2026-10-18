@@ -6,7 +6,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from openbilanz.client_transfer import filename as module
+from simpleob.client_transfer import filename as module
 
 
 def test_name_contains_company_local_time_and_random_id(monkeypatch):

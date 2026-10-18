@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from openbilanz.taxonomy.arelle_adapter import ArelleAdapter
-from openbilanz.taxonomy.version_comparison import (
+from simpleob.taxonomy.arelle_adapter import ArelleAdapter
+from simpleob.taxonomy.version_comparison import (
     TaxonomyVersionComparison,
 )
 

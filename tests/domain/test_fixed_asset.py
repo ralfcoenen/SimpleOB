@@ -4,8 +4,8 @@ from uuid import uuid4
 
 import pytest
 
-from openbilanz.domain.fixed_asset import FixedAsset
-from openbilanz.domain.fixed_asset_status import (
+from simpleob.domain.fixed_asset import FixedAsset
+from simpleob.domain.fixed_asset_status import (
     FixedAssetStatus,
 )
 

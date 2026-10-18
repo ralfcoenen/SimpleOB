@@ -5,60 +5,60 @@ from uuid import uuid4
 
 import pytest
 
-from openbilanz.domain.company import Company
-from openbilanz.domain.fiscal_year import FiscalYear
-from openbilanz.taxonomy.concept import (
+from simpleob.domain.company import Company
+from simpleob.domain.fiscal_year import FiscalYear
+from simpleob.taxonomy.concept import (
     TaxonomyBalance,
     TaxonomyConcept,
     TaxonomyPeriodType,
 )
-from openbilanz.taxonomy.concept_set import TaxonomyConceptSet
-from openbilanz.taxonomy.context import TaxonomyContext
-from openbilanz.taxonomy.fact import TaxonomyFact
-from openbilanz.taxonomy.gcd_company_data import GcdCompanyData
-from openbilanz.taxonomy.gcd_company_id_no import (
+from simpleob.taxonomy.concept_set import TaxonomyConceptSet
+from simpleob.taxonomy.context import TaxonomyContext
+from simpleob.taxonomy.fact import TaxonomyFact
+from simpleob.taxonomy.gcd_company_data import GcdCompanyData
+from simpleob.taxonomy.gcd_company_id_no import (
     GcdCompanyIdNo,
 )
-from openbilanz.taxonomy.gcd_company_identifiers import (
+from simpleob.taxonomy.gcd_company_identifiers import (
     GcdCompanyIdentifiers,
 )
-from openbilanz.taxonomy.gcd_domestic_branch_of_foreign_company import (
+from simpleob.taxonomy.gcd_domestic_branch_of_foreign_company import (
     GcdDomesticBranchOfForeignCompany,
     GcdDomesticBranchOfForeignCompanyType,
 )
-from openbilanz.taxonomy.gcd_entity_with_taxable_purpose_business import (
+from simpleob.taxonomy.gcd_entity_with_taxable_purpose_business import (
     GcdEntityWithTaxablePurposeBusiness,
     GcdEntityWithTaxablePurposeBusinessType,
 )
-from openbilanz.taxonomy.gcd_fact_builder import GcdFactBuilder
-from openbilanz.taxonomy.gcd_report_data import (
+from simpleob.taxonomy.gcd_fact_builder import GcdFactBuilder
+from simpleob.taxonomy.gcd_report_data import (
     GcdReportData,
 )
-from openbilanz.taxonomy.gcd_report_element import (
+from simpleob.taxonomy.gcd_report_element import (
     GcdReportElement,
 )
-from openbilanz.taxonomy.gcd_report_profile import (
+from simpleob.taxonomy.gcd_report_profile import (
     GcdReportProfile,
 )
-from openbilanz.taxonomy.gcd_shareholder import (
+from simpleob.taxonomy.gcd_shareholder import (
     GcdShareDivideKey,
     GcdShareholder,
     GcdShareholderGroup,
     GcdShareholderLegalStatus,
 )
-from openbilanz.taxonomy.gcd_shareholder_tuple import (
+from simpleob.taxonomy.gcd_shareholder_tuple import (
     GcdShareDivideKeyTuple,
     GcdShareholderLegalStatusTuple,
     GcdShareholderTuple,
 )
-from openbilanz.taxonomy.label_set import TaxonomyLabelSet
-from openbilanz.taxonomy.model import TaxonomyModel
-from openbilanz.taxonomy.nil_fact import TaxonomyNilFact
-from openbilanz.taxonomy.presentation_set import (
+from simpleob.taxonomy.label_set import TaxonomyLabelSet
+from simpleob.taxonomy.model import TaxonomyModel
+from simpleob.taxonomy.nil_fact import TaxonomyNilFact
+from simpleob.taxonomy.presentation_set import (
     TaxonomyPresentationSet,
 )
-from openbilanz.taxonomy.text_fact import TaxonomyTextFact
-from openbilanz.taxonomy.unit import TaxonomyUnit
+from simpleob.taxonomy.text_fact import TaxonomyTextFact
+from simpleob.taxonomy.unit import TaxonomyUnit
 
 TEST_ENTITY_SCHEME = (
     "http://www.bundesfinanzministerium.de"
@@ -2001,7 +2001,7 @@ def test_gcd_fact_builder_builds_domestic_branch_of_foreign_company() -> None:
 def test_gcd_fact_builder_builds_nil_facts_for_missing_shareholder_identifiers() -> None:
     """Fehlende Gesellschafter-Kennungen werden als NIL-Facts erzeugt."""
 
-    from openbilanz.taxonomy.nil_fact import TaxonomyNilFact
+    from simpleob.taxonomy.nil_fact import TaxonomyNilFact
 
     shareholder = GcdShareholder(
         name="Mustermann",

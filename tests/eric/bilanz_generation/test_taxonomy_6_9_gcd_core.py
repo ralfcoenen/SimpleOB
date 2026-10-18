@@ -1,9 +1,9 @@
 """Tests für den GCD-Kern des ERiC-Profils Taxonomie 6.9."""
 
-from openbilanz.eric.bilanz_generation.fact_plan import (
+from simpleob.eric.bilanz_generation.fact_plan import (
     FactPlanState,
 )
-from openbilanz.eric.bilanz_generation.taxonomy_6_9 import (
+from simpleob.eric.bilanz_generation.taxonomy_6_9 import (
     create_profile_6_9,
 )
 

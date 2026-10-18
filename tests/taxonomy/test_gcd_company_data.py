@@ -4,8 +4,8 @@ from uuid import uuid4
 
 import pytest
 
-from openbilanz.domain.company import Company
-from openbilanz.taxonomy.gcd_company_data import GcdCompanyData
+from simpleob.domain.company import Company
+from simpleob.taxonomy.gcd_company_data import GcdCompanyData
 
 
 def test_gcd_company_data_contains_company_identity() -> None:

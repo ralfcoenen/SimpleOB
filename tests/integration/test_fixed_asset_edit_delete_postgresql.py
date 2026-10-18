@@ -13,22 +13,22 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 
-from openbilanz.core.context import ApplicationContext
-from openbilanz.database.booking_repository import BookingRepository
-from openbilanz.database.company_repository import CompanyRepository
-from openbilanz.database.fixed_asset_depreciation_repository import (
+from simpleob.core.context import ApplicationContext
+from simpleob.database.booking_repository import BookingRepository
+from simpleob.database.company_repository import CompanyRepository
+from simpleob.database.fixed_asset_depreciation_repository import (
     FixedAssetDepreciationRepository,
 )
-from openbilanz.database.fixed_asset_movement_repository import (
+from simpleob.database.fixed_asset_movement_repository import (
     FixedAssetMovementRepository,
 )
-from openbilanz.database.fixed_asset_repository import FixedAssetRepository
-from openbilanz.database.lock_error import DatabaseLockError
-from openbilanz.database.models import Mandant
-from openbilanz.domain.company import Company
-from openbilanz.domain.fiscal_year import FiscalYear
-from openbilanz.domain.fixed_asset import FixedAsset
-from openbilanz.services.fiscal_year_workspace import FiscalYearWorkspace
+from simpleob.database.fixed_asset_repository import FixedAssetRepository
+from simpleob.database.lock_error import DatabaseLockError
+from simpleob.database.models import Mandant
+from simpleob.domain.company import Company
+from simpleob.domain.fiscal_year import FiscalYear
+from simpleob.domain.fixed_asset import FixedAsset
+from simpleob.services.fiscal_year_workspace import FiscalYearWorkspace
 
 
 @pytest.fixture

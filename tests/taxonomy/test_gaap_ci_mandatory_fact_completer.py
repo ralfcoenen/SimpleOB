@@ -3,30 +3,30 @@
 from datetime import date
 from decimal import Decimal
 
-from openbilanz.taxonomy.concept import (
+from simpleob.taxonomy.concept import (
     TaxonomyBalance,
     TaxonomyConcept,
     TaxonomyPeriodType,
 )
-from openbilanz.taxonomy.concept_set import TaxonomyConceptSet
-from openbilanz.taxonomy.context import TaxonomyContext
-from openbilanz.taxonomy.fact import TaxonomyFact
-from openbilanz.taxonomy.fiscal_requirement_reader import (
+from simpleob.taxonomy.concept_set import TaxonomyConceptSet
+from simpleob.taxonomy.context import TaxonomyContext
+from simpleob.taxonomy.fact import TaxonomyFact
+from simpleob.taxonomy.fiscal_requirement_reader import (
     FiscalConceptRequirement,
     FiscalRequirement,
 )
-from openbilanz.taxonomy.gaap_ci_mandatory_fact_completer import (
+from simpleob.taxonomy.gaap_ci_mandatory_fact_completer import (
     GaapCiMandatoryFactCompleter,
 )
-from openbilanz.taxonomy.label_set import TaxonomyLabelSet
-from openbilanz.taxonomy.model import TaxonomyModel
-from openbilanz.taxonomy.presentation import (
+from simpleob.taxonomy.label_set import TaxonomyLabelSet
+from simpleob.taxonomy.model import TaxonomyModel
+from simpleob.taxonomy.presentation import (
     TaxonomyPresentationRelation,
 )
-from openbilanz.taxonomy.presentation_set import (
+from simpleob.taxonomy.presentation_set import (
     TaxonomyPresentationSet,
 )
-from openbilanz.taxonomy.unit import TaxonomyUnit
+from simpleob.taxonomy.unit import TaxonomyUnit
 
 BALANCE_SHEET_ROLE = (
     "http://www.xbrl.de/taxonomies/de-gaap-ci/role/balanceSheet"

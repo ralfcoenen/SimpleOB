@@ -1,8 +1,8 @@
 import pytest
 
-from openbilanz.domain.booking import Booking
-from openbilanz.domain.booking_validator import BookingValidator
-from openbilanz.domain.errors import (
+from simpleob.domain.booking import Booking
+from simpleob.domain.booking_validator import BookingValidator
+from simpleob.domain.errors import (
     UnknownAccountError,
 )
 from tests.factories import (

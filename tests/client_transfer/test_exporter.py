@@ -6,28 +6,28 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 from uuid import UUID
 
-from openbilanz.accounting.financial_statement_position import (
+from simpleob.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
-from openbilanz.client_transfer.exporter import (
+from simpleob.client_transfer.exporter import (
     ClientTransferExporter,
 )
-from openbilanz.client_transfer.serialization import (
+from simpleob.client_transfer.serialization import (
     client_transfer_from_json,
     client_transfer_to_json,
 )
-from openbilanz.domain.account_type import AccountType
-from openbilanz.domain.depreciation_kind import DepreciationKind
-from openbilanz.domain.depreciation_source import DepreciationSource
-from openbilanz.domain.entry_side import EntrySide
-from openbilanz.domain.fiscal_year import FiscalYear
-from openbilanz.domain.fiscal_year_status import FiscalYearStatus
-from openbilanz.domain.fixed_asset_movement_type import (
+from simpleob.domain.account_type import AccountType
+from simpleob.domain.depreciation_kind import DepreciationKind
+from simpleob.domain.depreciation_source import DepreciationSource
+from simpleob.domain.entry_side import EntrySide
+from simpleob.domain.fiscal_year import FiscalYear
+from simpleob.domain.fiscal_year_status import FiscalYearStatus
+from simpleob.domain.fixed_asset_movement_type import (
     FixedAssetMovementType,
 )
-from openbilanz.domain.fixed_asset_status import FixedAssetStatus
-from openbilanz.domain.managed_fiscal_year import ManagedFiscalYear
-from openbilanz.domain.profit_appropriation_posting_type import (
+from simpleob.domain.fixed_asset_status import FixedAssetStatus
+from simpleob.domain.managed_fiscal_year import ManagedFiscalYear
+from simpleob.domain.profit_appropriation_posting_type import (
     ProfitAppropriationPostingType,
 )
 

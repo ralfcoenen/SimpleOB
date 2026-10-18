@@ -9,8 +9,8 @@ import pytest
 from alembic import command
 from alembic.config import Config
 
-from openbilanz.core.config import ApplicationConfig
-from openbilanz.database.migration_service import (
+from simpleob.core.config import ApplicationConfig
+from simpleob.database.migration_service import (
     LEGACY_SCHEMA_REVISION,
     DatabaseMigrationService,
     PostgreSQLSchemaStatus,
@@ -335,7 +335,7 @@ def test_postgresql_start_check_rejects_empty_database(
     from dataclasses import replace
     from unittest.mock import MagicMock
 
-    import openbilanz.database.migration_service as module
+    import simpleob.database.migration_service as module
 
     config = replace(
         _application_config(tmp_path / "test.db"),
@@ -471,7 +471,7 @@ def test_postgresql_inspection_without_alembic_version(
     from dataclasses import replace
     from unittest.mock import MagicMock
 
-    import openbilanz.database.migration_service as module
+    import simpleob.database.migration_service as module
 
     config = replace(
         _application_config(tmp_path / "unused.db"),
@@ -561,7 +561,7 @@ def test_postgresql_inspection_outdated_schema(
     from dataclasses import replace
     from unittest.mock import MagicMock
 
-    import openbilanz.database.migration_service as module
+    import simpleob.database.migration_service as module
 
     config = replace(
         _application_config(tmp_path / "unused.db"),
@@ -623,7 +623,7 @@ def test_postgresql_inspection_unknown_revision(
     from dataclasses import replace
     from unittest.mock import MagicMock
 
-    import openbilanz.database.migration_service as module
+    import simpleob.database.migration_service as module
 
     config = replace(
         _application_config(tmp_path / "unused.db"),
@@ -724,7 +724,7 @@ def test_direct_postgresql_upgrade_is_rejected(
     """Der bisherige Migrationsweg darf PostgreSQL nicht verändern."""
     from unittest.mock import Mock
 
-    from openbilanz.database import migration_service
+    from simpleob.database import migration_service
 
     application_config = Mock()
     application_config.database_url = (
@@ -762,7 +762,7 @@ def test_postgresql_connection_upgrade_rejects_sqlite(
 
     from sqlalchemy import create_engine
 
-    from openbilanz.database import migration_service
+    from simpleob.database import migration_service
 
     database_file = tmp_path / "rejected_upgrade.db"
     service = DatabaseMigrationService(
@@ -794,7 +794,7 @@ def test_postgresql_connection_upgrade_rejects_wrong_database(
     """Eine andere konfigurierte Datenbank ist unzulässig."""
     from unittest.mock import Mock
 
-    from openbilanz.database import migration_service
+    from simpleob.database import migration_service
 
     application_config = Mock()
     application_config.database_url = (
@@ -830,7 +830,7 @@ def test_postgresql_connection_upgrade_rejects_wrong_connection(
 
     from sqlalchemy import create_engine
 
-    from openbilanz.database import migration_service
+    from simpleob.database import migration_service
 
     application_config = Mock()
     application_config.database_url = (
@@ -933,7 +933,7 @@ def test_postgresql_connection_upgrade_checks_actual_database(
     """Die tatsächliche Datenbank wird vor Alembic geprüft."""
     from unittest.mock import Mock
 
-    from openbilanz.database import migration_service
+    from simpleob.database import migration_service
 
     application_config = Mock()
     application_config.database_url = (

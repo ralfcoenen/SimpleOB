@@ -4,14 +4,14 @@ from decimal import Decimal
 
 import pytest
 
-from openbilanz.accounting.financial_statement_position import (
+from simpleob.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
-from openbilanz.accounting.income_statement import IncomeStatement
-from openbilanz.eric.bilanz_generation.gaap_ci_6_9_values import (
+from simpleob.accounting.income_statement import IncomeStatement
+from simpleob.eric.bilanz_generation.gaap_ci_6_9_values import (
     GaapCi69ValueCalculator,
 )
-from openbilanz.hgb.income_statement_structure import (
+from simpleob.hgb.income_statement_structure import (
     create_hgb_income_statement_structure,
 )
 

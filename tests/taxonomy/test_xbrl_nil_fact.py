@@ -2,16 +2,16 @@
 
 from datetime import date
 
-from openbilanz.exporter.xbrl_export import XbrlExporter
-from openbilanz.taxonomy.concept import (
+from simpleob.exporter.xbrl_export import XbrlExporter
+from simpleob.taxonomy.concept import (
     TaxonomyBalance,
     TaxonomyConcept,
     TaxonomyPeriodType,
 )
-from openbilanz.taxonomy.context import TaxonomyContext
-from openbilanz.taxonomy.nil_fact import TaxonomyNilFact
-from openbilanz.taxonomy.unit import TaxonomyUnit
-from openbilanz.taxonomy.xbrl_writer import (
+from simpleob.taxonomy.context import TaxonomyContext
+from simpleob.taxonomy.nil_fact import TaxonomyNilFact
+from simpleob.taxonomy.unit import TaxonomyUnit
+from simpleob.taxonomy.xbrl_writer import (
     XSI_NAMESPACE,
     TaxonomyXbrlWriter,
 )

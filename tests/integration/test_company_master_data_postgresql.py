@@ -8,11 +8,11 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 
-from openbilanz.database.company_repository import CompanyRepository
-from openbilanz.database.lock_error import DatabaseLockError
-from openbilanz.database.models import Mandant
-from openbilanz.domain.company import Company
-from openbilanz.domain.company_master_data import CompanyMasterData
+from simpleob.database.company_repository import CompanyRepository
+from simpleob.database.lock_error import DatabaseLockError
+from simpleob.database.models import Mandant
+from simpleob.domain.company import Company
+from simpleob.domain.company_master_data import CompanyMasterData
 
 
 @pytest.fixture

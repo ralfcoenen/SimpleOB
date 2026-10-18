@@ -2,10 +2,10 @@
 
 from decimal import Decimal
 
-from openbilanz.taxonomy.presentation import (
+from simpleob.taxonomy.presentation import (
     TaxonomyPresentationRelation,
 )
-from openbilanz.taxonomy.presentation_set import (
+from simpleob.taxonomy.presentation_set import (
     TaxonomyPresentationSet,
 )
 

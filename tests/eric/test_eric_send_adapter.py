@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from openbilanz.eric.eric_send_adapter import (
+from simpleob.eric.eric_send_adapter import (
     ERIC_SEND_FLAGS,
     ERIC_SENDE,
     ERIC_VALIDIERE,

@@ -2,7 +2,7 @@
 
 import pytest
 
-from openbilanz.taxonomy.gcd_shareholder import (
+from simpleob.taxonomy.gcd_shareholder import (
     GcdShareDivideKey,
     GcdShareholder,
     GcdShareholderGroup,

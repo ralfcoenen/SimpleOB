@@ -5,21 +5,21 @@ from decimal import Decimal
 from unittest.mock import Mock
 from uuid import uuid4
 
-from openbilanz.domain.booking import Booking
-from openbilanz.domain.booking_line import BookingLine
-from openbilanz.domain.entry_side import EntrySide
-from openbilanz.domain.fiscal_year import FiscalYear
-from openbilanz.domain.fixed_asset import FixedAsset
-from openbilanz.domain.fixed_asset_disposal_calculation import (
+from simpleob.domain.booking import Booking
+from simpleob.domain.booking_line import BookingLine
+from simpleob.domain.entry_side import EntrySide
+from simpleob.domain.fiscal_year import FiscalYear
+from simpleob.domain.fixed_asset import FixedAsset
+from simpleob.domain.fixed_asset_disposal_calculation import (
     FixedAssetDisposalCalculation,
 )
-from openbilanz.domain.fixed_asset_movement_type import (
+from simpleob.domain.fixed_asset_movement_type import (
     FixedAssetMovementType,
 )
-from openbilanz.domain.fixed_asset_status import (
+from simpleob.domain.fixed_asset_status import (
     FixedAssetStatus,
 )
-from openbilanz.services.fixed_asset_disposal_workflow import (
+from simpleob.services.fixed_asset_disposal_workflow import (
     FixedAssetDisposalWorkflow,
 )
 

@@ -1,6 +1,6 @@
 import pytest
 
-from openbilanz.importers.chart_of_accounts_importer import (
+from simpleob.importers.chart_of_accounts_importer import (
     ChartOfAccountsImporter,
 )
 

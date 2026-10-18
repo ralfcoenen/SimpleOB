@@ -1,21 +1,21 @@
 """Tests für die Sammlung von Taxonomie-Zuordnungen."""
 import pytest
 
-from openbilanz.accounting.financial_statement_position import (
+from simpleob.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
-from openbilanz.accounting.statement_category import StatementCategory
-from openbilanz.taxonomy.concept import (
+from simpleob.accounting.statement_category import StatementCategory
+from simpleob.taxonomy.concept import (
     TaxonomyBalance,
     TaxonomyConcept,
     TaxonomyPeriodType,
 )
-from openbilanz.taxonomy.concept_set import TaxonomyConceptSet
-from openbilanz.taxonomy.label_set import TaxonomyLabelSet
-from openbilanz.taxonomy.mapping import TaxonomyMappingRule
-from openbilanz.taxonomy.mapping_set import TaxonomyMappingSet
-from openbilanz.taxonomy.model import TaxonomyModel
-from openbilanz.taxonomy.presentation_set import (
+from simpleob.taxonomy.concept_set import TaxonomyConceptSet
+from simpleob.taxonomy.label_set import TaxonomyLabelSet
+from simpleob.taxonomy.mapping import TaxonomyMappingRule
+from simpleob.taxonomy.mapping_set import TaxonomyMappingSet
+from simpleob.taxonomy.model import TaxonomyModel
+from simpleob.taxonomy.presentation_set import (
     TaxonomyPresentationSet,
 )
 

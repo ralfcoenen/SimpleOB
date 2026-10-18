@@ -6,12 +6,12 @@ from uuid import uuid4
 
 import pytest
 
-from openbilanz.domain.booking_type import BookingType
-from openbilanz.domain.depreciation_proposal import (
+from simpleob.domain.booking_type import BookingType
+from simpleob.domain.depreciation_proposal import (
     DepreciationProposal,
 )
-from openbilanz.domain.entry_side import EntrySide
-from openbilanz.services.depreciation_booking_service import (
+from simpleob.domain.entry_side import EntrySide
+from simpleob.services.depreciation_booking_service import (
     DepreciationBookingService,
 )
 

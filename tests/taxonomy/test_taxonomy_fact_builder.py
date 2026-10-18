@@ -5,27 +5,27 @@ from decimal import Decimal
 
 import pytest
 
-from openbilanz.accounting.financial_statement_position import (
+from simpleob.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
-from openbilanz.accounting.statement_category import StatementCategory
-from openbilanz.taxonomy.concept import (
+from simpleob.accounting.statement_category import StatementCategory
+from simpleob.taxonomy.concept import (
     TaxonomyBalance,
     TaxonomyConcept,
     TaxonomyPeriodType,
 )
-from openbilanz.taxonomy.concept_set import TaxonomyConceptSet
-from openbilanz.taxonomy.context import TaxonomyContext
-from openbilanz.taxonomy.fact_builder import TaxonomyFactBuilder
-from openbilanz.taxonomy.label_set import TaxonomyLabelSet
-from openbilanz.taxonomy.mapper import TaxonomyMapper
-from openbilanz.taxonomy.mapping import TaxonomyMappingRule
-from openbilanz.taxonomy.mapping_set import TaxonomyMappingSet
-from openbilanz.taxonomy.model import TaxonomyModel
-from openbilanz.taxonomy.presentation_set import (
+from simpleob.taxonomy.concept_set import TaxonomyConceptSet
+from simpleob.taxonomy.context import TaxonomyContext
+from simpleob.taxonomy.fact_builder import TaxonomyFactBuilder
+from simpleob.taxonomy.label_set import TaxonomyLabelSet
+from simpleob.taxonomy.mapper import TaxonomyMapper
+from simpleob.taxonomy.mapping import TaxonomyMappingRule
+from simpleob.taxonomy.mapping_set import TaxonomyMappingSet
+from simpleob.taxonomy.model import TaxonomyModel
+from simpleob.taxonomy.presentation_set import (
     TaxonomyPresentationSet,
 )
-from openbilanz.taxonomy.unit import TaxonomyUnit
+from simpleob.taxonomy.unit import TaxonomyUnit
 
 TEST_ENTITY_SCHEME = "http://www.bundesfinanzministerium.de"
 

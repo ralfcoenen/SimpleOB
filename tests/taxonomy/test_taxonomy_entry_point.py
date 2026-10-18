@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from openbilanz.taxonomy.entry_point import (
+from simpleob.taxonomy.entry_point import (
     TaxonomyEntryPoint,
     TaxonomyEntryPointVariant,
     TaxonomyFamily,

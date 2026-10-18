@@ -7,69 +7,69 @@ from uuid import uuid4
 
 import pytest
 
-from openbilanz.accounting.account_balance import AccountBalance
-from openbilanz.accounting.financial_statement_builder import (
+from simpleob.accounting.account_balance import AccountBalance
+from simpleob.accounting.financial_statement_builder import (
     FinancialStatementBuilder,
 )
-from openbilanz.accounting.financial_statement_position import (
+from simpleob.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
-from openbilanz.accounting.mapper import AccountMapper
-from openbilanz.accounting.statement_category import StatementCategory
-from openbilanz.domain.account_mapping_rule import AccountMappingRule
-from openbilanz.domain.account_type import AccountType
-from openbilanz.domain.chart_of_accounts_template import (
+from simpleob.accounting.mapper import AccountMapper
+from simpleob.accounting.statement_category import StatementCategory
+from simpleob.domain.account_mapping_rule import AccountMappingRule
+from simpleob.domain.account_type import AccountType
+from simpleob.domain.chart_of_accounts_template import (
     ChartOfAccountsTemplate,
 )
-from openbilanz.domain.company import Company
-from openbilanz.domain.fiscal_year import FiscalYear
-from openbilanz.domain.template_account import TemplateAccount
-from openbilanz.exporter.xbrl_export import XbrlExporter
-from openbilanz.hgb.balance_sheet_structure import (
+from simpleob.domain.company import Company
+from simpleob.domain.fiscal_year import FiscalYear
+from simpleob.domain.template_account import TemplateAccount
+from simpleob.exporter.xbrl_export import XbrlExporter
+from simpleob.hgb.balance_sheet_structure import (
     create_hgb_balance_sheet_structure,
 )
-from openbilanz.hgb.income_statement_structure import (
+from simpleob.hgb.income_statement_structure import (
     create_hgb_income_statement_structure,
 )
-from openbilanz.taxonomy.arelle_adapter import ArelleAdapter
-from openbilanz.taxonomy.concept import (
+from simpleob.taxonomy.arelle_adapter import ArelleAdapter
+from simpleob.taxonomy.concept import (
     TaxonomyBalance,
     TaxonomyConcept,
     TaxonomyPeriodType,
 )
-from openbilanz.taxonomy.context import TaxonomyContext
-from openbilanz.taxonomy.entry_point import TaxonomyEntryPoint
-from openbilanz.taxonomy.fact import TaxonomyFact
-from openbilanz.taxonomy.fact_builder import TaxonomyFactBuilder
-from openbilanz.taxonomy.gcd_company_data import GcdCompanyData
-from openbilanz.taxonomy.gcd_company_identifiers import (
+from simpleob.taxonomy.context import TaxonomyContext
+from simpleob.taxonomy.entry_point import TaxonomyEntryPoint
+from simpleob.taxonomy.fact import TaxonomyFact
+from simpleob.taxonomy.fact_builder import TaxonomyFactBuilder
+from simpleob.taxonomy.gcd_company_data import GcdCompanyData
+from simpleob.taxonomy.gcd_company_identifiers import (
     GcdCompanyIdentifiers,
 )
-from openbilanz.taxonomy.gcd_domestic_branch_of_foreign_company import (
+from simpleob.taxonomy.gcd_domestic_branch_of_foreign_company import (
     GcdDomesticBranchOfForeignCompanyType,
 )
-from openbilanz.taxonomy.gcd_entity_with_taxable_purpose_business import (
+from simpleob.taxonomy.gcd_entity_with_taxable_purpose_business import (
     GcdEntityWithTaxablePurposeBusinessType,
 )
-from openbilanz.taxonomy.gcd_fact_builder import GcdFactBuilder
-from openbilanz.taxonomy.gcd_report_profile import (
+from simpleob.taxonomy.gcd_fact_builder import GcdFactBuilder
+from simpleob.taxonomy.gcd_report_profile import (
     GcdReportProfile,
 )
-from openbilanz.taxonomy.gcd_shareholder import (
+from simpleob.taxonomy.gcd_shareholder import (
     GcdShareDivideKey,
     GcdShareholder,
     GcdShareholderGroup,
     GcdShareholderLegalStatus,
 )
-from openbilanz.taxonomy.hgb_gaap_ci_mapping import (
+from simpleob.taxonomy.hgb_gaap_ci_mapping import (
     create_hgb_gaap_ci_mapping,
 )
-from openbilanz.taxonomy.mapper import TaxonomyMapper
-from openbilanz.taxonomy.mapping import TaxonomyMappingRule
-from openbilanz.taxonomy.mapping_set import TaxonomyMappingSet
-from openbilanz.taxonomy.resolver import TaxonomyResolver
-from openbilanz.taxonomy.taxonomy import TaxonomyVersion
-from openbilanz.taxonomy.unit import TaxonomyUnit
+from simpleob.taxonomy.mapper import TaxonomyMapper
+from simpleob.taxonomy.mapping import TaxonomyMappingRule
+from simpleob.taxonomy.mapping_set import TaxonomyMappingSet
+from simpleob.taxonomy.resolver import TaxonomyResolver
+from simpleob.taxonomy.taxonomy import TaxonomyVersion
+from simpleob.taxonomy.unit import TaxonomyUnit
 
 TAXONOMY_ROOT = Path(
     "data/taxonomy"

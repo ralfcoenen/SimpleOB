@@ -2,7 +2,7 @@
 
 import pytest
 
-from openbilanz.taxonomy.taxonomy import TaxonomyPosition
+from simpleob.taxonomy.taxonomy import TaxonomyPosition
 
 
 def test_taxonomy_position_stores_name_and_label() -> None:

@@ -3,33 +3,33 @@
 from datetime import date
 from decimal import Decimal
 
-from openbilanz.accounting.financial_statement_position import (
+from simpleob.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
-from openbilanz.accounting.statement_category import (
+from simpleob.accounting.statement_category import (
     StatementCategory,
 )
-from openbilanz.services.fixed_asset_schedule_service import (
+from simpleob.services.fixed_asset_schedule_service import (
     FixedAssetSchedulePosition,
 )
-from openbilanz.taxonomy.concept import (
+from simpleob.taxonomy.concept import (
     TaxonomyBalance,
     TaxonomyConcept,
     TaxonomyPeriodType,
 )
-from openbilanz.taxonomy.concept_set import TaxonomyConceptSet
-from openbilanz.taxonomy.fixed_asset_schedule_builder import (
+from simpleob.taxonomy.concept_set import TaxonomyConceptSet
+from simpleob.taxonomy.fixed_asset_schedule_builder import (
     FixedAssetScheduleBuilder,
 )
-from openbilanz.taxonomy.label_set import TaxonomyLabelSet
-from openbilanz.taxonomy.mapper import TaxonomyMapper
-from openbilanz.taxonomy.mapping import TaxonomyMappingRule
-from openbilanz.taxonomy.mapping_set import TaxonomyMappingSet
-from openbilanz.taxonomy.model import TaxonomyModel
-from openbilanz.taxonomy.presentation import (
+from simpleob.taxonomy.label_set import TaxonomyLabelSet
+from simpleob.taxonomy.mapper import TaxonomyMapper
+from simpleob.taxonomy.mapping import TaxonomyMappingRule
+from simpleob.taxonomy.mapping_set import TaxonomyMappingSet
+from simpleob.taxonomy.model import TaxonomyModel
+from simpleob.taxonomy.presentation import (
     TaxonomyPresentationRelation,
 )
-from openbilanz.taxonomy.presentation_set import (
+from simpleob.taxonomy.presentation_set import (
     TaxonomyPresentationSet,
 )
 

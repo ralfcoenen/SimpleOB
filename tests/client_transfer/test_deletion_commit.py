@@ -6,8 +6,8 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.exc import OperationalError
 
-from openbilanz.services import client_deletion_service as module
-from openbilanz.services.client_deletion_service import (
+from simpleob.services import client_deletion_service as module
+from simpleob.services.client_deletion_service import (
     ClientDeletionCommitUnknown,
     ClientDeletionService,
 )

@@ -13,8 +13,8 @@ from uuid import uuid4
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from openbilanz.core.config import load_config
-from openbilanz.database.models import (
+from simpleob.core.config import load_config
+from simpleob.database.models import (
     Buchung,
     Buchungszeile,
     Mandant,

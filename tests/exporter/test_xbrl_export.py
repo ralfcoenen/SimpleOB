@@ -6,36 +6,36 @@ from xml.etree import ElementTree as ET
 
 import pytest
 
-from openbilanz.exporter.xbrl_export import XbrlExporter
-from openbilanz.taxonomy.concept import (
+from simpleob.exporter.xbrl_export import XbrlExporter
+from simpleob.taxonomy.concept import (
     TaxonomyBalance,
     TaxonomyConcept,
     TaxonomyPeriodType,
 )
-from openbilanz.taxonomy.context import TaxonomyContext
-from openbilanz.taxonomy.entry_point import TaxonomyEntryPoint
-from openbilanz.taxonomy.fact import TaxonomyFact
-from openbilanz.taxonomy.gcd_company_id_no import (
+from simpleob.taxonomy.context import TaxonomyContext
+from simpleob.taxonomy.entry_point import TaxonomyEntryPoint
+from simpleob.taxonomy.fact import TaxonomyFact
+from simpleob.taxonomy.gcd_company_id_no import (
     GcdCompanyIdNo,
 )
-from openbilanz.taxonomy.gcd_domestic_branch_of_foreign_company import (
+from simpleob.taxonomy.gcd_domestic_branch_of_foreign_company import (
     GcdDomesticBranchOfForeignCompany,
 )
-from openbilanz.taxonomy.gcd_entity_with_taxable_purpose_business import (
+from simpleob.taxonomy.gcd_entity_with_taxable_purpose_business import (
     GcdEntityWithTaxablePurposeBusiness,
 )
-from openbilanz.taxonomy.gcd_report_element import (
+from simpleob.taxonomy.gcd_report_element import (
     GcdReportElement,
 )
-from openbilanz.taxonomy.gcd_shareholder_tuple import (
+from simpleob.taxonomy.gcd_shareholder_tuple import (
     GcdShareDivideKeyTuple,
     GcdShareholderLegalStatusTuple,
     GcdShareholderTuple,
 )
-from openbilanz.taxonomy.resolver import TaxonomyResolver
-from openbilanz.taxonomy.taxonomy import TaxonomyVersion
-from openbilanz.taxonomy.text_fact import TaxonomyTextFact
-from openbilanz.taxonomy.unit import TaxonomyUnit
+from simpleob.taxonomy.resolver import TaxonomyResolver
+from simpleob.taxonomy.taxonomy import TaxonomyVersion
+from simpleob.taxonomy.text_fact import TaxonomyTextFact
+from simpleob.taxonomy.unit import TaxonomyUnit
 
 DE_GAAP_CI_NAMESPACE = (
     "http://www.xbrl.de/taxonomies/"

@@ -8,15 +8,15 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from openbilanz.database.company_repository import (
+from simpleob.database.company_repository import (
     CompanyRepository,
 )
-from openbilanz.database.database import Base
-from openbilanz.database.fixed_asset_repository import (
+from simpleob.database.database import Base
+from simpleob.database.fixed_asset_repository import (
     FixedAssetRepository,
 )
-from openbilanz.domain.company import Company
-from openbilanz.domain.fixed_asset import FixedAsset
+from simpleob.domain.company import Company
+from simpleob.domain.fixed_asset import FixedAsset
 
 
 def _fixed_asset(

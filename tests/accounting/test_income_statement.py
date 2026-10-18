@@ -1,9 +1,9 @@
 from decimal import Decimal
 
-from openbilanz.accounting.financial_statement_position import (
+from simpleob.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
-from openbilanz.accounting.income_statement import IncomeStatement
+from simpleob.accounting.income_statement import IncomeStatement
 
 
 def test_returns_amount_for_position() -> None:

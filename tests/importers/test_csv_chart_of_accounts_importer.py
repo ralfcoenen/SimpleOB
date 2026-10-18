@@ -2,20 +2,20 @@ from pathlib import Path
 
 import pytest
 
-from openbilanz.accounting.hgb_financial_statement_position_provider import (
+from simpleob.accounting.hgb_financial_statement_position_provider import (
     HgbFinancialStatementPositionProvider,
 )
-from openbilanz.domain.account_type import AccountType
-from openbilanz.hgb.balance_sheet_structure import (
+from simpleob.domain.account_type import AccountType
+from simpleob.hgb.balance_sheet_structure import (
     create_hgb_balance_sheet_structure,
 )
-from openbilanz.hgb.income_statement_structure import (
+from simpleob.hgb.income_statement_structure import (
     create_hgb_income_statement_structure,
 )
-from openbilanz.importers.csv_chart_of_accounts_importer import (
+from simpleob.importers.csv_chart_of_accounts_importer import (
     CsvChartOfAccountsImporter,
 )
-from openbilanz.importers.errors import (
+from simpleob.importers.errors import (
     ChartOfAccountsImportError,
 )
 

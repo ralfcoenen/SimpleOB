@@ -6,15 +6,15 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from openbilanz.database.company_repository import (
+from simpleob.database.company_repository import (
     CompanyRepository,
 )
-from openbilanz.database.database import Base
-from openbilanz.database.shareholder_repository import (
+from simpleob.database.database import Base
+from simpleob.database.shareholder_repository import (
     ShareholderRepository,
 )
-from openbilanz.domain.company import Company
-from openbilanz.domain.shareholder import Shareholder
+from simpleob.domain.company import Company
+from simpleob.domain.shareholder import Shareholder
 
 
 def _shareholder(

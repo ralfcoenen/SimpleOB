@@ -3,16 +3,16 @@
 from datetime import date
 from decimal import Decimal
 
-from openbilanz.domain.accounting_control_accounts import (
+from simpleob.domain.accounting_control_accounts import (
     AccountingControlAccounts,
 )
-from openbilanz.domain.profit_appropriation_annual_data import (
+from simpleob.domain.profit_appropriation_annual_data import (
     ProfitAppropriationAnnualData,
 )
-from openbilanz.domain.profit_appropriation_posting_type import (
+from simpleob.domain.profit_appropriation_posting_type import (
     ProfitAppropriationPostingType,
 )
-from openbilanz.services.profit_appropriation_posting_service import (
+from simpleob.services.profit_appropriation_posting_service import (
     ProfitAppropriationPostingService,
 )
 

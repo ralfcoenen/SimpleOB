@@ -54,180 +54,180 @@ import xml.etree.ElementTree as ET
 import getpass
 import os
 
-from openbilanz.accounting.balance_sheet import BalanceSheet
-from openbilanz.accounting.financial_statement_context import (
+from simpleob.accounting.balance_sheet import BalanceSheet
+from simpleob.accounting.financial_statement_context import (
     create_financial_statement_context,
     create_standard_financial_statement_context,
 )
-from openbilanz.accounting.hgb_financial_statement_position_provider import (
+from simpleob.accounting.hgb_financial_statement_position_provider import (
     HgbFinancialStatementPositionProvider,
 )
-from openbilanz.accounting.income_statement import IncomeStatement
-from openbilanz.accounting.ledger import Ledger
-from openbilanz.core.config import load_config
-from openbilanz.core.version import get_application_version
-from openbilanz.database.booking_repository import BookingRepository
-from openbilanz.database.chart_of_accounts_repository import (
+from simpleob.accounting.income_statement import IncomeStatement
+from simpleob.accounting.ledger import Ledger
+from simpleob.core.config import load_config
+from simpleob.core.version import get_application_version
+from simpleob.database.booking_repository import BookingRepository
+from simpleob.database.chart_of_accounts_repository import (
     ChartOfAccountsRepository,
 )
-from openbilanz.database.company_repository import CompanyRepository
-from openbilanz.database.database import Database
-from openbilanz.database.fixed_asset_depreciation_repository import (
+from simpleob.database.company_repository import CompanyRepository
+from simpleob.database.database import Database
+from simpleob.database.fixed_asset_depreciation_repository import (
     FixedAssetDepreciationRepository,
 )
-from openbilanz.database.fixed_asset_movement_repository import (
+from simpleob.database.fixed_asset_movement_repository import (
     FixedAssetMovementRepository,
 )
-from openbilanz.database.fixed_asset_repository import FixedAssetRepository
-from openbilanz.database.shareholder_repository import (
+from simpleob.database.fixed_asset_repository import FixedAssetRepository
+from simpleob.database.shareholder_repository import (
     ShareholderRepository,
 )
-from openbilanz.domain.account_type import AccountType
-from openbilanz.domain.booking_type import BookingType
-from openbilanz.domain.company import Company
-from openbilanz.domain.fiscal_year import FiscalYear
-from openbilanz.domain.fiscal_year_status import FiscalYearStatus
-from openbilanz.domain.managed_fiscal_year import ManagedFiscalYear
-from openbilanz.domain.money import ZERO
-from openbilanz.eric.bilanz_generation.fact_plan_resolver import (
+from simpleob.domain.account_type import AccountType
+from simpleob.domain.booking_type import BookingType
+from simpleob.domain.company import Company
+from simpleob.domain.fiscal_year import FiscalYear
+from simpleob.domain.fiscal_year_status import FiscalYearStatus
+from simpleob.domain.managed_fiscal_year import ManagedFiscalYear
+from simpleob.domain.money import ZERO
+from simpleob.eric.bilanz_generation.fact_plan_resolver import (
     FactPlanResolver,
 )
-from openbilanz.eric.bilanz_generation.gaap_ci_6_9_account_detail_values import (
+from simpleob.eric.bilanz_generation.gaap_ci_6_9_account_detail_values import (
     GaapCi69AccountDetailValueBuilder,
 )
-from openbilanz.eric.bilanz_generation.gaap_ci_6_9_balance_sheet_values import (
+from simpleob.eric.bilanz_generation.gaap_ci_6_9_balance_sheet_values import (
     GaapCi69BalanceSheetValueBuilder,
 )
-from openbilanz.eric.bilanz_generation.gaap_ci_6_9_income_statement_values import (
+from simpleob.eric.bilanz_generation.gaap_ci_6_9_income_statement_values import (
     GaapCi69IncomeStatementValueBuilder,
 )
-from openbilanz.eric.bilanz_generation.gaap_ci_6_9_values import (
+from simpleob.eric.bilanz_generation.gaap_ci_6_9_values import (
     GaapCi69ValueCalculator,
 )
-from openbilanz.eric.bilanz_generation.taxonomy_6_9 import (
+from simpleob.eric.bilanz_generation.taxonomy_6_9 import (
     create_profile_6_9,
 )
-from openbilanz.eric.bilanz_generation.taxonomy_6_9_values import (
+from simpleob.eric.bilanz_generation.taxonomy_6_9_values import (
     Taxonomy69ValueBuilder,
 )
-from openbilanz.eric.bilanz_generation.taxonomy_6_9_xbrl_document_builder import (
+from simpleob.eric.bilanz_generation.taxonomy_6_9_xbrl_document_builder import (
     Taxonomy69XbrlDocumentBuilder,
 )
 
-from openbilanz.eric.elster_bilanz_payload_service import (
+from simpleob.eric.elster_bilanz_payload_service import (
     ElsterBilanzPayloadService,
 )
-from openbilanz.eric.eric_create_th_adapter import (
+from simpleob.eric.eric_create_th_adapter import (
     EricCreateThAdapter,
 )
-from openbilanz.eric.eric_validate_adapter import (
+from simpleob.eric.eric_validate_adapter import (
     EricValidateAdapter,
     EricValidateError,
 )
-from openbilanz.eric.eric_send_adapter import (
+from simpleob.eric.eric_send_adapter import (
     EricSendAdapter,
     EricSendError,
 )
-from openbilanz.services.closing_result import ClosingResult
-from openbilanz.services.closing_service import ClosingService
-from openbilanz.services.e_bilanz_account_detail_service import (
+from simpleob.services.closing_result import ClosingResult
+from simpleob.services.closing_service import ClosingService
+from simpleob.services.e_bilanz_account_detail_service import (
     EBilanzAccountDetailService,
 )
-from openbilanz.services.fixed_asset_schedule_service import (
+from simpleob.services.fixed_asset_schedule_service import (
     FixedAssetScheduleService,
 )
-from openbilanz.services.posting_service import PostingService
-from openbilanz.taxonomy.account_balance_builder import (
+from simpleob.services.posting_service import PostingService
+from simpleob.taxonomy.account_balance_builder import (
     AccountBalanceBuilder,
 )
-from openbilanz.taxonomy.arelle_adapter import ArelleAdapter
-from openbilanz.taxonomy.concept import TaxonomyPeriodType
-from openbilanz.taxonomy.concept_set import TaxonomyConceptSet
-from openbilanz.taxonomy.context import TaxonomyContext
-from openbilanz.taxonomy.entry_point import TaxonomyEntryPoint
-from openbilanz.taxonomy.gcd_company_data_mapper import (
+from simpleob.taxonomy.arelle_adapter import ArelleAdapter
+from simpleob.taxonomy.concept import TaxonomyPeriodType
+from simpleob.taxonomy.concept_set import TaxonomyConceptSet
+from simpleob.taxonomy.context import TaxonomyContext
+from simpleob.taxonomy.entry_point import TaxonomyEntryPoint
+from simpleob.taxonomy.gcd_company_data_mapper import (
     GcdCompanyDataMapper,
 )
-from openbilanz.taxonomy.gcd_fact_builder import GcdFactBuilder
-from openbilanz.taxonomy.gcd_shareholder import (
+from simpleob.taxonomy.gcd_fact_builder import GcdFactBuilder
+from simpleob.taxonomy.gcd_shareholder import (
     GcdShareDivideKey,
     GcdShareholder,
     GcdShareholderLegalStatus,
 )
-from openbilanz.taxonomy.gcd_report_profile import GcdReportProfile
-from openbilanz.taxonomy.hgb_gaap_ci_mapping import (
+from simpleob.taxonomy.gcd_report_profile import GcdReportProfile
+from simpleob.taxonomy.hgb_gaap_ci_mapping import (
     create_hgb_gaap_ci_mapping,
 )
-from openbilanz.taxonomy.gaap_ci_mandatory_fact_completer import (
+from simpleob.taxonomy.gaap_ci_mandatory_fact_completer import (
     GaapCiMandatoryFactCompleter,
 )
-from openbilanz.taxonomy.fact import TaxonomyFact
-from openbilanz.taxonomy.fixed_asset_schedule_builder import (
+from simpleob.taxonomy.fact import TaxonomyFact
+from simpleob.taxonomy.fixed_asset_schedule_builder import (
     FixedAssetScheduleBuilder,
 )
-from openbilanz.taxonomy.fiscal_requirement_reader import (
+from simpleob.taxonomy.fiscal_requirement_reader import (
     FiscalRequirement,
     FiscalRequirementReader,
 )
-from openbilanz.taxonomy.mapper import TaxonomyMapper
-from openbilanz.taxonomy.nil_fact import TaxonomyNilFact
-from openbilanz.taxonomy.resolver import TaxonomyResolver
-from openbilanz.taxonomy.taxonomy import TaxonomyVersion
-from openbilanz.taxonomy.unit import TaxonomyUnit
-from openbilanz.accounting.financial_statement_context import (
+from simpleob.taxonomy.mapper import TaxonomyMapper
+from simpleob.taxonomy.nil_fact import TaxonomyNilFact
+from simpleob.taxonomy.resolver import TaxonomyResolver
+from simpleob.taxonomy.taxonomy import TaxonomyVersion
+from simpleob.taxonomy.unit import TaxonomyUnit
+from simpleob.accounting.financial_statement_context import (
     create_standard_financial_statement_context,
 )
-from openbilanz.accounting.hgb_financial_statement_position_provider import (
+from simpleob.accounting.hgb_financial_statement_position_provider import (
     HgbFinancialStatementPositionProvider,
 )
-from openbilanz.core.context import ApplicationContext
-from openbilanz.database.bvv_annual_data_repository import (
+from simpleob.core.context import ApplicationContext
+from simpleob.database.bvv_annual_data_repository import (
     BvvAnnualDataRepository,
 )
-from openbilanz.database.tax_depreciation_adjustment_repository import (
+from simpleob.database.tax_depreciation_adjustment_repository import (
     TaxDepreciationAdjustmentRepository,
 )
-from openbilanz.services.closing_accounts import ClosingAccounts
-from openbilanz.services.closing_consistency_service import (
+from simpleob.services.closing_accounts import ClosingAccounts
+from simpleob.services.closing_consistency_service import (
     ClosingConsistencyService,
 )
-from openbilanz.services.depreciation_booking_service import (
+from simpleob.services.depreciation_booking_service import (
     DepreciationBookingService,
 )
-from openbilanz.services.depreciation_service import (
+from simpleob.services.depreciation_service import (
     DepreciationService,
 )
-from openbilanz.services.e_bilanz_export_service import (
+from simpleob.services.e_bilanz_export_service import (
     EBilanzExportService,
 )
-from openbilanz.services.e_bilanz_preparation_service import (
+from simpleob.services.e_bilanz_preparation_service import (
     EBilanzPreparationService,
 )
-from openbilanz.services.e_bilanz_service import EBilanzService
-from openbilanz.services.fiscal_year_closing_workflow import (
+from simpleob.services.e_bilanz_service import EBilanzService
+from simpleob.services.fiscal_year_closing_workflow import (
     FiscalYearClosingWorkflow,
 )
-from openbilanz.services.fiscal_year_workspace import (
+from simpleob.services.fiscal_year_workspace import (
     FiscalYearWorkspace,
 )
-from openbilanz.services.fixed_asset_depreciation_workflow import (
+from simpleob.services.fixed_asset_depreciation_workflow import (
     FixedAssetDepreciationWorkflow,
 )
-from openbilanz.services.posting_service import PostingService
-from openbilanz.services.reporting_service import ReportingService
-from openbilanz.services.taxonomy_management_service import (
+from simpleob.services.posting_service import PostingService
+from simpleob.services.reporting_service import ReportingService
+from simpleob.services.taxonomy_management_service import (
     TaxonomyManagementService,
 )
-from openbilanz.taxonomy.arelle_adapter import ArelleAdapter
-from openbilanz.taxonomy.gcd_company_data_mapper import (
+from simpleob.taxonomy.arelle_adapter import ArelleAdapter
+from simpleob.taxonomy.gcd_company_data_mapper import (
     GcdCompanyDataMapper,
 )
-from openbilanz.taxonomy.resolver import TaxonomyResolver
-from openbilanz.taxonomy.taxonomy_catalog import TaxonomyCatalog
-from openbilanz.taxonomy.taxonomy_downloader import (
+from simpleob.taxonomy.resolver import TaxonomyResolver
+from simpleob.taxonomy.taxonomy_catalog import TaxonomyCatalog
+from simpleob.taxonomy.taxonomy_downloader import (
     TaxonomyDownloader,
 )
-from openbilanz.taxonomy.taxonomy_installation_service import (
+from simpleob.taxonomy.taxonomy_installation_service import (
     TaxonomyInstallationService,
 )
 

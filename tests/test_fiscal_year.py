@@ -5,7 +5,7 @@ from datetime import date
 
 import pytest
 
-from openbilanz.domain import FiscalYear
+from simpleob.domain import FiscalYear
 
 
 def test_fiscal_year_accepts_calendar_year() -> None:

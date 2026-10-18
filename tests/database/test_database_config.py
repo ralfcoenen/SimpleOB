@@ -4,8 +4,8 @@ from pathlib import Path
 
 from sqlalchemy import inspect
 
-from openbilanz.core.config import ApplicationConfig
-from openbilanz.database.database import Database
+from simpleob.core.config import ApplicationConfig
+from simpleob.database.database import Database
 
 
 def create_config(

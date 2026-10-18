@@ -1,0 +1,509 @@
+"""Orchestrierung einer vollständigen E-Bilanz aus GCD und GAAP-CI."""
+
+from collections.abc import Mapping
+from dataclasses import dataclass, replace
+from decimal import Decimal
+
+from simpleob.accounting.financial_statement_position import (
+    FinancialStatementPosition,
+)
+from simpleob.domain.e_bilanz_account_detail import (
+    EBilanzAccountDetail,
+)
+from simpleob.domain.fiscal_year import FiscalYear
+from simpleob.exporter.xbrl_export import XbrlExporter
+from simpleob.services.fixed_asset_schedule_service import (
+    FixedAssetSchedulePosition,
+)
+from simpleob.taxonomy.account_balance_builder import (
+    AccountBalanceBuilder,
+)
+from simpleob.taxonomy.entry_point import TaxonomyEntryPoint
+from simpleob.taxonomy.fiscal_requirement_reader import (
+    FiscalConceptRequirement,
+    FiscalRequirementReader,
+)
+from simpleob.taxonomy.fixed_asset_schedule_builder import (
+    FixedAssetScheduleBuilder,
+)
+from simpleob.taxonomy.gaap_ci_mandatory_fact_completer import (
+    GaapCiMandatoryFactCompleter,
+)
+from simpleob.taxonomy.gaap_ci_statement_builder import (
+    GaapCiStatement,
+    GaapCiStatementBuilder,
+)
+from simpleob.taxonomy.gcd_company_data import GcdCompanyData
+from simpleob.taxonomy.gcd_company_identifiers import (
+    GcdCompanyIdentifiers,
+)
+from simpleob.taxonomy.gcd_domestic_branch_of_foreign_company import (
+    GcdDomesticBranchOfForeignCompanyType,
+)
+from simpleob.taxonomy.gcd_entity_with_taxable_purpose_business import (
+    GcdEntityWithTaxablePurposeBusinessType,
+)
+from simpleob.taxonomy.gcd_fact_builder import GcdFactBuilder
+from simpleob.taxonomy.gcd_report_data import GcdReportData
+from simpleob.taxonomy.gcd_report_profile import GcdReportProfile
+from simpleob.taxonomy.gcd_shareholder import GcdShareholder
+from simpleob.taxonomy.hgb_gaap_ci_mapping import (
+    create_hgb_gaap_ci_mapping,
+)
+from simpleob.taxonomy.mapper import TaxonomyMapper
+from simpleob.taxonomy.model import TaxonomyModel
+from simpleob.taxonomy.nil_fact import TaxonomyNilFact
+from simpleob.taxonomy.text_fact import TaxonomyTextFact
+from simpleob.taxonomy.unit import TaxonomyUnit
+
+BALANCE_SHEET_ROLE_URI = (
+    "http://www.xbrl.de/taxonomies/"
+    "de-gaap-ci/role/balanceSheet"
+)
+
+INCOME_STATEMENT_ROLE_URI = (
+    "http://www.xbrl.de/taxonomies/"
+    "de-gaap-ci/role/incomeStatement"
+)
+
+APPROPRIATION_PROFITS_ROLE_URI = (
+    "http://www.xbrl.de/taxonomies/"
+    "de-gaap-ci/role/appropriationProfits"
+)
+
+TRANSFERS_TAX_ASSETS_ROLE_URI = (
+    "http://www.xbrl.de/taxonomies/"
+    "de-gaap-ci/role/transfersTaxAssets"
+)
+
+
+@dataclass(frozen=True, slots=True)
+class EBilanzDocument:
+    """Ergebnis der vollständigen E-Bilanz-Erzeugung."""
+
+    xml: str
+    gaap_ci_statement: GaapCiStatement | None = None
+
+
+class EBilanzBuilder:
+    """Erzeugt eine vollständige E-Bilanz aus GCD und HGB-Abschluss."""
+
+    def __init__(
+        self,
+        *,
+        gcd_model: TaxonomyModel,
+        gaap_ci_model: TaxonomyModel,
+        gcd_entry_point: TaxonomyEntryPoint,
+        gaap_ci_entry_point: TaxonomyEntryPoint,
+        gcd_namespace: str,
+        gaap_ci_namespace: str,
+        assets: FinancialStatementPosition,
+        liabilities: FinancialStatementPosition,
+        income_statement: FinancialStatementPosition,
+    ) -> None:
+        self._gcd_model = gcd_model
+        self._gaap_ci_model = gaap_ci_model
+        self._gcd_entry_point = gcd_entry_point
+        self._gaap_ci_entry_point = gaap_ci_entry_point
+        self._gcd_namespace = gcd_namespace
+        self._gaap_ci_namespace = gaap_ci_namespace
+        self._assets = assets
+        self._liabilities = liabilities
+        self._income_statement = income_statement
+
+    def build(
+        self,
+        *,
+        company_data: GcdCompanyData,
+        fiscal_year: FiscalYear,
+        amounts: Mapping[
+            FinancialStatementPosition,
+            Decimal,
+        ],
+        entity_identifier: str,
+        entity_scheme: str,
+        previous_fiscal_year: FiscalYear | None = None,
+        identifiers: GcdCompanyIdentifiers | None = None,
+        shareholders: tuple[GcdShareholder, ...] = (),
+        domestic_branch_types: tuple[
+            GcdDomesticBranchOfForeignCompanyType,
+            ...,
+        ] = (),
+        taxable_purpose_business_types: tuple[
+            GcdEntityWithTaxablePurposeBusinessType,
+            ...,
+        ] = (),
+        account_details: tuple[
+            EBilanzAccountDetail,
+            ...,
+        ] = (),
+        fixed_asset_schedule: tuple[
+            FixedAssetSchedulePosition,
+            ...,
+        ] = (),
+        report_profile: GcdReportProfile | None = None,
+    ) -> EBilanzDocument:
+        """Erzeugt die vollständige E-Bilanz-XBRL-Instanz."""
+
+        gaap_builder = GaapCiStatementBuilder(
+            taxonomy_model=self._gaap_ci_model,
+            assets=self._assets,
+            liabilities=self._liabilities,
+            income_statement=self._income_statement,
+        )
+
+        gaap_statement = gaap_builder.build(
+            amounts=amounts,
+            entity_identifier=entity_identifier,
+            entity_scheme=entity_scheme,
+            fiscal_year_start=fiscal_year.start_date,
+            fiscal_year_end=fiscal_year.end_date,
+        )
+
+        duration_context = gaap_statement.duration_context
+
+        has_appropriation_profits = any(
+            fact.concept.name.startswith(
+                "incomeUse."
+            )
+            for fact in gaap_statement.facts
+        )
+
+        has_transfers_tax_assets = any(
+            fact.concept.name.startswith(
+                "BVV."
+            )
+            for fact in gaap_statement.facts
+        )
+
+        active_gaap_ci_roles = [
+            BALANCE_SHEET_ROLE_URI,
+            INCOME_STATEMENT_ROLE_URI,
+        ]
+
+        if has_appropriation_profits:
+            active_gaap_ci_roles.append(
+                APPROPRIATION_PROFITS_ROLE_URI
+            )
+
+        if has_transfers_tax_assets:
+            active_gaap_ci_roles.append(
+                TRANSFERS_TAX_ASSETS_ROLE_URI
+            )
+
+        fiscal_requirements = (
+            FiscalRequirementReader(
+                self._gaap_ci_entry_point
+            ).corporation_requirements()
+        )
+
+        fiscal_requirements = (
+            self._requirements_for_roles(
+                requirements=fiscal_requirements,
+                role_uris=tuple(
+                    active_gaap_ci_roles
+                ),
+            )
+        )
+
+        nil_facts = (
+            GaapCiMandatoryFactCompleter(
+                taxonomy_model=self._gaap_ci_model
+            ).build_missing_nil_facts(
+                requirements=fiscal_requirements,
+                existing_facts=gaap_statement.facts,
+                instant_context=(
+                    gaap_statement.instant_context
+                ),
+                duration_context=(
+                    gaap_statement.duration_context
+                ),
+                unit=gaap_statement.unit,
+            )
+        )
+
+        taxonomy_mappings = create_hgb_gaap_ci_mapping(
+            assets=self._assets,
+            liabilities=self._liabilities,
+            income_statement=self._income_statement,
+        )
+
+        taxonomy_mapper = TaxonomyMapper(
+            mappings=taxonomy_mappings,
+            taxonomy_model=self._gaap_ci_model,
+        )
+
+        account_balance_builder = AccountBalanceBuilder(
+            taxonomy_model=self._gaap_ci_model,
+            taxonomy_mapper=taxonomy_mapper,
+        )
+
+        account_balances = tuple(
+            account_balance_builder.build(
+                detail=detail,
+                context=duration_context,
+            )
+            for detail in account_details
+        )
+
+        fixed_asset_schedule_xbrl = FixedAssetScheduleBuilder(
+            taxonomy_model=self._gaap_ci_model,
+            taxonomy_mapper=taxonomy_mapper,
+        ).build(
+            positions=fixed_asset_schedule,
+            entity_identifier=entity_identifier,
+            entity_scheme=entity_scheme,
+            fiscal_year_start=fiscal_year.start_date,
+            fiscal_year_end=fiscal_year.end_date,
+        )
+
+        gcd_builder = GcdFactBuilder()
+
+        gcd_fiscal_year_facts = (
+            gcd_builder.fiscal_year_facts(
+                fiscal_year=fiscal_year,
+                previous_fiscal_year=previous_fiscal_year,
+                taxonomy_model=self._gcd_model,
+                context=duration_context,
+            )
+        )
+
+        gcd_fiscal_year_text_facts = tuple(
+            fact
+            for fact in gcd_fiscal_year_facts
+            if isinstance(
+                fact,
+                TaxonomyTextFact,
+            )
+        )
+
+        gcd_fiscal_year_nil_facts = tuple(
+            fact
+            for fact in gcd_fiscal_year_facts
+            if isinstance(
+                fact,
+                TaxonomyNilFact,
+            )
+        )
+
+        gcd_facts = (
+            gcd_builder.company_facts(
+                data=company_data,
+                taxonomy_model=self._gcd_model,
+                context=duration_context,
+            )
+            + gcd_fiscal_year_text_facts
+        )
+
+        profile = (
+            report_profile
+            if report_profile is not None
+            else GcdReportProfile.standard()
+        )
+
+        report_elements = list(
+            profile.report_elements
+        )
+
+        if account_balances:
+            report_elements.append(
+                "genInfo.report.id.reportElement."
+                "reportElements.KS"
+            )
+
+        if fixed_asset_schedule_xbrl.facts:
+            report_elements.append(
+                "genInfo.report.id.reportElement."
+                "reportElements.BAL"
+            )
+
+        if has_appropriation_profits:
+            report_elements.append(
+                "genInfo.report.id.reportElement."
+                "reportElements.EV"
+            )
+
+        if has_transfers_tax_assets:
+            report_elements.append(
+                "genInfo.report.id.reportElement."
+                "reportElements.BVV"
+            )
+
+        profile = replace(
+            profile,
+            report_elements=tuple(
+                dict.fromkeys(report_elements)
+            ),
+        )
+
+        profile_facts = gcd_builder.report_profile_facts(
+            profile=profile,
+            taxonomy_model=self._gcd_model,
+            context=duration_context,
+        )
+
+        report_data_facts = gcd_builder.report_data_facts(
+            data=GcdReportData(
+                income_statement_ends_with_balance_profit=False,
+            ),
+            taxonomy_model=self._gcd_model,
+            context=duration_context,
+        )
+
+        report_element = gcd_builder.report_element(
+            profile=profile,
+            taxonomy_model=self._gcd_model,
+            context=duration_context,
+        )
+
+        company_id_nos = (
+            ()
+            if identifiers is None
+            else (
+                gcd_builder.company_id_no(
+                    identifiers=identifiers,
+                    taxonomy_model=self._gcd_model,
+                    context=duration_context,
+                ),
+            )
+        )
+
+        shareholder_tuples = tuple(
+            gcd_builder.shareholder(
+                shareholder=shareholder,
+                taxonomy_model=self._gcd_model,
+                context=duration_context,
+            )
+            for shareholder in shareholders
+        )
+
+        domestic_branches = tuple(
+            gcd_builder.domestic_branch_of_foreign_company(
+                branch_type=branch_type,
+                taxonomy_model=self._gcd_model,
+                context=duration_context,
+            )
+            for branch_type in domestic_branch_types
+        )
+
+        taxable_purpose_businesses = tuple(
+            gcd_builder.entity_with_taxable_purpose_business(
+                business_type=business_type,
+                taxonomy_model=self._gcd_model,
+                context=duration_context,
+            )
+            for business_type in taxable_purpose_business_types
+        )
+
+        facts = (
+            gcd_facts
+            + profile_facts
+            + report_data_facts
+            + gaap_statement.facts
+            + fixed_asset_schedule_xbrl.facts
+        )
+
+        pure_unit = TaxonomyUnit.pure()
+
+        exporter = XbrlExporter()
+
+        year = fiscal_year.end_date.year
+
+        contexts = {
+            f"ctx-instant-{year}":
+                gaap_statement.instant_context,
+            f"ctx-duration-{year}":
+                gaap_statement.duration_context,
+        }
+
+        contexts.update(
+            fixed_asset_schedule_xbrl.contexts
+        )
+
+        xml = exporter.export(
+            contexts=contexts,
+            units={
+                "EUR": gaap_statement.unit,
+                "PURE": pure_unit,
+            },
+            facts=facts,
+            nil_facts=(
+                nil_facts
+                + gcd_fiscal_year_nil_facts
+            ),
+            account_balances=account_balances,
+            report_elements=(
+                report_element,
+            ),
+            taxonomy_namespace=self._gaap_ci_namespace,
+            taxonomy_namespaces={
+                "de-gcd": self._gcd_namespace,
+                "de-gaap-ci": self._gaap_ci_namespace,
+            },
+            entry_points=(
+                self._gcd_entry_point,
+                self._gaap_ci_entry_point,
+            ),
+            company_id_nos=company_id_nos,
+            shareholders=shareholder_tuples,
+            domestic_branches=domestic_branches,
+            taxable_purpose_businesses=(
+                taxable_purpose_businesses
+            ),
+        )
+
+        return EBilanzDocument(
+            xml=xml,
+            gaap_ci_statement=gaap_statement,
+        )
+
+    def _requirements_for_roles(
+        self,
+        *,
+        requirements: tuple[
+            FiscalConceptRequirement,
+            ...,
+        ],
+        role_uris: tuple[str, ...],
+    ) -> tuple[
+        FiscalConceptRequirement,
+        ...,
+    ]:
+        """Beschränkt Mussfelder auf aktive GAAP-CI-Berichtsteile."""
+
+        concept_ids: set[str] = set()
+
+        for role_uri in role_uris:
+            relations = (
+                self._gaap_ci_model.presentation
+                .relations_for_role(
+                    role_uri
+                )
+            )
+
+            for relation in relations:
+                concept_ids.add(
+                    relation.parent_concept_id
+                )
+                concept_ids.add(
+                    relation.child_concept_id
+                )
+
+        concept_names = {
+            concept.name
+            for concept_id in concept_ids
+            if (
+                concept
+                := self._gaap_ci_model.concepts.by_id(
+                    concept_id
+                )
+            )
+            is not None
+        }
+
+        return tuple(
+            requirement
+            for requirement in requirements
+            if requirement.concept_name
+            in concept_names
+        )

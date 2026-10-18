@@ -6,9 +6,9 @@ from uuid import uuid4
 
 import pytest
 
-from openbilanz.accounting.ledger_entry import LedgerEntry
-from openbilanz.domain.entry_side import EntrySide
-from openbilanz.reporting.account_statement_line import (
+from simpleob.accounting.ledger_entry import LedgerEntry
+from simpleob.domain.entry_side import EntrySide
+from simpleob.reporting.account_statement_line import (
     AccountStatementLine,
 )
 

@@ -4,15 +4,15 @@ from decimal import Decimal
 
 import pytest
 
-from openbilanz.eric.bilanz_generation.fact_plan_resolver import (
+from simpleob.eric.bilanz_generation.fact_plan_resolver import (
     ResolvedFactPlan,
 )
-from openbilanz.eric.bilanz_generation.tax_reconciliation import (
+from simpleob.eric.bilanz_generation.tax_reconciliation import (
     TaxReconciliationChange,
     TaxReconciliationKind,
     TaxReconciliationTransfer,
 )
-from openbilanz.eric.bilanz_generation.taxonomy_6_9_xbrl_document_builder import (
+from simpleob.eric.bilanz_generation.taxonomy_6_9_xbrl_document_builder import (
     GAAP_CI_69_NAMESPACE,
     Taxonomy69XbrlDocumentBuilder,
 )

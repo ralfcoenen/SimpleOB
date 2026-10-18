@@ -5,7 +5,7 @@ from uuid import UUID
 
 import pytest
 
-from openbilanz.client_transfer.model import (
+from simpleob.client_transfer.model import (
     CLIENT_TRANSFER_FORMAT_NAME,
     CLIENT_TRANSFER_FORMAT_VERSION,
     ClientTransfer,

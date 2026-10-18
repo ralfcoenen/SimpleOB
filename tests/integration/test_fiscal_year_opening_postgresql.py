@@ -12,26 +12,26 @@ from sqlalchemy.orm import sessionmaker
 
 from unittest.mock import Mock
 
-from openbilanz.core.context import ApplicationContext
-from openbilanz.services.fiscal_year_workspace import FiscalYearWorkspace
-from openbilanz.database.booking_repository import BookingRepository
-from openbilanz.database.company_repository import CompanyRepository
-from openbilanz.database.lock_error import DatabaseLockError
-from openbilanz.database.models import Mandant
-from openbilanz.domain.account_type import AccountType
-from openbilanz.domain.booking import Booking
-from openbilanz.domain.booking_line import BookingLine
-from openbilanz.domain.booking_type import BookingType
-from openbilanz.domain.company import Company
-from openbilanz.domain.entry_side import EntrySide
-from openbilanz.domain.fiscal_year import FiscalYear
-from openbilanz.services.fiscal_year_opening_workflow import (
+from simpleob.core.context import ApplicationContext
+from simpleob.services.fiscal_year_workspace import FiscalYearWorkspace
+from simpleob.database.booking_repository import BookingRepository
+from simpleob.database.company_repository import CompanyRepository
+from simpleob.database.lock_error import DatabaseLockError
+from simpleob.database.models import Mandant
+from simpleob.domain.account_type import AccountType
+from simpleob.domain.booking import Booking
+from simpleob.domain.booking_line import BookingLine
+from simpleob.domain.booking_type import BookingType
+from simpleob.domain.company import Company
+from simpleob.domain.entry_side import EntrySide
+from simpleob.domain.fiscal_year import FiscalYear
+from simpleob.services.fiscal_year_opening_workflow import (
     FiscalYearOpeningWorkflow,
 )
-from openbilanz.services.fiscal_year_transfer_service import (
+from simpleob.services.fiscal_year_transfer_service import (
     FiscalYearTransferService,
 )
-from openbilanz.services.posting_service import PostingService
+from simpleob.services.posting_service import PostingService
 
 
 @pytest.fixture

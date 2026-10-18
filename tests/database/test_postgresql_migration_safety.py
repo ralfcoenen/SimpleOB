@@ -4,11 +4,11 @@ from pathlib import Path
 
 import pytest
 
-from openbilanz.database.migration_service import (
+from simpleob.database.migration_service import (
     PostgreSQLSchemaInspection,
     PostgreSQLSchemaStatus,
 )
-from openbilanz.database.postgresql_migration_safety import (
+from simpleob.database.postgresql_migration_safety import (
     PostgreSQLMigrationAction,
     PostgreSQLMigrationApproval,
     validate_postgresql_migration,

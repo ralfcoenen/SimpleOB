@@ -3,7 +3,7 @@
 from sqlalchemy import create_engine, inspect
 from sqlalchemy.orm import Session, sessionmaker
 
-from openbilanz.database.models import Base
+from simpleob.database.models import Base
 
 
 def test_database(tmp_path):

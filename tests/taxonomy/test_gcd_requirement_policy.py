@@ -2,7 +2,7 @@
 
 import pytest
 
-from openbilanz.taxonomy.gcd_requirement_policy import (
+from simpleob.taxonomy.gcd_requirement_policy import (
     GcdRequirement,
     GcdRequirementPolicy,
 )

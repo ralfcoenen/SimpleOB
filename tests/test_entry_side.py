@@ -2,7 +2,7 @@
 
 import pytest
 
-from openbilanz.domain import EntrySide
+from simpleob.domain import EntrySide
 
 
 def test_debit_has_expected_value() -> None:

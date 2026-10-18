@@ -2,7 +2,7 @@
 
 import pytest
 
-from openbilanz.eric.bilanz_generation.fact_plan import (
+from simpleob.eric.bilanz_generation.fact_plan import (
     FactPlan,
     FactPlanNode,
     FactPlanState,

@@ -1,16 +1,16 @@
 from decimal import Decimal
 
-from openbilanz.accounting.account_balance import AccountBalance
-from openbilanz.accounting.financial_statement_position import (
+from simpleob.accounting.account_balance import AccountBalance
+from simpleob.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
-from openbilanz.accounting.mapper import AccountMapper
-from openbilanz.domain.account_mapping_rule import AccountMappingRule
-from openbilanz.domain.account_type import AccountType
-from openbilanz.domain.chart_of_accounts_template import (
+from simpleob.accounting.mapper import AccountMapper
+from simpleob.domain.account_mapping_rule import AccountMappingRule
+from simpleob.domain.account_type import AccountType
+from simpleob.domain.chart_of_accounts_template import (
     ChartOfAccountsTemplate,
 )
-from openbilanz.domain.template_account import TemplateAccount
+from simpleob.domain.template_account import TemplateAccount
 
 
 def test_maps_debit_balance_to_debit_position() -> None:

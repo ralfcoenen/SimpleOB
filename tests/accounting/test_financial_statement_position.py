@@ -1,7 +1,7 @@
-from openbilanz.accounting.financial_statement_position import (
+from simpleob.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
-from openbilanz.accounting.statement_category import StatementCategory
+from simpleob.accounting.statement_category import StatementCategory
 
 
 def test_financial_statement_position_stores_legal_identity() -> None:

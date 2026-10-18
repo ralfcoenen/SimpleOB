@@ -5,12 +5,12 @@ from xml.etree import ElementTree as ET
 
 import pytest
 
-from openbilanz.eric.bilanz_generation.tax_reconciliation import (
+from simpleob.eric.bilanz_generation.tax_reconciliation import (
     TaxReconciliationChange,
     TaxReconciliationKind,
     TaxReconciliationTransfer,
 )
-from openbilanz.eric.bilanz_generation.taxonomy_6_9_tax_reconciliation_serializer import (
+from simpleob.eric.bilanz_generation.taxonomy_6_9_tax_reconciliation_serializer import (
     GAAP_CI_69_NAMESPACE,
     Taxonomy69TaxReconciliationSerializer,
 )

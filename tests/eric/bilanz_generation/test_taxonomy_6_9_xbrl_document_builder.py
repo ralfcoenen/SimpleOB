@@ -8,39 +8,39 @@ from xml.etree import ElementTree as ET
 
 import pytest
 
-from openbilanz.domain.company import Company
-from openbilanz.domain.fiscal_year import FiscalYear
-from openbilanz.eric.bilanz_generation.fact_plan_resolver import (
+from simpleob.domain.company import Company
+from simpleob.domain.fiscal_year import FiscalYear
+from simpleob.eric.bilanz_generation.fact_plan_resolver import (
     FactPlanResolver,
 )
-from openbilanz.eric.bilanz_generation.gaap_ci_6_9_values import (
+from simpleob.eric.bilanz_generation.gaap_ci_6_9_values import (
     GaapCi69Values,
 )
-from openbilanz.eric.bilanz_generation.taxonomy_6_9 import (
+from simpleob.eric.bilanz_generation.taxonomy_6_9 import (
     create_profile_6_9,
 )
-from openbilanz.eric.bilanz_generation.taxonomy_6_9_values import (
+from simpleob.eric.bilanz_generation.taxonomy_6_9_values import (
     Taxonomy69ValueBuilder,
 )
-from openbilanz.eric.bilanz_generation.taxonomy_6_9_xbrl_document_builder import (
+from simpleob.eric.bilanz_generation.taxonomy_6_9_xbrl_document_builder import (
     GAAP_CI_69_NAMESPACE,
     GCD_69_NAMESPACE,
     Taxonomy69XbrlDocumentBuilder,
 )
-from openbilanz.taxonomy.arelle_adapter import ArelleAdapter
-from openbilanz.taxonomy.concept import TaxonomyPeriodType
-from openbilanz.taxonomy.concept_set import TaxonomyConceptSet
-from openbilanz.taxonomy.context import TaxonomyContext
-from openbilanz.taxonomy.entry_point import TaxonomyEntryPoint
-from openbilanz.taxonomy.gcd_company_data import GcdCompanyData
-from openbilanz.taxonomy.gcd_company_identifiers import (
+from simpleob.taxonomy.arelle_adapter import ArelleAdapter
+from simpleob.taxonomy.concept import TaxonomyPeriodType
+from simpleob.taxonomy.concept_set import TaxonomyConceptSet
+from simpleob.taxonomy.context import TaxonomyContext
+from simpleob.taxonomy.entry_point import TaxonomyEntryPoint
+from simpleob.taxonomy.gcd_company_data import GcdCompanyData
+from simpleob.taxonomy.gcd_company_identifiers import (
     GcdCompanyIdentifiers,
 )
-from openbilanz.taxonomy.gcd_report_profile import GcdReportProfile
-from openbilanz.taxonomy.resolver import TaxonomyResolver
-from openbilanz.taxonomy.taxonomy import TaxonomyVersion
-from openbilanz.taxonomy.unit import TaxonomyUnit
-from openbilanz.taxonomy.xbrl_writer import (
+from simpleob.taxonomy.gcd_report_profile import GcdReportProfile
+from simpleob.taxonomy.resolver import TaxonomyResolver
+from simpleob.taxonomy.taxonomy import TaxonomyVersion
+from simpleob.taxonomy.unit import TaxonomyUnit
+from simpleob.taxonomy.xbrl_writer import (
     LINK_NAMESPACE,
     XBRLI_NAMESPACE,
     XLINK_NAMESPACE,

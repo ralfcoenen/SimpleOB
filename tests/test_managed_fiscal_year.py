@@ -4,9 +4,9 @@ from datetime import date
 
 import pytest
 
-from openbilanz.domain.fiscal_year import FiscalYear
-from openbilanz.domain.fiscal_year_status import FiscalYearStatus
-from openbilanz.domain.managed_fiscal_year import ManagedFiscalYear
+from simpleob.domain.fiscal_year import FiscalYear
+from simpleob.domain.fiscal_year_status import FiscalYearStatus
+from simpleob.domain.managed_fiscal_year import ManagedFiscalYear
 
 
 def test_managed_fiscal_year_contains_period_and_status() -> None:

@@ -1,11 +1,11 @@
 from decimal import Decimal
 
-from openbilanz.accounting.balance_sheet import BalanceSheet
-from openbilanz.accounting.financial_statement_position import (
+from simpleob.accounting.balance_sheet import BalanceSheet
+from simpleob.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
-from openbilanz.domain.bvv_evaluation import BvvEvaluation
-from openbilanz.services.pdf_reporting_service import (
+from simpleob.domain.bvv_evaluation import BvvEvaluation
+from simpleob.services.pdf_reporting_service import (
     PdfReportingService,
 )
 

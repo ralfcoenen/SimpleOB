@@ -1,7 +1,7 @@
 
 import pytest
 
-from openbilanz.domain import (
+from simpleob.domain import (
     Account,
     AccountType,
     ChartOfAccounts,

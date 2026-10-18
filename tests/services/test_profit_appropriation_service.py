@@ -3,14 +3,14 @@
 from datetime import date
 from decimal import Decimal
 
-from openbilanz.domain.profit_appropriation_annual_data import (
+from simpleob.domain.profit_appropriation_annual_data import (
     ProfitAppropriationAnnualData,
 )
-from openbilanz.reporting.trial_balance_report import (
+from simpleob.reporting.trial_balance_report import (
     TrialBalanceReport,
     TrialBalanceReportRow,
 )
-from openbilanz.services.profit_appropriation_service import (
+from simpleob.services.profit_appropriation_service import (
     ProfitAppropriationService,
 )
 

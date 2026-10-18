@@ -2,13 +2,13 @@ from pathlib import Path
 
 import pytest
 
-from openbilanz.taxonomy.entry_point import (
+from simpleob.taxonomy.entry_point import (
     TaxonomyEntryPoint,
     TaxonomyEntryPointVariant,
     TaxonomyFamily,
 )
-from openbilanz.taxonomy.package import TaxonomyPackage
-from openbilanz.taxonomy.taxonomy import TaxonomyVersion
+from simpleob.taxonomy.package import TaxonomyPackage
+from simpleob.taxonomy.taxonomy import TaxonomyVersion
 
 
 def test_taxonomy_package_stores_version_and_entry_points() -> None:

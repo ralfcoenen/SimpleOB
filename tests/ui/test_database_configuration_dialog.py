@@ -8,8 +8,8 @@ from unittest.mock import patch
 import pytest
 from PySide6.QtWidgets import QApplication, QDialog
 
-from openbilanz.core.config import ApplicationConfig
-from openbilanz.ui_qt.database_configuration_dialog import (
+from simpleob.core.config import ApplicationConfig
+from simpleob.ui_qt.database_configuration_dialog import (
     DatabaseConfigurationDialog,
 )
 
@@ -90,7 +90,7 @@ def test_postgresql_connection_is_checked(
     dialog._database_edit.setText("testdatabase")
 
     with patch(
-        "openbilanz.ui_qt.database_configuration_dialog."
+        "simpleob.ui_qt.database_configuration_dialog."
         "DatabaseMigrationService"
     ) as migration_service:
         database_url = dialog._check_connection()

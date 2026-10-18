@@ -2,15 +2,15 @@ from decimal import Decimal
 
 import pytest
 
-from openbilanz.accounting.account_balance import AccountBalance
-from openbilanz.accounting.financial_statement_position import (
+from simpleob.accounting.account_balance import AccountBalance
+from simpleob.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
-from openbilanz.accounting.ledger import Ledger
-from openbilanz.domain.account import Account
-from openbilanz.domain.account_type import AccountType
-from openbilanz.domain.template_account import TemplateAccount
-from openbilanz.services.e_bilanz_account_detail_service import (
+from simpleob.accounting.ledger import Ledger
+from simpleob.domain.account import Account
+from simpleob.domain.account_type import AccountType
+from simpleob.domain.template_account import TemplateAccount
+from simpleob.services.e_bilanz_account_detail_service import (
     EBilanzAccountDetailService,
 )
 

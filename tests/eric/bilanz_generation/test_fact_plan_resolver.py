@@ -5,24 +5,24 @@ from decimal import Decimal
 
 import pytest
 
-from openbilanz.eric.bilanz_generation.fact_plan import (
+from simpleob.eric.bilanz_generation.fact_plan import (
     FactPlan,
     FactPlanNode,
     FactPlanState,
 )
-from openbilanz.eric.bilanz_generation.fact_plan_resolver import (
+from simpleob.eric.bilanz_generation.fact_plan_resolver import (
     FactPlanResolver,
 )
-from openbilanz.taxonomy.concept import (
+from simpleob.taxonomy.concept import (
     TaxonomyBalance,
     TaxonomyConcept,
     TaxonomyPeriodType,
 )
-from openbilanz.taxonomy.concept_set import TaxonomyConceptSet
-from openbilanz.taxonomy.context import TaxonomyContext
-from openbilanz.taxonomy.fact import TaxonomyFact
-from openbilanz.taxonomy.nil_fact import TaxonomyNilFact
-from openbilanz.taxonomy.text_fact import TaxonomyTextFact
+from simpleob.taxonomy.concept_set import TaxonomyConceptSet
+from simpleob.taxonomy.context import TaxonomyContext
+from simpleob.taxonomy.fact import TaxonomyFact
+from simpleob.taxonomy.nil_fact import TaxonomyNilFact
+from simpleob.taxonomy.text_fact import TaxonomyTextFact
 
 
 def _concept(

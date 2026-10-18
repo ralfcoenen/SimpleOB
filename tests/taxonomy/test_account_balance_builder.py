@@ -1,25 +1,25 @@
 from datetime import date
 from decimal import Decimal
 
-from openbilanz.accounting.financial_statement_position import (
+from simpleob.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
-from openbilanz.domain.e_bilanz_account_detail import (
+from simpleob.domain.e_bilanz_account_detail import (
     EBilanzAccountDetail,
 )
-from openbilanz.taxonomy.account_balance_builder import (
+from simpleob.taxonomy.account_balance_builder import (
     AccountBalanceBuilder,
 )
-from openbilanz.taxonomy.concept import (
+from simpleob.taxonomy.concept import (
     TaxonomyBalance,
     TaxonomyConcept,
     TaxonomyPeriodType,
 )
-from openbilanz.taxonomy.concept_set import TaxonomyConceptSet
-from openbilanz.taxonomy.context import TaxonomyContext
-from openbilanz.taxonomy.label_set import TaxonomyLabelSet
-from openbilanz.taxonomy.model import TaxonomyModel
-from openbilanz.taxonomy.presentation_set import (
+from simpleob.taxonomy.concept_set import TaxonomyConceptSet
+from simpleob.taxonomy.context import TaxonomyContext
+from simpleob.taxonomy.label_set import TaxonomyLabelSet
+from simpleob.taxonomy.model import TaxonomyModel
+from simpleob.taxonomy.presentation_set import (
     TaxonomyPresentationSet,
 )
 

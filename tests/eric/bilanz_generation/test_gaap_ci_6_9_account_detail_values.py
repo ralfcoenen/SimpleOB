@@ -4,13 +4,13 @@ from decimal import Decimal
 
 import pytest
 
-from openbilanz.accounting.financial_statement_position import (
+from simpleob.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
-from openbilanz.domain.e_bilanz_account_detail import (
+from simpleob.domain.e_bilanz_account_detail import (
     EBilanzAccountDetail,
 )
-from openbilanz.eric.bilanz_generation.gaap_ci_6_9_account_detail_values import (
+from simpleob.eric.bilanz_generation.gaap_ci_6_9_account_detail_values import (
     GaapCi69AccountDetailValueBuilder,
 )
 

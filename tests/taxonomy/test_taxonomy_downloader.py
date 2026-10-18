@@ -3,7 +3,7 @@
 from pathlib import Path
 from unittest.mock import patch
 
-from openbilanz.taxonomy.taxonomy_downloader import (
+from simpleob.taxonomy.taxonomy_downloader import (
     TaxonomyDownloader,
 )
 
@@ -19,7 +19,7 @@ def test_downloads_file(
     response = b"ZIP-Inhalt"
 
     with patch(
-        "openbilanz.taxonomy.taxonomy_downloader.urlopen"
+        "simpleob.taxonomy.taxonomy_downloader.urlopen"
     ) as urlopen:
         urlopen.return_value.__enter__.return_value.read.return_value = (
             response

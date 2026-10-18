@@ -2,7 +2,7 @@
 
 import pytest
 
-from openbilanz.domain.tax_number_normalizer import (
+from simpleob.domain.tax_number_normalizer import (
     TaxNumberNormalizer,
 )
 

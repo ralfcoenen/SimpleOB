@@ -7,25 +7,25 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from openbilanz.accounting.ledger import Ledger
-from openbilanz.database.booking_repository import BookingRepository
-from openbilanz.database.company_repository import CompanyRepository
-from openbilanz.database.database import Base
-from openbilanz.domain.account_type import AccountType
-from openbilanz.domain.booking import Booking
-from openbilanz.domain.booking_line import BookingLine
-from openbilanz.domain.company import Company
-from openbilanz.domain.entry_side import EntrySide
-from openbilanz.domain.fiscal_year import FiscalYear
-from openbilanz.domain.fiscal_year_status import FiscalYearStatus
-from openbilanz.domain.journal import Journal
-from openbilanz.services.fiscal_year_opening_workflow import (
+from simpleob.accounting.ledger import Ledger
+from simpleob.database.booking_repository import BookingRepository
+from simpleob.database.company_repository import CompanyRepository
+from simpleob.database.database import Base
+from simpleob.domain.account_type import AccountType
+from simpleob.domain.booking import Booking
+from simpleob.domain.booking_line import BookingLine
+from simpleob.domain.company import Company
+from simpleob.domain.entry_side import EntrySide
+from simpleob.domain.fiscal_year import FiscalYear
+from simpleob.domain.fiscal_year_status import FiscalYearStatus
+from simpleob.domain.journal import Journal
+from simpleob.services.fiscal_year_opening_workflow import (
     FiscalYearOpeningWorkflow,
 )
-from openbilanz.services.fiscal_year_transfer_service import (
+from simpleob.services.fiscal_year_transfer_service import (
     FiscalYearTransferService,
 )
-from openbilanz.services.posting_service import PostingService
+from simpleob.services.posting_service import PostingService
 
 
 def test_opens_fiscal_year_and_persists_opening_source() -> None:

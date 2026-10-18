@@ -4,7 +4,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from openbilanz.domain.shareholder import Shareholder
+from simpleob.domain.shareholder import Shareholder
 
 
 def test_shareholder_accepts_valid_data() -> None:

@@ -3,15 +3,15 @@
 from datetime import date
 from decimal import Decimal
 
-from openbilanz.domain.booking_type import BookingType
-from openbilanz.domain.entry_side import EntrySide
-from openbilanz.domain.profit_appropriation_posting_proposal import (
+from simpleob.domain.booking_type import BookingType
+from simpleob.domain.entry_side import EntrySide
+from simpleob.domain.profit_appropriation_posting_proposal import (
     ProfitAppropriationPostingProposal,
 )
-from openbilanz.domain.profit_appropriation_posting_type import (
+from simpleob.domain.profit_appropriation_posting_type import (
     ProfitAppropriationPostingType,
 )
-from openbilanz.services.profit_appropriation_booking_service import (
+from simpleob.services.profit_appropriation_booking_service import (
     ProfitAppropriationBookingService,
 )
 

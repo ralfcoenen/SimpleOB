@@ -6,10 +6,10 @@ from uuid import uuid4
 
 import pytest
 
-from openbilanz.domain.fixed_asset_movement import (
+from simpleob.domain.fixed_asset_movement import (
     FixedAssetMovement,
 )
-from openbilanz.domain.fixed_asset_movement_type import (
+from simpleob.domain.fixed_asset_movement_type import (
     FixedAssetMovementType,
 )
 

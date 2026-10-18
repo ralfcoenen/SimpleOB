@@ -3,10 +3,10 @@
 from datetime import date
 from decimal import Decimal
 
-from openbilanz.domain.entry_side import EntrySide
-from openbilanz.domain.vat_accounts import VatAccounts
-from openbilanz.domain.vat_booking_item import VatBookingItem
-from openbilanz.services.vat_booking_service import (
+from simpleob.domain.entry_side import EntrySide
+from simpleob.domain.vat_accounts import VatAccounts
+from simpleob.domain.vat_booking_item import VatBookingItem
+from simpleob.services.vat_booking_service import (
     VatBookingService,
 )
 

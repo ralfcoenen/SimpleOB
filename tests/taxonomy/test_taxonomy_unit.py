@@ -2,7 +2,7 @@
 
 import pytest
 
-from openbilanz.taxonomy.unit import TaxonomyUnit
+from simpleob.taxonomy.unit import TaxonomyUnit
 
 
 def test_taxonomy_unit_rejects_blank_measure() -> None:

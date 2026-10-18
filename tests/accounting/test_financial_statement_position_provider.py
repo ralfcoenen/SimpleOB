@@ -1,7 +1,7 @@
-from openbilanz.accounting.hgb_financial_statement_position_provider import (
+from simpleob.accounting.hgb_financial_statement_position_provider import (
     HgbFinancialStatementPositionProvider,
 )
-from openbilanz.hgb.income_statement_structure import (
+from simpleob.hgb.income_statement_structure import (
     create_hgb_income_statement_structure,
 )
 

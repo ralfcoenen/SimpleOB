@@ -161,7 +161,7 @@ fi
 
 INSTALLED_VERSION="$(
     python -c \
-        'from importlib.metadata import version; print(version("openbilanz"))'
+        'from importlib.metadata import version; print(version("simpleob"))'
 )"
 
 PROJECT_VERSION="$(

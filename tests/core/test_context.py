@@ -5,9 +5,9 @@ from uuid import uuid4
 
 import pytest
 
-from openbilanz.core.context import ApplicationContext
-from openbilanz.domain.company import Company
-from openbilanz.domain.fiscal_year import FiscalYear
+from simpleob.core.context import ApplicationContext
+from simpleob.domain.company import Company
+from simpleob.domain.fiscal_year import FiscalYear
 
 
 def test_application_context_contains_company_and_fiscal_year() -> None:

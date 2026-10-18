@@ -3,31 +3,31 @@
 from datetime import date
 from decimal import Decimal
 
-from openbilanz.accounting.account_balance import AccountBalance
-from openbilanz.accounting.balance_sheet import BalanceSheet
-from openbilanz.accounting.financial_statement_position import (
+from simpleob.accounting.account_balance import AccountBalance
+from simpleob.accounting.balance_sheet import BalanceSheet
+from simpleob.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
-from openbilanz.accounting.income_statement import IncomeStatement
-from openbilanz.accounting.ledger import Ledger
-from openbilanz.accounting.mapper import AccountMapper
-from openbilanz.accounting.statement_category import StatementCategory
-from openbilanz.accounting.trial_balance import TrialBalance
-from openbilanz.domain.account_mapping_rule import AccountMappingRule
-from openbilanz.domain.account_type import AccountType
-from openbilanz.domain.booking import Booking
-from openbilanz.domain.booking_line import BookingLine
-from openbilanz.domain.chart_of_accounts_template import (
+from simpleob.accounting.income_statement import IncomeStatement
+from simpleob.accounting.ledger import Ledger
+from simpleob.accounting.mapper import AccountMapper
+from simpleob.accounting.statement_category import StatementCategory
+from simpleob.accounting.trial_balance import TrialBalance
+from simpleob.domain.account_mapping_rule import AccountMappingRule
+from simpleob.domain.account_type import AccountType
+from simpleob.domain.booking import Booking
+from simpleob.domain.booking_line import BookingLine
+from simpleob.domain.chart_of_accounts_template import (
     ChartOfAccountsTemplate,
 )
-from openbilanz.domain.closing_consistency_result import ClosingConsistencyResult
-from openbilanz.domain.entry_side import EntrySide
-from openbilanz.domain.template_account import TemplateAccount
-from openbilanz.services.closing_consistency_service import (
+from simpleob.domain.closing_consistency_result import ClosingConsistencyResult
+from simpleob.domain.entry_side import EntrySide
+from simpleob.domain.template_account import TemplateAccount
+from simpleob.services.closing_consistency_service import (
     ClosingConsistencyService,
 )
-from openbilanz.services.closing_result import ClosingResult
-from openbilanz.services.posting_service import PostingService
+from simpleob.services.closing_result import ClosingResult
+from simpleob.services.posting_service import PostingService
 
 
 class UnbalancedTrialBalance(TrialBalance):

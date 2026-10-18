@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from openbilanz.core.eric_privacy_acknowledgement import (
+from simpleob.core.eric_privacy_acknowledgement import (
     ERIC_PRIVACY_ACKNOWLEDGEMENT_FILENAME,
     ERIC_PRIVACY_NOTICE_VERSION,
     is_eric_privacy_acknowledged,

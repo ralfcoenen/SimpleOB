@@ -9,13 +9,13 @@ verwenden konsistente Testdaten.
 from datetime import date
 from decimal import Decimal
 
-from openbilanz.domain.account import Account
-from openbilanz.domain.account_type import AccountType
-from openbilanz.domain.booking import Booking
-from openbilanz.domain.booking_line import BookingLine
-from openbilanz.domain.chart_of_accounts import ChartOfAccounts
-from openbilanz.domain.entry_side import EntrySide
-from openbilanz.domain.template_account import TemplateAccount
+from simpleob.domain.account import Account
+from simpleob.domain.account_type import AccountType
+from simpleob.domain.booking import Booking
+from simpleob.domain.booking_line import BookingLine
+from simpleob.domain.chart_of_accounts import ChartOfAccounts
+from simpleob.domain.entry_side import EntrySide
+from simpleob.domain.template_account import TemplateAccount
 
 
 def create_booking_line(

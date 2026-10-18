@@ -6,8 +6,8 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from openbilanz.accounting.ledger_entry import LedgerEntry
-from openbilanz.domain.entry_side import EntrySide
+from simpleob.accounting.ledger_entry import LedgerEntry
+from simpleob.domain.entry_side import EntrySide
 
 
 def test_ledger_entry_rejects_empty_account_number() -> None:

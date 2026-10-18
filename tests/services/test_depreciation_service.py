@@ -4,9 +4,9 @@ from datetime import date
 from decimal import Decimal
 from uuid import uuid4
 
-from openbilanz.domain.fiscal_year import FiscalYear
-from openbilanz.domain.fixed_asset import FixedAsset
-from openbilanz.services.depreciation_service import (
+from simpleob.domain.fiscal_year import FiscalYear
+from simpleob.domain.fixed_asset import FixedAsset
+from simpleob.services.depreciation_service import (
         DepreciationService,
 )
 

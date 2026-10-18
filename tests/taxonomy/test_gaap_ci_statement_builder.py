@@ -6,14 +6,14 @@ from pathlib import Path
 
 import pytest
 
-from openbilanz.hgb.balance_sheet_structure import (
+from simpleob.hgb.balance_sheet_structure import (
     create_hgb_balance_sheet_structure,
 )
-from openbilanz.hgb.income_statement_structure import (
+from simpleob.hgb.income_statement_structure import (
     create_hgb_income_statement_structure,
 )
-from openbilanz.taxonomy.arelle_adapter import ArelleAdapter
-from openbilanz.taxonomy.gaap_ci_statement_builder import (
+from simpleob.taxonomy.arelle_adapter import ArelleAdapter
+from simpleob.taxonomy.gaap_ci_statement_builder import (
     GaapCiStatementBuilder,
 )
 

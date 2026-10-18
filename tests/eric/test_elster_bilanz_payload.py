@@ -5,7 +5,7 @@ from xml.etree import ElementTree as ET
 
 import pytest
 
-from openbilanz.eric.elster_bilanz_payload import (
+from simpleob.eric.elster_bilanz_payload import (
     EBILANZ_NAMESPACE,
     XBRL_NAMESPACE,
     ElsterBilanzPayloadBuilder,

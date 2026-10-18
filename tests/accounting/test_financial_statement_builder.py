@@ -1,24 +1,24 @@
 from decimal import Decimal
 
-from openbilanz.accounting.account_balance import AccountBalance
-from openbilanz.accounting.financial_statement_builder import (
+from simpleob.accounting.account_balance import AccountBalance
+from simpleob.accounting.financial_statement_builder import (
     FinancialStatementBuilder,
 )
-from openbilanz.accounting.financial_statement_position import (
+from simpleob.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
-from openbilanz.accounting.mapper import AccountMapper
-from openbilanz.accounting.statement_category import StatementCategory
-from openbilanz.domain.account_mapping_rule import AccountMappingRule
-from openbilanz.domain.account_type import AccountType
-from openbilanz.domain.chart_of_accounts_template import (
+from simpleob.accounting.mapper import AccountMapper
+from simpleob.accounting.statement_category import StatementCategory
+from simpleob.domain.account_mapping_rule import AccountMappingRule
+from simpleob.domain.account_type import AccountType
+from simpleob.domain.chart_of_accounts_template import (
     ChartOfAccountsTemplate,
 )
-from openbilanz.domain.template_account import TemplateAccount
-from openbilanz.hgb.balance_sheet_structure import (
+from simpleob.domain.template_account import TemplateAccount
+from simpleob.hgb.balance_sheet_structure import (
     create_hgb_balance_sheet_structure,
 )
-from openbilanz.services.closing_result import ClosingResult
+from simpleob.services.closing_result import ClosingResult
 
 
 def test_sums_multiple_account_balances_for_same_position() -> None:

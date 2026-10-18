@@ -5,29 +5,29 @@ from uuid import uuid4
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from openbilanz.accounting.hgb_financial_statement_position_provider import (
+from simpleob.accounting.hgb_financial_statement_position_provider import (
     HgbFinancialStatementPositionProvider,
 )
-from openbilanz.database.chart_of_accounts_repository import (
+from simpleob.database.chart_of_accounts_repository import (
     ChartOfAccountsRepository,
 )
-from openbilanz.database.company_repository import (
+from simpleob.database.company_repository import (
     CompanyRepository,
 )
-from openbilanz.database.database import Base
-from openbilanz.domain.account_type import AccountType
-from openbilanz.domain.chart_of_accounts_template import (
+from simpleob.database.database import Base
+from simpleob.domain.account_type import AccountType
+from simpleob.domain.chart_of_accounts_template import (
     ChartOfAccountsTemplate,
 )
-from openbilanz.domain.company import Company
-from openbilanz.domain.template_account import TemplateAccount
-from openbilanz.hgb.balance_sheet_structure import (
+from simpleob.domain.company import Company
+from simpleob.domain.template_account import TemplateAccount
+from simpleob.hgb.balance_sheet_structure import (
     create_hgb_balance_sheet_structure,
 )
-from openbilanz.hgb.income_statement_structure import (
+from simpleob.hgb.income_statement_structure import (
     create_hgb_income_statement_structure,
 )
-from openbilanz.services.chart_of_accounts_initialization_service import (
+from simpleob.services.chart_of_accounts_initialization_service import (
     ChartOfAccountsInitializationService,
 )
 

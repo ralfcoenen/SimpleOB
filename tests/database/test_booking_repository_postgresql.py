@@ -12,15 +12,15 @@ from sqlalchemy import create_engine
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 
-from openbilanz.database.booking_repository import BookingRepository
-from openbilanz.database.company_repository import CompanyRepository
-from openbilanz.database.lock_error import DatabaseLockError
-from openbilanz.database.models import Mandant, Wirtschaftsjahr
-from openbilanz.domain.booking import Booking
-from openbilanz.domain.booking_line import BookingLine
-from openbilanz.domain.company import Company
-from openbilanz.domain.entry_side import EntrySide
-from openbilanz.domain.fiscal_year import FiscalYear
+from simpleob.database.booking_repository import BookingRepository
+from simpleob.database.company_repository import CompanyRepository
+from simpleob.database.lock_error import DatabaseLockError
+from simpleob.database.models import Mandant, Wirtschaftsjahr
+from simpleob.domain.booking import Booking
+from simpleob.domain.booking_line import BookingLine
+from simpleob.domain.company import Company
+from simpleob.domain.entry_side import EntrySide
+from simpleob.domain.fiscal_year import FiscalYear
 
 
 @pytest.fixture

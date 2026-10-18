@@ -1,7 +1,7 @@
 import pytest
 
-from openbilanz.domain import DuplicateBookingError
-from openbilanz.domain.journal import Journal
+from simpleob.domain import DuplicateBookingError
+from simpleob.domain.journal import Journal
 from tests.factories import create_booking
 
 

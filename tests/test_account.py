@@ -1,6 +1,6 @@
 import pytest
 
-from openbilanz.domain import Account, AccountType, TemplateAccount
+from simpleob.domain import Account, AccountType, TemplateAccount
 
 
 def make_template() -> TemplateAccount:

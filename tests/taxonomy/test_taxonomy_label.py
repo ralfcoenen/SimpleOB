@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from openbilanz.taxonomy.label import (
+from simpleob.taxonomy.label import (
     TaxonomyLabel,
     TaxonomyLabelRole,
 )

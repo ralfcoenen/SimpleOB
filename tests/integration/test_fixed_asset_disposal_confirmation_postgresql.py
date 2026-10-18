@@ -12,34 +12,34 @@ from sqlalchemy import create_engine, delete, select
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 
-from openbilanz.core.context import ApplicationContext
-from openbilanz.database.booking_repository import BookingRepository
-from openbilanz.database.company_repository import CompanyRepository
-from openbilanz.database.fixed_asset_repository import FixedAssetRepository
-from openbilanz.database.fixed_asset_movement_repository import (
+from simpleob.core.context import ApplicationContext
+from simpleob.database.booking_repository import BookingRepository
+from simpleob.database.company_repository import CompanyRepository
+from simpleob.database.fixed_asset_repository import FixedAssetRepository
+from simpleob.database.fixed_asset_movement_repository import (
     FixedAssetMovementRepository,
 )
-from openbilanz.database.lock_error import DatabaseLockError
-from openbilanz.database.models import Anlagebewegung, Anlagegut, Mandant
-from openbilanz.domain.booking import Booking
-from openbilanz.domain.booking_line import BookingLine
-from openbilanz.domain.company import Company
-from openbilanz.domain.entry_side import EntrySide
-from openbilanz.domain.fiscal_year import FiscalYear
-from openbilanz.domain.fixed_asset import FixedAsset
-from openbilanz.domain.fixed_asset_disposal_calculation import (
+from simpleob.database.lock_error import DatabaseLockError
+from simpleob.database.models import Anlagebewegung, Anlagegut, Mandant
+from simpleob.domain.booking import Booking
+from simpleob.domain.booking_line import BookingLine
+from simpleob.domain.company import Company
+from simpleob.domain.entry_side import EntrySide
+from simpleob.domain.fiscal_year import FiscalYear
+from simpleob.domain.fixed_asset import FixedAsset
+from simpleob.domain.fixed_asset_disposal_calculation import (
     FixedAssetDisposalCalculation,
 )
-from openbilanz.domain.fixed_asset_disposal_preview import (
+from simpleob.domain.fixed_asset_disposal_preview import (
     FixedAssetDisposalPreview,
 )
-from openbilanz.domain.fixed_asset_movement import FixedAssetMovement
-from openbilanz.domain.fixed_asset_movement_type import (
+from simpleob.domain.fixed_asset_movement import FixedAssetMovement
+from simpleob.domain.fixed_asset_movement_type import (
     FixedAssetMovementType,
 )
-from openbilanz.domain.fixed_asset_status import FixedAssetStatus
-from openbilanz.services.fiscal_year_workspace import FiscalYearWorkspace
-from openbilanz.services.fixed_asset_disposal_workflow import (
+from simpleob.domain.fixed_asset_status import FixedAssetStatus
+from simpleob.services.fiscal_year_workspace import FiscalYearWorkspace
+from simpleob.services.fixed_asset_disposal_workflow import (
     FixedAssetDisposalWorkflow,
 )
 

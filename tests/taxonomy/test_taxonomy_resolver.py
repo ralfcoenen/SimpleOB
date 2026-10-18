@@ -5,9 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from openbilanz.domain.fiscal_year import FiscalYear
-from openbilanz.taxonomy.resolver import TaxonomyResolver
-from openbilanz.taxonomy.taxonomy import TaxonomyVersion
+from simpleob.domain.fiscal_year import FiscalYear
+from simpleob.taxonomy.resolver import TaxonomyResolver
+from simpleob.taxonomy.taxonomy import TaxonomyVersion
 
 TAXONOMY_ROOT = Path(
     "/tmp/openbilanz-taxonomy"

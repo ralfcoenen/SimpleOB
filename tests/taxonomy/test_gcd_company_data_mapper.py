@@ -4,11 +4,11 @@ from uuid import uuid4
 
 import pytest
 
-from openbilanz.domain.company import Company
-from openbilanz.domain.company_master_data import (
+from simpleob.domain.company import Company
+from simpleob.domain.company_master_data import (
     CompanyMasterData,
 )
-from openbilanz.taxonomy.gcd_company_data_mapper import (
+from simpleob.taxonomy.gcd_company_data_mapper import (
     GcdCompanyDataMapper,
 )
 

@@ -2,7 +2,7 @@ from datetime import date
 
 import pytest
 
-from openbilanz.date_input import (
+from simpleob.date_input import (
     parse_german_date,
 )
 

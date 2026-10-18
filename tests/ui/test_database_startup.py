@@ -7,9 +7,9 @@ from unittest.mock import MagicMock
 import pytest
 from PySide6.QtWidgets import QDialog, QMessageBox
 
-from openbilanz import qt_main
-from openbilanz.core.config import ApplicationConfig
-from openbilanz.database.connection_credentials import (
+from simpleob import qt_main
+from simpleob.core.config import ApplicationConfig
+from simpleob.database.connection_credentials import (
     PostgreSQLCredentials,
 )
 

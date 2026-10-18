@@ -4,17 +4,17 @@ from decimal import Decimal
 
 import pytest
 
-from openbilanz.accounting.balance_sheet import BalanceSheet
-from openbilanz.accounting.financial_statement_position import (
+from simpleob.accounting.balance_sheet import BalanceSheet
+from simpleob.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
-from openbilanz.eric.bilanz_generation.gaap_ci_6_9_balance_sheet_values import (
+from simpleob.eric.bilanz_generation.gaap_ci_6_9_balance_sheet_values import (
     GaapCi69BalanceSheetValueBuilder,
 )
-from openbilanz.hgb.balance_sheet_structure import (
+from simpleob.hgb.balance_sheet_structure import (
     create_hgb_balance_sheet_structure,
 )
-from openbilanz.hgb.income_statement_structure import (
+from simpleob.hgb.income_statement_structure import (
     create_hgb_income_statement_structure,
 )
 

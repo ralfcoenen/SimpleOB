@@ -5,24 +5,24 @@ from decimal import Decimal
 
 import pytest
 
-from openbilanz.taxonomy.arelle_adapter import ArelleAdapter
-from openbilanz.taxonomy.calculation_set import (
+from simpleob.taxonomy.arelle_adapter import ArelleAdapter
+from simpleob.taxonomy.calculation_set import (
     TaxonomyCalculationSet,
 )
-from openbilanz.taxonomy.calculation import (
+from simpleob.taxonomy.calculation import (
     TaxonomyCalculationRelation,
 )
-from openbilanz.taxonomy.concept import (
+from simpleob.taxonomy.concept import (
     TaxonomyBalance,
     TaxonomyPeriodType,
 )
-from openbilanz.taxonomy.concept_set import TaxonomyConceptSet
-from openbilanz.taxonomy.label import (
+from simpleob.taxonomy.concept_set import TaxonomyConceptSet
+from simpleob.taxonomy.label import (
     TaxonomyLabelRole,
 )
-from openbilanz.taxonomy.label_set import TaxonomyLabelSet
-from openbilanz.taxonomy.model import TaxonomyModel
-from openbilanz.taxonomy.presentation_set import (
+from simpleob.taxonomy.label_set import TaxonomyLabelSet
+from simpleob.taxonomy.model import TaxonomyModel
+from simpleob.taxonomy.presentation_set import (
     TaxonomyPresentationSet,
 )
 

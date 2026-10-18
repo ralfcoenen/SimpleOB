@@ -3,19 +3,19 @@
 from decimal import Decimal
 from unittest.mock import Mock
 
-from openbilanz.accounting.financial_statement_builder import (
+from simpleob.accounting.financial_statement_builder import (
     FinancialStatementBuilder,
 )
-from openbilanz.accounting.financial_statement_position import (
+from simpleob.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
-from openbilanz.accounting.income_statement import IncomeStatement
-from openbilanz.accounting.ledger import Ledger
-from openbilanz.domain.account_type import AccountType
-from openbilanz.services.e_bilanz_preparation_service import (
+from simpleob.accounting.income_statement import IncomeStatement
+from simpleob.accounting.ledger import Ledger
+from simpleob.domain.account_type import AccountType
+from simpleob.services.e_bilanz_preparation_service import (
     EBilanzPreparationService,
 )
-from openbilanz.services.closing_service import ClosingService
+from simpleob.services.closing_service import ClosingService
 
 def test_combines_pre_closing_income_statement_with_closed_balance_sheet(
 ) -> None:

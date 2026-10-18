@@ -2,10 +2,10 @@
 
 from pathlib import Path
 
-from openbilanz.taxonomy.entry_point import (
+from simpleob.taxonomy.entry_point import (
     TaxonomyEntryPoint,
 )
-from openbilanz.taxonomy.fiscal_requirement_reader import (
+from simpleob.taxonomy.fiscal_requirement_reader import (
     FiscalConceptRequirement,
     FiscalRequirement,
     FiscalRequirementReader,

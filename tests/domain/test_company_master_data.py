@@ -4,8 +4,8 @@ from uuid import uuid4
 
 import pytest
 
-from openbilanz.domain.company import Company
-from openbilanz.domain.company_master_data import (
+from simpleob.domain.company import Company
+from simpleob.domain.company_master_data import (
     LEGAL_FORM_GMBH,
     LEGAL_FORM_SOLE_PROPRIETORSHIP_GBR,
     LEGAL_FORM_UG,

@@ -4,8 +4,8 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-from openbilanz.core.config import DATABASE_URL
-from openbilanz.database.database import Base
+from simpleob.core.config import DATABASE_URL
+from simpleob.database.database import Base
 
 target_metadata = Base.metadata
 

@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from openbilanz.taxonomy.concept import (
+from simpleob.taxonomy.concept import (
     TaxonomyBalance,
     TaxonomyConcept,
     TaxonomyPeriodType,

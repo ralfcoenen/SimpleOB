@@ -9,18 +9,18 @@ import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 
-from openbilanz.database.migration_service import (
+from simpleob.database.migration_service import (
     PostgreSQLSchemaStatus,
 )
-from openbilanz.database.postgresql_administration_service import (
+from simpleob.database.postgresql_administration_service import (
     PostgreSQLAdministrationService,
 )
-from openbilanz.database.postgresql_migration_lock import (
+from simpleob.database.postgresql_migration_lock import (
     MIGRATION_LOCK_KEY,
 )
 from pathlib import Path
 
-from openbilanz.database.postgresql_migration_safety import (
+from simpleob.database.postgresql_migration_safety import (
     PostgreSQLMigrationAction,
     PostgreSQLMigrationApproval,
 )
@@ -268,7 +268,7 @@ def test_migration_dry_run_releases_lock_after_backup_failure(
     monkeypatch,
 ) -> None:
     """Ein Backupfehler beendet den Probelauf und gibt die Sperre frei."""
-    from openbilanz.database import postgresql_administration_service as module
+    from simpleob.database import postgresql_administration_service as module
 
     def failing_backup(self, *, backup_path):
         raise RuntimeError("Simulierter Backupfehler")
@@ -297,7 +297,7 @@ def test_migration_dry_run_releases_lock_after_restore_failure(
     monkeypatch,
 ) -> None:
     """Ein Restorefehler beendet den Probelauf und gibt die Sperre frei."""
-    from openbilanz.database import postgresql_administration_service as module
+    from simpleob.database import postgresql_administration_service as module
 
     def failing_restore(self, *, backup_path):
         raise RuntimeError("Simulierter Restorefehler")
@@ -531,7 +531,7 @@ def test_execute_migration_on_connection_commits(
     monkeypatch,
 ) -> None:
     """Erfolgreiche simulierte Migration beendet die Transaktion."""
-    from openbilanz.database import postgresql_administration_service as module
+    from simpleob.database import postgresql_administration_service as module
 
     service = _service(database_url)
     calls = []
@@ -596,7 +596,7 @@ def test_migration_failure_releases_maintenance_isolation(
     monkeypatch,
 ) -> None:
     """Ein Migrationsfehler gibt Wartungsisolierung und Sperre frei."""
-    from openbilanz.database import postgresql_administration_service as module
+    from simpleob.database import postgresql_administration_service as module
 
     service = _service(database_url)
 
@@ -705,7 +705,7 @@ def test_execute_migration_empty_requires_approval(
     monkeypatch,
 ) -> None:
     """Ein leeres Schema benötigt Initialisierungs- und Wartungsfreigabe."""
-    from openbilanz.database.migration_service import (
+    from simpleob.database.migration_service import (
         PostgreSQLSchemaInspection,
     )
 
@@ -757,7 +757,7 @@ def test_execute_migration_outdated_requires_approval(
     monkeypatch,
 ) -> None:
     """Ein veraltetes Schema darf nicht ohne Zustimmung migriert werden."""
-    from openbilanz.database.migration_service import (
+    from simpleob.database.migration_service import (
         PostgreSQLSchemaInspection,
     )
 
@@ -791,8 +791,8 @@ def test_execute_migration_outdated_success_simulated(
     monkeypatch,
 ) -> None:
     """Simulierte Migration: Backup, Wartung, Alembic und Endprüfung."""
-    from openbilanz.database import postgresql_administration_service as module
-    from openbilanz.database.migration_service import PostgreSQLSchemaInspection
+    from simpleob.database import postgresql_administration_service as module
+    from simpleob.database.migration_service import PostgreSQLSchemaInspection
 
     service = _service(database_url)
     head = service._migration_service.inspect_postgresql_schema().head_revision
@@ -876,7 +876,7 @@ def test_execute_migration_failure_releases_isolation(
     monkeypatch,
 ) -> None:
     """Simulierter Alembic-Fehler hebt die Wartungssperre auf."""
-    from openbilanz.database.migration_service import PostgreSQLSchemaInspection
+    from simpleob.database.migration_service import PostgreSQLSchemaInspection
 
     service = _service(database_url)
     head = service._migration_service.inspect_postgresql_schema().head_revision
@@ -942,7 +942,7 @@ def test_execute_migration_empty_success_simulated(
     monkeypatch,
 ) -> None:
     """Bestätigte Initialisierung eines simuliert leeren Schemas."""
-    from openbilanz.database.migration_service import (
+    from simpleob.database.migration_service import (
         PostgreSQLSchemaInspection,
     )
 
@@ -1007,7 +1007,7 @@ def test_execute_migration_rejects_unknown_schema(
     monkeypatch,
 ) -> None:
     """Ein unbekannter Schemazustand verhindert die Migration."""
-    from openbilanz.database.migration_service import (
+    from simpleob.database.migration_service import (
         PostgreSQLSchemaInspection,
     )
 

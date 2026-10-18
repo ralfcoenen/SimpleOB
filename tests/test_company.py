@@ -5,7 +5,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from openbilanz.domain import Company
+from simpleob.domain import Company
 
 
 def test_company_accepts_valid_values() -> None:

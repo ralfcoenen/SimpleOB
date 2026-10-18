@@ -7,13 +7,13 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from openbilanz.domain import (
+from simpleob.domain import (
 Booking,
 BookingLine,
 EntrySide,
 UnbalancedBookingError,
 )
-from openbilanz.domain.booking_type import BookingType
+from simpleob.domain.booking_type import BookingType
 
 
 def create_balanced_lines() -> tuple[BookingLine, BookingLine]:

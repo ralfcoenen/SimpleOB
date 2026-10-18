@@ -5,7 +5,7 @@ from decimal import Decimal
 
 import pytest
 
-from openbilanz.domain import BookingLine, EntrySide
+from simpleob.domain import BookingLine, EntrySide
 
 
 def test_debit_booking_line_is_created() -> None:

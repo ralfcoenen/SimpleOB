@@ -7,26 +7,26 @@ from uuid import uuid4
 
 import pytest
 
-from openbilanz.accounting.financial_statement_position import (
+from simpleob.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
-from openbilanz.domain.company import Company
-from openbilanz.domain.fiscal_year import FiscalYear
-from openbilanz.hgb.balance_sheet_structure import (
+from simpleob.domain.company import Company
+from simpleob.domain.fiscal_year import FiscalYear
+from simpleob.hgb.balance_sheet_structure import (
     create_hgb_balance_sheet_structure,
 )
-from openbilanz.hgb.income_statement_structure import (
+from simpleob.hgb.income_statement_structure import (
     create_hgb_income_statement_structure,
 )
-from openbilanz.services.fixed_asset_schedule_service import (
+from simpleob.services.fixed_asset_schedule_service import (
     FixedAssetSchedulePosition,
 )
-from openbilanz.taxonomy.arelle_adapter import ArelleAdapter
-from openbilanz.taxonomy.e_bilanz_builder import EBilanzBuilder
-from openbilanz.taxonomy.entry_point import TaxonomyEntryPoint
-from openbilanz.taxonomy.gcd_company_data import GcdCompanyData
-from openbilanz.taxonomy.resolver import TaxonomyResolver
-from openbilanz.taxonomy.taxonomy import TaxonomyVersion
+from simpleob.taxonomy.arelle_adapter import ArelleAdapter
+from simpleob.taxonomy.e_bilanz_builder import EBilanzBuilder
+from simpleob.taxonomy.entry_point import TaxonomyEntryPoint
+from simpleob.taxonomy.gcd_company_data import GcdCompanyData
+from simpleob.taxonomy.resolver import TaxonomyResolver
+from simpleob.taxonomy.taxonomy import TaxonomyVersion
 
 TAXONOMY_ROOT = Path(
     "data/taxonomy"

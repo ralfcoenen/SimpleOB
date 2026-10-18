@@ -7,13 +7,13 @@ from decimal import Decimal
 
 import pytest
 
-from openbilanz.accounting.ledger import Ledger
-from openbilanz.domain import DuplicateBookingError
-from openbilanz.domain.booking import Booking
-from openbilanz.domain.booking_line import BookingLine
-from openbilanz.domain.entry_side import EntrySide
-from openbilanz.domain.journal import Journal
-from openbilanz.services.posting_service import PostingService
+from simpleob.accounting.ledger import Ledger
+from simpleob.domain import DuplicateBookingError
+from simpleob.domain.booking import Booking
+from simpleob.domain.booking_line import BookingLine
+from simpleob.domain.entry_side import EntrySide
+from simpleob.domain.journal import Journal
+from simpleob.services.posting_service import PostingService
 from tests.factories import create_booking
 
 

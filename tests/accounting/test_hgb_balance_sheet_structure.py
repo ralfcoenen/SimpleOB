@@ -1,4 +1,4 @@
-from openbilanz.hgb.balance_sheet_structure import (
+from simpleob.hgb.balance_sheet_structure import (
     create_hgb_balance_sheet_structure,
 )
 

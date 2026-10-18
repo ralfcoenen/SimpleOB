@@ -7,35 +7,35 @@ from uuid import uuid4
 
 import pytest
 
-from openbilanz.accounting.balance_sheet import BalanceSheet
-from openbilanz.accounting.financial_statement_position import (
+from simpleob.accounting.balance_sheet import BalanceSheet
+from simpleob.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
-from openbilanz.accounting.income_statement import IncomeStatement
-from openbilanz.domain.accounting_account_roles import (
+from simpleob.accounting.income_statement import IncomeStatement
+from simpleob.domain.accounting_account_roles import (
     AccountingAccountRoles,
 )
-from openbilanz.domain.company import Company
-from openbilanz.domain.company_master_data import (
+from simpleob.domain.company import Company
+from simpleob.domain.company_master_data import (
     CompanyMasterData,
 )
-from openbilanz.domain.e_bilanz_account_detail import (
+from simpleob.domain.e_bilanz_account_detail import (
     EBilanzAccountDetail,
 )
-from openbilanz.domain.fiscal_year import FiscalYear
-from openbilanz.domain.vat_accounts import VatAccounts
-from openbilanz.hgb.balance_sheet_structure import (
+from simpleob.domain.fiscal_year import FiscalYear
+from simpleob.domain.vat_accounts import VatAccounts
+from simpleob.hgb.balance_sheet_structure import (
     create_hgb_balance_sheet_structure,
 )
-from openbilanz.hgb.income_statement_structure import (
+from simpleob.hgb.income_statement_structure import (
     create_hgb_income_statement_structure,
 )
-from openbilanz.services.e_bilanz_service import EBilanzService
-from openbilanz.taxonomy.arelle_adapter import ArelleAdapter
-from openbilanz.taxonomy.gcd_company_data_mapper import (
+from simpleob.services.e_bilanz_service import EBilanzService
+from simpleob.taxonomy.arelle_adapter import ArelleAdapter
+from simpleob.taxonomy.gcd_company_data_mapper import (
     GcdCompanyDataMapper,
 )
-from openbilanz.taxonomy.resolver import TaxonomyResolver
+from simpleob.taxonomy.resolver import TaxonomyResolver
 
 TAXONOMY_ROOT = Path(
     "data/taxonomy"

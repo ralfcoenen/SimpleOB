@@ -8,7 +8,7 @@ import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 
-from openbilanz.database.postgresql_migration_lock import (
+from simpleob.database.postgresql_migration_lock import (
     MIGRATION_LOCK_KEY,
     postgresql_migration_lock,
 )

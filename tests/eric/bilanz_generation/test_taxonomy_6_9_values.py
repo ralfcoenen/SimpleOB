@@ -6,19 +6,19 @@ from uuid import uuid4
 
 import pytest
 
-from openbilanz.domain.company import Company
-from openbilanz.domain.fiscal_year import FiscalYear
-from openbilanz.eric.bilanz_generation.gaap_ci_6_9_values import (
+from simpleob.domain.company import Company
+from simpleob.domain.fiscal_year import FiscalYear
+from simpleob.eric.bilanz_generation.gaap_ci_6_9_values import (
     GaapCi69Values,
 )
-from openbilanz.eric.bilanz_generation.taxonomy_6_9_values import (
+from simpleob.eric.bilanz_generation.taxonomy_6_9_values import (
     Taxonomy69ValueBuilder,
 )
-from openbilanz.taxonomy.gcd_company_data import GcdCompanyData
-from openbilanz.taxonomy.gcd_company_identifiers import (
+from simpleob.taxonomy.gcd_company_data import GcdCompanyData
+from simpleob.taxonomy.gcd_company_identifiers import (
     GcdCompanyIdentifiers,
 )
-from openbilanz.taxonomy.gcd_report_profile import GcdReportProfile
+from simpleob.taxonomy.gcd_report_profile import GcdReportProfile
 
 
 def _company_data() -> GcdCompanyData:

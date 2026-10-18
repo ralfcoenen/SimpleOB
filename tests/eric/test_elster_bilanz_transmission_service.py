@@ -4,12 +4,12 @@ from datetime import date
 from pathlib import Path
 from types import SimpleNamespace
 
-from openbilanz.eric.elster_bilanz_transmission_service import (
+from simpleob.eric.elster_bilanz_transmission_service import (
     ELSTER_TEST_MARKER,
     ElsterBilanzTransmissionService,
 )
-from openbilanz.eric.eric_send_adapter import EricSendResult
-from openbilanz.eric.eric_validate_adapter import EricValidationResult
+from simpleob.eric.eric_send_adapter import EricSendResult
+from simpleob.eric.eric_validate_adapter import EricValidationResult
 
 
 class FakePayloadService:

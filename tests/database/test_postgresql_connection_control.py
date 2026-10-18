@@ -7,7 +7,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from openbilanz.database.postgresql_connection_control import (
+from simpleob.database.postgresql_connection_control import (
     PostgreSQLConnectionControl,
     TEST_DATABASE,
 )

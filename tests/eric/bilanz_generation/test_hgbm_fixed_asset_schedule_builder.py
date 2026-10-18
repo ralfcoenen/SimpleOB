@@ -5,21 +5,21 @@ from decimal import Decimal
 
 import pytest
 
-from openbilanz.eric.bilanz_generation.hgbm_fixed_asset_schedule_builder import (
+from simpleob.eric.bilanz_generation.hgbm_fixed_asset_schedule_builder import (
     HgbmFixedAssetScheduleBuilder,
 )
-from openbilanz.taxonomy.concept import (
+from simpleob.taxonomy.concept import (
     TaxonomyBalance,
     TaxonomyConcept,
     TaxonomyPeriodType,
 )
-from openbilanz.taxonomy.context import (
+from simpleob.taxonomy.context import (
     TaxonomyContext,
     TaxonomyDimension,
 )
-from openbilanz.taxonomy.fact import TaxonomyFact
-from openbilanz.taxonomy.unit import TaxonomyUnit
-from openbilanz.taxonomy.xbrl_writer import TaxonomyXbrlWriter
+from simpleob.taxonomy.fact import TaxonomyFact
+from simpleob.taxonomy.unit import TaxonomyUnit
+from simpleob.taxonomy.xbrl_writer import TaxonomyXbrlWriter
 
 
 @pytest.mark.parametrize(

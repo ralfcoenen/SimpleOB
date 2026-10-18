@@ -3,16 +3,16 @@ from datetime import date
 
 import pytest
 
-from openbilanz.taxonomy.concept import (
+from simpleob.taxonomy.concept import (
     TaxonomyBalance,
     TaxonomyConcept,
     TaxonomyPeriodType,
 )
-from openbilanz.taxonomy.context import TaxonomyContext
-from openbilanz.taxonomy.gcd_report_element import (
+from simpleob.taxonomy.context import TaxonomyContext
+from simpleob.taxonomy.gcd_report_element import (
     GcdReportElement,
 )
-from openbilanz.taxonomy.text_fact import TaxonomyTextFact
+from simpleob.taxonomy.text_fact import TaxonomyTextFact
 
 TEST_ENTITY_SCHEME = (
     "http://www.bundesfinanzministerium.de"

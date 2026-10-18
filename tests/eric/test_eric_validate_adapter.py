@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from openbilanz.eric.eric_validate_adapter import (
+from simpleob.eric.eric_validate_adapter import (
     ERIC_VALIDIERE,
     EricValidateAdapter,
     EricValidateError,

@@ -8,16 +8,16 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from openbilanz.accounting.financial_statement_position import (
+from simpleob.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
-from openbilanz.accounting.hgb_financial_statement_position_provider import (
+from simpleob.accounting.hgb_financial_statement_position_provider import (
     HgbFinancialStatementPositionProvider,
 )
-from openbilanz.client_transfer.importer import (
+from simpleob.client_transfer.importer import (
     ClientTransferImporter,
 )
-from openbilanz.client_transfer.model import (
+from simpleob.client_transfer.model import (
     CLIENT_TRANSFER_FORMAT_NAME,
     CLIENT_TRANSFER_FORMAT_VERSION,
     ClientTransfer,
@@ -44,59 +44,59 @@ from openbilanz.client_transfer.model import (
     ClientTransferProfitAppropriationAnnualData,
     ClientTransferProfitAppropriationPosting,
 )
-from openbilanz.database.booking_repository import (
+from simpleob.database.booking_repository import (
     BookingRepository,
 )
-from openbilanz.database.chart_of_accounts_repository import (
+from simpleob.database.chart_of_accounts_repository import (
     ChartOfAccountsRepository,
 )
-from openbilanz.database.company_repository import (
+from simpleob.database.company_repository import (
     CompanyRepository,
 )
-from openbilanz.database.database import Base
-from openbilanz.database.fixed_asset_depreciation_repository import (
+from simpleob.database.database import Base
+from simpleob.database.fixed_asset_depreciation_repository import (
     FixedAssetDepreciationRepository,
 )
-from openbilanz.database.tax_depreciation_adjustment_repository import (
+from simpleob.database.tax_depreciation_adjustment_repository import (
     TaxDepreciationAdjustmentRepository,
 )
-from openbilanz.database.equity_contribution_repository import (
+from simpleob.database.equity_contribution_repository import (
     EquityContributionRepository,
 )
-from openbilanz.database.fixed_asset_repository import (
+from simpleob.database.fixed_asset_repository import (
     FixedAssetRepository,
 )
-from openbilanz.database.fixed_asset_movement_repository import (
+from simpleob.database.fixed_asset_movement_repository import (
     FixedAssetMovementRepository,
 )
-from openbilanz.database.profit_appropriation_annual_data_repository import (
+from simpleob.database.profit_appropriation_annual_data_repository import (
     ProfitAppropriationAnnualDataRepository,
 )
-from openbilanz.database.profit_appropriation_posting_repository import (
+from simpleob.database.profit_appropriation_posting_repository import (
     ProfitAppropriationPostingRepository,
 )
-from openbilanz.database.shareholder_repository import (
+from simpleob.database.shareholder_repository import (
     ShareholderRepository,
 )
-from openbilanz.domain.profit_appropriation_posting_type import (
+from simpleob.domain.profit_appropriation_posting_type import (
     ProfitAppropriationPostingType,
 )
-from openbilanz.domain.company import Company
-from openbilanz.domain.depreciation_kind import DepreciationKind
-from openbilanz.domain.depreciation_source import DepreciationSource
-from openbilanz.domain.equity_contribution_reference import (
+from simpleob.domain.company import Company
+from simpleob.domain.depreciation_kind import DepreciationKind
+from simpleob.domain.depreciation_source import DepreciationSource
+from simpleob.domain.equity_contribution_reference import (
     EquityContributionReference,
 )
-from openbilanz.domain.fiscal_year import FiscalYear
-from openbilanz.domain.fiscal_year_status import (
+from simpleob.domain.fiscal_year import FiscalYear
+from simpleob.domain.fiscal_year_status import (
     FiscalYearStatus,
 )
-from openbilanz.domain.fixed_asset_movement_type import (
+from simpleob.domain.fixed_asset_movement_type import (
     FixedAssetMovementType,
 )
-from openbilanz.domain.booking_type import BookingType
-from openbilanz.domain.entry_side import EntrySide
-from openbilanz.domain.fixed_asset_status import (
+from simpleob.domain.booking_type import BookingType
+from simpleob.domain.entry_side import EntrySide
+from simpleob.domain.fixed_asset_status import (
     FixedAssetStatus,
 )
 

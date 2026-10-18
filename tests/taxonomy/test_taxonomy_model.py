@@ -3,22 +3,22 @@ from decimal import Decimal
 
 import pytest
 
-from openbilanz.taxonomy.concept import (
+from simpleob.taxonomy.concept import (
     TaxonomyBalance,
     TaxonomyConcept,
     TaxonomyPeriodType,
 )
-from openbilanz.taxonomy.concept_set import TaxonomyConceptSet
-from openbilanz.taxonomy.label import (
+from simpleob.taxonomy.concept_set import TaxonomyConceptSet
+from simpleob.taxonomy.label import (
     TaxonomyLabel,
     TaxonomyLabelRole,
 )
-from openbilanz.taxonomy.label_set import TaxonomyLabelSet
-from openbilanz.taxonomy.model import TaxonomyModel
-from openbilanz.taxonomy.presentation import (
+from simpleob.taxonomy.label_set import TaxonomyLabelSet
+from simpleob.taxonomy.model import TaxonomyModel
+from simpleob.taxonomy.presentation import (
     TaxonomyPresentationRelation,
 )
-from openbilanz.taxonomy.presentation_set import (
+from simpleob.taxonomy.presentation_set import (
     TaxonomyPresentationSet,
 )
 

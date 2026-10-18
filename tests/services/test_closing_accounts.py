@@ -1,6 +1,6 @@
 from dataclasses import is_dataclass
 
-from openbilanz.services.closing_accounts import ClosingAccounts
+from simpleob.services.closing_accounts import ClosingAccounts
 
 
 def test_closing_accounts_contains_required_accounts() -> None:

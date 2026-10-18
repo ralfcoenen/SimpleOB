@@ -4,8 +4,8 @@ from datetime import date
 
 import pytest
 
-from openbilanz.taxonomy.concept import TaxonomyPeriodType
-from openbilanz.taxonomy.context import (
+from simpleob.taxonomy.concept import TaxonomyPeriodType
+from simpleob.taxonomy.context import (
     TaxonomyContext,
     TaxonomyDimension,
 )

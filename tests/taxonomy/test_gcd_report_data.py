@@ -2,7 +2,7 @@
 
 import pytest
 
-from openbilanz.taxonomy.gcd_report_data import (
+from simpleob.taxonomy.gcd_report_data import (
     GcdReportData,
 )
 

@@ -1,7 +1,7 @@
 from dataclasses import is_dataclass
 from decimal import Decimal
 
-from openbilanz.services.closing_result import ClosingResult
+from simpleob.services.closing_result import ClosingResult
 
 
 def test_closing_result_contains_net_income() -> None:

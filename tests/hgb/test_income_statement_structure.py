@@ -1,5 +1,5 @@
-from openbilanz.accounting.statement_category import StatementCategory
-from openbilanz.hgb.income_statement_structure import (
+from simpleob.accounting.statement_category import StatementCategory
+from simpleob.hgb.income_statement_structure import (
     create_hgb_income_statement_structure,
 )
 

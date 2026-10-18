@@ -1,6 +1,6 @@
 import pytest
 
-from openbilanz.domain import AccountType, TemplateAccount
+from simpleob.domain import AccountType, TemplateAccount
 
 
 def test_template_account_can_be_created() -> None:

@@ -2,7 +2,7 @@
 
 import pytest
 
-from openbilanz.taxonomy.gcd_company_identifiers import (
+from simpleob.taxonomy.gcd_company_identifiers import (
     GcdCompanyIdentifiers,
 )
 

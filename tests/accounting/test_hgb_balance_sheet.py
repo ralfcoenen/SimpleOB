@@ -1,9 +1,9 @@
 from decimal import Decimal
 
-from openbilanz.accounting.financial_statement_position import (
+from simpleob.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
-from openbilanz.accounting.hgb_balance_sheet import HgbBalanceSheet
+from simpleob.accounting.hgb_balance_sheet import HgbBalanceSheet
 
 
 def test_hgb_balance_sheet_stores_assets_liabilities_and_amounts() -> None:

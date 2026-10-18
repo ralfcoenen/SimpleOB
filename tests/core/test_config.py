@@ -3,7 +3,7 @@
 import sys
 from pathlib import Path
 
-from openbilanz.core.config import (
+from simpleob.core.config import (
     ApplicationConfig,
     bundled_eric_lib_dir,
     default_config,
@@ -15,7 +15,7 @@ from openbilanz.core.config import (
     save_eric_certificate_path,
     save_eric_data_supplier,
 )
-from openbilanz.domain.elster_data_supplier import (
+from simpleob.domain.elster_data_supplier import (
     ElsterDataSupplier,
 )
 
@@ -496,7 +496,7 @@ def test_desktop_application_data_dir_uses_macos_application_support(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(
-        "openbilanz.core.config.sys.platform",
+        "simpleob.core.config.sys.platform",
         "darwin",
     )
     monkeypatch.setattr(
@@ -518,7 +518,7 @@ def test_installed_config_uses_desktop_application_data_directory(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(
-        "openbilanz.core.config.sys.platform",
+        "simpleob.core.config.sys.platform",
         "darwin",
     )
     monkeypatch.setattr(
@@ -556,7 +556,7 @@ def test_load_installed_config_reads_config_from_desktop_data_directory(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(
-        "openbilanz.core.config.sys.platform",
+        "simpleob.core.config.sys.platform",
         "darwin",
     )
     monkeypatch.setattr(
@@ -684,7 +684,7 @@ def test_load_installed_config_uses_bundled_eric_lib_directory(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(
-        "openbilanz.core.config.sys.platform",
+        "simpleob.core.config.sys.platform",
         "darwin",
     )
     monkeypatch.setattr(
@@ -844,7 +844,7 @@ def test_load_config_rejects_unsupported_database_url(
 def test_save_database_configuration_persists_postgresql(
     tmp_path,
 ) -> None:
-    from openbilanz.core.config import (
+    from simpleob.core.config import (
         default_config,
         load_config,
         save_database_configuration,
@@ -887,7 +887,7 @@ def test_save_database_configuration_persists_postgresql(
 def test_save_database_configuration_restores_sqlite(
     tmp_path,
 ) -> None:
-    from openbilanz.core.config import (
+    from simpleob.core.config import (
         default_config,
         load_config,
         save_database_configuration,
@@ -928,7 +928,7 @@ def test_save_database_configuration_rejects_password(
 ) -> None:
     import pytest
 
-    from openbilanz.core.config import (
+    from simpleob.core.config import (
         default_config,
         load_config,
         save_database_configuration,

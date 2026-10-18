@@ -12,46 +12,46 @@ from sqlalchemy import MetaData, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 
-from openbilanz.database.booking_repository import BookingRepository
-from openbilanz.database.chart_of_accounts_repository import (
+from simpleob.database.booking_repository import BookingRepository
+from simpleob.database.chart_of_accounts_repository import (
     ChartOfAccountsRepository,
 )
-from openbilanz.database.company_repository import CompanyRepository
-from openbilanz.database.lock_error import DatabaseLockError
-from openbilanz.database.models import (
+from simpleob.database.company_repository import CompanyRepository
+from simpleob.database.lock_error import DatabaseLockError
+from simpleob.database.models import (
     Gewinnverwendungsbuchung,
     Mandant,
     Wirtschaftsjahr,
     GewinnverwendungsJahresdaten,
     Kontenrolle,
 )
-from openbilanz.database.profit_appropriation_annual_data_repository import (
+from simpleob.database.profit_appropriation_annual_data_repository import (
     ProfitAppropriationAnnualDataRepository,
 )
-from openbilanz.database.profit_appropriation_posting_repository import (
+from simpleob.database.profit_appropriation_posting_repository import (
     ProfitAppropriationPostingRepository,
 )
-from openbilanz.domain.company import Company
-from openbilanz.domain.fiscal_year import FiscalYear
-from openbilanz.domain.profit_appropriation_annual_data import (
+from simpleob.domain.company import Company
+from simpleob.domain.fiscal_year import FiscalYear
+from simpleob.domain.profit_appropriation_annual_data import (
     ProfitAppropriationAnnualData,
 )
-from openbilanz.domain.profit_appropriation_posting_proposal import (
+from simpleob.domain.profit_appropriation_posting_proposal import (
     ProfitAppropriationPostingProposal,
 )
-from openbilanz.domain.profit_appropriation_posting_type import (
+from simpleob.domain.profit_appropriation_posting_type import (
     ProfitAppropriationPostingType,
 )
-from openbilanz.services.chart_of_accounts_initialization_service import (
+from simpleob.services.chart_of_accounts_initialization_service import (
     ChartOfAccountsInitializationService,
 )
-from openbilanz.services.profit_appropriation_booking_service import (
+from simpleob.services.profit_appropriation_booking_service import (
     ProfitAppropriationBookingService,
 )
-from openbilanz.services.profit_appropriation_posting_service import (
+from simpleob.services.profit_appropriation_posting_service import (
     ProfitAppropriationPostingService,
 )
-from openbilanz.services.profit_appropriation_posting_workflow import (
+from simpleob.services.profit_appropriation_posting_workflow import (
     ProfitAppropriationPostingWorkflow,
 )
 
@@ -274,7 +274,7 @@ def postgres_profit_appropriation_data():
 
             # Dieselben Standarddaten wie beim regulären Programmstart.
             # Import erst nach der Datenbank-Sicherheitsprüfung.
-            from openbilanz.qt_main import (
+            from simpleob.qt_main import (
                 CsvAccountTaxonomyMappingImporter,
                 HgbFinancialStatementPositionProvider,
                 create_standard_financial_statement_context,
@@ -291,7 +291,7 @@ def postgres_profit_appropriation_data():
             mapping_file = (
                 Path(__file__).resolve().parents[2]
                 / "src"
-                / "openbilanz"
+                / "simpleob"
                 / "resources"
                 / "e_bilanz"
                 / "account_mappings"
@@ -453,10 +453,10 @@ def test_profit_appropriation_can_be_reposted_after_reversal(
 ):
     """Nach Stornierung ist derselbe Ergebnisverwendungstyp erneut buchbar."""
 
-    from openbilanz.domain.booking import Booking
-    from openbilanz.domain.booking_line import BookingLine
-    from openbilanz.domain.booking_type import BookingType
-    from openbilanz.domain.entry_side import EntrySide
+    from simpleob.domain.booking import Booking
+    from simpleob.domain.booking_line import BookingLine
+    from simpleob.domain.booking_type import BookingType
+    from simpleob.domain.entry_side import EntrySide
 
     (
         Session,

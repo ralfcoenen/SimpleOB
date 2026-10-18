@@ -4,12 +4,12 @@ from pathlib import Path
 
 import pytest
 
-from openbilanz.taxonomy.concept import (
+from simpleob.taxonomy.concept import (
     TaxonomyBalance,
     TaxonomyConcept,
     TaxonomyPeriodType,
 )
-from openbilanz.taxonomy.concept_set import TaxonomyConceptSet
+from simpleob.taxonomy.concept_set import TaxonomyConceptSet
 
 
 def _concept(

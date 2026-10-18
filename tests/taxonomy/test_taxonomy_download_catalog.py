@@ -1,9 +1,9 @@
 """Tests für die offiziellen Taxonomie-Downloadquellen."""
 
-from openbilanz.taxonomy.taxonomy import (
+from simpleob.taxonomy.taxonomy import (
     TaxonomyVersion,
 )
-from openbilanz.taxonomy.taxonomy_download_catalog import (
+from simpleob.taxonomy.taxonomy_download_catalog import (
     TaxonomyDownloadCatalog,
 )
 

@@ -4,35 +4,35 @@ from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
-from openbilanz.accounting.financial_statement_builder import (
+from simpleob.accounting.financial_statement_builder import (
     FinancialStatementBuilder,
 )
-from openbilanz.accounting.hgb_financial_statement_position_provider import (
+from simpleob.accounting.hgb_financial_statement_position_provider import (
     HgbFinancialStatementPositionProvider,
 )
-from openbilanz.accounting.income_statement import IncomeStatement
-from openbilanz.accounting.ledger import Ledger
-from openbilanz.accounting.mapper import AccountMapper
-from openbilanz.domain.account_type import AccountType
-from openbilanz.domain.booking import Booking
-from openbilanz.domain.booking_line import BookingLine
-from openbilanz.domain.entry_side import EntrySide
-from openbilanz.domain.journal import Journal
-from openbilanz.hgb.balance_sheet_structure import (
+from simpleob.accounting.income_statement import IncomeStatement
+from simpleob.accounting.ledger import Ledger
+from simpleob.accounting.mapper import AccountMapper
+from simpleob.domain.account_type import AccountType
+from simpleob.domain.booking import Booking
+from simpleob.domain.booking_line import BookingLine
+from simpleob.domain.entry_side import EntrySide
+from simpleob.domain.journal import Journal
+from simpleob.hgb.balance_sheet_structure import (
     create_hgb_balance_sheet_structure,
 )
-from openbilanz.hgb.income_statement_structure import (
+from simpleob.hgb.income_statement_structure import (
     create_hgb_income_statement_structure,
 )
-from openbilanz.importers.csv_chart_of_accounts_importer import (
+from simpleob.importers.csv_chart_of_accounts_importer import (
     CsvChartOfAccountsImporter,
 )
-from openbilanz.services.closing_accounts import ClosingAccounts
-from openbilanz.services.closing_service import ClosingService
-from openbilanz.services.fiscal_year_transfer_service import (
+from simpleob.services.closing_accounts import ClosingAccounts
+from simpleob.services.closing_service import ClosingService
+from simpleob.services.fiscal_year_transfer_service import (
     FiscalYearTransferService,
 )
-from openbilanz.services.posting_service import PostingService
+from simpleob.services.posting_service import PostingService
 
 
 def test_closes_profit_and_transfers_it_to_next_fiscal_year() -> None:
@@ -119,7 +119,7 @@ def test_closes_profit_and_transfers_it_to_next_fiscal_year() -> None:
     csv_file = (
         Path(__file__).resolve().parents[2]
         / "src"
-        / "openbilanz"
+        / "simpleob"
         / "resources"
         / "chart_of_accounts"
         / "openbilanz_standard.csv"
@@ -342,7 +342,7 @@ def test_closes_loss_and_transfers_it_to_next_fiscal_year() -> None:
     csv_file = (
         Path(__file__).resolve().parents[2]
         / "src"
-        / "openbilanz"
+        / "simpleob"
         / "resources"
         / "chart_of_accounts"
         / "openbilanz_standard.csv"
