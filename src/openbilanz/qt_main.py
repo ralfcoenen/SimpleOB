@@ -1,11 +1,12 @@
 """Startpunkt der PySide6-Oberfläche von SimpleOB."""
 
 import sys
-from pathlib import Path
 from dataclasses import replace
+from pathlib import Path
 
-from PySide6.QtWidgets import QApplication, QDialog
 from PySide6.QtWidgets import QApplication, QDialog, QMessageBox
+from sqlalchemy.engine import make_url
+from sqlalchemy.exc import DBAPIError
 
 from openbilanz.accounting.financial_statement_context import (
     create_financial_statement_context,
@@ -34,6 +35,9 @@ from openbilanz.database.chart_of_accounts_repository import (
     ChartOfAccountsRepository,
 )
 from openbilanz.database.company_repository import CompanyRepository
+from openbilanz.database.connection_credentials import (
+    PostgreSQLCredentials,
+)
 from openbilanz.database.database import Database
 from openbilanz.database.equity_contribution_repository import (
     EquityContributionRepository,
@@ -54,9 +58,6 @@ from openbilanz.database.profit_appropriation_annual_data_repository import (
 from openbilanz.database.profit_appropriation_posting_repository import (
     ProfitAppropriationPostingRepository,
 )
-from openbilanz.database.connection_credentials import (
-    PostgreSQLCredentials,
-)
 from openbilanz.database.shareholder_repository import ShareholderRepository
 from openbilanz.database.tax_depreciation_adjustment_repository import (
     TaxDepreciationAdjustmentRepository,
@@ -76,6 +77,7 @@ from openbilanz.importers.csv_account_taxonomy_mapping_importer import (
 from openbilanz.services.chart_of_accounts_initialization_service import (
     ChartOfAccountsInitializationService,
 )
+from openbilanz.services.client_deletion_service import ClientDeletionService
 from openbilanz.services.closing_accounts import ClosingAccounts
 from openbilanz.services.closing_consistency_service import (
     ClosingConsistencyService,
@@ -114,11 +116,11 @@ from openbilanz.services.fixed_asset_schedule_service import (
 )
 from openbilanz.services.pdf_reporting_service import PdfReportingService
 from openbilanz.services.posting_service import PostingService
-from openbilanz.services.profit_appropriation_posting_service import (
-    ProfitAppropriationPostingService,
-)
 from openbilanz.services.profit_appropriation_booking_service import (
     ProfitAppropriationBookingService,
+)
+from openbilanz.services.profit_appropriation_posting_service import (
+    ProfitAppropriationPostingService,
 )
 from openbilanz.services.profit_appropriation_posting_workflow import (
     ProfitAppropriationPostingWorkflow,
@@ -135,17 +137,16 @@ from openbilanz.taxonomy.taxonomy_downloader import TaxonomyDownloader
 from openbilanz.taxonomy.taxonomy_installation_service import (
     TaxonomyInstallationService,
 )
-from openbilanz.ui_qt.eric_privacy_dialog import EricPrivacyDialog
-from openbilanz.ui_qt.main_window import MainWindow
-from openbilanz.ui_qt.start_dialog import StartDialog
 from openbilanz.ui_qt.database_configuration_dialog import (
     DatabaseConfigurationDialog,
 )
+from openbilanz.ui_qt.eric_privacy_dialog import EricPrivacyDialog
+from openbilanz.ui_qt.main_window import MainWindow
 from openbilanz.ui_qt.postgresql_password_dialog import (
     PostgreSQLPasswordDialog,
 )
-from sqlalchemy.engine import make_url
-from sqlalchemy.exc import DBAPIError
+from openbilanz.ui_qt.start_dialog import StartDialog
+
 
 def _load_application_config():
     """Lädt die Konfiguration passend zur Ausführungsumgebung."""
@@ -610,6 +611,23 @@ def main() -> None:
                 position_provider=position_provider,
             )
 
+        client_deletion_service = ClientDeletionService(
+            engine=database.engine, position_provider=position_provider,
+        )
+
+        def delete_client(company, backup_path):
+            # Die Auswahl hat nur gelesen. Insbesondere SQLite-Lesetransaktionen
+            # der UI dürfen den Commit der eigenen Löschverbindung nicht blockieren.
+            session.close()
+            try:
+                return client_deletion_service.delete(
+                    company_id=company.company_id,
+                    expected_name=company.name,
+                    backup_path=backup_path,
+                )
+            finally:
+                session.close()
+
         while True:
             dialog = StartDialog(
                 repository=company_repository,
@@ -617,6 +635,7 @@ def main() -> None:
                 import_client_transfer=(
                     import_client_transfer
                 ),
+                delete_client=delete_client,
             )
 
             if dialog.exec() != QDialog.DialogCode.Accepted:
@@ -975,6 +994,8 @@ def main() -> None:
 
             if not window.return_to_start_requested:
                 break
+            window.deleteLater()
+            session.close()
 
     finally:
         session.close()

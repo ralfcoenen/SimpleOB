@@ -6,8 +6,6 @@ from decimal import Decimal
 from pathlib import Path
 from uuid import UUID
 
-from sqlalchemy.engine import make_url
-
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -30,6 +28,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from sqlalchemy.engine import make_url
 
 from openbilanz.accounting.balance_sheet import BalanceSheet
 from openbilanz.accounting.financial_statement_builder import (
@@ -42,6 +41,7 @@ from openbilanz.accounting.income_statement import IncomeStatement
 from openbilanz.client_transfer.archive import (
     write_client_transfer_archive,
 )
+from openbilanz.client_transfer.filename import client_backup_filename
 from openbilanz.client_transfer.model import ClientTransfer
 from openbilanz.core.config import (
     ApplicationConfig,
@@ -57,8 +57,8 @@ from openbilanz.domain.booking_type import BookingType
 from openbilanz.domain.chart_of_accounts_template import (
     ChartOfAccountsTemplate,
 )
-from openbilanz.domain.entry_side import EntrySide
 from openbilanz.domain.elster_data_supplier import ElsterDataSupplier
+from openbilanz.domain.entry_side import EntrySide
 from openbilanz.domain.fiscal_year_status import FiscalYearStatus
 from openbilanz.domain.vat_accounts import VatAccounts
 from openbilanz.eric.elster_bilanz_transmission_service import (
@@ -87,11 +87,11 @@ from openbilanz.ui_qt.e_bilanz_account_mapping_dialog import (
     EBilanzAccountMappingDialog,
 )
 from openbilanz.ui_qt.e_bilanz_frame import EBilanzFrame
-from openbilanz.ui_qt.eric_information_dialog import (
-    EricInformationDialog,
-)
 from openbilanz.ui_qt.elster_data_supplier_dialog import (
     ElsterDataSupplierDialog,
+)
+from openbilanz.ui_qt.eric_information_dialog import (
+    EricInformationDialog,
 )
 from openbilanz.ui_qt.fixed_asset_acquisition_link_dialog import (
     AcquisitionBookingCandidate,
@@ -118,7 +118,6 @@ from openbilanz.ui_qt.tax_depreciation_adjustment_dialog import (
     TaxDepreciationAdjustmentDialog,
 )
 from openbilanz.ui_qt.vat_booking_frame import VatBookingFrame
-
 
 ZERO = Decimal("0.00")
 
@@ -4854,9 +4853,7 @@ class MainWindow(QMainWindow):
         if self._export_client_transfer is None:
             return
 
-        suggested_filename = (
-            f"{self._context.company.name}.simpleob"
-        )
+        suggested_filename = client_backup_filename(self._context.company.name)
 
         filename, _ = QFileDialog.getSaveFileName(
             self,

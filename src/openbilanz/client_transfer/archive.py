@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import errno
+import os
+import sys
+import tempfile
 from pathlib import Path
 from zipfile import (
-    BadZipFile,
     ZIP_DEFLATED,
+    BadZipFile,
     ZipFile,
 )
 
@@ -18,6 +22,57 @@ from openbilanz.client_transfer.serialization import (
 )
 
 CLIENT_TRANSFER_ARCHIVE_MEMBER = "client.json"
+
+
+def write_verified_client_backup(path: Path, transfer: ClientTransfer) -> Path:
+    """Veröffentlicht ein geprüftes Archiv ohne bestehende Dateien zu ersetzen.
+
+    Der Aufrufer muss einen eindeutigen endgültigen Namen liefern. Bei Fehlern
+    bleibt ein bereits veröffentlichter Sicherungsstand bewusst erhalten.
+    """
+    path = path.absolute()
+    fd, temporary_name = tempfile.mkstemp(prefix=".simpleob-", dir=path.parent)
+    temporary = Path(temporary_name)
+    os.close(fd)
+    try:
+        write_client_transfer_archive(temporary, transfer)
+        with temporary.open("r+b") as file:
+            file.flush()
+            os.fsync(file.fileno())
+            if sys.platform == "darwin":
+                import fcntl
+
+                fcntl.fcntl(file.fileno(), fcntl.F_FULLFSYNC)
+        if read_client_transfer_archive(temporary) != transfer:
+            raise ValueError(
+                "Die geschriebene Mandantensicherung weicht vom Export ab."
+            )
+
+        # Atomare Veröffentlichung derselben Datei; EEXIST statt Überschreiben.
+        # Beide Namen liegen auf demselben Dateisystem. Kein exists/replace-Rennen.
+        os.link(temporary, path)
+        _sync_backup_directory(path.parent)
+        if read_client_transfer_archive(path) != transfer:
+            raise ValueError("Die bereitgestellte Mandantensicherung ist fehlerhaft.")
+        return path
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def _sync_backup_directory(directory: Path) -> None:
+    """Synchronisiert den Verzeichniseintrag, soweit vom OS unterstützt."""
+    if os.name == "nt":
+        # Windows stellt über os.open/fsync keine Verzeichnissynchronisation bereit.
+        return
+    fd = os.open(directory, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    try:
+        try:
+            os.fsync(fd)
+        except OSError as exc:
+            if exc.errno not in (errno.EINVAL, errno.ENOTSUP):
+                raise
+    finally:
+        os.close(fd)
 
 
 def write_client_transfer_archive(

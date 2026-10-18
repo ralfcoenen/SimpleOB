@@ -1,40 +1,42 @@
 """PySide6-Startdialog für SimpleOB."""
 
 from collections.abc import Callable
-
-from sqlalchemy.engine import make_url
+from pathlib import Path
 
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
-    QHBoxLayout,
-    QDialogButtonBox,
     QFileDialog,
     QFormLayout,
+    QHBoxLayout,
+    QInputDialog,
     QLabel,
     QMessageBox,
     QPushButton,
     QVBoxLayout,
 )
+from sqlalchemy.engine import make_url
 
 from openbilanz.client_transfer.archive import (
     read_client_transfer_archive,
 )
+from openbilanz.client_transfer.filename import client_backup_filename
 from openbilanz.client_transfer.model import ClientTransfer
-from openbilanz.core.context import ApplicationContext
-from openbilanz.database.company_repository import CompanyRepository
-from openbilanz.domain.company import Company
-from openbilanz.domain.fiscal_year import FiscalYear
-from openbilanz.ui_qt.new_company_dialog import NewCompanyDialog
-from openbilanz.ui_qt.new_fiscal_year_dialog import (
-    NewFiscalYearDialog,
-)
 from openbilanz.core.config import (
     ApplicationConfig,
     save_database_configuration,
 )
+from openbilanz.core.context import ApplicationContext
+from openbilanz.database.company_repository import CompanyRepository
+from openbilanz.domain.company import Company
+from openbilanz.domain.fiscal_year import FiscalYear
+from openbilanz.services.client_deletion_service import ClientDeletionCommitUnknown
 from openbilanz.ui_qt.database_configuration_dialog import (
     DatabaseConfigurationDialog,
+)
+from openbilanz.ui_qt.new_company_dialog import NewCompanyDialog
+from openbilanz.ui_qt.new_fiscal_year_dialog import (
+    NewFiscalYearDialog,
 )
 
 
@@ -49,6 +51,7 @@ class StartDialog(QDialog):
         import_client_transfer: (
             Callable[[ClientTransfer], None] | None
         ) = None,
+        delete_client: Callable[[Company, Path], Path] | None = None,
     ) -> None:
         super().__init__()
 
@@ -56,6 +59,7 @@ class StartDialog(QDialog):
 
         self._repository = repository
         self._import_client_transfer = import_client_transfer
+        self._delete_client = delete_client
 
         self.result: ApplicationContext | None = None
         self.opening_transfer_request: (
@@ -63,7 +67,6 @@ class StartDialog(QDialog):
         ) = None
 
         self._companies: tuple[Company, ...] = ()
-        self._company_by_display_name: dict[str, Company] = {}
         self._fiscal_year_by_display_name: dict[
             str,
             FiscalYear,
@@ -158,6 +161,10 @@ class StartDialog(QDialog):
             self._import_company_button
         )
 
+        self._delete_company_button = QPushButton("Mandant vollständig löschen …")
+        self._delete_company_button.clicked.connect(self._delete_company)
+        button_layout.addWidget(self._delete_company_button)
+
         self._new_fiscal_year_button = QPushButton(
             "Neues Geschäftsjahr"
         )
@@ -207,16 +214,10 @@ class StartDialog(QDialog):
 
         self._companies = self._repository.list_companies()
 
-        self._company_by_display_name = {
-            company.name: company
-            for company in self._companies
-        }
-
         self._company_box.blockSignals(True)
         self._company_box.clear()
-        self._company_box.addItems(
-            tuple(self._company_by_display_name)
-        )
+        for company in self._companies:
+            self._company_box.addItem(company.name, company)
 
         selected_index = 0
 
@@ -232,6 +233,9 @@ class StartDialog(QDialog):
             )
 
         self._company_box.blockSignals(False)
+        self._delete_company_button.setEnabled(
+            bool(self._companies) and self._delete_client is not None
+        )
 
         if not self._companies:
             self._status_label.setText(
@@ -297,9 +301,7 @@ class StartDialog(QDialog):
     ) -> Company | None:
         """Liefert das ausgewählte Unternehmen."""
 
-        return self._company_by_display_name.get(
-            self._company_box.currentText()
-        )
+        return self._company_box.currentData()
 
     def _selected_fiscal_year(
         self,
@@ -365,9 +367,7 @@ class StartDialog(QDialog):
         for index in range(
             self._company_box.count()
         ):
-            company = self._company_by_display_name.get(
-                self._company_box.itemText(index)
-            )
+            company = self._company_box.itemData(index)
 
             if (
                 company is not None
@@ -383,6 +383,71 @@ class StartDialog(QDialog):
             "Mandant importieren",
             "Der Mandant wurde erfolgreich importiert.",
         )
+
+    def _delete_company(self) -> None:
+        """Sichert und löscht ausschließlich den per UUID ausgewählten Mandanten."""
+        company = self._selected_company()
+        if company is None or self._delete_client is None:
+            return
+        directory = QFileDialog.getExistingDirectory(
+            self, "Ordner für die Mandantensicherung"
+        )
+        if not directory:
+            return
+        backup_path = Path(directory).absolute() / client_backup_filename(company.name)
+        name, accepted = QInputDialog.getText(
+            self,
+            "Mandant vollständig löschen",
+            f"Mandant: {company.name}\nID: {company.company_id}\n\n"
+            "Alle Geschäftsjahre und zugehörigen Daten werden unwiderruflich gelöscht.\n"
+            f"Die Sicherung wird zuvor erstellt und geprüft:\n{backup_path}\n\n"
+            "Geben Sie zur Bestätigung den vollständigen Mandantennamen ein:",
+        )
+        if not accepted:
+            return
+        if name != company.name:
+            QMessageBox.warning(
+                self, "Mandant löschen", "Der Mandantenname stimmt nicht überein."
+            )
+            return
+        self.setEnabled(False)
+        try:
+            self._delete_client(company, backup_path)
+        except ClientDeletionCommitUnknown as exc:
+            QMessageBox.critical(self, "Löschstatus unbestimmt", str(exc))
+            # Keine erneute Aktion auf möglicherweise veraltetem Bestand erlauben.
+            self.reject()
+            return
+        except Exception as exc:
+            QMessageBox.critical(
+                self,
+                "Mandant löschen",
+                "Die Löschung wurde nicht abgeschlossen.\n"
+                "Eine bereits erstellte Sicherung bleibt erhalten.\n"
+                f"Sicherungspfad: {backup_path}\n\n{exc}",
+            )
+        else:
+            self.result = None
+            self.opening_transfer_request = None
+            try:
+                self._load_companies()
+            except Exception as exc:
+                QMessageBox.critical(
+                    self,
+                    "Mandant gelöscht – Auswahl nicht verfügbar",
+                    f"Die Löschung wurde bestätigt. Sicherung: {backup_path}\n\n"
+                    f"Die Mandantenliste konnte nicht geladen werden: {exc}\n"
+                    "Bitte starten Sie SimpleOB erneut.",
+                )
+                self.reject()
+                return
+            QMessageBox.information(
+                self,
+                "Mandant gelöscht",
+                f"Der Mandant wurde vollständig gelöscht.\n\nSicherung: {backup_path}",
+            )
+        finally:
+            self.setEnabled(True)
 
     def _create_new_company(self) -> None:
         """Öffnet den Dialog zum Anlegen einer Buchhaltung."""
