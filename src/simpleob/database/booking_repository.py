@@ -8,8 +8,11 @@ from sqlalchemy.orm import Session
 
 from simpleob.database.lock_error import DatabaseLockError
 from simpleob.database.models import (
+    Ausgangsrechnung,
     Buchung,
     Buchungszeile,
+    Eingangsrechnung,
+    Gutschrift,
     Mandant,
     Wirtschaftsjahr,
 )
@@ -19,6 +22,13 @@ from simpleob.domain.booking_type import BookingType
 from simpleob.domain.entry_side import EntrySide
 from simpleob.domain.fiscal_year import FiscalYear
 from simpleob.domain.fiscal_year_status import FiscalYearStatus
+
+_OPEN_ITEM_REVERSAL_MESSAGE = (
+    "Diese Buchung gehört zu einem OP-Beleg. Für Kunden- und "
+    "Lieferantenrechnungen sowie Kunden- und Lieferantengutschriften "
+    "ist eine spezielle OP-Stornierung erforderlich; diese Funktion "
+    "wird in einer späteren Stufe implementiert."
+)
 
 
 class BookingRepository:
@@ -101,6 +111,11 @@ class BookingRepository:
                     "ist nicht vorhanden."
                 )
 
+            self._ensure_not_open_item_source(
+                booking_id=str(booking.reversal_of_booking_id),
+                mandant_id=fiscal_year_model.mandant_id,
+            )
+
             if (
                 original_booking.booking_type
                 != BookingType.REGULAR.value
@@ -157,6 +172,49 @@ class BookingRepository:
 
         if commit:
             self._session.commit()
+
+    def ensure_not_open_item_source_booking(
+        self,
+        *,
+        company_id: UUID,
+        booking_id: UUID,
+    ) -> None:
+        """Verhindert ein isoliertes Journalstorno eines OP-Ursprungsbelegs."""
+
+        company = (
+            self._session.query(Mandant)
+            .filter(Mandant.company_id == str(company_id))
+            .one_or_none()
+        )
+        if company is None:
+            raise ValueError("Der geöffnete Mandant wurde nicht gefunden.")
+
+        self._ensure_not_open_item_source(
+            booking_id=str(booking_id),
+            mandant_id=company.id,
+        )
+
+    def _ensure_not_open_item_source(
+        self,
+        *,
+        booking_id: str,
+        mandant_id: int,
+    ) -> None:
+        for document_model in (
+            Ausgangsrechnung,
+            Eingangsrechnung,
+            Gutschrift,
+        ):
+            document = (
+                self._session.query(document_model)
+                .filter(
+                    document_model.mandant_id == mandant_id,
+                    document_model.booking_id == booking_id,
+                )
+                .one_or_none()
+            )
+            if document is not None:
+                raise ValueError(_OPEN_ITEM_REVERSAL_MESSAGE)
 
     def commit(self) -> None:
         """Bestätigt die aktuelle Datenbanktransaktion."""

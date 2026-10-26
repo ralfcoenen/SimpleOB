@@ -1430,6 +1430,10 @@ def test_create_reversal_booking_mirrors_original_booking(
     )
 
     booking_repository.add.assert_not_called()
+    booking_repository.ensure_not_open_item_source_booking.assert_called_once_with(
+        company_id=context.company.company_id,
+        booking_id=original_booking.booking_id,
+    )
 
 @pytest.mark.parametrize(
     "booking_type",

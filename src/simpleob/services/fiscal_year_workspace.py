@@ -567,6 +567,11 @@ class FiscalYearWorkspace:
                 "wurde nicht gefunden."
             )
 
+        self._booking_repository.ensure_not_open_item_source_booking(
+            company_id=self._context.company.company_id,
+            booking_id=original_booking.booking_id,
+        )
+
         if (
             original_booking.booking_type
             is not BookingType.REGULAR
