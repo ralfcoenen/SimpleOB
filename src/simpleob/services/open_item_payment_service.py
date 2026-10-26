@@ -106,6 +106,7 @@ class OpenItemPaymentService:
                 raise ValueError("Für jede Zuordnung muss genau eine Ereignis-ID vorliegen.")
 
             normalized: list[tuple[UUID, Decimal]] = []
+            invoices_by_id = {}
             seen_open_item_ids: set[UUID] = set()
             for open_item_id, raw_allocation_amount in allocations:
                 if not isinstance(open_item_id, UUID):
@@ -140,6 +141,7 @@ class OpenItemPaymentService:
                         "Eine Zuordnung übersteigt den offenen Rechnungsbetrag "
                         f"({invoice.document_number}: {invoice.open_amount:.2f})."
                     )
+                invoices_by_id[open_item_id] = invoice
             roles = self._chart_of_accounts_repository.load_account_roles(company_id)
             if roles is None:
                 raise ValueError("Für den Mandanten sind keine Kontenrollen konfiguriert.")
@@ -190,7 +192,13 @@ class OpenItemPaymentService:
             booking = Booking(
                 booking_date=booking_date,
                 voucher_no=voucher_no,
-                description=description,
+                description=self._booking_description(
+                    direction=direction,
+                    partner_name=invoices_by_id[normalized[0][0]].partner_name,
+                    allocations=normalized,
+                    invoices_by_id=invoices_by_id,
+                    user_description=description,
+                ),
                 lines=tuple(lines),
             )
             payment = OpenItemPayment(
@@ -236,3 +244,40 @@ class OpenItemPaymentService:
         except Exception:
             self._booking_repository.rollback()
             raise
+
+    @staticmethod
+    def _booking_description(
+        *,
+        direction: PaymentDirection,
+        partner_name: str,
+        allocations: list[tuple[UUID, Decimal]],
+        invoices_by_id: dict,
+        user_description: str | None,
+    ) -> str:
+        if len(allocations) > 1:
+            payment_label = (
+                "Kundenzahlung"
+                if direction is PaymentDirection.CUSTOMER_RECEIPT
+                else "Lieferantenzahlung"
+            )
+            context = f"{payment_label} {partner_name}, {len(allocations)} Rechnungen"
+        else:
+            open_item_id, allocation_amount = allocations[0]
+            invoice = invoices_by_id[open_item_id]
+            is_partial = allocation_amount < invoice.open_amount
+            if direction is PaymentDirection.CUSTOMER_RECEIPT:
+                payment_label = "Teilzahlung" if is_partial else "Kundenzahlung"
+                context = (
+                    f"{payment_label} {partner_name}, "
+                    f"Rechnung {invoice.document_number}"
+                )
+            else:
+                payment_label = "Teilzahlung an" if is_partial else "Lieferantenzahlung"
+                context = (
+                    f"{payment_label} {partner_name}, "
+                    f"Rechnung {invoice.document_number}"
+                )
+
+        if user_description and user_description.strip():
+            return f"{user_description.strip()} – {context}"
+        return context

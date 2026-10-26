@@ -3,6 +3,7 @@
 from datetime import date
 from uuid import UUID
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -15,6 +16,7 @@ from PySide6.QtWidgets import (
 
 from simpleob.amount_input import parse_german_amount
 from simpleob.date_input import parse_german_date
+from simpleob.domain.open_item_payment import PaymentDirection
 from simpleob.services.payment_allocation_correction_service import (
     PaymentAllocationCorrectionService,
 )
@@ -25,9 +27,10 @@ class PaymentAllocationCorrectionDialog(QDialog):
         super().__init__(parent)
         self._company_id, self._fiscal_year, self._service = company_id, fiscal_year, service
         self.setWindowTitle("Zahlungszuordnung korrigieren")
-        self.resize(680, 300)
+        self.resize(980, 340)
         form = QFormLayout()
         self._source = QComboBox()
+        self._source.setMinimumContentsLength(90)
         self._target = QComboBox()
         self._amount = QLineEdit()
         today = date.today().strftime("%d.%m.%Y")
@@ -46,23 +49,52 @@ class PaymentAllocationCorrectionDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.addLayout(form)
         layout.addWidget(buttons)
-        for allocation in service.list_correctable_allocations(company_id):
-            self._source.addItem(
-                f"{allocation.direction.value} · {allocation.source_document_number} · "
-                f"Zahlung {allocation.payment_date:%d.%m.%Y} · ID {str(allocation.payment_id)[:8]} · "
-                f"korrigierbar {allocation.correctable_amount:.2f} EUR",
-                str(allocation.original_event_id),
+        self._allocations = service.list_correctable_allocations(company_id)
+        for allocation in self._allocations:
+            label = self._allocation_label(allocation)
+            self._source.addItem(label, str(allocation.original_event_id))
+            self._source.setItemData(
+                self._source.count() - 1,
+                label,
+                Qt.ItemDataRole.ToolTipRole,
             )
         self._source.currentIndexChanged.connect(self._refresh_targets)
         self._refresh_targets()
+
+    @staticmethod
+    def _allocation_label(allocation) -> str:
+        direction = (
+            "Kundenzahlung"
+            if allocation.direction is PaymentDirection.CUSTOMER_RECEIPT
+            else "Lieferantenzahlung"
+        )
+        label = (
+            f"{direction} · {allocation.partner_name} · "
+            f"Rechnung {allocation.source_document_number} · "
+            f"Zahlung {allocation.payment_date:%d.%m.%Y} · "
+            f"Buchung {allocation.payment_booking_date:%d.%m.%Y} · "
+            f"Zuordnung {allocation.original_amount:.2f} EUR "
+            f"(korrigierbar {allocation.correctable_amount:.2f} EUR) · "
+            f"Gesamtzahlung {allocation.payment_amount:.2f} EUR · "
+            f"erfasst {allocation.recorded_at:%d.%m.%Y %H:%M:%S}"
+        )
+        if allocation.payment_voucher_no:
+            label += f" · Beleg {allocation.payment_voucher_no}"
+        return label
 
     def _refresh_targets(self, *_args) -> None:
         self._target.clear()
         event_id = self._source.currentData()
         if event_id is None:
             return
-        source = next((item for item in self._service.list_correctable_allocations(self._company_id)
-                       if str(item.original_event_id) == str(event_id)), None)
+        source = next(
+            (
+                item
+                for item in self._allocations
+                if str(item.original_event_id) == str(event_id)
+            ),
+            None,
+        )
         if source is None:
             return
         for invoice in self._service.list_open_targets(
@@ -70,7 +102,9 @@ class PaymentAllocationCorrectionDialog(QDialog):
         ):
             if invoice.open_item_id != source.source_open_item_id:
                 self._target.addItem(
-                    f"{invoice.document_number} · offen {invoice.open_amount:.2f} EUR",
+                    f"{invoice.partner_name} · Rechnung {invoice.document_number} · "
+                    f"{invoice.document_date:%d.%m.%Y} · "
+                    f"offen {invoice.open_amount:.2f} EUR",
                     str(invoice.open_item_id),
                 )
 

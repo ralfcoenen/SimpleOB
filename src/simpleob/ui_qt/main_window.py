@@ -77,6 +77,7 @@ from simpleob.services.credit_note_posting_service import (
 )
 from simpleob.services.fiscal_year_workspace import FiscalYearWorkspace
 from simpleob.services.open_item_offset_service import OpenItemOffsetService
+from simpleob.services.open_item_overview_service import OpenItemOverviewService
 from simpleob.services.open_item_payment_service import OpenItemPaymentService
 from simpleob.services.open_item_reconciliation_service import (
     OpenItemReconciliationService,
@@ -128,6 +129,7 @@ from simpleob.ui_qt.income_statement_frame import (
 )
 from simpleob.ui_qt.new_fixed_asset_dialog import NewFixedAssetDialog
 from simpleob.ui_qt.open_item_offset_dialog import OpenItemOffsetDialog
+from simpleob.ui_qt.open_item_overview_widget import OpenItemOverviewWidget
 from simpleob.ui_qt.open_item_payment_dialog import OpenItemPaymentDialog
 from simpleob.ui_qt.open_item_reconciliation_widget import OpenItemReconciliationWidget
 from simpleob.ui_qt.opening_balance_dialog import OpeningBalanceDialog
@@ -190,6 +192,7 @@ class MainWindow(QMainWindow):
         open_item_offset_service: OpenItemOffsetService | None = None,
         payment_allocation_correction_service: PaymentAllocationCorrectionService | None = None,
         open_item_reconciliation_service: OpenItemReconciliationService | None = None,
+        open_item_overview_service: OpenItemOverviewService | None = None,
     ) -> None:
         super().__init__()
 
@@ -235,6 +238,7 @@ class MainWindow(QMainWindow):
         self._open_item_offset_service = open_item_offset_service
         self._payment_allocation_correction_service = payment_allocation_correction_service
         self._open_item_reconciliation_service = open_item_reconciliation_service
+        self._open_item_overview_service = open_item_overview_service
         self._eric_certificate_path = (
             Path(eric_certificate_path).expanduser()
             if eric_certificate_path is not None
@@ -410,6 +414,7 @@ class MainWindow(QMainWindow):
         self._closing_tab = QWidget()
         self._e_bilanz_tab = QWidget()
         self._open_item_reconciliation_tab = QWidget()
+        self._open_item_overview_tab = QWidget()
 
         self._notebook.addTab(
             self._accounts_tab,
@@ -439,6 +444,11 @@ class MainWindow(QMainWindow):
             self._reports_tab,
             "Auswertungen",
         )
+        if self._open_item_overview_service is not None:
+            self._notebook.addTab(
+                self._open_item_overview_tab,
+                "OP-Übersicht",
+            )
         if self._open_item_reconciliation_service is not None:
             self._notebook.addTab(
                 self._open_item_reconciliation_tab,
@@ -460,6 +470,14 @@ class MainWindow(QMainWindow):
         self._create_balance_sheet_tab()
         self._create_income_statement_tab()
         self._create_reports_tab()
+        if self._open_item_overview_service is not None:
+            overview_layout = QVBoxLayout(self._open_item_overview_tab)
+            overview_layout.addWidget(
+                OpenItemOverviewWidget(
+                    company_id=self._context.company.company_id,
+                    service=self._open_item_overview_service,
+                )
+            )
         if self._open_item_reconciliation_service is not None:
             reconciliation_layout = QVBoxLayout(self._open_item_reconciliation_tab)
             reconciliation_layout.addWidget(OpenItemReconciliationWidget(

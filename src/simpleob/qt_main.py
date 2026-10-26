@@ -55,6 +55,7 @@ from simpleob.database.migration_service import (
     DatabaseMigrationService,
 )
 from simpleob.database.open_item_offset_repository import OpenItemOffsetRepository
+from simpleob.database.open_item_overview_repository import OpenItemOverviewRepository
 from simpleob.database.open_item_payment_repository import OpenItemPaymentRepository
 from simpleob.database.open_item_reconciliation_repository import (
     OpenItemReconciliationRepository,
@@ -130,6 +131,7 @@ from simpleob.services.fixed_asset_schedule_service import (
     FixedAssetScheduleService,
 )
 from simpleob.services.open_item_offset_service import OpenItemOffsetService
+from simpleob.services.open_item_overview_service import OpenItemOverviewService
 from simpleob.services.open_item_payment_service import OpenItemPaymentService
 from simpleob.services.open_item_reconciliation_service import (
     OpenItemReconciliationService,
@@ -525,6 +527,9 @@ def main() -> None:
         )
         open_item_reconciliation_service = OpenItemReconciliationService(
             OpenItemReconciliationRepository(session)
+        )
+        open_item_overview_service = OpenItemOverviewService(
+            OpenItemOverviewRepository(session)
         )
         open_item_offset_service = OpenItemOffsetService(
             booking_repository=booking_repository,
@@ -1047,6 +1052,7 @@ def main() -> None:
                 credit_note_posting_service=credit_note_posting_service,
                 open_item_payment_service=open_item_payment_service,
                 open_item_reconciliation_service=open_item_reconciliation_service,
+                open_item_overview_service=open_item_overview_service,
                 open_item_offset_service=open_item_offset_service,
                 payment_allocation_correction_service=payment_allocation_correction_service,
                 eric_certificate_path=(

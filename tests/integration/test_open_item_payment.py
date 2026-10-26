@@ -204,6 +204,7 @@ def test_full_customer_receipt_posts_one_booking_and_closes_receivable():
         assert session.query(Zahlung).count() == 1
         assert session.query(RechnungsOPZahlungsereignis).count() == 1
         booking = session.query(Buchung).filter_by(booking_id=str(payment.booking_id)).one()
+        assert booking.description == "Kundenzahlung Partner GmbH, Rechnung AR-1"
         lines = {line.account_number: line for line in booking.zeilen}
         assert (lines["1000"].side, lines["1000"].amount) == (EntrySide.DEBIT.value, Decimal("119.00"))
         assert (lines["1200"].side, lines["1200"].amount) == (EntrySide.CREDIT.value, Decimal("119.00"))
@@ -235,6 +236,7 @@ def test_full_supplier_payment_uses_payable_debit_and_bank_credit():
         invoice = _create_payable(payable, company, partner)
         payment = _pay(session, payments, company, partner, invoice, PaymentDirection.SUPPLIER_PAYMENT, "119.00")
         booking = session.query(Buchung).filter_by(booking_id=str(payment.booking_id)).one()
+        assert booking.description == "Lieferantenzahlung Partner GmbH, Rechnung AP-1"
         lines = {line.account_number: line for line in booking.zeilen}
         assert (lines["3300"].side, lines["3300"].amount) == (EntrySide.DEBIT.value, Decimal("119.00"))
         assert (lines["1000"].side, lines["1000"].amount) == (EntrySide.CREDIT.value, Decimal("119.00"))
@@ -250,14 +252,60 @@ def test_several_partial_payments_calculate_remaining_open_amount():
     engine, session, company, partner, receivable, _, payments = _environment()
     try:
         invoice = _create_receivable(receivable, company, partner)
-        _pay(session, payments, company, partner, invoice, PaymentDirection.CUSTOMER_RECEIPT, "30.00")
+        first_payment = _pay(
+            session,
+            payments,
+            company,
+            partner,
+            invoice,
+            PaymentDirection.CUSTOMER_RECEIPT,
+            "30.00",
+        )
+        first_booking = session.query(Buchung).filter_by(
+            booking_id=str(first_payment.booking_id)
+        ).one()
+        assert first_booking.description == "Teilzahlung Partner GmbH, Rechnung AR-1"
         assert payments.list_open_invoices(company.company_id)[0].open_amount == Decimal("89.00")
-        _pay(session, payments, company, partner, invoice, PaymentDirection.CUSTOMER_RECEIPT, "40.00")
+        second_payment = _pay(
+            session,
+            payments,
+            company,
+            partner,
+            invoice,
+            PaymentDirection.CUSTOMER_RECEIPT,
+            "40.00",
+        )
+        second_booking = session.query(Buchung).filter_by(
+            booking_id=str(second_payment.booking_id)
+        ).one()
+        assert second_booking.description == "Teilzahlung Partner GmbH, Rechnung AR-1"
         summary = payments.list_open_invoices(company.company_id)[0]
         assert summary.open_amount == Decimal("49.00")
         assert session.query(Zahlung).count() == 2
         assert session.query(RechnungsOPZahlungsereignis).count() == 2
         assert session.query(Buchung).count() == 3
+    finally:
+        session.close()
+        engine.dispose()
+
+
+def test_partial_supplier_payment_has_a_readable_booking_description():
+    engine, session, company, partner, _, payable, payments = _environment()
+    try:
+        invoice = _create_payable(payable, company, partner)
+        payment = _pay(
+            session,
+            payments,
+            company,
+            partner,
+            invoice,
+            PaymentDirection.SUPPLIER_PAYMENT,
+            "30.00",
+        )
+        booking = session.query(Buchung).filter_by(
+            booking_id=str(payment.booking_id)
+        ).one()
+        assert booking.description == "Teilzahlung an Partner GmbH, Rechnung AP-1"
     finally:
         session.close()
         engine.dispose()
@@ -284,6 +332,7 @@ def test_customer_collection_allocates_one_payment_to_multiple_invoices():
         booking = session.query(Buchung).filter_by(
             booking_id=str(payment.booking_id)
         ).one()
+        assert booking.description == "Kundenzahlung Partner GmbH, 2 Rechnungen"
         control_lines = [line for line in booking.zeilen if line.account_number == "1200"]
         cash_lines = [line for line in booking.zeilen if line.account_number == "1000"]
         assert session.query(Buchung).count() == 3
@@ -336,6 +385,7 @@ def test_supplier_payment_allocates_one_payment_to_multiple_invoices():
         booking = session.query(Buchung).filter_by(
             booking_id=str(payment.booking_id)
         ).one()
+        assert booking.description == "Lieferantenzahlung Partner GmbH, 2 Rechnungen"
         control_lines = [line for line in booking.zeilen if line.account_number == "3300"]
         cash_lines = [line for line in booking.zeilen if line.account_number == "1000"]
         assert session.query(Buchung).count() == 3

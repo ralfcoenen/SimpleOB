@@ -13,8 +13,13 @@ from simpleob.domain.open_item_payment import PaymentDirection
 class CorrectablePaymentAllocation:
     company_id: UUID
     partner_id: UUID
+    partner_name: str
     payment_id: UUID
     payment_date: date
+    payment_booking_date: date
+    payment_amount: Decimal
+    payment_voucher_no: str | None
+    recorded_at: datetime
     direction: PaymentDirection
     original_event_id: UUID
     original_amount: Decimal

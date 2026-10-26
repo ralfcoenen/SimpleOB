@@ -10,6 +10,7 @@ from simpleob.database.models import (
     Buchung,
     Eingangsrechnung,
     ForderungsOP,
+    Geschaeftspartner,
     Mandant,
     RechnungsOPZahlungsereignis,
     VerbindlichkeitsOP,
@@ -55,12 +56,34 @@ class PaymentAllocationCorrectionRepository:
         invoice = self._session.query(invoice_model).filter_by(invoice_id=item.invoice_id).one()
         if invoice.mandant_id != payment.mandant_id or invoice.partner_id != payment.partner_id:
             raise ValueError("Zahlungszuordnung, Rechnung und Geschäftspartner stimmen nicht überein.")
+        partner = (
+            self._session.query(Geschaeftspartner)
+            .filter_by(
+                mandant_id=payment.mandant_id,
+                partner_id=payment.partner_id,
+            )
+            .one()
+        )
+        booking = (
+            self._session.query(Buchung)
+            .filter_by(booking_id=payment.booking_id)
+            .one()
+        )
         corrected = self._session.query(func.sum(Zahlungszuordnungskorrektur.amount)).filter_by(
             original_allocation_event_id=event.event_id
         ).scalar() or ZERO
         return CorrectablePaymentAllocation(
-            company_id=company_id, partner_id=UUID(payment.partner_id), payment_id=UUID(payment.payment_id),
-            payment_date=payment.payment_date, direction=direction, original_event_id=UUID(event.event_id),
+            company_id=company_id,
+            partner_id=UUID(payment.partner_id),
+            partner_name=partner.name,
+            payment_id=UUID(payment.payment_id),
+            payment_date=payment.payment_date,
+            payment_booking_date=booking.booking_date,
+            payment_amount=payment.amount,
+            payment_voucher_no=booking.voucher_no,
+            recorded_at=payment.recorded_at,
+            direction=direction,
+            original_event_id=UUID(event.event_id),
             original_amount=event.amount, corrected_amount=corrected,
             correctable_amount=event.amount-corrected, source_open_item_id=UUID(item_id),
             source_document_number=invoice.invoice_number,
