@@ -73,6 +73,9 @@ from simpleob.services.closing_service import (
 )
 from simpleob.services.fiscal_year_workspace import FiscalYearWorkspace
 from simpleob.services.opening_balance_service import OpeningBalanceService
+from simpleob.services.payable_invoice_posting_service import (
+    PayableInvoicePostingService,
+)
 from simpleob.services.pdf_reporting_service import PdfReportingService
 from simpleob.services.receivable_invoice_posting_service import (
     ReceivableInvoicePostingService,
@@ -163,6 +166,7 @@ class MainWindow(QMainWindow):
         application_config: ApplicationConfig | None = None,
         business_partner_repository: BusinessPartnerRepository | None = None,
         receivable_invoice_posting_service: ReceivableInvoicePostingService | None = None,
+        payable_invoice_posting_service: PayableInvoicePostingService | None = None,
     ) -> None:
         super().__init__()
 
@@ -202,6 +206,7 @@ class MainWindow(QMainWindow):
         self._application_config = application_config
         self._business_partner_repository = business_partner_repository
         self._receivable_invoice_posting_service = receivable_invoice_posting_service
+        self._payable_invoice_posting_service = payable_invoice_posting_service
         self._eric_certificate_path = (
             Path(eric_certificate_path).expanduser()
             if eric_certificate_path is not None
@@ -2021,6 +2026,11 @@ class MainWindow(QMainWindow):
                 if self._receivable_invoice_posting_service is not None
                 else None
             ),
+            on_payable_invoice_created=(
+                self._post_payable_invoice
+                if self._payable_invoice_posting_service is not None
+                else None
+            ),
         )
 
         self._booking_frame_layout.addWidget(
@@ -2119,6 +2129,39 @@ class MainWindow(QMainWindow):
             due_date=due_date,
             items=items,
             vat_accounts=self._vat_accounts,
+            description=description,
+        )
+        self._workspace.reload()
+        self._refresh_accounts()
+        self._refresh_journal()
+        self._refresh_balance_sheet()
+
+    def _post_payable_invoice(
+        self,
+        *,
+        partner_id: UUID,
+        invoice_number: str,
+        booking_date: date,
+        due_date: date,
+        items,
+        duplicate_reason: str | None,
+        description: str | None,
+    ) -> None:
+        """Verbucht eine Eingangsrechnung mit Verbindlichkeits-OP atomar."""
+        if self._workspace.is_closed:
+            raise ValueError("Das Geschäftsjahr ist abgeschlossen.")
+        if self._payable_invoice_posting_service is None:
+            raise ValueError("Die OP-Verwaltung ist nicht verfügbar.")
+        self._payable_invoice_posting_service.post_supplier_invoice_on_account(
+            company_id=self._context.company.company_id,
+            fiscal_year=self._context.fiscal_year,
+            partner_id=partner_id,
+            invoice_number=invoice_number,
+            booking_date=booking_date,
+            due_date=due_date,
+            items=items,
+            vat_accounts=self._vat_accounts,
+            duplicate_reason=duplicate_reason,
             description=description,
         )
         self._workspace.reload()

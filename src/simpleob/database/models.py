@@ -618,6 +618,63 @@ class ForderungsOP(Base):
         Numeric(18, 2), nullable=False
     )
 
+
+class Eingangsrechnung(Base):
+    """Gebuchte Eingangsrechnung mit eindeutigem Hauptbuchbezug."""
+
+    __tablename__ = "eingangsrechnungen"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["mandant_id", "partner_id"],
+            ["geschaeftspartner.mandant_id", "geschaeftspartner.partner_id"],
+            name="fk_eingangsrechnung_mandant_partner",
+        ),
+        CheckConstraint(
+            "gross_amount > 0",
+            name="ck_eingangsrechnung_betrag_positiv",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    invoice_id: Mapped[str] = mapped_column(
+        String(36), unique=True, nullable=False
+    )
+    mandant_id: Mapped[int] = mapped_column(
+        ForeignKey("mandanten.id"), nullable=False
+    )
+    partner_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    invoice_number: Mapped[str] = mapped_column(String, nullable=False)
+    invoice_date: Mapped[date] = mapped_column(Date, nullable=False)
+    due_date: Mapped[date] = mapped_column(Date, nullable=False)
+    gross_amount: Mapped[Decimal] = mapped_column(
+        Numeric(18, 2), nullable=False
+    )
+    booking_id: Mapped[str] = mapped_column(
+        ForeignKey("buchungen.booking_id"), unique=True, nullable=False
+    )
+    duplicate_reason: Mapped[str | None] = mapped_column(String, nullable=True)
+
+
+class VerbindlichkeitsOP(Base):
+    """Unveränderlicher Ursprungsbetrag eines Verbindlichkeits-OPs."""
+
+    __tablename__ = "verbindlichkeits_ops"
+    __table_args__ = (
+        CheckConstraint(
+            "amount > 0",
+            name="ck_verbindlichkeits_op_betrag_positiv",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    open_item_id: Mapped[str] = mapped_column(
+        String(36), unique=True, nullable=False
+    )
+    invoice_id: Mapped[str] = mapped_column(
+        ForeignKey("eingangsrechnungen.invoice_id"), unique=True, nullable=False
+    )
+    amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
+
 class Gesellschafter(Base):
     """Persistierter Gesellschafter."""
 

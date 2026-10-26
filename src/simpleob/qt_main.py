@@ -53,6 +53,7 @@ from simpleob.database.fixed_asset_repository import FixedAssetRepository
 from simpleob.database.migration_service import (
     DatabaseMigrationService,
 )
+from simpleob.database.payable_invoice_repository import PayableInvoiceRepository
 from simpleob.database.profit_appropriation_annual_data_repository import (
     ProfitAppropriationAnnualDataRepository,
 )
@@ -115,6 +116,9 @@ from simpleob.services.fixed_asset_disposal_workflow import (
 )
 from simpleob.services.fixed_asset_schedule_service import (
     FixedAssetScheduleService,
+)
+from simpleob.services.payable_invoice_posting_service import (
+    PayableInvoicePostingService,
 )
 from simpleob.services.pdf_reporting_service import PdfReportingService
 from simpleob.services.posting_service import PostingService
@@ -478,6 +482,13 @@ def main() -> None:
             booking_repository=booking_repository,
             partner_repository=business_partner_repository,
             invoice_repository=receivable_invoice_repository,
+            chart_of_accounts_repository=chart_of_accounts_repository,
+        )
+        payable_invoice_repository = PayableInvoiceRepository(session)
+        payable_invoice_posting_service = PayableInvoicePostingService(
+            booking_repository=booking_repository,
+            partner_repository=business_partner_repository,
+            invoice_repository=payable_invoice_repository,
             chart_of_accounts_repository=chart_of_accounts_repository,
         )
         posting_service = PostingService()
@@ -987,6 +998,7 @@ def main() -> None:
                 application_config=config,
                 business_partner_repository=business_partner_repository,
                 receivable_invoice_posting_service=receivable_invoice_posting_service,
+                payable_invoice_posting_service=payable_invoice_posting_service,
                 eric_certificate_path=(
                     config.eric_certificate_path
                 ),

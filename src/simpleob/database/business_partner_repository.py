@@ -75,6 +75,7 @@ class BusinessPartnerRepository:
         company_id: UUID,
         *,
         customers_only: bool = False,
+        suppliers_only: bool = False,
         active_only: bool = True,
     ) -> tuple[BusinessPartner, ...]:
         company = self._find_company(company_id)
@@ -85,6 +86,8 @@ class BusinessPartnerRepository:
         )
         if customers_only:
             query = query.filter(Geschaeftspartner.is_customer.is_(True))
+        if suppliers_only:
+            query = query.filter(Geschaeftspartner.is_supplier.is_(True))
         if active_only:
             query = query.filter(Geschaeftspartner.is_active.is_(True))
         return tuple(

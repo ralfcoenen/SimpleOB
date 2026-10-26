@@ -1266,6 +1266,26 @@ class ChartOfAccountsRepository:
                 f"{unsuitable}"
             )
 
+        unsuitable_payable_accounts = {
+            account_number
+            for account_number in account_roles.supplier_payables
+            if (
+                self._session.query(Konto.account_type)
+                .filter(
+                    Konto.mandant_id == company_model.id,
+                    Konto.account_number == account_number,
+                )
+                .scalar()
+                != AccountType.LIABILITY.name
+            )
+        }
+        if unsuitable_payable_accounts:
+            unsuitable = ", ".join(sorted(unsuitable_payable_accounts))
+            raise ValueError(
+                "Lieferantenverbindlichkeitskonten müssen Passivkonten sein: "
+                f"{unsuitable}"
+            )
+
         (
             self._session.query(Kontenrolle)
             .filter(
@@ -1293,6 +1313,10 @@ class ChartOfAccountsRepository:
             (
                 "CUSTOMER_RECEIVABLES",
                 account_roles.customer_receivables,
+            ),
+            (
+                "SUPPLIER_PAYABLES",
+                account_roles.supplier_payables,
             ),
         )
 
@@ -1406,11 +1430,18 @@ class ChartOfAccountsRepository:
             if model.role == "CUSTOMER_RECEIVABLES"
         )
 
+        supplier_payables = frozenset(
+            model.account_number
+            for model in models
+            if model.role == "SUPPLIER_PAYABLES"
+        )
+
         known_roles = {
             "CASH",
             "BANK",
             "GENERAL_RATE_SALES",
             "CUSTOMER_RECEIVABLES",
+            "SUPPLIER_PAYABLES",
         }
 
         unknown_roles = {
@@ -1436,6 +1467,7 @@ class ChartOfAccountsRepository:
                 general_rate_sales_accounts
             ),
             customer_receivables=customer_receivables,
+            supplier_payables=supplier_payables,
         )
 
     def validate_customer_receivable_account(
@@ -1466,6 +1498,36 @@ class ChartOfAccountsRepository:
         if account.account_type != AccountType.ASSET.name:
             raise ValueError(
                 "Das Forderungskonto muss ein Aktivkonto sein."
+            )
+
+    def validate_supplier_payable_account(
+        self,
+        *,
+        company_id: UUID,
+        account_number: str,
+    ) -> None:
+        """Prüft das konfigurierte, aktive Verbindlichkeitskonto."""
+
+        company_model = self._find_company(company_id)
+        if company_model is None:
+            raise ValueError("Das Unternehmen ist nicht vorhanden.")
+
+        account = (
+            self._session.query(Konto)
+            .filter(
+                Konto.mandant_id == company_model.id,
+                Konto.account_number == account_number,
+            )
+            .one_or_none()
+        )
+        if account is None or not account.is_active:
+            raise ValueError(
+                "Das konfigurierte Verbindlichkeitskonto ist nicht vorhanden "
+                "oder nicht aktiv."
+            )
+        if account.account_type != AccountType.LIABILITY.name:
+            raise ValueError(
+                "Das Verbindlichkeitskonto muss ein Passivkonto sein."
             )
 
     def lock_company(
