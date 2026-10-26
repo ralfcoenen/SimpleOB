@@ -81,7 +81,8 @@ class PaymentAllocationCorrectionService:
                 company_id=company_id, partner_id=source.partner_id, payment_id=source.payment_id,
                 original_event_id=source.original_event_id, direction=source.direction,
                 source_open_item_id=source.source_open_item_id, target_open_item_id=target_open_item_id,
-                amount=amount, correction_date=correction_date, reason=reason, booking_id=booking_id,
+                amount=amount, correction_date=correction_date,
+                booking_date=booking_date, reason=reason, booking_id=booking_id,
             )
             self._corrections.add(correction=correction, fiscal_year=fiscal_year, commit=False)
             self._booking.commit()

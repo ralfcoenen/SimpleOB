@@ -56,6 +56,9 @@ from simpleob.database.migration_service import (
 )
 from simpleob.database.open_item_offset_repository import OpenItemOffsetRepository
 from simpleob.database.open_item_payment_repository import OpenItemPaymentRepository
+from simpleob.database.open_item_reconciliation_repository import (
+    OpenItemReconciliationRepository,
+)
 from simpleob.database.payable_invoice_repository import PayableInvoiceRepository
 from simpleob.database.payment_allocation_correction_repository import (
     PaymentAllocationCorrectionRepository,
@@ -128,6 +131,9 @@ from simpleob.services.fixed_asset_schedule_service import (
 )
 from simpleob.services.open_item_offset_service import OpenItemOffsetService
 from simpleob.services.open_item_payment_service import OpenItemPaymentService
+from simpleob.services.open_item_reconciliation_service import (
+    OpenItemReconciliationService,
+)
 from simpleob.services.payable_invoice_posting_service import (
     PayableInvoicePostingService,
 )
@@ -516,6 +522,9 @@ def main() -> None:
             booking_repository=booking_repository,
             payment_repository=OpenItemPaymentRepository(session),
             chart_of_accounts_repository=chart_of_accounts_repository,
+        )
+        open_item_reconciliation_service = OpenItemReconciliationService(
+            OpenItemReconciliationRepository(session)
         )
         open_item_offset_service = OpenItemOffsetService(
             booking_repository=booking_repository,
@@ -1037,6 +1046,7 @@ def main() -> None:
                 payable_invoice_posting_service=payable_invoice_posting_service,
                 credit_note_posting_service=credit_note_posting_service,
                 open_item_payment_service=open_item_payment_service,
+                open_item_reconciliation_service=open_item_reconciliation_service,
                 open_item_offset_service=open_item_offset_service,
                 payment_allocation_correction_service=payment_allocation_correction_service,
                 eric_certificate_path=(

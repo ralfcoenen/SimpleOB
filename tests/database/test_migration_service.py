@@ -17,7 +17,8 @@ from simpleob.database.migration_service import (
 )
 
 BASELINE_REVISION = "7392d6cc6892"
-HEAD_REVISION = "7d0c4a28b9f1"
+PRE_CORRECTION_BOOKING_DATE_REVISION = "7d0c4a28b9f1"
+HEAD_REVISION = "c71f4db9e2a6"
 
 
 def _application_config(
@@ -92,6 +93,71 @@ def test_new_database_is_upgraded_to_head(
         HEAD_REVISION
     )
     assert not _backup_file(database_file).exists()
+
+
+def test_correction_booking_date_migration_backfills_only_linked_bookings(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    database_file = tmp_path / "correction-dates.db"
+    monkeypatch.setenv(
+        "OPENBILANZ_DATABASE_URL", f"sqlite:///{database_file}"
+    )
+    config = _alembic_config(database_file)
+    command.upgrade(config, PRE_CORRECTION_BOOKING_DATE_REVISION)
+
+    with sqlite3.connect(database_file) as connection:
+        connection.execute(
+            "INSERT INTO mandanten (id, company_id, name) VALUES (1, 'company', 'Test')"
+        )
+        connection.execute(
+            "INSERT INTO wirtschaftsjahre "
+            "(id, mandant_id, start_date, end_date, status) "
+            "VALUES (1, 1, '2026-01-01', '2026-12-31', 'OPEN')"
+        )
+        connection.execute(
+            "INSERT INTO buchungen "
+            "(id, booking_id, wirtschaftsjahr_id, booking_date) "
+            "VALUES (1, 'booking-linked', 1, '2026-04-18')"
+        )
+        shared = (
+            "mandant_id, partner_id, direction, original_payment_id, "
+            "original_allocation_event_id, source_receivable_open_item_id, "
+            "target_receivable_open_item_id, amount, correction_date, "
+            "recorded_at, reason, booking_id"
+        )
+        connection.execute(
+            f"INSERT INTO zahlungszuordnungskorrekturen "
+            f"(correction_id, {shared}) VALUES "
+            "('linked', 1, 'partner', 'CUSTOMER_RECEIPT', 'payment', 'event', "
+            "'source', 'target', 10, '2026-04-17', '2026-04-18T10:00:00+00:00', "
+            "'linked row', 'booking-linked')"
+        )
+        connection.execute(
+            f"INSERT INTO zahlungszuordnungskorrekturen "
+            f"(correction_id, {shared}) VALUES "
+            "('unlinked', 1, 'partner', 'CUSTOMER_RECEIPT', 'payment', 'event-2', "
+            "'source-2', 'target-2', 5, '2026-04-19', '2026-04-19T10:00:00+00:00', "
+            "'legacy row', NULL)"
+        )
+
+    command.upgrade(config, "head")
+    with sqlite3.connect(database_file) as connection:
+        values = dict(connection.execute(
+            "SELECT correction_id, booking_date "
+            "FROM zahlungszuordnungskorrekturen"
+        ).fetchall())
+    assert values == {"linked": "2026-04-18", "unlinked": None}
+
+    command.downgrade(config, PRE_CORRECTION_BOOKING_DATE_REVISION)
+    with sqlite3.connect(database_file) as connection:
+        columns = {
+            row[1]
+            for row in connection.execute(
+                "PRAGMA table_info(zahlungszuordnungskorrekturen)"
+            )
+        }
+    assert "booking_date" not in columns
 
 
 def test_alembic_database_is_backed_up_and_upgraded_to_head(

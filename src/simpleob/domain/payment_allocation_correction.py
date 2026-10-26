@@ -35,6 +35,7 @@ class PaymentAllocationCorrection:
     target_open_item_id: UUID
     amount: Decimal
     correction_date: date
+    booking_date: date
     reason: str
     booking_id: UUID | None
     correction_id: UUID = field(default_factory=uuid4)
@@ -62,6 +63,8 @@ class PaymentAllocationCorrection:
             raise TypeError("direction must be a PaymentDirection")
         if not isinstance(self.correction_date, date):
             raise TypeError("correction_date must be a date")
+        if not isinstance(self.booking_date, date):
+            raise TypeError("booking_date must be a date")
         if not isinstance(self.recorded_at, datetime):
             raise TypeError("recorded_at must be a datetime")
         if self.recorded_at.tzinfo is None:

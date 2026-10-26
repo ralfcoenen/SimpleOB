@@ -988,6 +988,7 @@ class Zahlungszuordnungskorrektur(Base):
     )
     amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
     correction_date: Mapped[date] = mapped_column(Date, nullable=False)
+    booking_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     reason: Mapped[str] = mapped_column(String, nullable=False)
     booking_id: Mapped[str | None] = mapped_column(

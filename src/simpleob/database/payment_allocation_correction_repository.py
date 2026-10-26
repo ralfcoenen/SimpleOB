@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from simpleob.database.models import (
     Ausgangsrechnung,
+    Buchung,
     Eingangsrechnung,
     ForderungsOP,
     Mandant,
@@ -88,8 +89,12 @@ class PaymentAllocationCorrectionRepository:
             fy is None
             or fy.status == FiscalYearStatus.CLOSED.value
             or not fiscal_year.contains(correction.correction_date)
+            or not fiscal_year.contains(correction.booking_date)
         ):
-            raise ValueError("Korrekturdatum oder Geschäftsjahr ist für diesen Mandanten ungültig.")
+            raise ValueError(
+                "Korrekturdatum oder Buchungsdatum liegt außerhalb des "
+                "offenen Geschäftsjahres dieses Mandanten."
+            )
         candidate = self.get_correctable(
             company_id=correction.company_id,
             event_id=correction.original_event_id,
@@ -99,6 +104,15 @@ class PaymentAllocationCorrectionRepository:
             raise ValueError("Der Betrag übersteigt den noch korrigierbaren Anteil der Zuordnung.")
         if candidate.payment_id != correction.payment_id or candidate.partner_id != correction.partner_id or candidate.direction is not correction.direction or candidate.source_open_item_id != correction.source_open_item_id:
             raise ValueError("Die Korrektur stimmt nicht mit der ursprünglichen Zahlungszuordnung überein.")
+        if correction.booking_id is not None:
+            booking = self._session.query(Buchung).filter_by(
+                booking_id=str(correction.booking_id)
+            ).one_or_none()
+            if booking is None or booking.booking_date != correction.booking_date:
+                raise ValueError(
+                    "Das Korrekturbuchungsdatum stimmt nicht mit der "
+                    "Hauptbuchumbuchung überein."
+                )
         model = Zahlungszuordnungskorrektur(
             correction_id=str(correction.correction_id), mandant_id=company.id,
             partner_id=str(correction.partner_id), direction=correction.direction.value,
@@ -108,6 +122,7 @@ class PaymentAllocationCorrectionRepository:
             target_receivable_open_item_id=str(correction.target_open_item_id) if correction.direction is PaymentDirection.CUSTOMER_RECEIPT else None,
             target_payable_open_item_id=str(correction.target_open_item_id) if correction.direction is PaymentDirection.SUPPLIER_PAYMENT else None,
             amount=correction.amount, correction_date=correction.correction_date,
+            booking_date=correction.booking_date,
             recorded_at=correction.recorded_at, reason=correction.reason, booking_id=str(correction.booking_id) if correction.booking_id else None,
         )
         self._session.add(model)
