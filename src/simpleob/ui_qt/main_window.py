@@ -76,6 +76,7 @@ from simpleob.services.credit_note_posting_service import (
     CreditNotePostingService,
 )
 from simpleob.services.fiscal_year_workspace import FiscalYearWorkspace
+from simpleob.services.open_item_payment_service import OpenItemPaymentService
 from simpleob.services.opening_balance_service import OpeningBalanceService
 from simpleob.services.payable_invoice_posting_service import (
     PayableInvoicePostingService,
@@ -119,6 +120,7 @@ from simpleob.ui_qt.income_statement_frame import (
     IncomeStatementFrame,
 )
 from simpleob.ui_qt.new_fixed_asset_dialog import NewFixedAssetDialog
+from simpleob.ui_qt.open_item_payment_dialog import OpenItemPaymentDialog
 from simpleob.ui_qt.opening_balance_dialog import OpeningBalanceDialog
 from simpleob.ui_qt.profit_appropriation_dialog import (
     ProfitAppropriationDialog,
@@ -172,6 +174,7 @@ class MainWindow(QMainWindow):
         receivable_invoice_posting_service: ReceivableInvoicePostingService | None = None,
         payable_invoice_posting_service: PayableInvoicePostingService | None = None,
         credit_note_posting_service: CreditNotePostingService | None = None,
+        open_item_payment_service: OpenItemPaymentService | None = None,
     ) -> None:
         super().__init__()
 
@@ -213,6 +216,7 @@ class MainWindow(QMainWindow):
         self._receivable_invoice_posting_service = receivable_invoice_posting_service
         self._payable_invoice_posting_service = payable_invoice_posting_service
         self._credit_note_posting_service = credit_note_posting_service
+        self._open_item_payment_service = open_item_payment_service
         self._eric_certificate_path = (
             Path(eric_certificate_path).expanduser()
             if eric_certificate_path is not None
@@ -1955,6 +1959,13 @@ class MainWindow(QMainWindow):
 
         layout.addLayout(mode_layout)
 
+        self._payment_button = QPushButton("Zahlung auf Rechnung erfassen…")
+        self._payment_button.setEnabled(
+            self._open_item_payment_service is not None
+        )
+        self._payment_button.clicked.connect(self._open_payment_dialog)
+        layout.addWidget(self._payment_button)
+
         technical_account_numbers = {
             self._opening_balance_account_number,
             self._closing_accounts.income_summary_account,
@@ -2071,6 +2082,27 @@ class MainWindow(QMainWindow):
         self._vat_booking_frame.set_enabled(enabled)
         self._booking_mode_box.setEnabled(enabled)
         self._opening_balance_button.setEnabled(enabled)
+        self._payment_button.setEnabled(
+            enabled and self._open_item_payment_service is not None
+        )
+
+    def _open_payment_dialog(self) -> None:
+        """Erfasst eine einzelne Zahlung auf einen offenen Rechnungs-OP."""
+        service = self._open_item_payment_service
+        if service is None or self._workspace.is_closed:
+            return
+        dialog = OpenItemPaymentDialog(
+            self,
+            company_id=self._context.company.company_id,
+            fiscal_year=self._context.fiscal_year,
+            service=service,
+            accounts=self._accounts,
+        )
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self._workspace.reload()
+            self._refresh_accounts()
+            self._refresh_journal()
+            self._refresh_balance_sheet()
 
     def _update_booking_mode(
         self,

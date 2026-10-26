@@ -1604,7 +1604,7 @@ class ChartOfAccountsRepository:
         company_id: UUID,
         account_number: str,
     ) -> None:
-        self._validate_credit_balance_account(
+        self._validate_active_account_type(
             company_id=company_id,
             account_number=account_number,
             account_type=AccountType.LIABILITY,
@@ -1617,14 +1617,39 @@ class ChartOfAccountsRepository:
         company_id: UUID,
         account_number: str,
     ) -> None:
-        self._validate_credit_balance_account(
+        self._validate_active_account_type(
             company_id=company_id,
             account_number=account_number,
             account_type=AccountType.ASSET,
             label="Lieferantenguthabenkonto",
         )
 
-    def _validate_credit_balance_account(
+    def validate_payment_cash_bank_account(
+        self,
+        *,
+        company_id: UUID,
+        account_number: str,
+    ) -> None:
+        """Prüft ein aktives, mandanteneigenes Bank- oder Kassenkonto."""
+        roles = self.load_account_roles(company_id)
+        configured_accounts = (
+            roles.cash_accounts | roles.bank_accounts
+            if roles is not None
+            else frozenset()
+        )
+        if account_number not in configured_accounts:
+            raise ValueError(
+                "Das Zahlungskonto ist keinem Bank- oder Kassenkonto "
+                "des Mandanten zugeordnet."
+            )
+        self._validate_active_account_type(
+            company_id=company_id,
+            account_number=account_number,
+            account_type=AccountType.ASSET,
+            label="Bank-/Kassenkonto",
+        )
+
+    def _validate_active_account_type(
         self,
         *,
         company_id: UUID,

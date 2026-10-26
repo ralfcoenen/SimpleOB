@@ -1,11 +1,12 @@
 """SQLAlchemy-Modelle für die Persistenz."""
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
     Date,
+    DateTime,
     ForeignKey,
     ForeignKeyConstraint,
     Integer,
@@ -763,6 +764,77 @@ class GuthabenOPEreignis(Base):
     amount_delta: Mapped[Decimal] = mapped_column(
         Numeric(18, 2), nullable=False
     )
+
+
+class Zahlung(Base):
+    """Tatsächliche Zahlung mit Buchungs- und Erfassungszeitpunkt."""
+
+    __tablename__ = "zahlungen"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["mandant_id", "partner_id"],
+            ["geschaeftspartner.mandant_id", "geschaeftspartner.partner_id"],
+            name="fk_zahlung_mandant_partner",
+        ),
+        CheckConstraint(
+            "direction IN ('CUSTOMER_RECEIPT', 'SUPPLIER_PAYMENT')",
+            name="ck_zahlung_richtung",
+        ),
+        CheckConstraint("amount > 0", name="ck_zahlung_betrag_positiv"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    payment_id: Mapped[str] = mapped_column(String(36), unique=True, nullable=False)
+    mandant_id: Mapped[int] = mapped_column(
+        ForeignKey("mandanten.id"), nullable=False
+    )
+    partner_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    direction: Mapped[str] = mapped_column(String(24), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
+    payment_date: Mapped[date] = mapped_column(Date, nullable=False)
+    recorded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    booking_id: Mapped[str] = mapped_column(
+        ForeignKey("buchungen.booking_id"), unique=True, nullable=False
+    )
+
+
+class RechnungsOPZahlungsereignis(Base):
+    """Unveränderliche Zahlung-zu-Rechnungs-OP-Zuordnung."""
+
+    __tablename__ = "rechnungs_op_zahlungsereignisse"
+    __table_args__ = (
+        CheckConstraint(
+            "(direction = 'CUSTOMER_RECEIPT' AND receivable_open_item_id IS NOT NULL "
+            "AND payable_open_item_id IS NULL) OR "
+            "(direction = 'SUPPLIER_PAYMENT' AND receivable_open_item_id IS NULL "
+            "AND payable_open_item_id IS NOT NULL)",
+            name="ck_rechnungs_op_zahlung_richtung_op",
+        ),
+        CheckConstraint(
+            "direction IN ('CUSTOMER_RECEIPT', 'SUPPLIER_PAYMENT')",
+            name="ck_rechnungs_op_zahlung_richtung",
+        ),
+        CheckConstraint(
+            "amount > 0", name="ck_rechnungs_op_zahlung_betrag_positiv"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    event_id: Mapped[str] = mapped_column(String(36), unique=True, nullable=False)
+    payment_id: Mapped[str] = mapped_column(
+        ForeignKey("zahlungen.payment_id"), unique=True, nullable=False
+    )
+    direction: Mapped[str] = mapped_column(String(24), nullable=False)
+    receivable_open_item_id: Mapped[str | None] = mapped_column(
+        ForeignKey("forderungs_ops.open_item_id"), nullable=True
+    )
+    payable_open_item_id: Mapped[str | None] = mapped_column(
+        ForeignKey("verbindlichkeits_ops.open_item_id"), nullable=True
+    )
+    amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
+    effective_date: Mapped[date] = mapped_column(Date, nullable=False)
 
 class Gesellschafter(Base):
     """Persistierter Gesellschafter."""
