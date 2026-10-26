@@ -17,7 +17,7 @@ from simpleob.database.migration_service import (
 )
 
 BASELINE_REVISION = "7392d6cc6892"
-HEAD_REVISION = "7c1f88e4d593"
+HEAD_REVISION = "8f32c0a94b1e"
 
 
 def _application_config(

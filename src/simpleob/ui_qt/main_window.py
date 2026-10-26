@@ -58,6 +58,7 @@ from simpleob.domain.booking_type import BookingType
 from simpleob.domain.chart_of_accounts_template import (
     ChartOfAccountsTemplate,
 )
+from simpleob.domain.credit_note import CreditNoteKind
 from simpleob.domain.elster_data_supplier import ElsterDataSupplier
 from simpleob.domain.entry_side import EntrySide
 from simpleob.domain.fiscal_year_status import FiscalYearStatus
@@ -70,6 +71,9 @@ from simpleob.services.closing_accounts import ClosingAccounts
 from simpleob.services.closing_service import (
     ClosingResult,
     ClosingService,
+)
+from simpleob.services.credit_note_posting_service import (
+    CreditNotePostingService,
 )
 from simpleob.services.fiscal_year_workspace import FiscalYearWorkspace
 from simpleob.services.opening_balance_service import OpeningBalanceService
@@ -167,6 +171,7 @@ class MainWindow(QMainWindow):
         business_partner_repository: BusinessPartnerRepository | None = None,
         receivable_invoice_posting_service: ReceivableInvoicePostingService | None = None,
         payable_invoice_posting_service: PayableInvoicePostingService | None = None,
+        credit_note_posting_service: CreditNotePostingService | None = None,
     ) -> None:
         super().__init__()
 
@@ -207,6 +212,7 @@ class MainWindow(QMainWindow):
         self._business_partner_repository = business_partner_repository
         self._receivable_invoice_posting_service = receivable_invoice_posting_service
         self._payable_invoice_posting_service = payable_invoice_posting_service
+        self._credit_note_posting_service = credit_note_posting_service
         self._eric_certificate_path = (
             Path(eric_certificate_path).expanduser()
             if eric_certificate_path is not None
@@ -2031,6 +2037,11 @@ class MainWindow(QMainWindow):
                 if self._payable_invoice_posting_service is not None
                 else None
             ),
+            on_credit_note_created=(
+                self._post_credit_note
+                if self._credit_note_posting_service is not None
+                else None
+            ),
         )
 
         self._booking_frame_layout.addWidget(
@@ -2164,6 +2175,47 @@ class MainWindow(QMainWindow):
             duplicate_reason=duplicate_reason,
             description=description,
         )
+        self._workspace.reload()
+        self._refresh_accounts()
+        self._refresh_journal()
+        self._refresh_balance_sheet()
+
+    def _post_credit_note(
+        self,
+        *,
+        kind: CreditNoteKind,
+        partner_id: UUID,
+        note_number: str,
+        note_date: date,
+        items,
+        original_invoice_number: str | None,
+        duplicate_reason: str | None,
+        description: str | None,
+    ) -> None:
+        """Verbucht eine Gutschrift mit Guthaben-OP atomar."""
+        if self._workspace.is_closed:
+            raise ValueError("Das Geschäftsjahr ist abgeschlossen.")
+        if self._credit_note_posting_service is None:
+            raise ValueError("Die OP-Verwaltung ist nicht verfügbar.")
+        post = (
+            self._credit_note_posting_service.post_customer_credit_note
+            if kind is CreditNoteKind.CUSTOMER
+            else self._credit_note_posting_service.post_supplier_credit_note
+        )
+        arguments = {
+            "company_id": self._context.company.company_id,
+            "fiscal_year": self._context.fiscal_year,
+            "partner_id": partner_id,
+            "note_number": note_number,
+            "note_date": note_date,
+            "items": items,
+            "vat_accounts": self._vat_accounts,
+            "original_invoice_number": original_invoice_number,
+            "description": description,
+        }
+        if kind is CreditNoteKind.SUPPLIER:
+            arguments["duplicate_reason"] = duplicate_reason
+        post(**arguments)
         self._workspace.reload()
         self._refresh_accounts()
         self._refresh_journal()

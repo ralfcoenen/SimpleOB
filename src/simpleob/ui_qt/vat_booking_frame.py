@@ -30,6 +30,10 @@ from simpleob.date_input import (
 from simpleob.domain.account import Account
 from simpleob.domain.account_type import AccountType
 from simpleob.domain.booking import Booking
+from simpleob.domain.credit_note import (
+    CreditNoteKind,
+    DuplicateSupplierCreditNoteError,
+)
 from simpleob.domain.payable_invoice import DuplicateSupplierInvoiceError
 from simpleob.domain.vat_accounts import VatAccounts
 from simpleob.domain.vat_booking_item import VatBookingItem
@@ -60,6 +64,7 @@ class VatBookingFrame(QWidget):
         partner_repository: BusinessPartnerRepository | None = None,
         on_receivable_invoice_created: Callable[..., None] | None = None,
         on_payable_invoice_created: Callable[..., None] | None = None,
+        on_credit_note_created: Callable[..., None] | None = None,
     ) -> None:
         super().__init__(parent)
 
@@ -72,6 +77,7 @@ class VatBookingFrame(QWidget):
         self._partner_repository = partner_repository
         self._on_receivable_invoice_created = on_receivable_invoice_created
         self._on_payable_invoice_created = on_payable_invoice_created
+        self._on_credit_note_created = on_credit_note_created
 
         self._accounts_by_display_name = {
             self._account_display_name(account): account
@@ -153,6 +159,10 @@ class VatBookingFrame(QWidget):
         self._due_date_entry.setMaximumWidth(140)
         self._due_date_entry.setVisible(False)
         form.addRow("Fällig am", self._due_date_entry)
+        self._original_invoice_number_entry = QLineEdit()
+        self._original_invoice_number_entry.setMaximumWidth(220)
+        self._original_invoice_number_entry.setVisible(False)
+        form.addRow("Rechnungsbezug (optional)", self._original_invoice_number_entry)
         self._refresh_customer_list()
         self._partner_add_button.clicked.connect(self._manage_partners)
 
@@ -279,6 +289,9 @@ class VatBookingFrame(QWidget):
         self._on_account.toggled.connect(self._on_form_changed)
         self._partner_box.currentIndexChanged.connect(self._on_form_changed)
         self._voucher_no_entry.textChanged.connect(self._on_form_changed)
+        self._original_invoice_number_entry.textChanged.connect(
+            self._on_form_changed
+        )
         self._due_date_entry.textChanged.connect(self._on_form_changed)
         self._booking_date_entry.textChanged.connect(
             self._on_form_changed
@@ -298,11 +311,15 @@ class VatBookingFrame(QWidget):
         if self._partner_repository is None or self._company_id is None:
             self._partner_box.setEnabled(False)
             return
-        is_output = self._invoice_type_box.currentText() == _OUTPUT_INVOICE
+        invoice_type = self._invoice_type_box.currentText()
+        is_customer = invoice_type in (
+            _OUTPUT_INVOICE,
+            _CUSTOMER_CREDIT_NOTE,
+        )
         partners = self._partner_repository.list_for_company(
             self._company_id,
-            customers_only=is_output,
-            suppliers_only=not is_output,
+            customers_only=is_customer,
+            suppliers_only=not is_customer,
         )
         for partner in partners:
             self._partner_box.addItem(partner.name, partner.partner_id)
@@ -323,13 +340,22 @@ class VatBookingFrame(QWidget):
         self._on_form_changed()
 
     def _update_invoice_fields(self, *_args: object) -> None:
-        output_invoice = self._invoice_type_box.currentText() == _OUTPUT_INVOICE
-        input_invoice = self._invoice_type_box.currentText() == _INPUT_INVOICE
-        available = (
+        invoice_type = self._invoice_type_box.currentText()
+        output_invoice = invoice_type == _OUTPUT_INVOICE
+        input_invoice = invoice_type == _INPUT_INVOICE
+        customer_credit = invoice_type == _CUSTOMER_CREDIT_NOTE
+        supplier_credit = invoice_type == _SUPPLIER_CREDIT_NOTE
+        target_available = (
             output_invoice and self._on_receivable_invoice_created is not None
         ) or (input_invoice and self._on_payable_invoice_created is not None)
-        self._on_account.setVisible(available)
-        target = available and self._on_account.isChecked()
+        credit_note_available = (
+            (customer_credit or supplier_credit)
+            and self._on_credit_note_created is not None
+        )
+        target = target_available and self._on_account.isChecked()
+        credit_note = credit_note_available
+        document_uses_partner = target or credit_note
+        self._on_account.setVisible(target_available)
         self._on_account.setText(
             "Ausgangsrechnung auf Ziel"
             if output_invoice
@@ -338,14 +364,26 @@ class VatBookingFrame(QWidget):
         self._on_account_label.setText(
             "Forderung" if output_invoice else "Verbindlichkeit"
         )
-        self._partner_label.setText("Kunde" if output_invoice else "Lieferant")
-        self._voucher_no_label.setText(
-            "Rechnungsnummer" if target else "Belegnummer"
+        self._on_account_label.setVisible(target_available)
+        self._partner_label.setText(
+            "Kunde" if output_invoice or customer_credit else "Lieferant"
         )
-        self._partner_box.setVisible(target)
-        self._partner_add_button.setVisible(target and self._partner_repository is not None)
+        self._voucher_no_label.setText(
+            "Gutschriftnummer"
+            if credit_note
+            else "Rechnungsnummer"
+            if target
+            else "Belegnummer"
+        )
+        self._partner_box.setVisible(document_uses_partner)
+        self._partner_add_button.setVisible(
+            document_uses_partner and self._partner_repository is not None
+        )
         self._due_date_entry.setVisible(target)
-        self._counter_account_box.setEnabled(self._enabled and not target)
+        self._original_invoice_number_entry.setVisible(credit_note)
+        self._counter_account_box.setEnabled(
+            self._enabled and not (target or credit_note)
+        )
         self._on_form_changed()
 
     def _add_position_row(self) -> None:
@@ -484,6 +522,7 @@ class VatBookingFrame(QWidget):
         self._partner_box.setEnabled(enabled)
         self._partner_add_button.setEnabled(enabled)
         self._due_date_entry.setEnabled(enabled)
+        self._original_invoice_number_entry.setEnabled(enabled)
 
         for row in self._position_rows:
             row["account_box"].setEnabled(enabled)
@@ -529,18 +568,20 @@ class VatBookingFrame(QWidget):
             valid = False
 
         target_invoice = self._is_target_invoice()
+        credit_note = self._is_credit_note_creation()
         counter_account = self._resolve_account(
             self._counter_account_box.currentText()
         )
 
-        if counter_account is None and not target_invoice:
+        if counter_account is None and not (target_invoice or credit_note):
             valid = False
 
-        if target_invoice:
+        if target_invoice or credit_note:
             if self._partner_box.currentData() is None:
                 valid = False
             if not self._voucher_no_entry.text().strip():
                 valid = False
+        if target_invoice:
             try:
                 self._parse_booking_date(self._due_date_entry.text())
             except ValueError:
@@ -603,7 +644,7 @@ class VatBookingFrame(QWidget):
                 valid = False
 
             if (
-                not target_invoice
+                not (target_invoice or credit_note)
                 and counter_account is not None
                 and account is not None
                 and counter_account.number
@@ -630,6 +671,13 @@ class VatBookingFrame(QWidget):
             )
         )
 
+    def _is_credit_note_creation(self) -> bool:
+        return (
+            self._invoice_type_box.currentText()
+            in (_CUSTOMER_CREDIT_NOTE, _SUPPLIER_CREDIT_NOTE)
+            and self._on_credit_note_created is not None
+        )
+
     def _create_booking(self) -> None:
         """Erzeugt die Buchung aus der Rechnung."""
 
@@ -637,12 +685,13 @@ class VatBookingFrame(QWidget):
             return
 
         target_invoice = self._is_target_invoice()
+        credit_note = self._is_credit_note_creation()
 
         counter_account = self._resolve_account(
             self._counter_account_box.currentText()
         )
 
-        if counter_account is None and not target_invoice:
+        if counter_account is None and not (target_invoice or credit_note):
             return
 
         try:
@@ -701,6 +750,39 @@ class VatBookingFrame(QWidget):
             self._clear()
             self._status_label.setText(
                 "Rechnung und offener Posten wurden übernommen."
+            )
+            return
+
+        if credit_note:
+            partner_id = self._partner_box.currentData()
+            if not isinstance(partner_id, UUID):
+                return
+            is_customer_credit = (
+                self._invoice_type_box.currentText() == _CUSTOMER_CREDIT_NOTE
+            )
+            arguments = {
+                "kind": (
+                    CreditNoteKind.CUSTOMER
+                    if is_customer_credit
+                    else CreditNoteKind.SUPPLIER
+                ),
+                "partner_id": partner_id,
+                "note_number": self._voucher_no_entry.text().strip(),
+                "note_date": booking_date,
+                "items": items,
+                "original_invoice_number": (
+                    self._original_invoice_number_entry.text().strip() or None
+                ),
+                "description": self._description_entry.text().strip() or None,
+            }
+            try:
+                self._submit_credit_note(arguments, supplier=not is_customer_credit)
+            except Exception as exc:
+                self._status_label.setText(str(exc))
+                return
+            self._clear()
+            self._status_label.setText(
+                "Gutschrift und Guthaben-OP wurden übernommen."
             )
             return
 
@@ -817,10 +899,41 @@ class VatBookingFrame(QWidget):
                 raise ValueError("Eine Begründung darf nicht leer sein.")
             callback(**common_arguments, duplicate_reason=reason.strip())
 
+    def _submit_credit_note(
+        self,
+        arguments: dict[str, object],
+        *,
+        supplier: bool,
+    ) -> None:
+        callback = self._on_credit_note_created
+        if callback is None:
+            raise ValueError("Die OP-Verwaltung ist nicht verfügbar.")
+        try:
+            callback(**arguments, duplicate_reason=None)
+        except DuplicateSupplierCreditNoteError as duplicate:
+            if not supplier:
+                raise
+            QMessageBox.warning(
+                self,
+                "Gutschriftnummer bereits erfasst",
+                str(duplicate),
+            )
+            reason, accepted = QInputDialog.getText(
+                self,
+                "Erneute Erfassung begründen",
+                "Begründung für die erneute Erfassung:",
+            )
+            if not accepted:
+                raise ValueError("Die erneute Erfassung wurde abgebrochen.")
+            if not reason.strip():
+                raise ValueError("Eine Begründung darf nicht leer sein.")
+            callback(**arguments, duplicate_reason=reason.strip())
+
     def _clear(self) -> None:
         """Leert die Rechnungspositionen nach der Buchung."""
 
         self._voucher_no_entry.clear()
+        self._original_invoice_number_entry.clear()
         self._description_entry.clear()
 
         self._counter_account_box.setCurrentIndex(

@@ -39,6 +39,7 @@ from simpleob.database.company_repository import CompanyRepository
 from simpleob.database.connection_credentials import (
     PostgreSQLCredentials,
 )
+from simpleob.database.credit_note_repository import CreditNoteRepository
 from simpleob.database.database import Database
 from simpleob.database.equity_contribution_repository import (
     EquityContributionRepository,
@@ -86,6 +87,9 @@ from simpleob.services.closing_consistency_service import (
     ClosingConsistencyService,
 )
 from simpleob.services.closing_service import ClosingService
+from simpleob.services.credit_note_posting_service import (
+    CreditNotePostingService,
+)
 from simpleob.services.depreciation_booking_service import (
     DepreciationBookingService,
 )
@@ -489,6 +493,13 @@ def main() -> None:
             booking_repository=booking_repository,
             partner_repository=business_partner_repository,
             invoice_repository=payable_invoice_repository,
+            chart_of_accounts_repository=chart_of_accounts_repository,
+        )
+        credit_note_repository = CreditNoteRepository(session)
+        credit_note_posting_service = CreditNotePostingService(
+            booking_repository=booking_repository,
+            partner_repository=business_partner_repository,
+            credit_note_repository=credit_note_repository,
             chart_of_accounts_repository=chart_of_accounts_repository,
         )
         posting_service = PostingService()
@@ -999,6 +1010,7 @@ def main() -> None:
                 business_partner_repository=business_partner_repository,
                 receivable_invoice_posting_service=receivable_invoice_posting_service,
                 payable_invoice_posting_service=payable_invoice_posting_service,
+                credit_note_posting_service=credit_note_posting_service,
                 eric_certificate_path=(
                     config.eric_certificate_path
                 ),

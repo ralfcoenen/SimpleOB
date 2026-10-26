@@ -45,6 +45,8 @@ class AccountingAccountRoles:
     general_rate_sales_accounts: frozenset[str]
     customer_receivables: frozenset[str] = frozenset()
     supplier_payables: frozenset[str] = frozenset()
+    customer_credit_balances: frozenset[str] = frozenset()
+    supplier_credit_balances: frozenset[str] = frozenset()
 
     def __post_init__(self) -> None:
         _validate_account_numbers(
@@ -67,6 +69,14 @@ class AccountingAccountRoles:
             field_name="supplier_payables",
             account_numbers=self.supplier_payables,
         )
+        _validate_account_numbers(
+            field_name="customer_credit_balances",
+            account_numbers=self.customer_credit_balances,
+        )
+        _validate_account_numbers(
+            field_name="supplier_credit_balances",
+            account_numbers=self.supplier_credit_balances,
+        )
         if len(self.customer_receivables) > 1:
             raise ValueError(
                 "Es darf höchstens ein Kundenforderungskonto "
@@ -77,6 +87,15 @@ class AccountingAccountRoles:
                 "Es darf höchstens ein Lieferantenverbindlichkeitskonto "
                 "konfiguriert sein."
             )
+        if len(self.customer_credit_balances) > 1:
+            raise ValueError(
+                "Es darf höchstens ein Kundenguthabenkonto konfiguriert sein."
+            )
+        if len(self.supplier_credit_balances) > 1:
+            raise ValueError(
+                "Es darf höchstens ein Lieferantenguthabenkonto "
+                "konfiguriert sein."
+            )
 
         role_sets = (
             self.cash_accounts,
@@ -84,6 +103,8 @@ class AccountingAccountRoles:
             self.general_rate_sales_accounts,
             self.customer_receivables,
             self.supplier_payables,
+            self.customer_credit_balances,
+            self.supplier_credit_balances,
         )
 
         for index, account_numbers in enumerate(role_sets):
@@ -114,4 +135,6 @@ class AccountingAccountRoles:
             self.general_rate_sales_accounts,
             self.customer_receivables,
             self.supplier_payables,
+            self.customer_credit_balances,
+            self.supplier_credit_balances,
         )

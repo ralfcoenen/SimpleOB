@@ -302,6 +302,14 @@ class AccountConfigurationDialog(QDialog):
             roles_layout,
             title="Lieferantenverbindlichkeiten",
         )
+        self._customer_credit_balances_list = self._create_role_list(
+            roles_layout,
+            title="Kundenguthaben",
+        )
+        self._supplier_credit_balances_list = self._create_role_list(
+            roles_layout,
+            title="Lieferantenguthaben",
+        )
 
     def _create_account_combobox(
         self,
@@ -458,6 +466,14 @@ class AccountConfigurationDialog(QDialog):
         self._select_role_accounts(
             self._supplier_payables_list,
             self._account_roles.supplier_payables,
+        )
+        self._select_role_accounts(
+            self._customer_credit_balances_list,
+            self._account_roles.customer_credit_balances,
+        )
+        self._select_role_accounts(
+            self._supplier_credit_balances_list,
+            self._account_roles.supplier_credit_balances,
         )
 
     @staticmethod
@@ -623,6 +639,16 @@ class AccountConfigurationDialog(QDialog):
                 supplier_payables=(
                     self._selected_account_numbers(
                         self._supplier_payables_list
+                    )
+                ),
+                customer_credit_balances=(
+                    self._selected_account_numbers(
+                        self._customer_credit_balances_list
+                    )
+                ),
+                supplier_credit_balances=(
+                    self._selected_account_numbers(
+                        self._supplier_credit_balances_list
                     )
                 ),
             )

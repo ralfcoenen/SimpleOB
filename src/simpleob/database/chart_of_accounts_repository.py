@@ -1286,6 +1286,50 @@ class ChartOfAccountsRepository:
                 f"{unsuitable}"
             )
 
+        unsuitable_customer_credit_accounts = {
+            account_number
+            for account_number in account_roles.customer_credit_balances
+            if (
+                self._session.query(Konto.account_type)
+                .filter(
+                    Konto.mandant_id == company_model.id,
+                    Konto.account_number == account_number,
+                )
+                .scalar()
+                != AccountType.LIABILITY.name
+            )
+        }
+        if unsuitable_customer_credit_accounts:
+            unsuitable = ", ".join(
+                sorted(unsuitable_customer_credit_accounts)
+            )
+            raise ValueError(
+                "Kundenguthabenkonten müssen Passivkonten sein: "
+                f"{unsuitable}"
+            )
+
+        unsuitable_supplier_credit_accounts = {
+            account_number
+            for account_number in account_roles.supplier_credit_balances
+            if (
+                self._session.query(Konto.account_type)
+                .filter(
+                    Konto.mandant_id == company_model.id,
+                    Konto.account_number == account_number,
+                )
+                .scalar()
+                != AccountType.ASSET.name
+            )
+        }
+        if unsuitable_supplier_credit_accounts:
+            unsuitable = ", ".join(
+                sorted(unsuitable_supplier_credit_accounts)
+            )
+            raise ValueError(
+                "Lieferantenguthabenkonten müssen Aktivkonten sein: "
+                f"{unsuitable}"
+            )
+
         (
             self._session.query(Kontenrolle)
             .filter(
@@ -1317,6 +1361,14 @@ class ChartOfAccountsRepository:
             (
                 "SUPPLIER_PAYABLES",
                 account_roles.supplier_payables,
+            ),
+            (
+                "CUSTOMER_CREDIT_BALANCES",
+                account_roles.customer_credit_balances,
+            ),
+            (
+                "SUPPLIER_CREDIT_BALANCES",
+                account_roles.supplier_credit_balances,
             ),
         )
 
@@ -1436,12 +1488,26 @@ class ChartOfAccountsRepository:
             if model.role == "SUPPLIER_PAYABLES"
         )
 
+        customer_credit_balances = frozenset(
+            model.account_number
+            for model in models
+            if model.role == "CUSTOMER_CREDIT_BALANCES"
+        )
+
+        supplier_credit_balances = frozenset(
+            model.account_number
+            for model in models
+            if model.role == "SUPPLIER_CREDIT_BALANCES"
+        )
+
         known_roles = {
             "CASH",
             "BANK",
             "GENERAL_RATE_SALES",
             "CUSTOMER_RECEIVABLES",
             "SUPPLIER_PAYABLES",
+            "CUSTOMER_CREDIT_BALANCES",
+            "SUPPLIER_CREDIT_BALANCES",
         }
 
         unknown_roles = {
@@ -1468,6 +1534,8 @@ class ChartOfAccountsRepository:
             ),
             customer_receivables=customer_receivables,
             supplier_payables=supplier_payables,
+            customer_credit_balances=customer_credit_balances,
+            supplier_credit_balances=supplier_credit_balances,
         )
 
     def validate_customer_receivable_account(
@@ -1529,6 +1597,57 @@ class ChartOfAccountsRepository:
             raise ValueError(
                 "Das Verbindlichkeitskonto muss ein Passivkonto sein."
             )
+
+    def validate_customer_credit_balance_account(
+        self,
+        *,
+        company_id: UUID,
+        account_number: str,
+    ) -> None:
+        self._validate_credit_balance_account(
+            company_id=company_id,
+            account_number=account_number,
+            account_type=AccountType.LIABILITY,
+            label="Kundenguthabenkonto",
+        )
+
+    def validate_supplier_credit_balance_account(
+        self,
+        *,
+        company_id: UUID,
+        account_number: str,
+    ) -> None:
+        self._validate_credit_balance_account(
+            company_id=company_id,
+            account_number=account_number,
+            account_type=AccountType.ASSET,
+            label="Lieferantenguthabenkonto",
+        )
+
+    def _validate_credit_balance_account(
+        self,
+        *,
+        company_id: UUID,
+        account_number: str,
+        account_type: AccountType,
+        label: str,
+    ) -> None:
+        company_model = self._find_company(company_id)
+        if company_model is None:
+            raise ValueError("Das Unternehmen ist nicht vorhanden.")
+        account = (
+            self._session.query(Konto)
+            .filter(
+                Konto.mandant_id == company_model.id,
+                Konto.account_number == account_number,
+            )
+            .one_or_none()
+        )
+        if account is None or not account.is_active:
+            raise ValueError(f"Das {label} ist nicht vorhanden oder nicht aktiv.")
+        if account.account_type != account_type.name:
+            account_kind = "Passivkonto" if account_type is AccountType.LIABILITY else "Aktivkonto"
+            raise ValueError(f"Das {label} muss ein {account_kind} sein.")
 
     def lock_company(
         self,

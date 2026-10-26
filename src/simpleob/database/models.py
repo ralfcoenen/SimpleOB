@@ -675,6 +675,95 @@ class VerbindlichkeitsOP(Base):
     )
     amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
 
+
+class Gutschrift(Base):
+    """Gebuchte Kunden- oder Lieferantengutschrift."""
+
+    __tablename__ = "gutschriften"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["mandant_id", "partner_id"],
+            ["geschaeftspartner.mandant_id", "geschaeftspartner.partner_id"],
+            name="fk_gutschrift_mandant_partner",
+        ),
+        CheckConstraint(
+            "credit_note_kind IN ('CUSTOMER', 'SUPPLIER')",
+            name="ck_gutschrift_art",
+        ),
+        CheckConstraint(
+            "NOT (original_receivable_invoice_id IS NOT NULL "
+            "AND original_payable_invoice_id IS NOT NULL)",
+            name="ck_gutschrift_nur_ein_rechnungsbezug",
+        ),
+        CheckConstraint(
+            "(credit_note_kind = 'CUSTOMER' AND original_payable_invoice_id IS NULL) "
+            "OR (credit_note_kind = 'SUPPLIER' AND original_receivable_invoice_id IS NULL)",
+            name="ck_gutschrift_rechnungsbezug_art",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    credit_note_id: Mapped[str] = mapped_column(
+        String(36), unique=True, nullable=False
+    )
+    mandant_id: Mapped[int] = mapped_column(
+        ForeignKey("mandanten.id"), nullable=False
+    )
+    partner_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    credit_note_kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    note_number: Mapped[str] = mapped_column(String, nullable=False)
+    note_date: Mapped[date] = mapped_column(Date, nullable=False)
+    original_receivable_invoice_id: Mapped[str | None] = mapped_column(
+        ForeignKey("ausgangsrechnungen.invoice_id"), nullable=True
+    )
+    original_payable_invoice_id: Mapped[str | None] = mapped_column(
+        ForeignKey("eingangsrechnungen.invoice_id"), nullable=True
+    )
+    booking_id: Mapped[str] = mapped_column(
+        ForeignKey("buchungen.booking_id"), unique=True, nullable=False
+    )
+    duplicate_reason: Mapped[str | None] = mapped_column(String, nullable=True)
+
+
+class GuthabenOP(Base):
+    """Unveränderlicher Ursprungsbetrag eines Gutschriftenguthabens."""
+
+    __tablename__ = "guthaben_ops"
+    __table_args__ = (
+        CheckConstraint("amount > 0", name="ck_guthaben_op_betrag_positiv"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    open_item_id: Mapped[str] = mapped_column(
+        String(36), unique=True, nullable=False
+    )
+    credit_note_id: Mapped[str] = mapped_column(
+        ForeignKey("gutschriften.credit_note_id"), unique=True, nullable=False
+    )
+    amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
+
+
+class GuthabenOPEreignis(Base):
+    """Unveränderliche Betragsänderung eines Guthaben-OPs."""
+
+    __tablename__ = "guthaben_op_ereignisse"
+    __table_args__ = (
+        CheckConstraint(
+            "amount_delta != 0",
+            name="ck_guthaben_op_ereignis_betrag_ungleich_null",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    event_id: Mapped[str] = mapped_column(String(36), unique=True, nullable=False)
+    open_item_id: Mapped[str] = mapped_column(
+        ForeignKey("guthaben_ops.open_item_id"), nullable=False
+    )
+    effective_date: Mapped[date] = mapped_column(Date, nullable=False)
+    amount_delta: Mapped[Decimal] = mapped_column(
+        Numeric(18, 2), nullable=False
+    )
+
 class Gesellschafter(Base):
     """Persistierter Gesellschafter."""
 
