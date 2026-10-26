@@ -57,6 +57,9 @@ from simpleob.database.migration_service import (
 from simpleob.database.open_item_offset_repository import OpenItemOffsetRepository
 from simpleob.database.open_item_payment_repository import OpenItemPaymentRepository
 from simpleob.database.payable_invoice_repository import PayableInvoiceRepository
+from simpleob.database.payment_allocation_correction_repository import (
+    PaymentAllocationCorrectionRepository,
+)
 from simpleob.database.profit_appropriation_annual_data_repository import (
     ProfitAppropriationAnnualDataRepository,
 )
@@ -127,6 +130,9 @@ from simpleob.services.open_item_offset_service import OpenItemOffsetService
 from simpleob.services.open_item_payment_service import OpenItemPaymentService
 from simpleob.services.payable_invoice_posting_service import (
     PayableInvoicePostingService,
+)
+from simpleob.services.payment_allocation_correction_service import (
+    PaymentAllocationCorrectionService,
 )
 from simpleob.services.pdf_reporting_service import PdfReportingService
 from simpleob.services.posting_service import PostingService
@@ -514,6 +520,12 @@ def main() -> None:
         open_item_offset_service = OpenItemOffsetService(
             booking_repository=booking_repository,
             offset_repository=OpenItemOffsetRepository(session),
+        )
+        payment_allocation_correction_service = PaymentAllocationCorrectionService(
+            booking_repository=booking_repository,
+            correction_repository=PaymentAllocationCorrectionRepository(session),
+            offset_repository=OpenItemOffsetRepository(session),
+            payment_repository=OpenItemPaymentRepository(session),
         )
         posting_service = PostingService()
 
@@ -1026,6 +1038,7 @@ def main() -> None:
                 credit_note_posting_service=credit_note_posting_service,
                 open_item_payment_service=open_item_payment_service,
                 open_item_offset_service=open_item_offset_service,
+                payment_allocation_correction_service=payment_allocation_correction_service,
                 eric_certificate_path=(
                     config.eric_certificate_path
                 ),

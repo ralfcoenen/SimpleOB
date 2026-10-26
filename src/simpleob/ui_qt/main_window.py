@@ -82,6 +82,9 @@ from simpleob.services.opening_balance_service import OpeningBalanceService
 from simpleob.services.payable_invoice_posting_service import (
     PayableInvoicePostingService,
 )
+from simpleob.services.payment_allocation_correction_service import (
+    PaymentAllocationCorrectionService,
+)
 from simpleob.services.pdf_reporting_service import PdfReportingService
 from simpleob.services.receivable_invoice_posting_service import (
     ReceivableInvoicePostingService,
@@ -124,6 +127,9 @@ from simpleob.ui_qt.new_fixed_asset_dialog import NewFixedAssetDialog
 from simpleob.ui_qt.open_item_offset_dialog import OpenItemOffsetDialog
 from simpleob.ui_qt.open_item_payment_dialog import OpenItemPaymentDialog
 from simpleob.ui_qt.opening_balance_dialog import OpeningBalanceDialog
+from simpleob.ui_qt.payment_allocation_correction_dialog import (
+    PaymentAllocationCorrectionDialog,
+)
 from simpleob.ui_qt.profit_appropriation_dialog import (
     ProfitAppropriationDialog,
 )
@@ -178,6 +184,7 @@ class MainWindow(QMainWindow):
         credit_note_posting_service: CreditNotePostingService | None = None,
         open_item_payment_service: OpenItemPaymentService | None = None,
         open_item_offset_service: OpenItemOffsetService | None = None,
+        payment_allocation_correction_service: PaymentAllocationCorrectionService | None = None,
     ) -> None:
         super().__init__()
 
@@ -221,6 +228,7 @@ class MainWindow(QMainWindow):
         self._credit_note_posting_service = credit_note_posting_service
         self._open_item_payment_service = open_item_payment_service
         self._open_item_offset_service = open_item_offset_service
+        self._payment_allocation_correction_service = payment_allocation_correction_service
         self._eric_certificate_path = (
             Path(eric_certificate_path).expanduser()
             if eric_certificate_path is not None
@@ -1978,6 +1986,11 @@ class MainWindow(QMainWindow):
         self._offset_button.clicked.connect(self._open_offset_dialog)
         layout.addWidget(self._offset_button)
 
+        self._payment_correction_button = QPushButton("Zahlungszuordnung korrigieren…")
+        self._payment_correction_button.setEnabled(self._payment_allocation_correction_service is not None)
+        self._payment_correction_button.clicked.connect(self._open_payment_correction_dialog)
+        layout.addWidget(self._payment_correction_button)
+
         technical_account_numbers = {
             self._opening_balance_account_number,
             self._closing_accounts.income_summary_account,
@@ -2102,6 +2115,9 @@ class MainWindow(QMainWindow):
             and self._open_item_offset_service is not None
             and self._business_partner_repository is not None
         )
+        self._payment_correction_button.setEnabled(
+            enabled and self._payment_allocation_correction_service is not None
+        )
 
     def _open_payment_dialog(self) -> None:
         """Erfasst eine einzelne Zahlung auf einen offenen Rechnungs-OP."""
@@ -2133,6 +2149,20 @@ class MainWindow(QMainWindow):
             fiscal_year=self._context.fiscal_year,
             service=service,
             partner_repository=partner_repository,
+        )
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self._workspace.reload()
+            self._refresh_accounts()
+            self._refresh_journal()
+            self._refresh_balance_sheet()
+
+    def _open_payment_correction_dialog(self) -> None:
+        service = self._payment_allocation_correction_service
+        if service is None or self._workspace.is_closed:
+            return
+        dialog = PaymentAllocationCorrectionDialog(
+            self, company_id=self._context.company.company_id,
+            fiscal_year=self._context.fiscal_year, service=service,
         )
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self._workspace.reload()

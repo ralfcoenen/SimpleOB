@@ -925,6 +925,120 @@ class RechnungsOPZahlungsereignis(Base):
     amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
     effective_date: Mapped[date] = mapped_column(Date, nullable=False)
 
+
+class Zahlungszuordnungskorrektur(Base):
+    """Kopfdatensatz einer begründeten Zahlung-zu-Rechnung-Korrektur."""
+
+    __tablename__ = "zahlungszuordnungskorrekturen"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["mandant_id", "partner_id"],
+            ["geschaeftspartner.mandant_id", "geschaeftspartner.partner_id"],
+            name="fk_zahlungszuordnungskorrektur_mandant_partner",
+        ),
+        CheckConstraint(
+            "(direction = 'CUSTOMER_RECEIPT' AND source_receivable_open_item_id IS NOT NULL "
+            "AND source_payable_open_item_id IS NULL AND target_receivable_open_item_id IS NOT NULL "
+            "AND target_payable_open_item_id IS NULL) OR "
+            "(direction = 'SUPPLIER_PAYMENT' AND source_receivable_open_item_id IS NULL "
+            "AND source_payable_open_item_id IS NOT NULL AND target_receivable_open_item_id IS NULL "
+            "AND target_payable_open_item_id IS NOT NULL)",
+            name="ck_zahlungszuordnungskorrektur_richtung_ops",
+        ),
+        CheckConstraint(
+            "direction IN ('CUSTOMER_RECEIPT', 'SUPPLIER_PAYMENT')",
+            name="ck_zahlungszuordnungskorrektur_richtung",
+        ),
+        CheckConstraint("amount > 0", name="ck_zahlungszuordnungskorrektur_betrag_positiv"),
+        CheckConstraint("length(trim(reason)) > 0", name="ck_zahlungszuordnungskorrektur_begruendung"),
+        CheckConstraint(
+            "source_receivable_open_item_id IS NULL OR "
+            "source_receivable_open_item_id != target_receivable_open_item_id",
+            name="ck_zahlungszuordnungskorrektur_kundenziel_verschieden",
+        ),
+        CheckConstraint(
+            "source_payable_open_item_id IS NULL OR "
+            "source_payable_open_item_id != target_payable_open_item_id",
+            name="ck_zahlungszuordnungskorrektur_lieferantenziel_verschieden",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    correction_id: Mapped[str] = mapped_column(String(36), unique=True, nullable=False)
+    mandant_id: Mapped[int] = mapped_column(ForeignKey("mandanten.id"), nullable=False)
+    partner_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    direction: Mapped[str] = mapped_column(String(24), nullable=False)
+    original_payment_id: Mapped[str] = mapped_column(
+        ForeignKey("zahlungen.payment_id"), nullable=False
+    )
+    original_allocation_event_id: Mapped[str] = mapped_column(
+        ForeignKey("rechnungs_op_zahlungsereignisse.event_id"), index=True, nullable=False
+    )
+    source_receivable_open_item_id: Mapped[str | None] = mapped_column(
+        ForeignKey("forderungs_ops.open_item_id"), nullable=True
+    )
+    source_payable_open_item_id: Mapped[str | None] = mapped_column(
+        ForeignKey("verbindlichkeits_ops.open_item_id"), nullable=True
+    )
+    target_receivable_open_item_id: Mapped[str | None] = mapped_column(
+        ForeignKey("forderungs_ops.open_item_id"), nullable=True
+    )
+    target_payable_open_item_id: Mapped[str | None] = mapped_column(
+        ForeignKey("verbindlichkeits_ops.open_item_id"), nullable=True
+    )
+    amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
+    correction_date: Mapped[date] = mapped_column(Date, nullable=False)
+    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    reason: Mapped[str] = mapped_column(String, nullable=False)
+    booking_id: Mapped[str | None] = mapped_column(
+        ForeignKey("buchungen.booking_id"), unique=True, nullable=True
+    )
+
+
+class Zahlungszuordnungskorrekturereignis(Base):
+    """Unveränderliche Entlastungs- oder Belastungsbuchung einer Korrektur."""
+
+    __tablename__ = "zahlungszuordnungskorrekturereignisse"
+    __table_args__ = (
+        CheckConstraint(
+            "(direction = 'CUSTOMER_RECEIPT' AND receivable_open_item_id IS NOT NULL "
+            "AND payable_open_item_id IS NULL) OR "
+            "(direction = 'SUPPLIER_PAYMENT' AND receivable_open_item_id IS NULL "
+            "AND payable_open_item_id IS NOT NULL)",
+            name="ck_zahlungszuordnungskorrekturereignis_richtung_op",
+        ),
+        CheckConstraint(
+            "(event_role = 'SOURCE_RELEASE' AND amount_delta < 0) OR "
+            "(event_role = 'TARGET_APPLY' AND amount_delta > 0)",
+            name="ck_zahlungszuordnungskorrekturereignis_delta_richtung",
+        ),
+        CheckConstraint(
+            "event_role IN ('SOURCE_RELEASE', 'TARGET_APPLY')",
+            name="ck_zahlungszuordnungskorrekturereignis_rolle",
+        ),
+        CheckConstraint("amount_delta != 0", name="ck_zahlungszuordnungskorrekturereignis_delta_nicht_null"),
+        UniqueConstraint(
+            "correction_id", "event_role",
+            name="uq_zahlungszuordnungskorrekturereignis_korrektur_rolle",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    event_id: Mapped[str] = mapped_column(String(36), unique=True, nullable=False)
+    correction_id: Mapped[str] = mapped_column(
+        ForeignKey("zahlungszuordnungskorrekturen.correction_id"), nullable=False
+    )
+    event_role: Mapped[str] = mapped_column(String(20), nullable=False)
+    direction: Mapped[str] = mapped_column(String(24), nullable=False)
+    receivable_open_item_id: Mapped[str | None] = mapped_column(
+        ForeignKey("forderungs_ops.open_item_id"), index=True, nullable=True
+    )
+    payable_open_item_id: Mapped[str | None] = mapped_column(
+        ForeignKey("verbindlichkeits_ops.open_item_id"), index=True, nullable=True
+    )
+    amount_delta: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
+    effective_date: Mapped[date] = mapped_column(Date, nullable=False)
+
 class Gesellschafter(Base):
     """Persistierter Gesellschafter."""
 

@@ -17,6 +17,7 @@ from simpleob.database.models import (
     VerbindlichkeitsOP,
     Wirtschaftsjahr,
     Zahlung,
+    Zahlungszuordnungskorrekturereignis,
 )
 from simpleob.domain.fiscal_year import FiscalYear
 from simpleob.domain.money import ZERO
@@ -227,6 +228,12 @@ class OpenItemPaymentRepository:
                 )
                 .scalar()
             )
+            correction_delta = self._session.query(
+                func.sum(Zahlungszuordnungskorrekturereignis.amount_delta)
+            ).filter(
+                Zahlungszuordnungskorrekturereignis.receivable_open_item_id
+                == str(open_item_id)
+            ).scalar()
             original_amount = open_item.amount
             direction_label = PaymentDirection.CUSTOMER_RECEIPT
         else:
@@ -261,6 +268,12 @@ class OpenItemPaymentRepository:
                 )
                 .scalar()
             )
+            correction_delta = self._session.query(
+                func.sum(Zahlungszuordnungskorrekturereignis.amount_delta)
+            ).filter(
+                Zahlungszuordnungskorrekturereignis.payable_open_item_id
+                == str(open_item_id)
+            ).scalar()
             original_amount = open_item.amount
             direction_label = PaymentDirection.SUPPLIER_PAYMENT
 
@@ -290,7 +303,7 @@ class OpenItemPaymentRepository:
             raise ValueError("Der Geschäftspartner hat nicht die zum Rechnungs-OP passende Rolle.")
         open_amount = original_amount - (allocated or ZERO) - (
             offset_allocated or ZERO
-        )
+        ) - (correction_delta or ZERO)
         if open_amount < ZERO:
             raise ValueError(
                 "Zahlungs- und Verrechnungsereignisse überschreiten den "
