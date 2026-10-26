@@ -2216,6 +2216,9 @@ class MainWindow(QMainWindow):
         if self._workspace.is_closed:
             return
 
+        if not self._confirm_op_control_account_booking(booking):
+            return
+
         self._workspace.post_booking(
             booking,
             equity_contribution_line_positions=(
@@ -2231,6 +2234,74 @@ class MainWindow(QMainWindow):
         self._refresh_accounts()
         self._refresh_journal()
         self._refresh_balance_sheet()
+
+    def _confirm_op_control_account_booking(self, booking) -> bool:
+        """Bestätigt manuelle Buchungen auf konfigurierte OP-Sammelkonten."""
+
+        try:
+            _, _, account_roles = (
+                self._workspace.load_account_configuration()
+            )
+        except (RuntimeError, ValueError) as exc:
+            QMessageBox.critical(
+                self,
+                "Kontenkonfiguration",
+                str(exc),
+            )
+            return False
+
+        role_labels = (
+            ("Kundenforderungen", account_roles.customer_receivables),
+            ("Lieferantenverbindlichkeiten", account_roles.supplier_payables),
+            ("Kundenguthaben", account_roles.customer_credit_balances),
+            ("Lieferantenguthaben", account_roles.supplier_credit_balances),
+        )
+        affected_accounts: dict[str, set[str]] = {}
+        for line in booking.lines:
+            for role_label, account_numbers in role_labels:
+                if line.account_number in account_numbers:
+                    affected_accounts.setdefault(
+                        line.account_number,
+                        set(),
+                    ).add(role_label)
+
+        if not affected_accounts:
+            return True
+
+        if not booking.description or not booking.description.strip():
+            QMessageBox.warning(
+                self,
+                "Begründung erforderlich",
+                "Bitte tragen Sie im Buchungstext eine nachvollziehbare "
+                "Begründung für die manuelle Sammelkontobuchung ein.",
+            )
+            return False
+
+        affected_lines = "\n".join(
+            f"• {account_number}: {', '.join(sorted(role_names))}"
+            for account_number, role_names in affected_accounts.items()
+        )
+        message = (
+            "Die Buchung verwendet folgende konfigurierte OP-Sammelkonten:\n"
+            f"{affected_lines}\n\n"
+            "Diese Buchung wird ausschließlich im Hauptbuch gespeichert. "
+            "Sie erzeugt keine OP-Zuordnung und kann eine Differenz zur "
+            "OP-Nebenbuchführung verursachen. Die Bewegung erscheint in der "
+            "OP-Abstimmung als ungeklärt.\n\n"
+            "Der Buchungstext muss den Grund für die manuelle "
+            "Sammelkontobuchung nachvollziehbar beschreiben.\n"
+            f"Buchungstext (Begründung): {booking.description}\n\n"
+            "Soll die Buchung trotzdem übernommen werden?"
+        )
+        answer = QMessageBox.warning(
+            self,
+            "Manuelle Buchung auf OP-Sammelkonto",
+            message,
+            QMessageBox.StandardButton.Yes
+            | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        return answer == QMessageBox.StandardButton.Yes
 
     def _post_receivable_invoice(
         self,
