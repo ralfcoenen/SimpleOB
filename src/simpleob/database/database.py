@@ -1,6 +1,6 @@
 """Datenbankkonfiguration von OpenBilanz."""
 
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.orm import (
     Session,
     declarative_base,
@@ -11,12 +11,12 @@ from simpleob.core.config import (
     ApplicationConfig,
     load_config,
 )
-from simpleob.database.postgresql_maintenance_guard import (
-    install_postgresql_maintenance_guard,
-)
 from simpleob.database.connection_credentials import (
     PostgreSQLCredentials,
     database_connect_args,
+)
+from simpleob.database.postgresql_maintenance_guard import (
+    install_postgresql_maintenance_guard,
 )
 
 Base = declarative_base()
@@ -44,6 +44,11 @@ class Database:
                 credentials,
             ),
         )
+
+        if self._engine.dialect.name == "sqlite":
+            @event.listens_for(self._engine, "connect")
+            def _enable_sqlite_foreign_keys(connection, _record) -> None:
+                connection.execute("PRAGMA foreign_keys=ON")
 
         install_postgresql_maintenance_guard(
             self._engine

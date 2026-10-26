@@ -294,6 +294,10 @@ class AccountConfigurationDialog(QDialog):
                 ),
             )
         )
+        self._customer_receivables_list = self._create_role_list(
+            roles_layout,
+            title="Kundenforderungen",
+        )
 
     def _create_account_combobox(
         self,
@@ -442,6 +446,10 @@ class AccountConfigurationDialog(QDialog):
                 self._account_roles
                 .general_rate_sales_accounts
             ),
+        )
+        self._select_role_accounts(
+            self._customer_receivables_list,
+            self._account_roles.customer_receivables,
         )
 
     @staticmethod
@@ -597,6 +605,11 @@ class AccountConfigurationDialog(QDialog):
                 general_rate_sales_accounts=(
                     self._selected_account_numbers(
                         self._general_rate_sales_list
+                    )
+                ),
+                customer_receivables=(
+                    self._selected_account_numbers(
+                        self._customer_receivables_list
                     )
                 ),
             )

@@ -49,6 +49,7 @@ from simpleob.core.config import (
     save_eric_data_supplier,
 )
 from simpleob.core.context import ApplicationContext
+from simpleob.database.business_partner_repository import BusinessPartnerRepository
 from simpleob.database.lock_error import DatabaseLockError
 from simpleob.date_input import parse_german_date
 from simpleob.domain.account import Account
@@ -73,6 +74,9 @@ from simpleob.services.closing_service import (
 from simpleob.services.fiscal_year_workspace import FiscalYearWorkspace
 from simpleob.services.opening_balance_service import OpeningBalanceService
 from simpleob.services.pdf_reporting_service import PdfReportingService
+from simpleob.services.receivable_invoice_posting_service import (
+    ReceivableInvoicePostingService,
+)
 from simpleob.ui_qt.account_configuration_dialog import (
     AccountConfigurationDialog,
 )
@@ -157,6 +161,8 @@ class MainWindow(QMainWindow):
         eric_certificate_path: Path | None = None,
         eric_data_supplier: ElsterDataSupplier | None = None,
         application_config: ApplicationConfig | None = None,
+        business_partner_repository: BusinessPartnerRepository | None = None,
+        receivable_invoice_posting_service: ReceivableInvoicePostingService | None = None,
     ) -> None:
         super().__init__()
 
@@ -194,6 +200,8 @@ class MainWindow(QMainWindow):
             elster_bilanz_transmission_service
         )
         self._application_config = application_config
+        self._business_partner_repository = business_partner_repository
+        self._receivable_invoice_posting_service = receivable_invoice_posting_service
         self._eric_certificate_path = (
             Path(eric_certificate_path).expanduser()
             if eric_certificate_path is not None
@@ -2006,6 +2014,13 @@ class MainWindow(QMainWindow):
             accounts=vat_bookable_accounts,
             vat_accounts=self._vat_accounts,
             on_booking_created=self._post_booking,
+            company_id=self._context.company.company_id,
+            partner_repository=self._business_partner_repository,
+            on_receivable_invoice_created=(
+                self._post_receivable_invoice
+                if self._receivable_invoice_posting_service is not None
+                else None
+            ),
         )
 
         self._booking_frame_layout.addWidget(
@@ -2076,6 +2091,37 @@ class MainWindow(QMainWindow):
             ),
         )
 
+        self._refresh_accounts()
+        self._refresh_journal()
+        self._refresh_balance_sheet()
+
+    def _post_receivable_invoice(
+        self,
+        *,
+        partner_id: UUID,
+        invoice_number: str,
+        booking_date: date,
+        due_date: date,
+        items,
+        description: str | None,
+    ) -> None:
+        """Verbucht eine Ausgangsrechnung mit Forderungs-OP atomar."""
+        if self._workspace.is_closed:
+            raise ValueError("Das Geschäftsjahr ist abgeschlossen.")
+        if self._receivable_invoice_posting_service is None:
+            raise ValueError("Die OP-Verwaltung ist nicht verfügbar.")
+        self._receivable_invoice_posting_service.post_output_invoice_on_account(
+            company_id=self._context.company.company_id,
+            fiscal_year=self._context.fiscal_year,
+            partner_id=partner_id,
+            invoice_number=invoice_number,
+            booking_date=booking_date,
+            due_date=due_date,
+            items=items,
+            vat_accounts=self._vat_accounts,
+            description=description,
+        )
+        self._workspace.reload()
         self._refresh_accounts()
         self._refresh_journal()
         self._refresh_balance_sheet()

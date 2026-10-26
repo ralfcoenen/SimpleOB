@@ -31,6 +31,7 @@ from simpleob.core.eric_privacy_acknowledgement import (
 )
 from simpleob.core.product import ERIC_MANUFACTURER_ID
 from simpleob.database.booking_repository import BookingRepository
+from simpleob.database.business_partner_repository import BusinessPartnerRepository
 from simpleob.database.chart_of_accounts_repository import (
     ChartOfAccountsRepository,
 )
@@ -58,6 +59,7 @@ from simpleob.database.profit_appropriation_annual_data_repository import (
 from simpleob.database.profit_appropriation_posting_repository import (
     ProfitAppropriationPostingRepository,
 )
+from simpleob.database.receivable_invoice_repository import ReceivableInvoiceRepository
 from simpleob.database.shareholder_repository import ShareholderRepository
 from simpleob.database.tax_depreciation_adjustment_repository import (
     TaxDepreciationAdjustmentRepository,
@@ -124,6 +126,9 @@ from simpleob.services.profit_appropriation_posting_service import (
 )
 from simpleob.services.profit_appropriation_posting_workflow import (
     ProfitAppropriationPostingWorkflow,
+)
+from simpleob.services.receivable_invoice_posting_service import (
+    ReceivableInvoicePostingService,
 )
 from simpleob.services.reporting_service import ReportingService
 from simpleob.services.taxonomy_management_service import (
@@ -467,6 +472,14 @@ def main() -> None:
         )
 
         booking_repository = BookingRepository(session)
+        business_partner_repository = BusinessPartnerRepository(session)
+        receivable_invoice_repository = ReceivableInvoiceRepository(session)
+        receivable_invoice_posting_service = ReceivableInvoicePostingService(
+            booking_repository=booking_repository,
+            partner_repository=business_partner_repository,
+            invoice_repository=receivable_invoice_repository,
+            chart_of_accounts_repository=chart_of_accounts_repository,
+        )
         posting_service = PostingService()
 
         fixed_asset_repository = FixedAssetRepository(session)
@@ -972,6 +985,8 @@ def main() -> None:
                     elster_bilanz_transmission_service
                 ),
                 application_config=config,
+                business_partner_repository=business_partner_repository,
+                receivable_invoice_posting_service=receivable_invoice_posting_service,
                 eric_certificate_path=(
                     config.eric_certificate_path
                 ),

@@ -4,8 +4,10 @@ from decimal import Decimal
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Date,
     ForeignKey,
+    ForeignKeyConstraint,
     Integer,
     Numeric,
     String,
@@ -524,6 +526,96 @@ class Buchungszeile(Base):
 
     buchung: Mapped[Buchung] = relationship(
         back_populates="zeilen",
+    )
+
+
+class Geschaeftspartner(Base):
+    """Mandantenbezogener Debitor oder Kreditor."""
+
+    __tablename__ = "geschaeftspartner"
+    __table_args__ = (
+        CheckConstraint(
+            "is_customer OR is_supplier",
+            name="ck_geschaeftspartner_mindestens_eine_rolle",
+        ),
+        UniqueConstraint(
+            "mandant_id",
+            "partner_id",
+            name="uq_geschaeftspartner_mandant_partner",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    partner_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    mandant_id: Mapped[int] = mapped_column(
+        ForeignKey("mandanten.id"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    is_customer: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    is_supplier: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False)
+
+
+class Ausgangsrechnung(Base):
+    """Gebuchte Ausgangsrechnung mit eindeutigem Hauptbuchbezug."""
+
+    __tablename__ = "ausgangsrechnungen"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["mandant_id", "partner_id"],
+            ["geschaeftspartner.mandant_id", "geschaeftspartner.partner_id"],
+            name="fk_ausgangsrechnung_mandant_partner",
+        ),
+        UniqueConstraint(
+            "mandant_id",
+            "invoice_number",
+            name="uq_ausgangsrechnung_mandant_nummer",
+        ),
+        CheckConstraint(
+            "gross_amount > 0",
+            name="ck_ausgangsrechnung_betrag_positiv",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    invoice_id: Mapped[str] = mapped_column(
+        String(36), unique=True, nullable=False
+    )
+    mandant_id: Mapped[int] = mapped_column(
+        ForeignKey("mandanten.id"), nullable=False
+    )
+    partner_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    invoice_number: Mapped[str] = mapped_column(String, nullable=False)
+    invoice_date: Mapped[date] = mapped_column(Date, nullable=False)
+    due_date: Mapped[date] = mapped_column(Date, nullable=False)
+    gross_amount: Mapped[Decimal] = mapped_column(
+        Numeric(18, 2), nullable=False
+    )
+    booking_id: Mapped[str] = mapped_column(
+        ForeignKey("buchungen.booking_id"), unique=True, nullable=False
+    )
+
+
+class ForderungsOP(Base):
+    """Unveränderlicher Ursprungsbetrag eines Forderungs-OPs."""
+
+    __tablename__ = "forderungs_ops"
+    __table_args__ = (
+        CheckConstraint(
+            "amount > 0",
+            name="ck_forderungs_op_betrag_positiv",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    open_item_id: Mapped[str] = mapped_column(
+        String(36), unique=True, nullable=False
+    )
+    invoice_id: Mapped[str] = mapped_column(
+        ForeignKey("ausgangsrechnungen.invoice_id"), unique=True, nullable=False
+    )
+    amount: Mapped[Decimal] = mapped_column(
+        Numeric(18, 2), nullable=False
     )
 
 class Gesellschafter(Base):

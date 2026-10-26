@@ -43,6 +43,7 @@ class AccountingAccountRoles:
     cash_accounts: frozenset[str]
     bank_accounts: frozenset[str]
     general_rate_sales_accounts: frozenset[str]
+    customer_receivables: frozenset[str] = frozenset()
 
     def __post_init__(self) -> None:
         _validate_account_numbers(
@@ -57,11 +58,21 @@ class AccountingAccountRoles:
             field_name="general_rate_sales_accounts",
             account_numbers=self.general_rate_sales_accounts,
         )
+        _validate_account_numbers(
+            field_name="customer_receivables",
+            account_numbers=self.customer_receivables,
+        )
+        if len(self.customer_receivables) > 1:
+            raise ValueError(
+                "Es darf höchstens ein Kundenforderungskonto "
+                "konfiguriert sein."
+            )
 
         role_sets = (
             self.cash_accounts,
             self.bank_accounts,
             self.general_rate_sales_accounts,
+            self.customer_receivables,
         )
 
         for index, account_numbers in enumerate(role_sets):
@@ -90,4 +101,5 @@ class AccountingAccountRoles:
             self.cash_accounts,
             self.bank_accounts,
             self.general_rate_sales_accounts,
+            self.customer_receivables,
         )

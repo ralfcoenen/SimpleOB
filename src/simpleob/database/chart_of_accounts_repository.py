@@ -2,15 +2,14 @@
 
 from uuid import UUID
 
-from sqlalchemy.orm import Session
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
-
-from simpleob.database.lock_error import DatabaseLockError
+from sqlalchemy.orm import Session
 
 from simpleob.accounting.financial_statement_position_provider import (
     FinancialStatementPositionProvider,
 )
+from simpleob.database.lock_error import DatabaseLockError
 from simpleob.database.models import (
     KontenrahmenKonfiguration,
     Kontenrolle,
@@ -1245,6 +1244,28 @@ class ChartOfAccountsRepository:
                 f"{missing}"
             )
 
+        unsuitable_receivable_accounts = {
+            account_number
+            for account_number in account_roles.customer_receivables
+            if (
+                self._session.query(Konto.account_type)
+                .filter(
+                    Konto.mandant_id == company_model.id,
+                    Konto.account_number == account_number,
+                )
+                .scalar()
+                != AccountType.ASSET.name
+            )
+        }
+        if unsuitable_receivable_accounts:
+            unsuitable = ", ".join(
+                sorted(unsuitable_receivable_accounts)
+            )
+            raise ValueError(
+                "Kundenforderungskonten müssen Aktivkonten sein: "
+                f"{unsuitable}"
+            )
+
         (
             self._session.query(Kontenrolle)
             .filter(
@@ -1268,6 +1289,10 @@ class ChartOfAccountsRepository:
             (
                 "GENERAL_RATE_SALES",
                 account_roles.general_rate_sales_accounts,
+            ),
+            (
+                "CUSTOMER_RECEIVABLES",
+                account_roles.customer_receivables,
             ),
         )
 
@@ -1375,10 +1400,17 @@ class ChartOfAccountsRepository:
             if model.role == "GENERAL_RATE_SALES"
         )
 
+        customer_receivables = frozenset(
+            model.account_number
+            for model in models
+            if model.role == "CUSTOMER_RECEIVABLES"
+        )
+
         known_roles = {
             "CASH",
             "BANK",
             "GENERAL_RATE_SALES",
+            "CUSTOMER_RECEIVABLES",
         }
 
         unknown_roles = {
@@ -1403,7 +1435,38 @@ class ChartOfAccountsRepository:
             general_rate_sales_accounts=(
                 general_rate_sales_accounts
             ),
+            customer_receivables=customer_receivables,
         )
+
+    def validate_customer_receivable_account(
+        self,
+        *,
+        company_id: UUID,
+        account_number: str,
+    ) -> None:
+        """Prüft das konfigurierte, aktive Debitoren-Sammelkonto."""
+
+        company_model = self._find_company(company_id)
+        if company_model is None:
+            raise ValueError("Das Unternehmen ist nicht vorhanden.")
+
+        account = (
+            self._session.query(Konto)
+            .filter(
+                Konto.mandant_id == company_model.id,
+                Konto.account_number == account_number,
+            )
+            .one_or_none()
+        )
+        if account is None or not account.is_active:
+            raise ValueError(
+                "Das konfigurierte Forderungskonto ist nicht vorhanden "
+                "oder nicht aktiv."
+            )
+        if account.account_type != AccountType.ASSET.name:
+            raise ValueError(
+                "Das Forderungskonto muss ein Aktivkonto sein."
+            )
 
     def lock_company(
         self,

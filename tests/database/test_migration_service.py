@@ -16,9 +16,8 @@ from simpleob.database.migration_service import (
     PostgreSQLSchemaStatus,
 )
 
-
 BASELINE_REVISION = "7392d6cc6892"
-HEAD_REVISION = "3d5f3f742f56"
+HEAD_REVISION = "4ad7f6e0c31b"
 
 
 def _application_config(
