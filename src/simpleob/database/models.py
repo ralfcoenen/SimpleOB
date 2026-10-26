@@ -753,6 +753,10 @@ class GuthabenOPEreignis(Base):
             "amount_delta != 0",
             name="ck_guthaben_op_ereignis_betrag_ungleich_null",
         ),
+        UniqueConstraint(
+            "settlement_id",
+            name="uq_guthaben_op_ereignisse_settlement",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -764,6 +768,91 @@ class GuthabenOPEreignis(Base):
     amount_delta: Mapped[Decimal] = mapped_column(
         Numeric(18, 2), nullable=False
     )
+    settlement_id: Mapped[str | None] = mapped_column(
+        ForeignKey("op_guthabenverrechnungen.settlement_id"), nullable=True
+    )
+
+
+class OPGuthabenverrechnung(Base):
+    """Gemeinsamer Vorgang für die Verrechnung zweier OPs."""
+
+    __tablename__ = "op_guthabenverrechnungen"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["mandant_id", "partner_id"],
+            ["geschaeftspartner.mandant_id", "geschaeftspartner.partner_id"],
+            name="fk_op_verrechnung_mandant_partner",
+        ),
+        CheckConstraint(
+            "(direction = 'CUSTOMER' AND receivable_open_item_id IS NOT NULL "
+            "AND payable_open_item_id IS NULL) OR "
+            "(direction = 'SUPPLIER' AND receivable_open_item_id IS NULL "
+            "AND payable_open_item_id IS NOT NULL)",
+            name="ck_op_verrechnung_richtung_rechnungs_op",
+        ),
+        CheckConstraint(
+            "direction IN ('CUSTOMER', 'SUPPLIER')",
+            name="ck_op_verrechnung_richtung",
+        ),
+        CheckConstraint("amount > 0", name="ck_op_verrechnung_betrag_positiv"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    settlement_id: Mapped[str] = mapped_column(String(36), unique=True, nullable=False)
+    mandant_id: Mapped[int] = mapped_column(
+        ForeignKey("mandanten.id"), nullable=False
+    )
+    partner_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    direction: Mapped[str] = mapped_column(String(16), nullable=False)
+    receivable_open_item_id: Mapped[str | None] = mapped_column(
+        ForeignKey("forderungs_ops.open_item_id"), nullable=True
+    )
+    payable_open_item_id: Mapped[str | None] = mapped_column(
+        ForeignKey("verbindlichkeits_ops.open_item_id"), nullable=True
+    )
+    credit_open_item_id: Mapped[str] = mapped_column(
+        ForeignKey("guthaben_ops.open_item_id"), nullable=False
+    )
+    amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
+    settlement_date: Mapped[date] = mapped_column(Date, nullable=False)
+    recorded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    booking_id: Mapped[str] = mapped_column(
+        ForeignKey("buchungen.booking_id"), unique=True, nullable=False
+    )
+
+
+class RechnungsOPVerrechnungsereignis(Base):
+    """Unveränderliches Verrechnungsereignis auf der Rechnungsseite."""
+
+    __tablename__ = "rechnungs_op_verrechnungsereignisse"
+    __table_args__ = (
+        CheckConstraint(
+            "(direction = 'CUSTOMER' AND receivable_open_item_id IS NOT NULL "
+            "AND payable_open_item_id IS NULL) OR "
+            "(direction = 'SUPPLIER' AND receivable_open_item_id IS NULL "
+            "AND payable_open_item_id IS NOT NULL)",
+            name="ck_rechnungs_op_verrechnung_richtung_op",
+        ),
+        CheckConstraint("amount > 0", name="ck_rechnungs_op_verrechnung_betrag_positiv"),
+        UniqueConstraint("settlement_id", name="uq_rechnungs_op_verrechnung_settlement"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    event_id: Mapped[str] = mapped_column(String(36), unique=True, nullable=False)
+    settlement_id: Mapped[str] = mapped_column(
+        ForeignKey("op_guthabenverrechnungen.settlement_id"), nullable=False
+    )
+    direction: Mapped[str] = mapped_column(String(16), nullable=False)
+    receivable_open_item_id: Mapped[str | None] = mapped_column(
+        ForeignKey("forderungs_ops.open_item_id"), nullable=True
+    )
+    payable_open_item_id: Mapped[str | None] = mapped_column(
+        ForeignKey("verbindlichkeits_ops.open_item_id"), nullable=True
+    )
+    amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
+    effective_date: Mapped[date] = mapped_column(Date, nullable=False)
 
 
 class Zahlung(Base):

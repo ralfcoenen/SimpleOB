@@ -12,6 +12,7 @@ from simpleob.database.models import (
     ForderungsOP,
     Geschaeftspartner,
     Mandant,
+    RechnungsOPVerrechnungsereignis,
     RechnungsOPZahlungsereignis,
     VerbindlichkeitsOP,
     Wirtschaftsjahr,
@@ -216,6 +217,16 @@ class OpenItemPaymentRepository:
                 )
                 .scalar()
             )
+            offset_allocated = (
+                self._session.query(
+                    func.sum(RechnungsOPVerrechnungsereignis.amount)
+                )
+                .filter(
+                    RechnungsOPVerrechnungsereignis.receivable_open_item_id
+                    == str(open_item_id)
+                )
+                .scalar()
+            )
             original_amount = open_item.amount
             direction_label = PaymentDirection.CUSTOMER_RECEIPT
         else:
@@ -236,6 +247,16 @@ class OpenItemPaymentRepository:
                 self._session.query(func.sum(RechnungsOPZahlungsereignis.amount))
                 .filter(
                     RechnungsOPZahlungsereignis.payable_open_item_id
+                    == str(open_item_id)
+                )
+                .scalar()
+            )
+            offset_allocated = (
+                self._session.query(
+                    func.sum(RechnungsOPVerrechnungsereignis.amount)
+                )
+                .filter(
+                    RechnungsOPVerrechnungsereignis.payable_open_item_id
                     == str(open_item_id)
                 )
                 .scalar()
@@ -267,9 +288,14 @@ class OpenItemPaymentRepository:
         )
         if not partner_role:
             raise ValueError("Der Geschäftspartner hat nicht die zum Rechnungs-OP passende Rolle.")
-        open_amount = original_amount - (allocated or ZERO)
+        open_amount = original_amount - (allocated or ZERO) - (
+            offset_allocated or ZERO
+        )
         if open_amount < ZERO:
-            raise ValueError("Die Zahlungsereignisse überschreiten den Ursprungsbetrag des Rechnungs-OPs.")
+            raise ValueError(
+                "Zahlungs- und Verrechnungsereignisse überschreiten den "
+                "Ursprungsbetrag des Rechnungs-OPs."
+            )
         return OpenInvoiceSummary(
             company_id=company_id,
             partner_id=UUID(invoice.partner_id),

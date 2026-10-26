@@ -76,6 +76,7 @@ from simpleob.services.credit_note_posting_service import (
     CreditNotePostingService,
 )
 from simpleob.services.fiscal_year_workspace import FiscalYearWorkspace
+from simpleob.services.open_item_offset_service import OpenItemOffsetService
 from simpleob.services.open_item_payment_service import OpenItemPaymentService
 from simpleob.services.opening_balance_service import OpeningBalanceService
 from simpleob.services.payable_invoice_posting_service import (
@@ -120,6 +121,7 @@ from simpleob.ui_qt.income_statement_frame import (
     IncomeStatementFrame,
 )
 from simpleob.ui_qt.new_fixed_asset_dialog import NewFixedAssetDialog
+from simpleob.ui_qt.open_item_offset_dialog import OpenItemOffsetDialog
 from simpleob.ui_qt.open_item_payment_dialog import OpenItemPaymentDialog
 from simpleob.ui_qt.opening_balance_dialog import OpeningBalanceDialog
 from simpleob.ui_qt.profit_appropriation_dialog import (
@@ -175,6 +177,7 @@ class MainWindow(QMainWindow):
         payable_invoice_posting_service: PayableInvoicePostingService | None = None,
         credit_note_posting_service: CreditNotePostingService | None = None,
         open_item_payment_service: OpenItemPaymentService | None = None,
+        open_item_offset_service: OpenItemOffsetService | None = None,
     ) -> None:
         super().__init__()
 
@@ -217,6 +220,7 @@ class MainWindow(QMainWindow):
         self._payable_invoice_posting_service = payable_invoice_posting_service
         self._credit_note_posting_service = credit_note_posting_service
         self._open_item_payment_service = open_item_payment_service
+        self._open_item_offset_service = open_item_offset_service
         self._eric_certificate_path = (
             Path(eric_certificate_path).expanduser()
             if eric_certificate_path is not None
@@ -1966,6 +1970,14 @@ class MainWindow(QMainWindow):
         self._payment_button.clicked.connect(self._open_payment_dialog)
         layout.addWidget(self._payment_button)
 
+        self._offset_button = QPushButton("Guthaben mit Rechnung verrechnen…")
+        self._offset_button.setEnabled(
+            self._open_item_offset_service is not None
+            and self._business_partner_repository is not None
+        )
+        self._offset_button.clicked.connect(self._open_offset_dialog)
+        layout.addWidget(self._offset_button)
+
         technical_account_numbers = {
             self._opening_balance_account_number,
             self._closing_accounts.income_summary_account,
@@ -2085,6 +2097,11 @@ class MainWindow(QMainWindow):
         self._payment_button.setEnabled(
             enabled and self._open_item_payment_service is not None
         )
+        self._offset_button.setEnabled(
+            enabled
+            and self._open_item_offset_service is not None
+            and self._business_partner_repository is not None
+        )
 
     def _open_payment_dialog(self) -> None:
         """Erfasst eine einzelne Zahlung auf einen offenen Rechnungs-OP."""
@@ -2097,6 +2114,25 @@ class MainWindow(QMainWindow):
             fiscal_year=self._context.fiscal_year,
             service=service,
             accounts=self._accounts,
+        )
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self._workspace.reload()
+            self._refresh_accounts()
+            self._refresh_journal()
+            self._refresh_balance_sheet()
+
+    def _open_offset_dialog(self) -> None:
+        """Erfasst eine manuelle Verrechnung zweier offener Posten."""
+        service = self._open_item_offset_service
+        partner_repository = self._business_partner_repository
+        if service is None or partner_repository is None or self._workspace.is_closed:
+            return
+        dialog = OpenItemOffsetDialog(
+            self,
+            company_id=self._context.company.company_id,
+            fiscal_year=self._context.fiscal_year,
+            service=service,
+            partner_repository=partner_repository,
         )
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self._workspace.reload()

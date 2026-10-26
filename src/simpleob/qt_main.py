@@ -54,6 +54,7 @@ from simpleob.database.fixed_asset_repository import FixedAssetRepository
 from simpleob.database.migration_service import (
     DatabaseMigrationService,
 )
+from simpleob.database.open_item_offset_repository import OpenItemOffsetRepository
 from simpleob.database.open_item_payment_repository import OpenItemPaymentRepository
 from simpleob.database.payable_invoice_repository import PayableInvoiceRepository
 from simpleob.database.profit_appropriation_annual_data_repository import (
@@ -122,6 +123,7 @@ from simpleob.services.fixed_asset_disposal_workflow import (
 from simpleob.services.fixed_asset_schedule_service import (
     FixedAssetScheduleService,
 )
+from simpleob.services.open_item_offset_service import OpenItemOffsetService
 from simpleob.services.open_item_payment_service import OpenItemPaymentService
 from simpleob.services.payable_invoice_posting_service import (
     PayableInvoicePostingService,
@@ -508,6 +510,10 @@ def main() -> None:
             booking_repository=booking_repository,
             payment_repository=OpenItemPaymentRepository(session),
             chart_of_accounts_repository=chart_of_accounts_repository,
+        )
+        open_item_offset_service = OpenItemOffsetService(
+            booking_repository=booking_repository,
+            offset_repository=OpenItemOffsetRepository(session),
         )
         posting_service = PostingService()
 
@@ -1019,6 +1025,7 @@ def main() -> None:
                 payable_invoice_posting_service=payable_invoice_posting_service,
                 credit_note_posting_service=credit_note_posting_service,
                 open_item_payment_service=open_item_payment_service,
+                open_item_offset_service=open_item_offset_service,
                 eric_certificate_path=(
                     config.eric_certificate_path
                 ),
