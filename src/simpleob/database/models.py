@@ -824,7 +824,7 @@ class RechnungsOPZahlungsereignis(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     event_id: Mapped[str] = mapped_column(String(36), unique=True, nullable=False)
     payment_id: Mapped[str] = mapped_column(
-        ForeignKey("zahlungen.payment_id"), unique=True, nullable=False
+        ForeignKey("zahlungen.payment_id"), index=True, nullable=False
     )
     direction: Mapped[str] = mapped_column(String(24), nullable=False)
     receivable_open_item_id: Mapped[str | None] = mapped_column(

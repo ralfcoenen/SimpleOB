@@ -176,6 +176,25 @@ def _pay(session, service, company, partner, invoice, direction, amount):
     )
 
 
+def _pay_allocations(
+    service, company, partner, direction, amount, allocations
+):
+    return service.post_payment_allocations(
+        company_id=company.company_id,
+        fiscal_year=FY,
+        partner_id=partner.partner_id,
+        direction=direction,
+        amount=Decimal(amount),
+        allocations=tuple(
+            (open_item_id, Decimal(allocation))
+            for open_item_id, allocation in allocations
+        ),
+        payment_date=date(2026, 4, 15),
+        booking_date=date(2026, 4, 16),
+        cash_bank_account_number="1000",
+    )
+
+
 def test_full_customer_receipt_posts_one_booking_and_closes_receivable():
     engine, session, company, partner, receivable, _, payments = _environment()
     try:
@@ -244,6 +263,177 @@ def test_several_partial_payments_calculate_remaining_open_amount():
         engine.dispose()
 
 
+def test_customer_collection_allocates_one_payment_to_multiple_invoices():
+    engine, session, company, partner, receivable, _, payments = _environment()
+    try:
+        first_invoice = _create_receivable(receivable, company, partner, "AR-1")
+        second_invoice = _create_receivable(receivable, company, partner, "AR-2")
+        first_open_item = _open_item_id(session, first_invoice)
+        second_open_item = _open_item_id(session, second_invoice)
+
+        payment = _pay_allocations(
+            payments,
+            company,
+            partner,
+            PaymentDirection.CUSTOMER_RECEIPT,
+            "149.00",
+            ((first_open_item, "119.00"), (second_open_item, "30.00")),
+        )
+
+        events = session.query(RechnungsOPZahlungsereignis).all()
+        booking = session.query(Buchung).filter_by(
+            booking_id=str(payment.booking_id)
+        ).one()
+        control_lines = [line for line in booking.zeilen if line.account_number == "1200"]
+        cash_lines = [line for line in booking.zeilen if line.account_number == "1000"]
+        assert session.query(Buchung).count() == 3
+        assert session.query(Zahlung).count() == 1
+        assert len(events) == 2
+        assert {event.payment_id for event in events} == {str(payment.payment_id)}
+        assert {event.receivable_open_item_id for event in events} == {
+            str(first_open_item),
+            str(second_open_item),
+        }
+        assert len(control_lines) == 2
+        assert all(line.side == EntrySide.CREDIT.value for line in control_lines)
+        assert sum((line.amount for line in control_lines), start=ZERO) == payment.amount
+        assert len(cash_lines) == 1
+        assert cash_lines[0].side == EntrySide.DEBIT.value
+        assert cash_lines[0].amount == payment.amount
+        assert payments._payment_repository.get_open_invoice(
+            company_id=company.company_id,
+            open_item_id=first_open_item,
+            direction=PaymentDirection.CUSTOMER_RECEIPT,
+        ).open_amount == ZERO
+        assert payments._payment_repository.get_open_invoice(
+            company_id=company.company_id,
+            open_item_id=second_open_item,
+            direction=PaymentDirection.CUSTOMER_RECEIPT,
+        ).open_amount == Decimal("89.00")
+    finally:
+        session.close()
+        engine.dispose()
+
+
+def test_supplier_payment_allocates_one_payment_to_multiple_invoices():
+    engine, session, company, partner, _, payable, payments = _environment()
+    try:
+        first_invoice = _create_payable(payable, company, partner, "AP-1")
+        second_invoice = _create_payable(payable, company, partner, "AP-2")
+        first_open_item = _open_item_id(session, first_invoice)
+        second_open_item = _open_item_id(session, second_invoice)
+
+        payment = _pay_allocations(
+            payments,
+            company,
+            partner,
+            PaymentDirection.SUPPLIER_PAYMENT,
+            "149.00",
+            ((first_open_item, "119.00"), (second_open_item, "30.00")),
+        )
+
+        events = session.query(RechnungsOPZahlungsereignis).all()
+        booking = session.query(Buchung).filter_by(
+            booking_id=str(payment.booking_id)
+        ).one()
+        control_lines = [line for line in booking.zeilen if line.account_number == "3300"]
+        cash_lines = [line for line in booking.zeilen if line.account_number == "1000"]
+        assert session.query(Buchung).count() == 3
+        assert session.query(Zahlung).count() == 1
+        assert len(events) == 2
+        assert {event.payment_id for event in events} == {str(payment.payment_id)}
+        assert {event.payable_open_item_id for event in events} == {
+            str(first_open_item),
+            str(second_open_item),
+        }
+        assert len(control_lines) == 2
+        assert all(line.side == EntrySide.DEBIT.value for line in control_lines)
+        assert sum((line.amount for line in control_lines), start=ZERO) == payment.amount
+        assert len(cash_lines) == 1
+        assert cash_lines[0].side == EntrySide.CREDIT.value
+        assert cash_lines[0].amount == payment.amount
+        assert payments._payment_repository.get_open_invoice(
+            company_id=company.company_id,
+            open_item_id=first_open_item,
+            direction=PaymentDirection.SUPPLIER_PAYMENT,
+        ).open_amount == ZERO
+        assert payments._payment_repository.get_open_invoice(
+            company_id=company.company_id,
+            open_item_id=second_open_item,
+            direction=PaymentDirection.SUPPLIER_PAYMENT,
+        ).open_amount == Decimal("89.00")
+    finally:
+        session.close()
+        engine.dispose()
+
+
+def test_invalid_payment_allocations_are_rejected_before_booking():
+    engine, session, company, partner, receivable, _, payments = _environment()
+    other_partner = BusinessPartner(company.company_id, "Andere Kundin")
+    BusinessPartnerRepository(session).add(other_partner)
+    try:
+        invoice = _create_receivable(receivable, company, partner, "AR-1")
+        other_invoice = _create_receivable(
+            receivable, company, other_partner, "AR-2"
+        )
+        open_item_id = _open_item_id(session, invoice)
+        other_open_item_id = _open_item_id(session, other_invoice)
+        other_company = Company(uuid4(), "Anderer Mandant")
+        CompanyRepository(session).add(other_company)
+
+        with pytest.raises(ValueError, match="exakt dem Zahlungsbetrag"):
+            _pay_allocations(
+                payments,
+                company,
+                partner,
+                PaymentDirection.CUSTOMER_RECEIPT,
+                "100.00",
+                ((open_item_id, "99.99"),),
+            )
+        with pytest.raises(ValueError, match="nur einmal"):
+            _pay_allocations(
+                payments,
+                company,
+                partner,
+                PaymentDirection.CUSTOMER_RECEIPT,
+                "100.00",
+                ((open_item_id, "50.00"), (open_item_id, "50.00")),
+            )
+        with pytest.raises(ValueError, match="demselben Geschäftspartner"):
+            _pay_allocations(
+                payments,
+                company,
+                partner,
+                PaymentDirection.CUSTOMER_RECEIPT,
+                "20.00",
+                ((open_item_id, "10.00"), (other_open_item_id, "10.00")),
+            )
+        with pytest.raises(ValueError, match="geöffneten Mandanten"):
+            _pay_allocations(
+                payments,
+                other_company,
+                partner,
+                PaymentDirection.CUSTOMER_RECEIPT,
+                "10.00",
+                ((open_item_id, "10.00"),),
+            )
+        with pytest.raises(ValueError, match="Zuordnung übersteigt"):
+            _pay_allocations(
+                payments,
+                company,
+                partner,
+                PaymentDirection.CUSTOMER_RECEIPT,
+                "120.00",
+                ((open_item_id, "120.00"),),
+            )
+        assert session.query(Buchung).count() == 2
+        assert session.query(Zahlung).count() == 0
+        assert session.query(RechnungsOPZahlungsereignis).count() == 0
+    finally:
+        session.close()
+        engine.dispose()
+
+
 def test_overpayment_is_rejected_without_new_records():
     engine, session, company, partner, receivable, _, payments = _environment()
     try:
@@ -262,7 +452,8 @@ def test_overpayment_is_rejected_without_new_records():
 
 def test_failure_after_payment_staging_rolls_back_booking_and_payment():
     engine, session, company, partner, receivable, _, payments = _environment()
-    invoice = _create_receivable(receivable, company, partner)
+    first_invoice = _create_receivable(receivable, company, partner, "AR-1")
+    second_invoice = _create_receivable(receivable, company, partner, "AR-2")
     original_repository = payments._payment_repository
 
     class FailingRepository(OpenItemPaymentRepository):
@@ -273,8 +464,18 @@ def test_failure_after_payment_staging_rolls_back_booking_and_payment():
     payments._payment_repository = FailingRepository(session)
     try:
         with pytest.raises(RuntimeError, match="Zuordnungsfehler"):
-            _pay(session, payments, company, partner, invoice, PaymentDirection.CUSTOMER_RECEIPT, "10.00")
-        assert session.query(Buchung).count() == 1
+            _pay_allocations(
+                payments,
+                company,
+                partner,
+                PaymentDirection.CUSTOMER_RECEIPT,
+                "10.00",
+                (
+                    (_open_item_id(session, first_invoice), "5.00"),
+                    (_open_item_id(session, second_invoice), "5.00"),
+                ),
+            )
+        assert session.query(Buchung).count() == 2
         assert session.query(Zahlung).count() == 0
         assert session.query(RechnungsOPZahlungsereignis).count() == 0
     finally:
@@ -287,7 +488,7 @@ def test_partner_and_fiscal_year_validation_preserve_existing_records():
     engine, session, company, partner, receivable, _, payments = _environment()
     try:
         invoice = _create_receivable(receivable, company, partner)
-        with pytest.raises(ValueError, match="anderen Geschäftspartner"):
+        with pytest.raises(ValueError, match="demselben Geschäftspartner"):
             payments.post_payment(
                 company_id=company.company_id,
                 fiscal_year=FY,

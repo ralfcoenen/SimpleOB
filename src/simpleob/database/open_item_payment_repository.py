@@ -28,7 +28,7 @@ from simpleob.domain.open_item_payment import (
 
 
 class OpenItemPaymentRepository:
-    """Schreibt Zahlung und genau eine OP-Zuordnung in derselben Session."""
+    """Schreibt eine Zahlung und ihre OP-Zuordnungen in derselben Session."""
 
     def __init__(self, session: Session) -> None:
         self._session = session
@@ -37,7 +37,7 @@ class OpenItemPaymentRepository:
         self,
         *,
         payment: OpenItemPayment,
-        event: OpenItemPaymentEvent,
+        events: tuple[OpenItemPaymentEvent, ...],
         fiscal_year: FiscalYear,
         company_id: UUID,
         partner_id: UUID,
@@ -45,18 +45,23 @@ class OpenItemPaymentRepository:
     ) -> None:
         if not isinstance(payment, OpenItemPayment):
             raise TypeError("payment must be an OpenItemPayment")
-        if not isinstance(event, OpenItemPaymentEvent):
-            raise TypeError("event must be an OpenItemPaymentEvent")
+        if not isinstance(events, tuple) or not events:
+            raise ValueError("Mindestens ein OP-Zahlungsereignis ist erforderlich.")
+        if not all(isinstance(event, OpenItemPaymentEvent) for event in events):
+            raise TypeError("events must contain OpenItemPaymentEvent values")
         if payment.company_id != company_id or payment.partner_id != partner_id:
             raise ValueError("Zahlung und Aufruf haben unterschiedliche Partnerbezüge.")
-        if event.payment_id != payment.payment_id:
-            raise ValueError("Das OP-Ereignis verweist auf eine andere Zahlung.")
-        if event.direction is not payment.direction:
-            raise ValueError("Zahlungsrichtung und OP-Zuordnung stimmen nicht überein.")
-        if event.amount != payment.amount:
-            raise ValueError("Zahlungsbetrag und Zuordnungsbetrag stimmen nicht überein.")
-        if event.effective_date != payment.payment_date:
-            raise ValueError("Ereignisdatum und tatsächliches Zahlungsdatum stimmen nicht überein.")
+        if sum((event.amount for event in events), start=ZERO) != payment.amount:
+            raise ValueError("Die Summe der OP-Zuordnungen muss exakt dem Zahlungsbetrag entsprechen.")
+        if len({event.open_item_id for event in events}) != len(events):
+            raise ValueError("Ein Rechnungs-OP darf pro Zahlung nur einmal zugeordnet werden.")
+        for event in events:
+            if event.payment_id != payment.payment_id:
+                raise ValueError("Ein OP-Ereignis verweist auf eine andere Zahlung.")
+            if event.direction is not payment.direction:
+                raise ValueError("Zahlungsrichtung und OP-Zuordnung stimmen nicht überein.")
+            if event.effective_date != payment.payment_date:
+                raise ValueError("Ereignisdatum und tatsächliches Zahlungsdatum stimmen nicht überein.")
 
         company = (
             self._session.query(Mandant)
@@ -81,32 +86,36 @@ class OpenItemPaymentRepository:
             Zahlung.payment_id == str(payment.payment_id)
         ).one_or_none():
             raise ValueError("Die Zahlungs-ID ist bereits vorhanden.")
+        event_id_values = [str(event.event_id) for event in events]
+        if len(set(event_id_values)) != len(event_id_values):
+            raise ValueError("OP-Ereignis-IDs müssen eindeutig sein.")
         if self._session.query(RechnungsOPZahlungsereignis.id).filter(
-            RechnungsOPZahlungsereignis.event_id == str(event.event_id)
-        ).one_or_none():
-            raise ValueError("Die OP-Ereignis-ID ist bereits vorhanden.")
+            RechnungsOPZahlungsereignis.event_id.in_(event_id_values)
+        ).first():
+            raise ValueError("Eine OP-Ereignis-ID ist bereits vorhanden.")
         if self._session.query(Zahlung.id).filter(
             Zahlung.booking_id == str(payment.booking_id)
         ).one_or_none():
             raise ValueError("Für diese Buchung existiert bereits eine Zahlung.")
 
-        invoice = self.get_open_invoice(
-            company_id=company_id,
-            open_item_id=event.open_item_id,
-            direction=payment.direction,
-            for_update=True,
-        )
-        if invoice is None:
-            raise ValueError("Der Rechnungs-OP ist nicht vorhanden.")
-        if invoice.partner_id != partner_id:
-            raise ValueError("Der Rechnungs-OP gehört zu einem anderen Geschäftspartner.")
-        if invoice.open_amount <= ZERO:
-            raise ValueError("Der Rechnungs-OP ist bereits vollständig ausgeglichen.")
-        if payment.amount > invoice.open_amount:
-            raise ValueError(
-                f"Die Zahlung übersteigt den offenen Rechnungsbetrag "
-                f"({invoice.open_amount:.2f}). Überzahlungen sind in dieser Stufe nicht zulässig."
+        for event in sorted(events, key=lambda item: str(item.open_item_id)):
+            invoice = self.get_open_invoice(
+                company_id=company_id,
+                open_item_id=event.open_item_id,
+                direction=payment.direction,
+                for_update=True,
             )
+            if invoice is None:
+                raise ValueError("Ein Rechnungs-OP ist nicht vorhanden.")
+            if invoice.partner_id != partner_id:
+                raise ValueError("Alle Rechnungs-OPs müssen demselben Geschäftspartner gehören.")
+            if invoice.open_amount <= ZERO:
+                raise ValueError("Ein Rechnungs-OP ist bereits vollständig ausgeglichen.")
+            if event.amount > invoice.open_amount:
+                raise ValueError(
+                    f"Die Zuordnung übersteigt den offenen Rechnungsbetrag "
+                    f"({invoice.document_number}: {invoice.open_amount:.2f})."
+                )
 
         booking = (
             self._session.query(Buchung.id)
@@ -150,8 +159,9 @@ class OpenItemPaymentRepository:
             )
         )
         self._session.flush()
-        self._session.add(
-            RechnungsOPZahlungsereignis(
+        self._session.add_all(
+            [
+                RechnungsOPZahlungsereignis(
                 event_id=str(event.event_id),
                 payment_id=str(event.payment_id),
                 direction=event.direction.value,
@@ -168,6 +178,8 @@ class OpenItemPaymentRepository:
                 amount=event.amount,
                 effective_date=event.effective_date,
             )
+                for event in events
+            ]
         )
         if commit:
             self._session.commit()
