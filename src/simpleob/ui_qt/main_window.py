@@ -76,6 +76,9 @@ from simpleob.services.credit_note_posting_service import (
     CreditNotePostingService,
 )
 from simpleob.services.fiscal_year_workspace import FiscalYearWorkspace
+from simpleob.services.open_item_invoice_cancellation_service import (
+    OpenItemInvoiceCancellationService,
+)
 from simpleob.services.open_item_offset_service import OpenItemOffsetService
 from simpleob.services.open_item_overview_service import OpenItemOverviewService
 from simpleob.services.open_item_payment_service import OpenItemPaymentService
@@ -193,6 +196,7 @@ class MainWindow(QMainWindow):
         payment_allocation_correction_service: PaymentAllocationCorrectionService | None = None,
         open_item_reconciliation_service: OpenItemReconciliationService | None = None,
         open_item_overview_service: OpenItemOverviewService | None = None,
+        open_item_invoice_cancellation_service: OpenItemInvoiceCancellationService | None = None,
     ) -> None:
         super().__init__()
 
@@ -239,6 +243,7 @@ class MainWindow(QMainWindow):
         self._payment_allocation_correction_service = payment_allocation_correction_service
         self._open_item_reconciliation_service = open_item_reconciliation_service
         self._open_item_overview_service = open_item_overview_service
+        self._open_item_invoice_cancellation_service = open_item_invoice_cancellation_service
         self._eric_certificate_path = (
             Path(eric_certificate_path).expanduser()
             if eric_certificate_path is not None
@@ -476,6 +481,9 @@ class MainWindow(QMainWindow):
                 OpenItemOverviewWidget(
                     company_id=self._context.company.company_id,
                     service=self._open_item_overview_service,
+                    cancellation_service=self._open_item_invoice_cancellation_service,
+                    fiscal_year=self._context.fiscal_year,
+                    on_cancelled=self._refresh_after_open_item_cancellation,
                 )
             )
         if self._open_item_reconciliation_service is not None:
@@ -501,6 +509,15 @@ class MainWindow(QMainWindow):
         self._notebook.currentChanged.connect(
             self._reload_bookkeeping_data
         )
+
+    def _refresh_after_open_item_cancellation(self) -> None:
+        """Aktualisiert Hauptbuchanzeigen nach einem OP-Rechnungsstorno."""
+
+        self._workspace.reload()
+        self._refresh_accounts()
+        self._refresh_journal()
+        self._refresh_balance_sheet()
+        self._refresh_closing()
 
     def closeEvent(self, event) -> None:
         """Kehrt beim Schließen des Hauptfensters zur Buchhaltungsauswahl zurück."""

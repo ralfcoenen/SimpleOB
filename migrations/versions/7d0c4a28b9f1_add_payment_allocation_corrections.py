@@ -142,26 +142,43 @@ def upgrade() -> None:
         ),
     )
     op.create_index(
-        "ix_zahlungszuordnungskorrekturereignisse_receivable_open_item_id",
+        "ix_zukorr_evt_receivable_open_item",
         "zahlungszuordnungskorrekturereignisse",
         ["receivable_open_item_id"],
     )
     op.create_index(
-        "ix_zahlungszuordnungskorrekturereignisse_payable_open_item_id",
+        "ix_zukorr_evt_payable_open_item",
         "zahlungszuordnungskorrekturereignisse",
         ["payable_open_item_id"],
     )
 
 
 def downgrade() -> None:
-    op.drop_index(
-        "ix_zahlungszuordnungskorrekturereignisse_payable_open_item_id",
-        table_name="zahlungszuordnungskorrekturereignisse",
-    )
-    op.drop_index(
-        "ix_zahlungszuordnungskorrekturereignisse_receivable_open_item_id",
-        table_name="zahlungszuordnungskorrekturereignisse",
-    )
+    existing_indexes = {
+        index["name"]
+        for index in sa.inspect(op.get_bind()).get_indexes(
+            "zahlungszuordnungskorrekturereignisse"
+        )
+    }
+    for index_names in (
+        (
+            "ix_zukorr_evt_payable_open_item",
+            "ix_zahlungszuordnungskorrekturereignisse_payable_open_item_id",
+        ),
+        (
+            "ix_zukorr_evt_receivable_open_item",
+            "ix_zahlungszuordnungskorrekturereignisse_receivable_open_item_id",
+        ),
+    ):
+        existing_name = next(
+            (name for name in index_names if name in existing_indexes),
+            None,
+        )
+        if existing_name is not None:
+            op.drop_index(
+                existing_name,
+                table_name="zahlungszuordnungskorrekturereignisse",
+            )
     op.drop_table("zahlungszuordnungskorrekturereignisse")
     op.drop_index(
         "ix_zahlungszuordnungskorrekturen_original_allocation_event_id",

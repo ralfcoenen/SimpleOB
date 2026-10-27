@@ -12,6 +12,7 @@ from simpleob.database.models import (
     ForderungsOP,
     Geschaeftspartner,
     Mandant,
+    RechnungsOPStorno,
     RechnungsOPVerrechnungsereignis,
     RechnungsOPZahlungsereignis,
     VerbindlichkeitsOP,
@@ -234,6 +235,11 @@ class OpenItemPaymentRepository:
                 Zahlungszuordnungskorrekturereignis.receivable_open_item_id
                 == str(open_item_id)
             ).scalar()
+            storno_amount = self._session.query(
+                func.sum(RechnungsOPStorno.amount)
+            ).filter(
+                RechnungsOPStorno.receivable_open_item_id == str(open_item_id)
+            ).scalar()
             original_amount = open_item.amount
             direction_label = PaymentDirection.CUSTOMER_RECEIPT
         else:
@@ -274,6 +280,11 @@ class OpenItemPaymentRepository:
                 Zahlungszuordnungskorrekturereignis.payable_open_item_id
                 == str(open_item_id)
             ).scalar()
+            storno_amount = self._session.query(
+                func.sum(RechnungsOPStorno.amount)
+            ).filter(
+                RechnungsOPStorno.payable_open_item_id == str(open_item_id)
+            ).scalar()
             original_amount = open_item.amount
             direction_label = PaymentDirection.SUPPLIER_PAYMENT
 
@@ -304,6 +315,7 @@ class OpenItemPaymentRepository:
         open_amount = original_amount - (allocated or ZERO) - (
             offset_allocated or ZERO
         ) - (correction_delta or ZERO)
+        open_amount -= storno_amount or ZERO
         if open_amount < ZERO:
             raise ValueError(
                 "Zahlungs- und Verrechnungsereignisse überschreiten den "

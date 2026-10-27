@@ -1,11 +1,17 @@
 """Integrationstests für die aktuelle OP-Übersicht."""
 
+import os
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 from decimal import Decimal
+from pathlib import Path
+from threading import Barrier
 from uuid import UUID, uuid4
 
-from sqlalchemy import create_engine, event
-from sqlalchemy.orm import Session
+import pytest
+from sqlalchemy import create_engine, event, text
+from sqlalchemy.engine import make_url
+from sqlalchemy.orm import Session, sessionmaker
 
 from simpleob.database.booking_repository import BookingRepository
 from simpleob.database.business_partner_repository import BusinessPartnerRepository
@@ -23,6 +29,7 @@ from simpleob.database.models import (
     Konto,
     Mandant,
     OPGuthabenverrechnung,
+    RechnungsOPStorno,
     RechnungsOPVerrechnungsereignis,
     RechnungsOPZahlungsereignis,
     VerbindlichkeitsOP,
@@ -31,9 +38,15 @@ from simpleob.database.models import (
     Zahlungszuordnungskorrektur,
     Zahlungszuordnungskorrekturereignis,
 )
+from simpleob.database.open_item_invoice_cancellation_repository import (
+    OpenItemInvoiceCancellationRepository,
+)
 from simpleob.database.open_item_offset_repository import OpenItemOffsetRepository
 from simpleob.database.open_item_overview_repository import OpenItemOverviewRepository
 from simpleob.database.open_item_payment_repository import OpenItemPaymentRepository
+from simpleob.database.open_item_reconciliation_repository import (
+    OpenItemReconciliationRepository,
+)
 from simpleob.database.payable_invoice_repository import PayableInvoiceRepository
 from simpleob.database.payment_allocation_correction_repository import (
     PaymentAllocationCorrectionRepository,
@@ -50,6 +63,9 @@ from simpleob.domain.open_item_payment import PaymentDirection
 from simpleob.domain.vat_accounts import VatAccounts
 from simpleob.domain.vat_booking_item import VatBookingItem
 from simpleob.services.credit_note_posting_service import CreditNotePostingService
+from simpleob.services.open_item_invoice_cancellation_service import (
+    OpenItemInvoiceCancellationService,
+)
 from simpleob.services.open_item_offset_service import OpenItemOffsetService
 from simpleob.services.open_item_overview_service import OpenItemOverviewService
 from simpleob.services.open_item_payment_service import OpenItemPaymentService
@@ -68,15 +84,23 @@ FY26 = FiscalYear(date(2026, 1, 1), date(2026, 12, 31))
 VAT = VatAccounts("1576", "1570", "1776", "1770")
 
 
-def _environment():
-    engine = create_engine("sqlite:///:memory:")
+def _environment(
+    database_url="sqlite:///:memory:",
+    *,
+    engine=None,
+    session_factory=Session,
+    create_schema=True,
+):
+    engine = engine or create_engine(database_url)
 
     @event.listens_for(engine, "connect")
     def _enable_foreign_keys(connection, _record):
-        connection.execute("PRAGMA foreign_keys=ON")
+        if engine.dialect.name == "sqlite":
+            connection.execute("PRAGMA foreign_keys=ON")
 
-    Base.metadata.create_all(engine)
-    session = Session(engine)
+    if create_schema:
+        Base.metadata.create_all(engine)
+    session = session_factory(bind=engine)
     companies = CompanyRepository(session)
     company = Company(uuid4(), "OP Overview UG")
     other_company = Company(uuid4(), "Andere OP Overview UG")
@@ -701,5 +725,715 @@ def _stored_counts(session: Session) -> tuple[int, ...]:
         GuthabenOPEreignis,
         Zahlungszuordnungskorrektur,
         Zahlungszuordnungskorrekturereignis,
+        RechnungsOPStorno,
     )
     return tuple(session.query(model).count() for model in models)
+
+
+@pytest.mark.parametrize("supplier", (False, True), ids=("customer", "supplier"))
+def test_unpaid_invoice_cancellation_mirrors_booking_and_reconciles_by_date(supplier):
+    (
+        engine,
+        session,
+        company,
+        _other_company,
+        partner,
+        _other_partner,
+        receivables,
+        payables,
+        _payments,
+        _credits,
+        _offsets,
+        _corrections,
+        overview,
+    ) = _environment()
+    booking_repository = BookingRepository(session)
+    service = OpenItemInvoiceCancellationService(
+        OpenItemInvoiceCancellationRepository(
+            session=session,
+            booking_repository=booking_repository,
+        )
+    )
+    reconciliation = OpenItemReconciliationRepository(session)
+    try:
+        invoice = _invoice(
+            payables if supplier else receivables,
+            company,
+            partner,
+            year=FY26,
+            number="AP-STORNO" if supplier else "AR-STORNO",
+            date_value=date(2026, 3, 1),
+            supplier=supplier,
+        )
+        op_model = VerbindlichkeitsOP if supplier else ForderungsOP
+        open_item_id = _open_id(
+            session,
+            op_model,
+            foreign_key="invoice_id",
+            foreign_id=invoice.invoice_id,
+        )
+        role = "SUPPLIER_PAYABLES" if supplier else "CUSTOMER_RECEIVABLES"
+        preview = service.preview(
+            company_id=company.company_id,
+            fiscal_year=FY26,
+            open_item_id=open_item_id,
+        )
+        original_lines = tuple(preview.original_booking.lines)
+        bookings_before = session.query(Buchung).count()
+        service.cancel_invoice(
+            company_id=company.company_id,
+            fiscal_year=FY26,
+            open_item_id=open_item_id,
+            booking_date=date(2026, 4, 15),
+            reason="Rechnung fehlerhaft",
+            confirmed=True,
+        )
+        storno = session.query(RechnungsOPStorno).one()
+        reversal = session.query(Buchung).filter_by(booking_id=storno.booking_id).one()
+        actual_lines = tuple(
+            (line.account_number, line.side, Decimal(line.amount))
+            for line in sorted(reversal.zeilen, key=lambda row: row.position)
+        )
+        expected_lines = tuple(
+            (
+                line.account_number,
+                "CREDIT" if line.side.value == "DEBIT" else "DEBIT",
+                line.amount,
+            )
+            for line in original_lines
+        )
+        assert actual_lines == expected_lines
+        assert reversal.booking_type == "REVERSAL"
+        assert reversal.reversal_of_booking_id == str(invoice.booking_id)
+        assert session.query(Buchung).count() == bookings_before + 1
+        assert "1000" not in {line.account_number for line in reversal.zeilen}
+        assert session.query(Zahlung).count() == 0
+
+        before = reconciliation.reconcile(
+            company_id=company.company_id,
+            as_of_date=date(2026, 4, 14),
+        )
+        after = reconciliation.reconcile(
+            company_id=company.company_id,
+            as_of_date=date(2026, 4, 15),
+        )
+        assert next(row for row in before.rows if row.role == role).open_item_balance == Decimal("119.00")
+        reconciled = next(row for row in after.rows if row.role == role)
+        assert reconciled.open_item_balance == Decimal("0.00")
+        assert reconciled.ledger_balance == Decimal("0.00")
+        assert reconciled.status == "ABGESTIMMT"
+
+        all_items = overview.list_items(
+            company_id=company.company_id,
+            include_settled=True,
+        ).items
+        canceled_item = next(item for item in all_items if item.open_item_id == open_item_id)
+        assert canceled_item.open_amount == Decimal("0.00")
+        assert canceled_item.payments_amount == Decimal("0.00")
+        detail = overview.get_detail(
+            company_id=company.company_id,
+            open_item_id=open_item_id,
+        )
+        assert detail is not None
+        activity = next(
+            item for item in detail.activities
+            if item.kind.value == "INVOICE_CANCELLATION"
+        )
+        assert activity.booking_date == date(2026, 4, 15)
+        assert activity.amount == Decimal("-119.00")
+        assert "Rechnung fehlerhaft" in activity.description
+        assert str(storno.booking_id) not in activity.description
+        assert session.query(RechnungsOPZahlungsereignis).count() == 0
+        with pytest.raises(ValueError, match="bereits storniert|Gegenbuchung"):
+            service.cancel_invoice(
+                company_id=company.company_id,
+                fiscal_year=FY26,
+                open_item_id=open_item_id,
+                booking_date=date(2026, 4, 16),
+                reason="Doppelversuch",
+                confirmed=True,
+            )
+        assert session.query(RechnungsOPStorno).count() == 1
+        assert session.query(Buchung).filter(
+            Buchung.reversal_of_booking_id == str(invoice.booking_id)
+        ).count() == 1
+    finally:
+        session.close()
+        engine.dispose()
+
+
+def test_invoice_cancellation_rejects_payment_history_and_rolls_back_failed_write(monkeypatch):
+    (
+        engine,
+        session,
+        company,
+        _other_company,
+        partner,
+        _other_partner,
+        receivables,
+        _payables,
+        payments,
+        _credits,
+        _offsets,
+        _corrections,
+        _overview,
+    ) = _environment()
+    booking_repository = BookingRepository(session)
+    service = OpenItemInvoiceCancellationService(
+        OpenItemInvoiceCancellationRepository(
+            session=session,
+            booking_repository=booking_repository,
+        )
+    )
+    try:
+        invoice = _invoice(
+            receivables,
+            company,
+            partner,
+            year=FY26,
+            number="AR-PAID-HISTORY",
+            date_value=date(2026, 3, 1),
+        )
+        open_item_id = _open_id(
+            session,
+            ForderungsOP,
+            foreign_key="invoice_id",
+            foreign_id=invoice.invoice_id,
+        )
+        _post_payment(
+            payments,
+            company,
+            partner,
+            open_item_id,
+            direction=PaymentDirection.CUSTOMER_RECEIPT,
+            amount="1.00",
+            booking_date=date(2026, 3, 2),
+        )
+        counts = _stored_counts(session)
+        with pytest.raises(ValueError, match="Zahlungshistorie"):
+            service.cancel_invoice(
+                company_id=company.company_id,
+                fiscal_year=FY26,
+                open_item_id=open_item_id,
+                booking_date=date(2026, 4, 1),
+                reason="Nicht zulässig",
+                confirmed=True,
+            )
+        assert _stored_counts(session) == counts
+
+        unpaid = _invoice(
+            receivables,
+            company,
+            partner,
+            year=FY26,
+            number="AR-ROLLBACK",
+            date_value=date(2026, 4, 2),
+        )
+        unpaid_id = _open_id(
+            session,
+            ForderungsOP,
+            foreign_key="invoice_id",
+            foreign_id=unpaid.invoice_id,
+        )
+        before_failed_write = session.query(Buchung).count(), session.query(RechnungsOPStorno).count()
+        monkeypatch.setattr(
+            booking_repository,
+            "commit",
+            lambda: (_ for _ in ()).throw(RuntimeError("simulierter Commitfehler")),
+        )
+        with pytest.raises(RuntimeError, match="simulierter Commitfehler"):
+            service.cancel_invoice(
+                company_id=company.company_id,
+                fiscal_year=FY26,
+                open_item_id=unpaid_id,
+                booking_date=date(2026, 4, 3),
+                reason="Rollback testen",
+                confirmed=True,
+            )
+        assert (session.query(Buchung).count(), session.query(RechnungsOPStorno).count()) == before_failed_write
+    finally:
+        session.close()
+        engine.dispose()
+
+
+@pytest.mark.parametrize("history_kind", ("offset", "correction"))
+def test_invoice_cancellation_rejects_offset_and_correction_history(history_kind):
+    (
+        engine,
+        session,
+        company,
+        _other_company,
+        partner,
+        _other_partner,
+        receivables,
+        _payables,
+        payments,
+        credits,
+        offsets,
+        corrections,
+        _overview,
+    ) = _environment()
+    service = OpenItemInvoiceCancellationService(
+        OpenItemInvoiceCancellationRepository(
+            session=session,
+            booking_repository=BookingRepository(session),
+        )
+    )
+    try:
+        invoice = _invoice(
+            receivables,
+            company,
+            partner,
+            year=FY26,
+            number=f"AR-{history_kind.upper()}-HISTORY",
+            date_value=date(2026, 3, 1),
+        )
+        source_id = _open_id(
+            session,
+            ForderungsOP,
+            foreign_key="invoice_id",
+            foreign_id=invoice.invoice_id,
+        )
+        if history_kind == "offset":
+            credit = _credit(
+                credits,
+                company,
+                partner,
+                number="CN-HISTORY",
+                amount="1.00",
+            )
+            credit_id = _open_id(
+                session,
+                GuthabenOP,
+                foreign_key="credit_note_id",
+                foreign_id=credit.credit_note_id,
+            )
+            _offset(
+                offsets,
+                company,
+                partner,
+                invoice_id=source_id,
+                credit_id=credit_id,
+                amount="1.00",
+                direction=OffsetDirection.CUSTOMER,
+            )
+            expected = "Verrechnungshistorie"
+        else:
+            payment = _post_payment(
+                payments,
+                company,
+                partner,
+                source_id,
+                direction=PaymentDirection.CUSTOMER_RECEIPT,
+                amount="1.00",
+                booking_date=date(2026, 3, 2),
+            )
+            event_id = UUID(
+                session.query(RechnungsOPZahlungsereignis.event_id)
+                .filter_by(payment_id=str(payment.payment_id))
+                .scalar()
+            )
+            target_invoice = _invoice(
+                receivables,
+                company,
+                partner,
+                year=FY26,
+                number="AR-CORRECTION-TARGET",
+                date_value=date(2026, 3, 3),
+            )
+            target_id = _open_id(
+                session,
+                ForderungsOP,
+                foreign_key="invoice_id",
+                foreign_id=target_invoice.invoice_id,
+            )
+            corrections.correct(
+                company_id=company.company_id,
+                fiscal_year=FY26,
+                original_event_id=event_id,
+                target_open_item_id=target_id,
+                amount=Decimal("1.00"),
+                correction_date=date(2026, 3, 4),
+                booking_date=date(2026, 3, 4),
+                reason="Falscher OP",
+                confirmed=True,
+            )
+            expected = "Zahlungshistorie|Korrekturhistorie"
+            assert session.query(Zahlungszuordnungskorrektur).count() == 1
+        with pytest.raises(ValueError, match=expected):
+            service.cancel_invoice(
+                company_id=company.company_id,
+                fiscal_year=FY26,
+                open_item_id=source_id,
+                booking_date=date(2026, 4, 1),
+                reason="Historie vorhanden",
+                confirmed=True,
+            )
+        assert session.query(RechnungsOPStorno).count() == 0
+    finally:
+        session.close()
+        engine.dispose()
+
+
+def test_invoice_cancellation_requires_same_open_fiscal_year_and_tenant():
+    (
+        engine,
+        session,
+        company,
+        other_company,
+        partner,
+        other_partner,
+        receivables,
+        _payables,
+        _payments,
+        _credits,
+        _offsets,
+        _corrections,
+        _overview,
+    ) = _environment()
+    repository = OpenItemInvoiceCancellationRepository(
+        session=session,
+        booking_repository=BookingRepository(session),
+    )
+    service = OpenItemInvoiceCancellationService(repository)
+    try:
+        invoice = _invoice(
+            receivables,
+            company,
+            partner,
+            year=FY26,
+            number="AR-WRONG-YEAR",
+            date_value=date(2026, 3, 1),
+        )
+        open_item_id = _open_id(
+            session,
+            ForderungsOP,
+            foreign_key="invoice_id",
+            foreign_id=invoice.invoice_id,
+        )
+        with pytest.raises(ValueError, match="ausgewählten Geschäftsjahr"):
+            service.cancel_invoice(
+                company_id=company.company_id,
+                fiscal_year=FY25,
+                open_item_id=open_item_id,
+                booking_date=date(2025, 12, 1),
+                reason="Falsches Jahr",
+                confirmed=True,
+            )
+        company_model = session.query(Mandant).filter_by(
+            company_id=str(company.company_id)
+        ).one()
+        fiscal_year_model = session.query(Wirtschaftsjahr).filter_by(
+            mandant_id=company_model.id,
+            start_date=FY26.start_date,
+        ).one()
+        fiscal_year_model.status = FiscalYearStatus.CLOSED.value
+        session.commit()
+        with pytest.raises(ValueError, match="nicht offen"):
+            service.cancel_invoice(
+                company_id=company.company_id,
+                fiscal_year=FY26,
+                open_item_id=open_item_id,
+                booking_date=date(2026, 4, 1),
+                reason="Geschlossenes Jahr",
+                confirmed=True,
+            )
+        fiscal_year_model.status = FiscalYearStatus.OPEN.value
+        session.commit()
+        other_invoice = _invoice(
+            receivables,
+            other_company,
+            other_partner,
+            year=FY26,
+            number="OTHER-AR-STORNO",
+            date_value=date(2026, 3, 1),
+        )
+        other_id = _open_id(
+            session,
+            ForderungsOP,
+            foreign_key="invoice_id",
+            foreign_id=other_invoice.invoice_id,
+        )
+        with pytest.raises(ValueError, match="Mandanten"):
+            service.preview(
+                company_id=company.company_id,
+                fiscal_year=FY26,
+                open_item_id=other_id,
+            )
+        assert session.query(RechnungsOPStorno).count() == 0
+    finally:
+        session.close()
+        engine.dispose()
+
+
+def test_concurrent_invoice_cancellation_leaves_one_complete_reversal(tmp_path: Path):
+    (
+        engine,
+        session,
+        company,
+        _other_company,
+        partner,
+        _other_partner,
+        receivables,
+        _payables,
+        _payments,
+        _credits,
+        _offsets,
+        _corrections,
+        _overview,
+    ) = _environment(f"sqlite:///{tmp_path / 'concurrent_storno.db'}")
+    try:
+        invoice = _invoice(
+            receivables,
+            company,
+            partner,
+            year=FY26,
+            number="AR-CONCURRENT",
+            date_value=date(2026, 3, 1),
+        )
+        open_item_id = _open_id(
+            session,
+            ForderungsOP,
+            foreign_key="invoice_id",
+            foreign_id=invoice.invoice_id,
+        )
+        session.close()
+        barrier = Barrier(2)
+
+        def cancel_from_independent_session():
+            local_session = Session(engine)
+            booking_repository = BookingRepository(local_session)
+            repository = OpenItemInvoiceCancellationRepository(
+                session=local_session,
+                booking_repository=booking_repository,
+            )
+            original_load = repository._load_eligible_invoice
+
+            def synchronized_load(**kwargs):
+                result = original_load(**kwargs)
+                if kwargs["for_update"]:
+                    barrier.wait(timeout=5)
+                return result
+
+            repository._load_eligible_invoice = synchronized_load
+            service = OpenItemInvoiceCancellationService(repository)
+            try:
+                service.cancel_invoice(
+                    company_id=company.company_id,
+                    fiscal_year=FY26,
+                    open_item_id=open_item_id,
+                    booking_date=date(2026, 4, 1),
+                    reason="Paralleler Versuch",
+                    confirmed=True,
+                )
+                return "ok"
+            except Exception as error:
+                return error
+            finally:
+                local_session.close()
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            results = tuple(
+                executor.map(
+                    lambda _index: cancel_from_independent_session(),
+                    range(2),
+                )
+            )
+        assert results.count("ok") == 1
+        assert sum(isinstance(result, Exception) for result in results) == 1
+        verification = Session(engine)
+        try:
+            assert verification.query(RechnungsOPStorno).count() == 1
+            assert verification.query(Buchung).filter(
+                Buchung.reversal_of_booking_id == str(invoice.booking_id)
+            ).count() == 1
+        finally:
+            verification.close()
+    finally:
+        session.close()
+        engine.dispose()
+
+
+def test_postgresql_cancels_customer_and_supplier_invoices_atomically(monkeypatch):
+    database_url = os.environ.get("SIMPLEOB_POSTGRES_TEST_URL")
+    if not database_url:
+        pytest.skip("SIMPLEOB_POSTGRES_TEST_URL ist nicht gesetzt.")
+
+    url = make_url(database_url)
+    if (
+        url.drivername != "postgresql+psycopg"
+        or url.database != "simpleob_migration_test"
+        or url.host not in ("localhost", "127.0.0.1")
+        or url.username != "simpleob_auth_test"
+    ):
+        pytest.fail(
+            "Nur die lokale PostgreSQL-Testdatenbank simpleob_migration_test "
+            "als simpleob_auth_test ist zulässig."
+        )
+
+    engine = create_engine(url)
+    connection = engine.connect()
+    transaction = connection.begin()
+    session = None
+    try:
+        identity = connection.execute(
+            text("SELECT current_database(), current_user")
+        ).one()
+        assert identity == ("simpleob_migration_test", "simpleob_auth_test")
+
+        factory = sessionmaker(
+            join_transaction_mode="create_savepoint",
+        )
+        environment = _environment(
+            engine=engine,
+            session_factory=lambda **kwargs: factory(bind=connection),
+            create_schema=False,
+        )
+        (
+            _engine,
+            session,
+            company,
+            _other_company,
+            partner,
+            _other_partner,
+            receivables,
+            payables,
+            _payments,
+            _credits,
+            _offsets,
+            _corrections,
+            _overview,
+        ) = environment
+        booking_repository = BookingRepository(session)
+        service = OpenItemInvoiceCancellationService(
+            OpenItemInvoiceCancellationRepository(
+                session=session,
+                booking_repository=booking_repository,
+            )
+        )
+
+        foreign_invoice = _invoice(
+            receivables,
+            _other_company,
+            _other_partner,
+            year=FY26,
+            number="PG-FOREIGN-AR",
+            date_value=date(2026, 6, 1),
+        )
+        foreign_item_id = _open_id(
+            session,
+            ForderungsOP,
+            foreign_key="invoice_id",
+            foreign_id=foreign_invoice.invoice_id,
+        )
+        with pytest.raises(ValueError):
+            service.cancel_invoice(
+                company_id=company.company_id,
+                fiscal_year=FY26,
+                open_item_id=foreign_item_id,
+                booking_date=date(2026, 6, 15),
+                reason="Fremdmandantentest",
+                confirmed=True,
+            )
+        assert session.query(RechnungsOPStorno).count() == 0
+
+        for supplier, posting_service, invoice_number in (
+            (False, receivables, "PG-AR-STORNO"),
+            (True, payables, "PG-AP-STORNO"),
+        ):
+            invoice = _invoice(
+                posting_service,
+                company,
+                partner,
+                year=FY26,
+                number=invoice_number,
+                date_value=date(2026, 6, 1),
+                supplier=supplier,
+            )
+            open_item_model = VerbindlichkeitsOP if supplier else ForderungsOP
+            open_item_id = _open_id(
+                session,
+                open_item_model,
+                foreign_key="invoice_id",
+                foreign_id=invoice.invoice_id,
+            )
+            service.cancel_invoice(
+                company_id=company.company_id,
+                fiscal_year=FY26,
+                open_item_id=open_item_id,
+                booking_date=date(2026, 6, 15),
+                reason="PostgreSQL-Integrationstest",
+                confirmed=True,
+            )
+
+            storno = session.query(RechnungsOPStorno).filter_by(
+                receivable_open_item_id=(None if supplier else str(open_item_id)),
+                payable_open_item_id=(str(open_item_id) if supplier else None),
+            ).one()
+            reversal = session.query(Buchung).filter_by(
+                booking_id=storno.booking_id
+            ).one()
+            assert reversal.reversal_of_booking_id == str(invoice.booking_id)
+            assert reversal.booking_type == "REVERSAL"
+            assert session.query(RechnungsOPStorno).filter_by(
+                booking_id=reversal.booking_id
+            ).count() == 1
+            assert session.query(Buchung).filter_by(
+                reversal_of_booking_id=str(invoice.booking_id)
+            ).count() == 1
+
+            with pytest.raises(ValueError):
+                service.cancel_invoice(
+                    company_id=company.company_id,
+                    fiscal_year=FY26,
+                    open_item_id=open_item_id,
+                    booking_date=date(2026, 6, 16),
+                    reason="Doppelstorno",
+                    confirmed=True,
+                )
+            assert session.query(RechnungsOPStorno).filter_by(
+                booking_id=reversal.booking_id
+            ).count() == 1
+
+        rollback_invoice = _invoice(
+            receivables,
+            company,
+            partner,
+            year=FY26,
+            number="PG-ROLLBACK-AR",
+            date_value=date(2026, 6, 2),
+        )
+        rollback_item_id = _open_id(
+            session,
+            ForderungsOP,
+            foreign_key="invoice_id",
+            foreign_id=rollback_invoice.invoice_id,
+        )
+        original_flush = session.flush
+
+        def fail_flush(*_args, **_kwargs):
+            raise RuntimeError("PostgreSQL rollback test")
+
+        monkeypatch.setattr(session, "flush", fail_flush)
+        with pytest.raises(RuntimeError, match="rollback test"):
+            service.cancel_invoice(
+                company_id=company.company_id,
+                fiscal_year=FY26,
+                open_item_id=rollback_item_id,
+                booking_date=date(2026, 6, 16),
+                reason="Rollbacktest",
+                confirmed=True,
+            )
+        monkeypatch.setattr(session, "flush", original_flush)
+        assert session.query(RechnungsOPStorno).filter_by(
+            receivable_open_item_id=str(rollback_item_id)
+        ).count() == 0
+        assert session.query(Buchung).filter(
+            Buchung.reversal_of_booking_id == str(rollback_invoice.booking_id)
+        ).count() == 0
+    finally:
+        if session is not None:
+            session.close()
+        transaction.rollback()
+        connection.close()
+        engine.dispose()

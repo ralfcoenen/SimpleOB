@@ -1,9 +1,13 @@
 from datetime import date
 from decimal import Decimal
+from types import SimpleNamespace
 from uuid import uuid4
 
-from PySide6.QtWidgets import QApplication, QPushButton
+from PySide6.QtWidgets import QApplication, QMessageBox, QPushButton
 
+from simpleob.domain.booking_line import BookingLine
+from simpleob.domain.entry_side import EntrySide
+from simpleob.domain.fiscal_year import FiscalYear
 from simpleob.domain.open_item_overview import (
     OpenItemActivity,
     OpenItemActivityKind,
@@ -229,5 +233,87 @@ def test_widget_filters_partner_and_settled_items_and_shows_read_only_details():
     assert widget._items_table.rowCount() == 5
     assert widget._summary_table.rowCount() == 4
     assert all(call[0] == company_id for call in service.detail_calls)
+    widget.close()
+    app.processEvents()
+
+
+def test_widget_exposes_explicit_invoice_cancellation_confirmation(monkeypatch):
+    app = QApplication.instance() or QApplication([])
+    company_id = uuid4()
+    partner_id = uuid4()
+    item = _item(
+        company_id,
+        partner_id,
+        "Kunde",
+        OpenItemKind.CUSTOMER_RECEIVABLE,
+        "AR-1",
+        "119.00",
+        "119.00",
+    )
+    overview = _OverviewService(
+        OpenItemOverviewReport(
+            company_id=company_id,
+            partners=(OpenItemPartnerOption(partner_id, "Kunde"),),
+            items=(item,),
+            include_settled=False,
+        ),
+        {
+            item.open_item_id: OpenItemOverviewDetail(item=item, activities=()),
+        },
+    )
+
+    class CancellationService:
+        def __init__(self):
+            self.preview_calls = []
+            self.cancel_calls = []
+
+        def preview(self, **kwargs):
+            self.preview_calls.append(kwargs)
+            return SimpleNamespace(
+                partner_name="Kunde",
+                invoice_number="AR-1",
+                amount=Decimal("119.00"),
+                original_booking=SimpleNamespace(
+                    lines=(BookingLine("1200", EntrySide.DEBIT, Decimal("119.00")),)
+                ),
+            )
+
+        def cancel_invoice(self, **kwargs):
+            self.cancel_calls.append(kwargs)
+
+    cancellation = CancellationService()
+    text_answers = iter(("15.04.2026", "Rechnungsfehler"))
+    confirmation_text = []
+    monkeypatch.setattr(
+        "simpleob.ui_qt.open_item_overview_widget.QInputDialog.getText",
+        lambda *args, **kwargs: (next(text_answers), True),
+    )
+    monkeypatch.setattr(
+        "simpleob.ui_qt.open_item_overview_widget.QMessageBox.question",
+        lambda *args, **kwargs: (
+            confirmation_text.append(args[2])
+            or QMessageBox.StandardButton.Yes
+        ),
+    )
+    widget = OpenItemOverviewWidget(
+        company_id=company_id,
+        service=overview,
+        cancellation_service=cancellation,
+        fiscal_year=FiscalYear(date(2026, 1, 1), date(2026, 12, 31)),
+    )
+    button = next(
+        control for control in widget.findChildren(QPushButton)
+        if control.text() == "Rechnung vollständig stornieren"
+    )
+    assert button.isEnabled()
+    button.click()
+    assert cancellation.preview_calls == [
+        {"company_id": company_id, "fiscal_year": FiscalYear(date(2026, 1, 1), date(2026, 12, 31)), "open_item_id": item.open_item_id}
+    ]
+    assert cancellation.cancel_calls[0]["booking_date"] == date(2026, 4, 15)
+    assert cancellation.cancel_calls[0]["reason"] == "Rechnungsfehler"
+    assert cancellation.cancel_calls[0]["confirmed"] is True
+    assert "Haben" in confirmation_text[0]
+    assert "keine Bank- oder Kassenbewegung" in confirmation_text[0]
     widget.close()
     app.processEvents()

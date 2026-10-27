@@ -21,6 +21,7 @@ from simpleob.database.models import (
     Konto,
     Mandant,
     OPGuthabenverrechnung,
+    RechnungsOPStorno,
     RechnungsOPVerrechnungsereignis,
     RechnungsOPZahlungsereignis,
     VerbindlichkeitsOP,
@@ -194,6 +195,26 @@ class OpenItemReconciliationRepository:
             if balance_adjustment and open_item_id in item_state:
                 # Event delta is the opposite of its effect on receivable/payable balance.
                 item_state[open_item_id]["balance"] += balance_adjustment
+
+        for storno, booking in (
+            self._session.query(RechnungsOPStorno, Buchung)
+            .join(Buchung, RechnungsOPStorno.booking_id == Buchung.booking_id)
+            .join(Wirtschaftsjahr, Buchung.wirtschaftsjahr_id == Wirtschaftsjahr.id)
+            .filter(
+                RechnungsOPStorno.mandant_id == company.id,
+                Wirtschaftsjahr.mandant_id == company.id,
+            )
+            .all()
+        ):
+            known_booking_ids.add(booking.booking_id)
+            if booking.booking_date <= as_of_date:
+                open_item_id = (
+                    storno.receivable_open_item_id
+                    or storno.payable_open_item_id
+                )
+                state = item_state.get(open_item_id)
+                if state is not None and state["balance"] is not None:
+                    state["balance"] -= storno.amount
 
         # Current-year opening bookings already carry prior balance-sheet
         # balances forward; do not add earlier fiscal-year balances twice.

@@ -1,5 +1,6 @@
 """Repository für Buchungen."""
 
+from datetime import date
 from uuid import UUID
 
 from sqlalchemy import text
@@ -225,6 +226,29 @@ class BookingRepository:
         """Verwirft die aktuelle Datenbanktransaktion."""
 
         self._session.rollback()
+
+    def require_open_fiscal_year(
+        self,
+        *,
+        company_id: UUID,
+        fiscal_year: FiscalYear,
+        booking_date: date,
+        for_update: bool = False,
+    ) -> Wirtschaftsjahr:
+        """Lädt ein offenes Zieljahr und prüft dessen Buchungsdatum."""
+
+        fiscal_year_model = self._find_fiscal_year(
+            company_id=company_id,
+            fiscal_year=fiscal_year,
+            for_update=for_update,
+        )
+        if fiscal_year_model is None:
+            raise ValueError("Das Geschäftsjahr gehört nicht zum geöffneten Mandanten.")
+        if fiscal_year_model.status != FiscalYearStatus.OPEN.value:
+            raise ValueError("Das Geschäftsjahr ist nicht offen.")
+        if not fiscal_year.contains(booking_date):
+            raise ValueError("Das Stornobuchungsdatum liegt außerhalb des Geschäftsjahrs.")
+        return fiscal_year_model
 
     def get(
         self,

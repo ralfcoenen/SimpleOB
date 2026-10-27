@@ -10,7 +10,9 @@ from PySide6.QtWidgets import (
     QComboBox,
     QHBoxLayout,
     QHeaderView,
+    QInputDialog,
     QLabel,
+    QMessageBox,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
@@ -18,9 +20,14 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from simpleob.date_input import parse_german_date
+from simpleob.domain.fiscal_year import FiscalYear
 from simpleob.domain.open_item_overview import (
     OpenItemKind,
     OpenItemOverviewItem,
+)
+from simpleob.services.open_item_invoice_cancellation_service import (
+    OpenItemInvoiceCancellationService,
 )
 from simpleob.services.open_item_overview_service import OpenItemOverviewService
 
@@ -37,10 +44,16 @@ class OpenItemOverviewWidget(QWidget):
         *,
         company_id: UUID,
         service: OpenItemOverviewService,
+        cancellation_service: OpenItemInvoiceCancellationService | None = None,
+        fiscal_year: FiscalYear | None = None,
+        on_cancelled=None,
     ) -> None:
         super().__init__()
         self._company_id = company_id
         self._service = service
+        self._cancellation_service = cancellation_service
+        self._fiscal_year = fiscal_year
+        self._on_cancelled = on_cancelled
         self._items: tuple[OpenItemOverviewItem, ...] = ()
 
         layout = QVBoxLayout(self)
@@ -127,6 +140,14 @@ class OpenItemOverviewWidget(QWidget):
             2, QHeaderView.ResizeMode.Stretch
         )
         layout.addWidget(self._items_table)
+        if cancellation_service is not None:
+            self._cancel_invoice_button = QPushButton(
+                "Rechnung vollständig stornieren"
+            )
+            self._cancel_invoice_button.clicked.connect(
+                self._cancel_selected_invoice
+            )
+            layout.addWidget(self._cancel_invoice_button)
 
         layout.addWidget(QLabel("Ereignisse des ausgewählten Postens"))
         self._activity_table = QTableWidget(0, 6)
@@ -156,7 +177,114 @@ class OpenItemOverviewWidget(QWidget):
         self._status_filter.currentIndexChanged.connect(self.refresh)
         self._refresh_button.clicked.connect(self.refresh)
         self._items_table.currentCellChanged.connect(self._show_detail)
+        if cancellation_service is not None:
+            self._items_table.currentCellChanged.connect(
+                self._update_cancellation_button
+            )
         self.refresh()
+
+    def _update_cancellation_button(self, *_args: object) -> None:
+        button = getattr(self, "_cancel_invoice_button", None)
+        if button is None:
+            return
+        row = self._items_table.currentRow()
+        items = self._visible_items()
+        button.setEnabled(
+            0 <= row < len(items)
+            and items[row].kind
+            in (
+                OpenItemKind.CUSTOMER_RECEIVABLE,
+                OpenItemKind.SUPPLIER_PAYABLE,
+            )
+            and items[row].open_amount > Decimal("0.00")
+        )
+
+    def _cancel_selected_invoice(self) -> None:
+        service = self._cancellation_service
+        fiscal_year = self._fiscal_year
+        row = self._items_table.currentRow()
+        items = self._visible_items()
+        if service is None or fiscal_year is None or row < 0 or row >= len(items):
+            return
+        item = items[row]
+        if item.kind not in (
+            OpenItemKind.CUSTOMER_RECEIVABLE,
+            OpenItemKind.SUPPLIER_PAYABLE,
+        ):
+            QMessageBox.information(self, "Rechnungsstorno", "Nur Rechnungen können in dieser Stufe storniert werden.")
+            return
+        try:
+            preview = service.preview(
+                company_id=self._company_id,
+                fiscal_year=fiscal_year,
+                open_item_id=item.open_item_id,
+            )
+        except (TypeError, ValueError) as error:
+            QMessageBox.warning(self, "Rechnung nicht stornierbar", str(error))
+            return
+        default_date = date.today()
+        if not fiscal_year.contains(default_date):
+            default_date = fiscal_year.end_date
+        date_text, accepted = QInputDialog.getText(
+            self,
+            "Rechnungsstorno",
+            f"Stornobuchungsdatum innerhalb {fiscal_year.display_name} (TT.MM.JJJJ):",
+            text=default_date.strftime("%d.%m.%Y"),
+        )
+        if not accepted:
+            return
+        try:
+            booking_date = parse_german_date(date_text)
+            if not fiscal_year.contains(booking_date):
+                raise ValueError("Das Stornobuchungsdatum liegt außerhalb des geöffneten Geschäftsjahrs.")
+        except (TypeError, ValueError) as error:
+            QMessageBox.warning(self, "Ungültiges Buchungsdatum", str(error))
+            return
+        reason, accepted = QInputDialog.getText(
+            self,
+            "Stornogrund",
+            "Bitte geben Sie den verpflichtenden Grund für das Rechnungsstorno ein:",
+        )
+        if not accepted or not reason.strip():
+            if accepted:
+                QMessageBox.warning(self, "Stornogrund fehlt", "Ein Stornogrund ist erforderlich.")
+            return
+        lines = "\n".join(
+            f"{line.account_number} · "
+            f"{'Haben' if line.side.value == 'DEBIT' else 'Soll'} · "
+            f"{_money(line.amount)} €"
+            for line in preview.original_booking.lines
+        )
+        prompt = (
+            f"{preview.partner_name} · Rechnung {preview.invoice_number}\n"
+            f"Stornodatum: {_date(booking_date)} · Betrag: {_money(preview.amount)} €\n\n"
+            f"Gegenbuchung (Soll/Haben gespiegelt):\n{lines}\n\n"
+            "Der Rechnungs-OP wird vollständig geschlossen. Es entsteht keine Bank- oder Kassenbewegung.\n"
+            f"Grund: {reason.strip()}\n\nJetzt verbindlich stornieren?"
+        )
+        if QMessageBox.question(
+            self,
+            "Rechnung vollständig stornieren",
+            prompt,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        ) != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            service.cancel_invoice(
+                company_id=self._company_id,
+                fiscal_year=fiscal_year,
+                open_item_id=item.open_item_id,
+                booking_date=booking_date,
+                reason=reason,
+                confirmed=True,
+            )
+        except Exception as error:
+            QMessageBox.warning(self, "Rechnungsstorno fehlgeschlagen", str(error))
+            return
+        self.refresh()
+        if self._on_cancelled is not None:
+            self._on_cancelled()
 
     def refresh(self, *_args: object) -> None:
         """Lädt den aktuellen Mandantenbestand erneut, ohne Änderungen."""
@@ -235,6 +363,7 @@ class OpenItemOverviewWidget(QWidget):
         self._items_table.blockSignals(False)
         if items:
             self._show_detail(0, 0, -1, -1)
+        self._update_cancellation_button()
 
     def _render_summaries(
         self,

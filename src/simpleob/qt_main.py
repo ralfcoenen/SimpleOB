@@ -54,6 +54,9 @@ from simpleob.database.fixed_asset_repository import FixedAssetRepository
 from simpleob.database.migration_service import (
     DatabaseMigrationService,
 )
+from simpleob.database.open_item_invoice_cancellation_repository import (
+    OpenItemInvoiceCancellationRepository,
+)
 from simpleob.database.open_item_offset_repository import OpenItemOffsetRepository
 from simpleob.database.open_item_overview_repository import OpenItemOverviewRepository
 from simpleob.database.open_item_payment_repository import OpenItemPaymentRepository
@@ -129,6 +132,9 @@ from simpleob.services.fixed_asset_disposal_workflow import (
 )
 from simpleob.services.fixed_asset_schedule_service import (
     FixedAssetScheduleService,
+)
+from simpleob.services.open_item_invoice_cancellation_service import (
+    OpenItemInvoiceCancellationService,
 )
 from simpleob.services.open_item_offset_service import OpenItemOffsetService
 from simpleob.services.open_item_overview_service import OpenItemOverviewService
@@ -530,6 +536,12 @@ def main() -> None:
         )
         open_item_overview_service = OpenItemOverviewService(
             OpenItemOverviewRepository(session)
+        )
+        open_item_invoice_cancellation_service = OpenItemInvoiceCancellationService(
+            OpenItemInvoiceCancellationRepository(
+                session=session,
+                booking_repository=booking_repository,
+            )
         )
         open_item_offset_service = OpenItemOffsetService(
             booking_repository=booking_repository,
@@ -1053,6 +1065,7 @@ def main() -> None:
                 open_item_payment_service=open_item_payment_service,
                 open_item_reconciliation_service=open_item_reconciliation_service,
                 open_item_overview_service=open_item_overview_service,
+                open_item_invoice_cancellation_service=open_item_invoice_cancellation_service,
                 open_item_offset_service=open_item_offset_service,
                 payment_allocation_correction_service=payment_allocation_correction_service,
                 eric_certificate_path=(

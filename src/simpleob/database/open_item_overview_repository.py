@@ -17,6 +17,7 @@ from simpleob.database.models import (
     Gutschrift,
     Mandant,
     OPGuthabenverrechnung,
+    RechnungsOPStorno,
     RechnungsOPVerrechnungsereignis,
     RechnungsOPZahlungsereignis,
     VerbindlichkeitsOP,
@@ -224,6 +225,7 @@ class OpenItemOverviewRepository:
                     OpenItemActivityKind.PAYMENT: 1,
                     OpenItemActivityKind.OFFSET: 2,
                     OpenItemActivityKind.PAYMENT_CORRECTION: 3,
+                    OpenItemActivityKind.INVOICE_CANCELLATION: 4,
                 }[activity.kind],
                 activity.reference,
             )
@@ -258,10 +260,24 @@ class OpenItemOverviewRepository:
             .scalar()
             or ZERO
         )
+        storno_column = (
+            RechnungsOPStorno.receivable_open_item_id
+            if direction is PaymentDirection.CUSTOMER_RECEIPT
+            else RechnungsOPStorno.payable_open_item_id
+        )
+        storno_amount = (
+            self._session.query(func.sum(RechnungsOPStorno.amount))
+            .filter(storno_column == open_item.open_item_id)
+            .scalar()
+            or ZERO
+        )
         # The existing repository owns the residual calculation, including
         # payment allocation corrections. This derives its net payment part.
         payments_amount = (
-            summary.original_amount - offsets_amount - summary.open_amount
+            summary.original_amount
+            - offsets_amount
+            - storno_amount
+            - summary.open_amount
         )
         return OpenItemOverviewItem(
             company_id=company_id,
@@ -370,6 +386,11 @@ class OpenItemOverviewRepository:
             if receivable
             else Zahlungszuordnungskorrekturereignis.payable_open_item_id
         )
+        storno_item_column = (
+            RechnungsOPStorno.receivable_open_item_id
+            if receivable
+            else RechnungsOPStorno.payable_open_item_id
+        )
         correction_rows = (
             self._session.query(
                 Zahlungszuordnungskorrekturereignis,
@@ -463,6 +484,33 @@ class OpenItemOverviewRepository:
                     recorded_at=correction.recorded_at,
                 )
             )
+
+        storno_rows = (
+            self._session.query(RechnungsOPStorno, Buchung)
+            .join(Buchung, RechnungsOPStorno.booking_id == Buchung.booking_id)
+            .filter(storno_item_column == str(item.open_item_id))
+            .all()
+        )
+        activities.extend(
+            OpenItemActivity(
+                kind=OpenItemActivityKind.INVOICE_CANCELLATION,
+                activity_date=booking.booking_date,
+                booking_date=booking.booking_date,
+                amount=-storno.amount,
+                reference=(
+                    f"Rechnungsstorno · {item.partner_name} · "
+                    f"Rechnung {item.document_number}"
+                ),
+                description=(
+                    f"Hauptbuchgegenbuchung vom "
+                    f"{booking.booking_date:%d.%m.%Y}; "
+                    f"Grund: {storno.reason}"
+                ),
+                booking_id=storno.booking_id,
+                recorded_at=storno.recorded_at,
+            )
+            for storno, booking in storno_rows
+        )
         return activities
 
     def _credit_activities(

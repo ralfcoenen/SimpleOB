@@ -28,6 +28,7 @@ class OpenItemActivityKind(StrEnum):
     PAYMENT = "PAYMENT"
     OFFSET = "OFFSET"
     PAYMENT_CORRECTION = "PAYMENT_CORRECTION"
+    INVOICE_CANCELLATION = "INVOICE_CANCELLATION"
 
     @property
     def label(self) -> str:
@@ -38,6 +39,7 @@ class OpenItemActivityKind(StrEnum):
             OpenItemActivityKind.PAYMENT_CORRECTION: (
                 "Korrektur der Zahlungszuordnung"
             ),
+            OpenItemActivityKind.INVOICE_CANCELLATION: "Rechnungsstorno",
         }[self]
 
 

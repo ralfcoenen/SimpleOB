@@ -9,6 +9,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     ForeignKeyConstraint,
+    Index,
     Integer,
     Numeric,
     String,
@@ -677,6 +678,85 @@ class VerbindlichkeitsOP(Base):
     amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
 
 
+class RechnungsOPStorno(Base):
+    """Vollständiges Storno einer unbezahlten Kunden- oder Lieferantenrechnung."""
+
+    __tablename__ = "rechnungs_op_stornos"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["mandant_id", "partner_id"],
+            ["geschaeftspartner.mandant_id", "geschaeftspartner.partner_id"],
+            name="fk_rechnungs_op_storno_mandant_partner",
+        ),
+        CheckConstraint(
+            "(receivable_invoice_id IS NOT NULL "
+            "AND receivable_open_item_id IS NOT NULL "
+            "AND payable_invoice_id IS NULL "
+            "AND payable_open_item_id IS NULL) OR "
+            "(receivable_invoice_id IS NULL "
+            "AND receivable_open_item_id IS NULL "
+            "AND payable_invoice_id IS NOT NULL "
+            "AND payable_open_item_id IS NOT NULL)",
+            name="ck_rechnungs_op_storno_genau_eine_richtung",
+        ),
+        CheckConstraint(
+            "amount > 0",
+            name="ck_rechnungs_op_storno_betrag_positiv",
+        ),
+        CheckConstraint(
+            "length(trim(reason)) > 0",
+            name="ck_rechnungs_op_storno_begruendung",
+        ),
+        UniqueConstraint(
+            "receivable_invoice_id",
+            name="uq_rechnungs_op_storno_ausgangsrechnung",
+        ),
+        UniqueConstraint(
+            "payable_invoice_id",
+            name="uq_rechnungs_op_storno_eingangsrechnung",
+        ),
+        UniqueConstraint(
+            "receivable_open_item_id",
+            name="uq_rechnungs_op_storno_forderungs_op",
+        ),
+        UniqueConstraint(
+            "payable_open_item_id",
+            name="uq_rechnungs_op_storno_verbindlichkeits_op",
+        ),
+        UniqueConstraint(
+            "booking_id",
+            name="uq_rechnungs_op_storno_buchung",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    storno_id: Mapped[str] = mapped_column(String(36), unique=True, nullable=False)
+    mandant_id: Mapped[int] = mapped_column(
+        ForeignKey("mandanten.id"), nullable=False
+    )
+    partner_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    receivable_invoice_id: Mapped[str | None] = mapped_column(
+        ForeignKey("ausgangsrechnungen.invoice_id"), nullable=True
+    )
+    payable_invoice_id: Mapped[str | None] = mapped_column(
+        ForeignKey("eingangsrechnungen.invoice_id"), nullable=True
+    )
+    receivable_open_item_id: Mapped[str | None] = mapped_column(
+        ForeignKey("forderungs_ops.open_item_id"), nullable=True
+    )
+    payable_open_item_id: Mapped[str | None] = mapped_column(
+        ForeignKey("verbindlichkeits_ops.open_item_id"), nullable=True
+    )
+    booking_id: Mapped[str] = mapped_column(
+        ForeignKey("buchungen.booking_id"), nullable=False
+    )
+    amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
+    recorded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    reason: Mapped[str] = mapped_column(String, nullable=False)
+
+
 class Gutschrift(Base):
     """Gebuchte Kunden- oder Lieferantengutschrift."""
 
@@ -1022,6 +1102,14 @@ class Zahlungszuordnungskorrekturereignis(Base):
             "correction_id", "event_role",
             name="uq_zahlungszuordnungskorrekturereignis_korrektur_rolle",
         ),
+        Index(
+            "ix_zukorr_evt_receivable_open_item",
+            "receivable_open_item_id",
+        ),
+        Index(
+            "ix_zukorr_evt_payable_open_item",
+            "payable_open_item_id",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -1032,10 +1120,10 @@ class Zahlungszuordnungskorrekturereignis(Base):
     event_role: Mapped[str] = mapped_column(String(20), nullable=False)
     direction: Mapped[str] = mapped_column(String(24), nullable=False)
     receivable_open_item_id: Mapped[str | None] = mapped_column(
-        ForeignKey("forderungs_ops.open_item_id"), index=True, nullable=True
+        ForeignKey("forderungs_ops.open_item_id"), nullable=True
     )
     payable_open_item_id: Mapped[str | None] = mapped_column(
-        ForeignKey("verbindlichkeits_ops.open_item_id"), index=True, nullable=True
+        ForeignKey("verbindlichkeits_ops.open_item_id"), nullable=True
     )
     amount_delta: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
     effective_date: Mapped[date] = mapped_column(Date, nullable=False)
