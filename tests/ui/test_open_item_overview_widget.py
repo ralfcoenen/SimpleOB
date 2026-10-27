@@ -4,6 +4,7 @@ from decimal import Decimal
 from types import SimpleNamespace
 from uuid import uuid4
 
+import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QMessageBox, QPushButton
@@ -302,6 +303,7 @@ def test_context_menu_and_visible_actions_share_storno_eligibility(monkeypatch):
     class CancellationService:
         def __init__(self):
             self.preview_calls = []
+            self.assessment_calls = []
             self.cancel_calls = []
 
         def preview(self, **kwargs):
@@ -313,6 +315,14 @@ def test_context_menu_and_visible_actions_share_storno_eligibility(monkeypatch):
                 original_booking=SimpleNamespace(
                     lines=(BookingLine("1200", EntrySide.DEBIT, Decimal("119.00")),)
                 ),
+            )
+
+        def assess_payment_history(self, **kwargs):
+            self.assessment_calls.append(kwargs)
+            return SimpleNamespace(
+                invoice_amount=Decimal("119.00"),
+                effective_payment_amount=Decimal("15.00"),
+                open_amount=Decimal("104.00"),
             )
 
         def cancel_invoice(self, **kwargs):
@@ -377,6 +387,7 @@ def test_context_menu_and_visible_actions_share_storno_eligibility(monkeypatch):
             "open_item_id": receivable.open_item_id,
         }
     ]
+    assert cancellation.assessment_calls[0]["proposed_booking_date"] == date(2026, 4, 15)
     assert cancellation.cancel_calls[0]["booking_date"] == date(2026, 4, 15)
     assert cancellation.cancel_calls[0]["reason"] == "Rechnungsfehler"
     assert cancellation.cancel_calls[0]["confirmed"] is True
@@ -390,14 +401,268 @@ def test_context_menu_and_visible_actions_share_storno_eligibility(monkeypatch):
     )
     assert widget._items_table.item(receivable_row, 6).text() == "0,00"
     assert not cancel_button.isEnabled()
+    assert not widget._build_context_menu().actions()[1].isEnabled()
 
-    # Cleared invoice and credit items cannot be canceled.
+    # Fully settled invoice OPs remain actionable; credit OPs do not.
+    settled_invoice = next(item for item in items if item.document_number == "AR-SETTLED")
+    settled_detail = overview.details[settled_invoice.open_item_id]
+    overview.details[settled_invoice.open_item_id] = replace(
+        settled_detail,
+        activities=tuple(
+            activity for activity in settled_detail.activities
+            if activity.kind is not OpenItemActivityKind.INVOICE_CANCELLATION
+        ),
+    )
     widget._status_filter.setCurrentIndex(1)
     settled_invoice_row = next(
         row for row in range(widget._items_table.rowCount())
         if widget._items_table.item(row, 2).text() == "AR-SETTLED"
     )
     widget._items_table.setCurrentCell(settled_invoice_row, 0)
+    assert cancel_button.isEnabled()
+    assert widget._build_context_menu().actions()[1].isEnabled()
+    settled_credit_row = next(
+        row for row in range(widget._items_table.rowCount())
+        if widget._items_table.item(row, 2).text() == "CC-SETTLED"
+    )
+    widget._items_table.setCurrentCell(settled_credit_row, 0)
     assert not cancel_button.isEnabled()
+    assert not widget._build_context_menu().actions()[1].isEnabled()
+    widget.close()
+    app.processEvents()
+
+
+@pytest.mark.parametrize("supplier", (False, True), ids=("customer", "supplier"))
+@pytest.mark.parametrize(
+    ("paid_amount", "open_amount", "status_index"),
+    (
+        (Decimal("0.00"), Decimal("119.00"), 0),
+        (Decimal("40.00"), Decimal("79.00"), 0),
+        (Decimal("119.00"), Decimal("0.00"), 1),
+    ),
+    ids=("unpaid", "partial", "fully-paid"),
+)
+def test_invoice_cancellation_confirmation_shows_payment_assessment(
+    monkeypatch, supplier, paid_amount, open_amount, status_index
+):
+    app = QApplication.instance() or QApplication([])
+    company_id, items, overview = _environment()
+    invoice = items[2] if supplier else items[0]
+    invoice = replace(
+        invoice,
+        original_amount=Decimal("119.00"),
+        payments_amount=paid_amount,
+        offsets_amount=Decimal("0.00"),
+        open_amount=open_amount,
+    )
+    overview.report = replace(
+        overview.report,
+        items=tuple(
+            invoice if item.open_item_id == invoice.open_item_id else item
+            for item in overview.report.items
+        ),
+    )
+    cancellation_activity = next(
+        activity for activity in overview.details[invoice.open_item_id].activities
+        if activity.kind is OpenItemActivityKind.INVOICE_CANCELLATION
+    )
+    overview.details[invoice.open_item_id] = replace(
+        overview.details[invoice.open_item_id],
+        activities=tuple(
+            activity for activity in overview.details[invoice.open_item_id].activities
+            if activity.kind is not OpenItemActivityKind.INVOICE_CANCELLATION
+        ),
+    )
+
+    class CancellationService:
+        def __init__(self):
+            self.preview_calls = []
+            self.assessment_calls = []
+            self.cancel_calls = []
+
+        def preview(self, **kwargs):
+            self.preview_calls.append(kwargs)
+            return SimpleNamespace(
+                partner_name=invoice.partner_name,
+                invoice_number=invoice.document_number,
+                amount=Decimal("119.00"),
+                original_booking=SimpleNamespace(
+                    lines=(BookingLine("1200", EntrySide.DEBIT, Decimal("119.00")),)
+                ),
+            )
+
+        def assess_payment_history(self, **kwargs):
+            self.assessment_calls.append(kwargs)
+            return SimpleNamespace(
+                invoice_amount=Decimal("119.00"),
+                effective_payment_amount=paid_amount,
+                open_amount=open_amount,
+            )
+
+        def cancel_invoice(self, **kwargs):
+            self.cancel_calls.append(kwargs)
+            closed_invoice = replace(invoice, open_amount=Decimal("0.00"))
+            items_after = tuple(
+                closed_invoice if item.open_item_id == invoice.open_item_id else item
+                for item in overview.report.items
+            )
+            if paid_amount > Decimal("0.00"):
+                credit = _item(
+                    company_id,
+                    invoice.partner_id,
+                    invoice.partner_name,
+                    OpenItemKind.SUPPLIER_CREDIT if supplier else OpenItemKind.CUSTOMER_CREDIT,
+                    f"Storno {invoice.document_number}",
+                    str(paid_amount),
+                    str(paid_amount),
+                )
+                credit = replace(
+                    credit,
+                    payments_amount=Decimal("0.00"),
+                    offsets_amount=Decimal("0.00"),
+                )
+                items_after += (credit,)
+            overview.report = replace(overview.report, items=items_after)
+            overview.details[invoice.open_item_id] = replace(
+                overview.details[invoice.open_item_id],
+                activities=(
+                    *overview.details[invoice.open_item_id].activities,
+                    cancellation_activity,
+                ),
+            )
+
+    cancellation = CancellationService()
+    answers = iter(("15.04.2026", "Fehlerhafte Rechnung"))
+    confirmation_text = []
+    monkeypatch.setattr(
+        "simpleob.ui_qt.open_item_overview_widget.QInputDialog.getText",
+        lambda *args, **kwargs: (next(answers), True),
+    )
+    monkeypatch.setattr(
+        "simpleob.ui_qt.open_item_overview_widget.QMessageBox.question",
+        lambda *args, **kwargs: (
+            confirmation_text.append(args[2])
+            or QMessageBox.StandardButton.Yes
+        ),
+    )
+    fiscal_year = FiscalYear(date(2026, 1, 1), date(2026, 12, 31))
+    widget = OpenItemOverviewWidget(
+        company_id=company_id,
+        service=overview,
+        cancellation_service=cancellation,
+        fiscal_year=fiscal_year,
+    )
+    if status_index:
+        widget._status_filter.setCurrentIndex(status_index)
+    row = next(
+        index for index in range(widget._items_table.rowCount())
+        if widget._items_table.item(index, 2).text() == invoice.document_number
+    )
+    widget._items_table.setCurrentCell(row, 0)
+    cancel_button = next(
+        button for button in widget.findChildren(QPushButton)
+        if button.text() == "Rechnung vollständig stornieren"
+    )
+    assert cancel_button.isEnabled()
+    assert widget._build_context_menu().actions()[1].isEnabled()
+    cancel_button.click()
+
+    assert cancellation.assessment_calls == [
+        {
+            "company_id": company_id,
+            "fiscal_year": fiscal_year,
+            "open_item_id": invoice.open_item_id,
+            "proposed_booking_date": date(2026, 4, 15),
+        }
+    ]
+    prompt = confirmation_text[0]
+    assert "Ursprünglicher Rechnungsbetrag: 119,00 €" in prompt
+    assert f"Wirksam bezahlt: {_german_money(paid_amount)} €" in prompt
+    assert f"Noch offener Rechnungsbetrag: {_german_money(open_amount)} €" in prompt
+    assert "Stornodatum: 15.04.2026" in prompt
+    assert "Bereits erfolgte Zahlungen werden nicht rückgängig gemacht" in prompt
+    assert "keine Bank- oder Kassenbewegung" in prompt
+    if paid_amount > Decimal("0.00"):
+        credit_label = "Lieferantenguthaben" if supplier else "Kundenguthaben"
+        assert f"Entstehendes {credit_label}:" in prompt
+        assert f"{_german_money(paid_amount)} €" in prompt
+    else:
+        assert "Es entsteht kein Partnerguthaben." in prompt
+        assert "Entstehendes Kundenguthaben" not in prompt
+        assert "Entstehendes Lieferantenguthaben" not in prompt
+    assert cancellation.cancel_calls[0]["confirmed"] is True
+    assert cancellation.cancel_calls[0]["booking_date"] == date(2026, 4, 15)
+    widget._status_filter.setCurrentIndex(2)
+    visible_numbers = _shown_numbers(widget._items_table)
+    assert invoice.document_number in visible_numbers
+    if paid_amount > Decimal("0.00"):
+        assert f"Storno {invoice.document_number}" in visible_numbers
+    widget.close()
+    app.processEvents()
+
+
+def _german_money(value):
+    return f"{value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+@pytest.mark.parametrize(
+    ("failure_stage", "message"),
+    (
+        ("preview", "Die Rechnung hat Verrechnungshistorie"),
+        ("assessment", "Stornodatum liegt vor dem Zahlungsdatum"),
+    ),
+)
+def test_invoice_cancellation_rejections_show_warning_without_confirmation(
+    monkeypatch, failure_stage, message
+):
+    app = QApplication.instance() or QApplication([])
+    company_id, items, overview = _environment()
+    invoice = items[0]
+
+    class CancellationService:
+        def preview(self, **kwargs):
+            if failure_stage == "preview":
+                raise ValueError(message)
+            return SimpleNamespace(
+                partner_name=invoice.partner_name,
+                invoice_number=invoice.document_number,
+                amount=invoice.original_amount,
+                original_booking=SimpleNamespace(
+                    lines=(BookingLine("1200", EntrySide.DEBIT, Decimal("119.00")),)
+                ),
+            )
+
+        def assess_payment_history(self, **kwargs):
+            assert kwargs["proposed_booking_date"] == date(2026, 4, 15)
+            raise ValueError(message)
+
+        def cancel_invoice(self, **kwargs):
+            raise AssertionError("Bei abgelehnter Prüfung darf nicht storniert werden.")
+
+    answers = iter(("15.04.2026", "Fehlerhafte Rechnung"))
+    warnings = []
+    confirmations = []
+    monkeypatch.setattr(
+        "simpleob.ui_qt.open_item_overview_widget.QInputDialog.getText",
+        lambda *args, **kwargs: (next(answers), True),
+    )
+    monkeypatch.setattr(
+        "simpleob.ui_qt.open_item_overview_widget.QMessageBox.warning",
+        lambda *args, **kwargs: warnings.append(args[2]),
+    )
+    monkeypatch.setattr(
+        "simpleob.ui_qt.open_item_overview_widget.QMessageBox.question",
+        lambda *args, **kwargs: confirmations.append(args[2]),
+    )
+    widget = OpenItemOverviewWidget(
+        company_id=company_id,
+        service=overview,
+        cancellation_service=CancellationService(),
+        fiscal_year=FiscalYear(date(2026, 1, 1), date(2026, 12, 31)),
+    )
+    widget._items_table.setCurrentCell(0, 0)
+    widget._cancel_invoice_button.click()
+    assert warnings == [message]
+    assert confirmations == []
     widget.close()
     app.processEvents()

@@ -77,6 +77,7 @@ class OpenItemInvoiceCancellationRepository:
             target_year=target_year,
             open_item_id=open_item_id,
             for_update=False,
+            allow_payment_history=True,
         )
 
     def assess_payment_history(

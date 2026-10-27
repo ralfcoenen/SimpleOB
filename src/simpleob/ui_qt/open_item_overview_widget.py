@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
 from simpleob.date_input import parse_german_date
 from simpleob.domain.fiscal_year import FiscalYear
 from simpleob.domain.open_item_overview import (
+    OpenItemActivityKind,
     OpenItemKind,
     OpenItemOverviewItem,
 )
@@ -362,12 +363,25 @@ class OpenItemOverviewWidget(QWidget):
 
     def _can_cancel_selected_invoice(self) -> bool:
         item = self._selected_item()
+        if (
+            self._cancellation_service is None
+            or self._fiscal_year is None
+            or item is None
+            or item.kind not in _INVOICE_KINDS
+        ):
+            return False
+        if item.open_amount > Decimal("0.00"):
+            return True
+        detail = self._service.get_detail(
+            company_id=self._company_id,
+            open_item_id=item.open_item_id,
+        )
         return bool(
-            self._cancellation_service is not None
-            and self._fiscal_year is not None
-            and item is not None
-            and item.kind in _INVOICE_KINDS
-            and item.open_amount > Decimal("0.00")
+            detail is not None
+            and not any(
+                activity.kind is OpenItemActivityKind.INVOICE_CANCELLATION
+                for activity in detail.activities
+            )
         )
 
     def _update_action_availability(self, *_args: object) -> None:
@@ -450,6 +464,16 @@ class OpenItemOverviewWidget(QWidget):
         except (TypeError, ValueError) as error:
             QMessageBox.warning(self, "Ungültiges Buchungsdatum", str(error))
             return
+        try:
+            assessment = service.assess_payment_history(
+                company_id=self._company_id,
+                fiscal_year=fiscal_year,
+                open_item_id=item.open_item_id,
+                proposed_booking_date=booking_date,
+            )
+        except (TypeError, ValueError) as error:
+            QMessageBox.warning(self, "Rechnung nicht stornierbar", str(error))
+            return
         reason, accepted = QInputDialog.getText(
             self,
             "Stornogrund",
@@ -467,11 +491,28 @@ class OpenItemOverviewWidget(QWidget):
             f"{_money(line.amount)} €"
             for line in preview.original_booking.lines
         )
+        paid_amount = assessment.effective_payment_amount
+        credit_label = (
+            "Lieferantenguthaben"
+            if item.kind is OpenItemKind.SUPPLIER_PAYABLE
+            else "Kundenguthaben"
+        )
+        credit_description = (
+            f"Entstehendes {credit_label}: {_money(paid_amount)} €"
+            if paid_amount > Decimal("0.00")
+            else "Es entsteht kein Partnerguthaben."
+        )
         prompt = (
             f"{preview.partner_name} · Rechnung {preview.invoice_number}\n"
-            f"Stornodatum: {_date(booking_date)} · Betrag: {_money(preview.amount)} €\n\n"
+            f"Stornodatum: {_date(booking_date)}\n"
+            f"Ursprünglicher Rechnungsbetrag: {_money(assessment.invoice_amount)} €\n"
+            f"Wirksam bezahlt: {_money(paid_amount)} €\n"
+            f"Noch offener Rechnungsbetrag: {_money(assessment.open_amount)} €\n"
+            f"{credit_description}\n\n"
             f"Gegenbuchung (Soll/Haben gespiegelt):\n{lines}\n\n"
-            "Der Rechnungs-OP wird vollständig geschlossen. Es entsteht keine Bank- oder Kassenbewegung.\n"
+            "Die Rechnung wird vollständig storniert und der Rechnungs-OP geschlossen. "
+            "Bereits erfolgte Zahlungen werden nicht rückgängig gemacht. "
+            "Es entsteht keine Bank- oder Kassenbewegung.\n"
             f"Grund: {reason.strip()}\n\nJetzt verbindlich stornieren?"
         )
         if QMessageBox.question(
