@@ -2,12 +2,14 @@
 
 from pathlib import Path
 
+import pytest
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import create_engine, event, inspect, text
+from sqlalchemy.exc import IntegrityError
 
 BASELINE_REVISION = "7392d6cc6892"
-HEAD_REVISION = "d4a2f19c7b60"
+HEAD_REVISION = "a6d18f2c94b7"
 
 
 def _alembic_config(
@@ -476,6 +478,210 @@ def test_migrations_downgrade_from_head_to_baseline(
         _current_revision(database_path)
         == BASELINE_REVISION
     )
+    assert _foreign_key_check(database_path) == []
+
+
+def test_paid_invoice_cancellation_schema_backfills_and_checks_origins(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """Das 4D-3a-Schema erhält Altstornos und erzwingt Guthabenherkunft."""
+
+    database_path = tmp_path / "paid-cancellation-migration.db"
+    database_url = f"sqlite:///{database_path}"
+    monkeypatch.setenv("OPENBILANZ_DATABASE_URL", database_url)
+    config = _alembic_config(database_path)
+    command.upgrade(config, "d4a2f19c7b60")
+
+    engine = create_engine(database_url)
+
+    @event.listens_for(engine, "connect")
+    def _enable_foreign_keys(connection, _record) -> None:
+        connection.execute("PRAGMA foreign_keys=ON")
+
+    try:
+        with engine.begin() as connection:
+            connection.execute(text(
+                "INSERT INTO mandanten (id, company_id, name) "
+                "VALUES (1, 'company-1', 'Migrationstest')"
+            ))
+            connection.execute(text(
+                "INSERT INTO geschaeftspartner "
+                "(id, partner_id, mandant_id, name, is_customer, is_supplier, is_active) "
+                "VALUES (1, 'partner-1', 1, 'Partner', 1, 1, 1)"
+            ))
+            connection.execute(text(
+                "INSERT INTO wirtschaftsjahre "
+                "(id, mandant_id, start_date, end_date, status) "
+                "VALUES (1, 1, '2026-01-01', '2026-12-31', 'OPEN')"
+            ))
+            for booking_id, booking_date, kind, reversal_of in (
+                ('source-1', '2026-01-10', 'REGULAR', None),
+                ('reversal-1', '2026-02-10', 'REVERSAL', 'source-1'),
+                ('source-2', '2026-01-11', 'REGULAR', None),
+                ('reversal-2', '2026-02-11', 'REVERSAL', 'source-2'),
+                ('credit-booking', '2026-01-12', 'REGULAR', None),
+            ):
+                connection.execute(text(
+                    "INSERT INTO buchungen "
+                    "(booking_id, wirtschaftsjahr_id, booking_date, booking_type, "
+                    "reversal_of_booking_id) "
+                    "VALUES (:booking_id, 1, :booking_date, :kind, :reversal_of)"
+                ), {
+                    "booking_id": booking_id,
+                    "booking_date": booking_date,
+                    "kind": kind,
+                    "reversal_of": reversal_of,
+                })
+            for invoice_id, number, booking_id in (
+                ('invoice-1', 'AR-OLD', 'source-1'),
+                ('invoice-2', 'AR-ZERO', 'source-2'),
+            ):
+                connection.execute(text(
+                    "INSERT INTO ausgangsrechnungen "
+                    "(invoice_id, mandant_id, partner_id, invoice_number, invoice_date, "
+                    "due_date, gross_amount, booking_id) "
+                    "VALUES (:invoice_id, 1, 'partner-1', :number, '2026-01-10', "
+                    "'2026-01-31', 119.00, :booking_id)"
+                ), {
+                    "invoice_id": invoice_id,
+                    "number": number,
+                    "booking_id": booking_id,
+                })
+            connection.execute(text(
+                "INSERT INTO forderungs_ops (open_item_id, invoice_id, amount) "
+                "VALUES ('op-1', 'invoice-1', 119.00), ('op-2', 'invoice-2', 119.00)"
+            ))
+            connection.execute(text(
+                "INSERT INTO rechnungs_op_stornos "
+                "(storno_id, mandant_id, partner_id, receivable_invoice_id, "
+                "receivable_open_item_id, booking_id, amount, recorded_at, reason) "
+                "VALUES ('storno-old', 1, 'partner-1', 'invoice-1', 'op-1', "
+                "'reversal-1', 119.00, '2026-02-10 12:00:00', 'Altstorno')"
+            ))
+            connection.execute(text(
+                "INSERT INTO gutschriften "
+                "(credit_note_id, mandant_id, partner_id, credit_note_kind, note_number, "
+                "note_date, booking_id) "
+                "VALUES ('credit-1', 1, 'partner-1', 'CUSTOMER', 'GS-1', "
+                "'2026-01-12', 'credit-booking')"
+            ))
+            connection.execute(text(
+                "INSERT INTO guthaben_ops (open_item_id, credit_note_id, amount) "
+                "VALUES ('credit-op-1', 'credit-1', 20.00)"
+            ))
+    finally:
+        engine.dispose()
+
+    command.upgrade(config, HEAD_REVISION)
+    engine = create_engine(database_url)
+
+    @event.listens_for(engine, "connect")
+    def _enable_foreign_keys_after_upgrade(connection, _record) -> None:
+        connection.execute("PRAGMA foreign_keys=ON")
+
+    try:
+        with engine.begin() as connection:
+            legacy_amounts = connection.execute(text(
+                "SELECT amount, closed_open_amount FROM rechnungs_op_stornos "
+                "WHERE storno_id='storno-old'"
+            )).one()
+            assert tuple(legacy_amounts) == (119, 119)
+
+            # Fully bezahlte Rechnungen dürfen den OP mit null schließen.
+            connection.execute(text(
+                "INSERT INTO rechnungs_op_stornos "
+                "(storno_id, mandant_id, partner_id, receivable_invoice_id, "
+                "receivable_open_item_id, booking_id, amount, closed_open_amount, "
+                "recorded_at, reason) VALUES ('storno-zero', 1, 'partner-1', "
+                "'invoice-2', 'op-2', 'reversal-2', 119.00, 0.00, "
+                "'2026-02-11 12:00:00', 'Vollständig bezahlt')"
+            ))
+
+            # Die bestehende Gutschriftquelle bleibt erhalten; Storno ist zweite Quelle.
+            existing_credit = connection.execute(text(
+                "SELECT credit_note_id, invoice_cancellation_id "
+                "FROM guthaben_ops WHERE open_item_id='credit-op-1'"
+            )).one()
+            assert tuple(existing_credit) == ('credit-1', None)
+            connection.execute(text(
+                "INSERT INTO guthaben_ops "
+                "(open_item_id, credit_note_id, invoice_cancellation_id, amount) "
+                "VALUES ('storno-credit-op', NULL, 'storno-old', 40.00)"
+            ))
+
+            assert connection.execute(text(
+                "SELECT count(*) FROM guthaben_ops "
+                "WHERE invoice_cancellation_id='storno-old'"
+            )).scalar_one() == 1
+
+        with pytest.raises(IntegrityError):
+            with engine.begin() as connection:
+                connection.execute(text(
+                    "INSERT INTO guthaben_ops "
+                    "(open_item_id, credit_note_id, invoice_cancellation_id, amount) "
+                    "VALUES ('both-sources', 'credit-1', 'storno-zero', 10.00)"
+                ))
+        with pytest.raises(IntegrityError):
+            with engine.begin() as connection:
+                connection.execute(text(
+                    "INSERT INTO guthaben_ops "
+                    "(open_item_id, credit_note_id, invoice_cancellation_id, amount) "
+                    "VALUES ('no-source', NULL, NULL, 10.00)"
+                ))
+
+        inspector = inspect(engine)
+        storno_columns = {
+            column["name"]
+            for column in inspector.get_columns("rechnungs_op_stornos")
+        }
+        assert {"closed_open_amount", "credit_booking_id"} <= storno_columns
+        assert any(
+            fk["constrained_columns"] == ["invoice_cancellation_id"]
+            and fk["referred_table"] == "rechnungs_op_stornos"
+            for fk in inspector.get_foreign_keys("guthaben_ops")
+        )
+        assert _current_revision(database_path) == HEAD_REVISION
+        assert _foreign_key_check(database_path) == []
+    finally:
+        engine.dispose()
+
+
+def test_paid_invoice_cancellation_migration_downgrade_and_reupgrade(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """Die neue Migration lässt sich isoliert zurücknehmen und erneut anwenden."""
+
+    database_path = tmp_path / "paid-cancellation-roundtrip.db"
+    database_url = f"sqlite:///{database_path}"
+    monkeypatch.setenv("OPENBILANZ_DATABASE_URL", database_url)
+    config = _alembic_config(database_path)
+
+    command.upgrade(config, "d4a2f19c7b60")
+    command.upgrade(config, HEAD_REVISION)
+    command.downgrade(config, "d4a2f19c7b60")
+    assert _current_revision(database_path) == "d4a2f19c7b60"
+
+    engine = create_engine(database_url)
+    try:
+        inspector = inspect(engine)
+        storno_columns = {
+            column["name"]
+            for column in inspector.get_columns("rechnungs_op_stornos")
+        }
+        credit_columns = {
+            column["name"]
+            for column in inspector.get_columns("guthaben_ops")
+        }
+        assert "closed_open_amount" not in storno_columns
+        assert "credit_booking_id" not in storno_columns
+        assert "invoice_cancellation_id" not in credit_columns
+    finally:
+        engine.dispose()
+
+    command.upgrade(config, HEAD_REVISION)
+    assert _current_revision(database_path) == HEAD_REVISION
     assert _foreign_key_check(database_path) == []
 
 

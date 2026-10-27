@@ -167,6 +167,7 @@ class OpenItemInvoiceCancellationRepository:
                 ),
                 booking_id=str(reversal.booking_id),
                 amount=preview.amount,
+                closed_open_amount=preview.amount,
                 recorded_at=datetime.now(timezone.utc),
                 reason=reason,
             )

@@ -704,6 +704,10 @@ class RechnungsOPStorno(Base):
             name="ck_rechnungs_op_storno_betrag_positiv",
         ),
         CheckConstraint(
+            "closed_open_amount >= 0 AND closed_open_amount <= amount",
+            name="ck_rechnungs_op_storno_schliessbetrag",
+        ),
+        CheckConstraint(
             "length(trim(reason)) > 0",
             name="ck_rechnungs_op_storno_begruendung",
         ),
@@ -726,6 +730,10 @@ class RechnungsOPStorno(Base):
         UniqueConstraint(
             "booking_id",
             name="uq_rechnungs_op_storno_buchung",
+        ),
+        UniqueConstraint(
+            "credit_booking_id",
+            name="uq_rechnungs_op_storno_credit_buchung",
         ),
     )
 
@@ -750,7 +758,13 @@ class RechnungsOPStorno(Base):
     booking_id: Mapped[str] = mapped_column(
         ForeignKey("buchungen.booking_id"), nullable=False
     )
+    credit_booking_id: Mapped[str | None] = mapped_column(
+        ForeignKey("buchungen.booking_id"), nullable=True
+    )
     amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
+    closed_open_amount: Mapped[Decimal] = mapped_column(
+        Numeric(18, 2), nullable=False
+    )
     recorded_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )
@@ -812,14 +826,22 @@ class GuthabenOP(Base):
     __tablename__ = "guthaben_ops"
     __table_args__ = (
         CheckConstraint("amount > 0", name="ck_guthaben_op_betrag_positiv"),
+        CheckConstraint(
+            "(credit_note_id IS NOT NULL AND invoice_cancellation_id IS NULL) OR "
+            "(credit_note_id IS NULL AND invoice_cancellation_id IS NOT NULL)",
+            name="ck_guthaben_op_genau_eine_herkunft",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     open_item_id: Mapped[str] = mapped_column(
         String(36), unique=True, nullable=False
     )
-    credit_note_id: Mapped[str] = mapped_column(
-        ForeignKey("gutschriften.credit_note_id"), unique=True, nullable=False
+    credit_note_id: Mapped[str | None] = mapped_column(
+        ForeignKey("gutschriften.credit_note_id"), unique=True, nullable=True
+    )
+    invoice_cancellation_id: Mapped[str | None] = mapped_column(
+        ForeignKey("rechnungs_op_stornos.storno_id"), unique=True, nullable=True
     )
     amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
 
