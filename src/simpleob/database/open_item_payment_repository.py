@@ -240,7 +240,7 @@ class OpenItemPaymentRepository:
                 == str(open_item_id)
             ).scalar()
             storno_amount = self._session.query(
-                func.sum(RechnungsOPStorno.amount)
+                func.sum(RechnungsOPStorno.closed_open_amount)
             ).filter(
                 RechnungsOPStorno.receivable_open_item_id == str(open_item_id)
             ).scalar()
@@ -285,7 +285,7 @@ class OpenItemPaymentRepository:
                 == str(open_item_id)
             ).scalar()
             storno_amount = self._session.query(
-                func.sum(RechnungsOPStorno.amount)
+                func.sum(RechnungsOPStorno.closed_open_amount)
             ).filter(
                 RechnungsOPStorno.payable_open_item_id == str(open_item_id)
             ).scalar()

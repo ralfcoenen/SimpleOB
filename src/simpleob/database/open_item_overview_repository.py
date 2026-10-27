@@ -168,6 +168,74 @@ class OpenItemOverviewRepository:
             if include_settled or item.open_amount > ZERO:
                 items.append(item)
 
+        cancellation_credit_rows = (
+            self._session.query(GuthabenOP, RechnungsOPStorno, Buchung)
+            .join(
+                RechnungsOPStorno,
+                GuthabenOP.invoice_cancellation_id == RechnungsOPStorno.storno_id,
+            )
+            .join(Buchung, RechnungsOPStorno.credit_booking_id == Buchung.booking_id)
+            .join(Wirtschaftsjahr, Buchung.wirtschaftsjahr_id == Wirtschaftsjahr.id)
+            .filter(
+                RechnungsOPStorno.mandant_id == company.id,
+                Wirtschaftsjahr.mandant_id == company.id,
+            )
+            .all()
+        )
+        for open_item, cancellation, booking in cancellation_credit_rows:
+            if cancellation.receivable_invoice_id is not None:
+                direction = OffsetDirection.CUSTOMER
+                invoice = (
+                    self._session.query(Ausgangsrechnung)
+                    .filter(
+                        Ausgangsrechnung.invoice_id
+                        == cancellation.receivable_invoice_id
+                    )
+                    .one_or_none()
+                )
+            else:
+                direction = OffsetDirection.SUPPLIER
+                invoice = (
+                    self._session.query(Eingangsrechnung)
+                    .filter(
+                        Eingangsrechnung.invoice_id == cancellation.payable_invoice_id
+                    )
+                    .one_or_none()
+                )
+            if invoice is None or invoice.mandant_id != company.id:
+                continue
+            credit = self._offset_repository.get_credit(
+                company_id=company_id,
+                partner_id=UUID(cancellation.partner_id),
+                open_item_id=UUID(open_item.open_item_id),
+                direction=direction,
+            )
+            if credit is None:
+                continue
+            kind = (
+                OpenItemKind.CUSTOMER_CREDIT
+                if direction is OffsetDirection.CUSTOMER
+                else OpenItemKind.SUPPLIER_CREDIT
+            )
+            item = OpenItemOverviewItem(
+                company_id=company_id,
+                partner_id=credit.partner_id,
+                partner_name=self._partner_name(company.id, cancellation.partner_id),
+                open_item_id=credit.open_item_id,
+                kind=kind,
+                document_number=credit.document_number,
+                document_date=invoice.invoice_date,
+                booking_date=booking.booking_date,
+                due_date=None,
+                original_amount=credit.original_amount,
+                payments_amount=ZERO,
+                offsets_amount=credit.original_amount - credit.available_amount,
+                open_amount=credit.available_amount,
+                source_booking_id=cancellation.credit_booking_id,
+            )
+            if include_settled or item.open_amount > ZERO:
+                items.append(item)
+
         items.sort(
             key=lambda item: (
                 item.partner_name.casefold(),
@@ -197,14 +265,24 @@ class OpenItemOverviewRepository:
         if item is None:
             return None
 
+        cancellation_credit_id = (
+            self._session.query(GuthabenOP.invoice_cancellation_id)
+            .filter(GuthabenOP.open_item_id == str(open_item_id))
+            .scalar()
+        )
+        is_cancellation_credit = cancellation_credit_id is not None
         activities = [
             OpenItemActivity(
                 kind=OpenItemActivityKind.ORIGINAL,
-                activity_date=item.document_date,
+                activity_date=(item.booking_date if is_cancellation_credit else item.document_date),
                 booking_date=item.booking_date,
                 amount=item.original_amount,
                 reference=item.document_number,
-                description=f"Ursprungsbeleg – {item.kind.label}",
+                description=(
+                    f"Guthaben aus Rechnungsstorno – {item.document_number}"
+                    if is_cancellation_credit
+                    else f"Ursprungsbeleg – {item.kind.label}"
+                ),
                 booking_id=item.source_booking_id,
             )
         ]
@@ -265,8 +343,8 @@ class OpenItemOverviewRepository:
             if direction is PaymentDirection.CUSTOMER_RECEIPT
             else RechnungsOPStorno.payable_open_item_id
         )
-        storno_amount = (
-            self._session.query(func.sum(RechnungsOPStorno.amount))
+        storno_closed_amount = (
+            self._session.query(func.sum(RechnungsOPStorno.closed_open_amount))
             .filter(storno_column == open_item.open_item_id)
             .scalar()
             or ZERO
@@ -276,7 +354,7 @@ class OpenItemOverviewRepository:
         payments_amount = (
             summary.original_amount
             - offsets_amount
-            - storno_amount
+            - storno_closed_amount
             - summary.open_amount
         )
         return OpenItemOverviewItem(
@@ -496,13 +574,13 @@ class OpenItemOverviewRepository:
                 kind=OpenItemActivityKind.INVOICE_CANCELLATION,
                 activity_date=booking.booking_date,
                 booking_date=booking.booking_date,
-                amount=-storno.amount,
+                amount=-storno.closed_open_amount,
                 reference=(
                     f"Rechnungsstorno · {item.partner_name} · "
                     f"Rechnung {item.document_number}"
                 ),
                 description=(
-                    f"Hauptbuchgegenbuchung vom "
+                    f"OP-Schließung durch Hauptbuchgegenbuchung vom "
                     f"{booking.booking_date:%d.%m.%Y}; "
                     f"Grund: {storno.reason}"
                 ),
@@ -531,6 +609,11 @@ class OpenItemOverviewRepository:
             )
             .all()
         )
+        credit_reference = (
+            f"Rechnungsstorno {item.document_number.removeprefix('Storno ')}"
+            if item.document_number.startswith("Storno ")
+            else f"Gutschrift {item.document_number}"
+        )
         return [
             OpenItemActivity(
                 kind=OpenItemActivityKind.OFFSET,
@@ -538,7 +621,7 @@ class OpenItemOverviewRepository:
                 booking_date=booking.booking_date,
                 amount=-event.amount_delta,
                 reference=(
-                    f"Gutschriftenverrechnung · Gutschrift {item.document_number} "
+                    f"Guthabenverrechnung · {credit_reference} "
                     f"mit Rechnung {self._invoice_number_for_open_item(
                         settlement.receivable_open_item_id
                         or settlement.payable_open_item_id,

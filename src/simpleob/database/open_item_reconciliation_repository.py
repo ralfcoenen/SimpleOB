@@ -137,6 +137,43 @@ class OpenItemReconciliationRepository:
                 "balance": op.amount if booking.booking_date <= as_of_date else _ZERO,
             }
 
+        cancellation_credit_rows = (
+            self._session.query(GuthabenOP, RechnungsOPStorno, Buchung)
+            .join(
+                RechnungsOPStorno,
+                GuthabenOP.invoice_cancellation_id == RechnungsOPStorno.storno_id,
+            )
+            .join(Buchung, RechnungsOPStorno.credit_booking_id == Buchung.booking_id)
+            .join(Wirtschaftsjahr, Buchung.wirtschaftsjahr_id == Wirtschaftsjahr.id)
+            .filter(
+                RechnungsOPStorno.mandant_id == company.id,
+                Wirtschaftsjahr.mandant_id == company.id,
+            )
+            .all()
+        )
+        for op, cancellation, booking in cancellation_credit_rows:
+            if cancellation.receivable_invoice_id is not None:
+                role, side, account_type = (
+                    "CUSTOMER_CREDIT_BALANCES", "CREDIT", "LIABILITY"
+                )
+            else:
+                role, side, account_type = (
+                    "SUPPLIER_CREDIT_BALANCES", "DEBIT", "ASSET"
+                )
+            account_number = self._source_account(
+                company.id, booking.booking_id, side, account_type, op.amount
+            )
+            if account_number:
+                role_accounts[role].add(account_number)
+            else:
+                unresolved_roles.add(role)
+            known_booking_ids.add(booking.booking_id)
+            item_state[op.open_item_id] = {
+                "role": role,
+                "account": account_number,
+                "balance": op.amount if booking.booking_date <= as_of_date else _ZERO,
+            }
+
         # Payment and settlement events are dated by their associated ledger
         # booking, not by their operational/effective date.
         for event, payment, booking in (
@@ -214,7 +251,7 @@ class OpenItemReconciliationRepository:
                 )
                 state = item_state.get(open_item_id)
                 if state is not None and state["balance"] is not None:
-                    state["balance"] -= storno.amount
+                    state["balance"] -= storno.closed_open_amount
 
         # Current-year opening bookings already carry prior balance-sheet
         # balances forward; do not add earlier fiscal-year balances twice.

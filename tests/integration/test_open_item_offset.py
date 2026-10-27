@@ -255,6 +255,13 @@ def test_full_and_partial_offsets_reduce_both_open_items(
         invoice, credit_note, invoice_id, credit_id = _create_invoice_and_credit(
             session, company, partner, receivable, payable, credit_service, direction
         )
+        regular_credit = offsets._offset_repository.get_credit(
+            company_id=company.company_id,
+            partner_id=partner.partner_id,
+            open_item_id=credit_id,
+            direction=direction,
+        )
+        assert regular_credit.cancellation_booking_date is None
         first = _post_offset(offsets, company, partner, direction, invoice_id, credit_id, "30.00")
         first_booking = session.query(Buchung).filter_by(booking_id=str(first.booking_id)).one()
         assert {line.account_number: line.side for line in first_booking.zeilen} == {

@@ -1,4 +1,4 @@
-"""Vollständiges Storno unbezahlter Kunden- und Lieferantenrechnungen."""
+"""Vollständiges Storno von Kunden- und Lieferantenrechnungen."""
 
 from datetime import date
 from uuid import UUID

@@ -1,5 +1,6 @@
 """Persistenz und Restbetragsprüfung für manuelle OP-Verrechnungen."""
 
+from datetime import date
 from decimal import Decimal
 from uuid import UUID
 
@@ -19,6 +20,7 @@ from simpleob.database.models import (
     Konto,
     Mandant,
     OPGuthabenverrechnung,
+    RechnungsOPStorno,
     RechnungsOPVerrechnungsereignis,
     VerbindlichkeitsOP,
     Wirtschaftsjahr,
@@ -133,21 +135,105 @@ class OpenItemOffsetRepository:
         open_item = query.one_or_none()
         if open_item is None:
             return None
-        credit_note = (
-            self._session.query(Gutschrift)
-            .filter(Gutschrift.credit_note_id == open_item.credit_note_id)
-            .one()
-        )
-        company = self._session.query(Mandant).filter(
-            Mandant.id == credit_note.mandant_id
-        ).one()
+        cancellation_booking_date = None
+        if open_item.credit_note_id is not None:
+            credit_note = (
+                self._session.query(Gutschrift)
+                .filter(Gutschrift.credit_note_id == open_item.credit_note_id)
+                .one_or_none()
+            )
+            if credit_note is None:
+                raise ValueError("Die Gutschrift-Herkunft des Guthaben-OPs fehlt.")
+            company = self._session.query(Mandant).filter(
+                Mandant.id == credit_note.mandant_id
+            ).one()
+            if credit_note.credit_note_kind != direction.value:
+                raise ValueError("Guthaben und Rechnungs-OP passen fachlich nicht zusammen.")
+            if credit_note.partner_id != str(partner_id):
+                raise ValueError("Der Guthaben-OP gehört zu einem anderen Geschäftspartner.")
+            source_booking_id = credit_note.booking_id
+            document_number = credit_note.note_number
+        elif open_item.invoice_cancellation_id is not None:
+            cancellation = (
+                self._session.query(RechnungsOPStorno)
+                .filter(RechnungsOPStorno.storno_id == open_item.invoice_cancellation_id)
+                .one_or_none()
+            )
+            if cancellation is None or cancellation.credit_booking_id is None:
+                raise ValueError("Die Stornoherkunft oder Guthabenumbuchung des Guthaben-OPs fehlt.")
+            company = self._session.query(Mandant).filter(
+                Mandant.id == cancellation.mandant_id
+            ).one()
+            if cancellation.partner_id != str(partner_id):
+                raise ValueError("Der Guthaben-OP gehört zu einem anderen Geschäftspartner.")
+            if direction is OffsetDirection.CUSTOMER:
+                if cancellation.receivable_invoice_id is None or cancellation.payable_invoice_id is not None:
+                    raise ValueError("Die Stornoherkunft passt nicht zu einem Kundenguthaben.")
+                source_invoice = (
+                    self._session.query(Ausgangsrechnung)
+                    .filter(Ausgangsrechnung.invoice_id == cancellation.receivable_invoice_id)
+                    .one_or_none()
+                )
+            else:
+                if cancellation.payable_invoice_id is None or cancellation.receivable_invoice_id is not None:
+                    raise ValueError("Die Stornoherkunft passt nicht zu einem Lieferantenguthaben.")
+                source_invoice = (
+                    self._session.query(Eingangsrechnung)
+                    .filter(Eingangsrechnung.invoice_id == cancellation.payable_invoice_id)
+                    .one_or_none()
+                )
+            if (
+                source_invoice is None
+                or source_invoice.mandant_id != company.id
+                or source_invoice.partner_id != cancellation.partner_id
+            ):
+                raise ValueError("Rechnungsstorno und Guthaben-OP haben keine passende Mandanten-/Partnerherkunft.")
+            source_booking_id = cancellation.credit_booking_id
+            document_number = f"Storno {source_invoice.invoice_number}"
+            referenced_bookings = (
+                self._session.query(Buchung, Wirtschaftsjahr)
+                .join(Wirtschaftsjahr, Buchung.wirtschaftsjahr_id == Wirtschaftsjahr.id)
+                .filter(
+                    Buchung.booking_id.in_(
+                        (cancellation.booking_id, source_booking_id)
+                    ),
+                )
+                .all()
+            )
+            bookings_by_id = {
+                booking.booking_id: (booking, fiscal_year)
+                for booking, fiscal_year in referenced_bookings
+            }
+            reversal_reference = bookings_by_id.get(cancellation.booking_id)
+            transfer_reference = bookings_by_id.get(source_booking_id)
+            if reversal_reference is None or transfer_reference is None:
+                raise ValueError(
+                    "Die Rechnungsgegenbuchung oder Guthabenumbuchung fehlt."
+                )
+            reversal_booking, reversal_year = reversal_reference
+            transfer_booking, transfer_year = transfer_reference
+            if (
+                reversal_year.mandant_id != company.id
+                or transfer_year.mandant_id != company.id
+            ):
+                raise ValueError(
+                    "Die Rechnungsgegenbuchung oder Guthabenumbuchung "
+                    "gehört zu einem anderen Mandanten."
+                )
+            if (
+                reversal_booking.wirtschaftsjahr_id
+                != transfer_booking.wirtschaftsjahr_id
+                or reversal_booking.booking_date != transfer_booking.booking_date
+            ):
+                raise ValueError(
+                    "Rechnungsgegenbuchung und Guthabenumbuchung müssen "
+                    "dasselbe Geschäftsjahr und Buchungsdatum haben."
+                )
+            cancellation_booking_date = transfer_booking.booking_date
+        else:
+            raise ValueError("Der Guthaben-OP hat keine unterstützte Herkunft.")
         if company.company_id != str(company_id):
             raise ValueError("Der Guthaben-OP gehört nicht zum geöffneten Mandanten.")
-        expected_kind = direction.value
-        if credit_note.credit_note_kind != expected_kind:
-            raise ValueError("Guthaben und Rechnungs-OP passen fachlich nicht zusammen.")
-        if credit_note.partner_id != str(partner_id):
-            raise ValueError("Der Guthaben-OP gehört zu einem anderen Geschäftspartner.")
         partner = (
             self._session.query(Geschaeftspartner)
             .filter(
@@ -175,7 +261,7 @@ class OpenItemOffsetRepository:
             raise ValueError("Die Guthaben-OP-Ereignisse reduzieren den Ursprungsbetrag unter null.")
         account_number = self._source_account_number(
             mandant_id=company.id,
-            booking_id=credit_note.booking_id,
+            booking_id=source_booking_id,
             side=(
                 EntrySide.CREDIT
                 if direction is OffsetDirection.CUSTOMER
@@ -194,11 +280,27 @@ class OpenItemOffsetRepository:
             partner_id=partner_id,
             open_item_id=open_item_id,
             direction=direction,
-            document_number=credit_note.note_number,
+            document_number=document_number,
             original_amount=open_item.amount,
             available_amount=available_amount,
             account_number=account_number,
+            cancellation_booking_date=cancellation_booking_date,
         )
+
+    @staticmethod
+    def ensure_credit_booking_date(
+        *, credit: CreditOffsetSummary, booking_date: date
+    ) -> None:
+        """Verhindert eine Verrechnung vor Entstehung eines Storno-Guthabens."""
+        if (
+            credit.cancellation_booking_date is not None
+            and booking_date < credit.cancellation_booking_date
+        ):
+            raise ValueError(
+                "Das Buchungsdatum der Verrechnung darf nicht vor dem "
+                "Entstehungsdatum des stornobasierten Guthabens liegen "
+                f"({credit.cancellation_booking_date:%d.%m.%Y})."
+            )
 
     def list_open_invoices(
         self, *, company_id: UUID, partner_id: UUID, direction: OffsetDirection
@@ -223,7 +325,7 @@ class OpenItemOffsetRepository:
         company = self._company_or_none(company_id)
         if company is None:
             return ()
-        open_items = (
+        credit_note_items = (
             self._session.query(GuthabenOP.open_item_id)
             .join(Gutschrift, GuthabenOP.credit_note_id == Gutschrift.credit_note_id)
             .filter(
@@ -233,6 +335,46 @@ class OpenItemOffsetRepository:
             )
             .all()
         )
+        if direction is OffsetDirection.CUSTOMER:
+            cancellation_ids = [
+                storno_id
+                for (storno_id,) in
+                self._session.query(RechnungsOPStorno.storno_id)
+                .join(
+                    Ausgangsrechnung,
+                    RechnungsOPStorno.receivable_invoice_id == Ausgangsrechnung.invoice_id,
+                )
+                .filter(
+                    RechnungsOPStorno.mandant_id == company.id,
+                    RechnungsOPStorno.partner_id == str(partner_id),
+                    Ausgangsrechnung.mandant_id == company.id,
+                    Ausgangsrechnung.partner_id == str(partner_id),
+                    RechnungsOPStorno.credit_booking_id.is_not(None),
+                ).all()
+            ]
+        else:
+            cancellation_ids = [
+                storno_id
+                for (storno_id,) in
+                self._session.query(RechnungsOPStorno.storno_id)
+                .join(
+                    Eingangsrechnung,
+                    RechnungsOPStorno.payable_invoice_id == Eingangsrechnung.invoice_id,
+                )
+                .filter(
+                    RechnungsOPStorno.mandant_id == company.id,
+                    RechnungsOPStorno.partner_id == str(partner_id),
+                    Eingangsrechnung.mandant_id == company.id,
+                    Eingangsrechnung.partner_id == str(partner_id),
+                    RechnungsOPStorno.credit_booking_id.is_not(None),
+                ).all()
+            ]
+        cancellation_items = (
+            self._session.query(GuthabenOP.open_item_id)
+            .filter(GuthabenOP.invoice_cancellation_id.in_(cancellation_ids))
+            .all()
+        )
+        open_items = credit_note_items + cancellation_items
         summaries = []
         for (stored_open_item_id,) in open_items:
             summary = self.get_credit(
@@ -291,6 +433,15 @@ class OpenItemOffsetRepository:
         )
         if invoice is None or credit is None:
             raise ValueError("Ein zu verrechnender OP ist nicht vorhanden.")
+        booking = self._session.query(Buchung).filter_by(
+            booking_id=str(offset.booking_id)
+        ).one_or_none()
+        if booking is None:
+            raise ValueError("Die Hauptbuchbuchung der Verrechnung fehlt.")
+        self.ensure_credit_booking_date(
+            credit=credit,
+            booking_date=booking.booking_date,
+        )
         self.ensure_invoice_not_cancelled(
             open_item_id=offset.invoice_open_item_id,
             direction=self._payment_direction(offset.direction),

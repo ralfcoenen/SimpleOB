@@ -88,6 +88,10 @@ class OpenItemOffsetService:
             )
             if invoice is None or credit is None:
                 raise ValueError("Ein zu verrechnender OP ist nicht vorhanden.")
+            self._offset_repository.ensure_credit_booking_date(
+                credit=credit,
+                booking_date=booking_date,
+            )
             self._offset_repository.ensure_invoice_not_cancelled(
                 open_item_id=invoice_open_item_id,
                 direction=direction,

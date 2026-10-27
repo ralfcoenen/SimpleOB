@@ -8,12 +8,14 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from simpleob.database.booking_repository import BookingRepository
+from simpleob.database.chart_of_accounts_repository import ChartOfAccountsRepository
 from simpleob.database.models import (
     Ausgangsrechnung,
     Buchungszeile,
     Eingangsrechnung,
     ForderungsOP,
     Geschaeftspartner,
+    GuthabenOP,
     Konto,
     Mandant,
     RechnungsOPStorno,
@@ -26,6 +28,7 @@ from simpleob.database.models import (
     Zahlungszuordnungskorrekturereignis,
 )
 from simpleob.database.models import Buchung as BuchungModel
+from simpleob.database.open_item_offset_repository import OpenItemOffsetRepository
 from simpleob.database.open_item_payment_repository import (
     OpenItemPaymentRepository,
 )
@@ -39,6 +42,7 @@ from simpleob.domain.open_item_invoice_cancellation import (
     InvoiceCancellationPaymentAssessment,
     InvoiceCancellationPreview,
 )
+from simpleob.domain.open_item_offset import OffsetDirection
 from simpleob.domain.open_item_payment import PaymentDirection
 
 
@@ -334,18 +338,61 @@ class OpenItemInvoiceCancellationRepository:
                 raise ValueError("Bitte geben Sie einen Stornogrund ein.")
             reason = reason.strip()
             company = self._company(company_id)
+            # OP-Schreibpfade sperren zuerst die betroffenen OP-Zeilen und
+            # anschließend das Geschäftsjahr in BookingRepository.add().
+            # Dieselbe Reihenfolge verhindert eine FY/OP-Lock-Inversion.
             target_year = self._booking_repository.require_open_fiscal_year(
                 company_id=company_id,
                 fiscal_year=fiscal_year,
                 booking_date=booking_date,
-                for_update=True,
+                for_update=False,
             )
             preview = self._load_eligible_invoice(
                 company=company,
                 target_year=target_year,
                 open_item_id=open_item_id,
                 for_update=True,
+                allow_payment_history=True,
             )
+            locked_year = self._booking_repository.require_open_fiscal_year(
+                company_id=company_id,
+                fiscal_year=fiscal_year,
+                booking_date=booking_date,
+                for_update=True,
+            )
+            if locked_year.id != target_year.id:
+                raise ValueError("Das ausgewählte Geschäftsjahr hat sich während der Prüfung geändert.")
+            assessment = self.assess_payment_history(
+                company_id=company_id,
+                fiscal_year=fiscal_year,
+                open_item_id=open_item_id,
+                proposed_booking_date=booking_date,
+            )
+            invoice_amount = preview.amount
+            paid_amount = assessment.effective_payment_amount
+            open_amount = assessment.open_amount
+            if (
+                assessment.invoice_amount != invoice_amount
+                or paid_amount < ZERO
+                or paid_amount > invoice_amount
+                or open_amount < ZERO
+                or open_amount > invoice_amount
+                or open_amount != invoice_amount - paid_amount
+            ):
+                raise ValueError("Die Zahlungs- und Rechnungsbeträge sind nicht konsistent.")
+
+            transfer_booking: Booking | None = None
+            if paid_amount > ZERO:
+                transfer_booking = self._build_paid_amount_transfer(
+                    company_id=company_id,
+                    partner_id=preview.partner_id,
+                    open_item_id=preview.open_item_id,
+                    supplier_invoice=preview.supplier_invoice,
+                    original_booking=preview.original_booking,
+                    booking_date=booking_date,
+                    amount=paid_amount,
+                    invoice_number=preview.invoice_number,
+                )
             reversal = Booking(
                 booking_date=booking_date,
                 description=(
@@ -388,6 +435,15 @@ class OpenItemInvoiceCancellationRepository:
                     for position, line in enumerate(reversal.lines)
                 ],
             )
+            self._session.add(stored_booking)
+            self._session.flush()
+            if transfer_booking is not None:
+                self._booking_repository.add(
+                    company_id=company_id,
+                    fiscal_year=fiscal_year,
+                    booking=transfer_booking,
+                    commit=False,
+                )
             storno = RechnungsOPStorno(
                 storno_id=str(uuid4()),
                 mandant_id=company.id,
@@ -413,18 +469,94 @@ class OpenItemInvoiceCancellationRepository:
                     else None
                 ),
                 booking_id=str(reversal.booking_id),
-                amount=preview.amount,
-                closed_open_amount=preview.amount,
+                amount=invoice_amount,
+                closed_open_amount=open_amount,
+                credit_booking_id=(
+                    str(transfer_booking.booking_id)
+                    if transfer_booking is not None
+                    else None
+                ),
                 recorded_at=datetime.now(timezone.utc),
                 reason=reason,
             )
-            self._session.add_all((stored_booking, storno))
+            self._session.add(storno)
             self._session.flush()
+            if transfer_booking is not None:
+                self._session.add(
+                    GuthabenOP(
+                        open_item_id=str(uuid4()),
+                        credit_note_id=None,
+                        invoice_cancellation_id=storno.storno_id,
+                        amount=paid_amount,
+                    )
+                )
+                self._session.flush()
             self._booking_repository.commit()
             return UUID(storno.storno_id)
         except Exception:
             self._booking_repository.rollback()
             raise
+
+    def _build_paid_amount_transfer(
+        self,
+        *,
+        company_id: UUID,
+        partner_id: UUID,
+        open_item_id: UUID,
+        supplier_invoice: bool,
+        original_booking: Booking,
+        booking_date: date,
+        amount: Decimal,
+        invoice_number: str,
+    ) -> Booking:
+        chart = ChartOfAccountsRepository(self._session)
+        roles = chart.load_account_roles(company_id)
+        if roles is None:
+            raise ValueError("Für den Mandanten sind keine Kontenrollen konfiguriert.")
+        credit_accounts = (
+            roles.supplier_credit_balances
+            if supplier_invoice
+            else roles.customer_credit_balances
+        )
+        role_label = "Lieferantenguthabenkonto" if supplier_invoice else "Kundenguthabenkonto"
+        if len(credit_accounts) != 1:
+            raise ValueError(f"Für den Mandanten muss genau ein {role_label} konfiguriert sein.")
+        credit_account = next(iter(credit_accounts))
+        validator = (
+            chart.validate_supplier_credit_balance_account
+            if supplier_invoice
+            else chart.validate_customer_credit_balance_account
+        )
+        validator(company_id=company_id, account_number=credit_account)
+
+        direction = OffsetDirection.SUPPLIER if supplier_invoice else OffsetDirection.CUSTOMER
+        invoice = OpenItemOffsetRepository(self._session).get_invoice(
+            company_id=company_id,
+            partner_id=partner_id,
+            open_item_id=open_item_id,
+            direction=direction,
+            for_update=True,
+        )
+        if invoice is None:
+            raise ValueError("Das Forderungs- beziehungsweise Verbindlichkeitskonto der Rechnung ist nicht ermittelbar.")
+        if invoice.account_number not in {line.account_number for line in original_booking.lines}:
+            raise ValueError("Das tatsächliche Rechnungskonto stimmt nicht mit der Originalbuchung überein.")
+
+        if supplier_invoice:
+            lines = (
+                BookingLine(credit_account, EntrySide.DEBIT, amount),
+                BookingLine(invoice.account_number, EntrySide.CREDIT, amount),
+            )
+        else:
+            lines = (
+                BookingLine(invoice.account_number, EntrySide.DEBIT, amount),
+                BookingLine(credit_account, EntrySide.CREDIT, amount),
+            )
+        return Booking(
+            booking_date=booking_date,
+            description=f"Guthabenübertrag aus Rechnungsstorno {invoice_number}",
+            lines=lines,
+        )
 
     def _load_eligible_invoice(
         self,
