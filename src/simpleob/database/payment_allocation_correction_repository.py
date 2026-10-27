@@ -19,6 +19,9 @@ from simpleob.database.models import (
     Zahlungszuordnungskorrektur,
     Zahlungszuordnungskorrekturereignis,
 )
+from simpleob.database.open_item_payment_repository import (
+    OpenItemPaymentRepository,
+)
 from simpleob.domain.fiscal_year import FiscalYear
 from simpleob.domain.fiscal_year_status import FiscalYearStatus
 from simpleob.domain.money import ZERO
@@ -32,6 +35,7 @@ from simpleob.domain.payment_allocation_correction import (
 class PaymentAllocationCorrectionRepository:
     def __init__(self, session: Session) -> None:
         self._session = session
+        self._payments = OpenItemPaymentRepository(session)
 
     def get_correctable(
         self, *, company_id: UUID, event_id: UUID, for_update: bool = False
@@ -118,6 +122,22 @@ class PaymentAllocationCorrectionRepository:
                 "Korrekturdatum oder Buchungsdatum liegt außerhalb des "
                 "offenen Geschäftsjahres dieses Mandanten."
             )
+        source = self._payments.get_open_invoice(
+            company_id=correction.company_id,
+            open_item_id=correction.source_open_item_id,
+            direction=correction.direction,
+            for_update=True,
+        )
+        if source is None or source.partner_id != correction.partner_id:
+            raise ValueError("Die Quellrechnung gehört nicht zum Mandanten oder Geschäftspartner.")
+        target = self._payments.get_open_invoice(
+            company_id=correction.company_id,
+            open_item_id=correction.target_open_item_id,
+            direction=correction.direction,
+            for_update=True,
+        )
+        if target is None or target.partner_id != correction.partner_id:
+            raise ValueError("Die Zielrechnung gehört nicht zum Mandanten oder Geschäftspartner.")
         candidate = self.get_correctable(
             company_id=correction.company_id,
             event_id=correction.original_event_id,
@@ -127,6 +147,14 @@ class PaymentAllocationCorrectionRepository:
             raise ValueError("Der Betrag übersteigt den noch korrigierbaren Anteil der Zuordnung.")
         if candidate.payment_id != correction.payment_id or candidate.partner_id != correction.partner_id or candidate.direction is not correction.direction or candidate.source_open_item_id != correction.source_open_item_id:
             raise ValueError("Die Korrektur stimmt nicht mit der ursprünglichen Zahlungszuordnung überein.")
+        self._payments.ensure_not_cancelled(
+            open_item_id=correction.source_open_item_id,
+            direction=correction.direction,
+        )
+        self._payments.ensure_not_cancelled(
+            open_item_id=correction.target_open_item_id,
+            direction=correction.direction,
+        )
         if correction.booking_id is not None:
             booking = self._session.query(Buchung).filter_by(
                 booking_id=str(correction.booking_id)

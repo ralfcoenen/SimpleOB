@@ -88,6 +88,10 @@ class OpenItemOffsetService:
             )
             if invoice is None or credit is None:
                 raise ValueError("Ein zu verrechnender OP ist nicht vorhanden.")
+            self._offset_repository.ensure_invoice_not_cancelled(
+                open_item_id=invoice_open_item_id,
+                direction=direction,
+            )
             if invoice.partner_id != credit.partner_id or invoice.partner_id != partner_id:
                 raise ValueError("Rechnungs-OP und Guthaben-OP müssen demselben Geschäftspartner gehören.")
             if invoice.direction is not credit.direction or invoice.direction is not direction:

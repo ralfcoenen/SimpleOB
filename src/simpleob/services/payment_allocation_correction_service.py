@@ -53,6 +53,10 @@ class PaymentAllocationCorrectionService:
             source = self._corrections.get_correctable(company_id=company_id, event_id=original_event_id)
             if source is None:
                 raise ValueError("Die ursprüngliche Zahlungszuordnung ist nicht vorhanden.")
+            self._payments.ensure_not_cancelled(
+                open_item_id=source.source_open_item_id,
+                direction=source.direction,
+            )
             if target_open_item_id == source.source_open_item_id:
                 raise ValueError("Quell- und Zielrechnung müssen unterschiedlich sein.")
             if amount > source.correctable_amount:
@@ -64,6 +68,10 @@ class PaymentAllocationCorrectionService:
                 open_item_id=target_open_item_id, direction=direction, for_update=True)
             if source_invoice is None or target_invoice is None:
                 raise ValueError("Quell- oder Zielrechnung ist nicht vorhanden.")
+            self._payments.ensure_not_cancelled(
+                open_item_id=target_open_item_id,
+                direction=source.direction,
+            )
             if target_invoice.open_amount < amount:
                 raise ValueError("Der offene Betrag der Zielrechnung reicht nicht aus.")
             booking_id = None

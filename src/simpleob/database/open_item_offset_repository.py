@@ -291,6 +291,10 @@ class OpenItemOffsetRepository:
         )
         if invoice is None or credit is None:
             raise ValueError("Ein zu verrechnender OP ist nicht vorhanden.")
+        self.ensure_invoice_not_cancelled(
+            open_item_id=offset.invoice_open_item_id,
+            direction=self._payment_direction(offset.direction),
+        )
         if offset.amount > invoice.open_amount:
             raise ValueError("Der Verrechnungsbetrag übersteigt den offenen Rechnungsbetrag.")
         if offset.amount > credit.available_amount:
@@ -411,6 +415,17 @@ class OpenItemOffsetRepository:
                 f"Das tatsächlich bebuchte {label}-Konto ist nicht eindeutig ermittelbar."
             )
         return matches[0]
+
+    def ensure_invoice_not_cancelled(
+        self,
+        *,
+        open_item_id: UUID,
+        direction: OffsetDirection,
+    ) -> None:
+        self._payment_repository.ensure_not_cancelled(
+            open_item_id=open_item_id,
+            direction=self._payment_direction(direction),
+        )
 
     def _company(self, company_id: UUID) -> Mandant:
         company = self._company_or_none(company_id)

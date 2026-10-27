@@ -110,6 +110,10 @@ class OpenItemPaymentRepository:
             )
             if invoice is None:
                 raise ValueError("Ein Rechnungs-OP ist nicht vorhanden.")
+            self.ensure_not_cancelled(
+                open_item_id=event.open_item_id,
+                direction=payment.direction,
+            )
             if invoice.partner_id != partner_id:
                 raise ValueError("Alle Rechnungs-OPs müssen demselben Geschäftspartner gehören.")
             if invoice.open_amount <= ZERO:
@@ -333,6 +337,26 @@ class OpenItemPaymentRepository:
             open_amount=open_amount,
             partner_name=partner.name,
         )
+
+    def ensure_not_cancelled(
+        self,
+        *,
+        open_item_id: UUID,
+        direction: PaymentDirection,
+    ) -> None:
+        """Verhindert neue OP-Bewegungen auf einer bereits stornierten Rechnung."""
+        if direction is PaymentDirection.CUSTOMER_RECEIPT:
+            query = self._session.query(RechnungsOPStorno.id).filter(
+                RechnungsOPStorno.receivable_open_item_id == str(open_item_id)
+            )
+        elif direction is PaymentDirection.SUPPLIER_PAYMENT:
+            query = self._session.query(RechnungsOPStorno.id).filter(
+                RechnungsOPStorno.payable_open_item_id == str(open_item_id)
+            )
+        else:
+            raise TypeError("direction must be a PaymentDirection")
+        if query.first():
+            raise ValueError("Der Rechnungs-OP wurde bereits storniert und kann nicht erneut verwendet werden.")
 
     def list_open_invoices(self, company_id: UUID) -> tuple[OpenInvoiceSummary, ...]:
         company = (

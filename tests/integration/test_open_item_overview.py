@@ -2,14 +2,14 @@
 
 import os
 from concurrent.futures import ThreadPoolExecutor
-from datetime import date
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 from threading import Barrier
 from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy import create_engine, event, text
+from sqlalchemy import create_engine, event, func, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -1436,4 +1436,435 @@ def test_postgresql_cancels_customer_and_supplier_invoices_atomically(monkeypatc
             session.close()
         transaction.rollback()
         connection.close()
+        engine.dispose()
+
+
+def _cancellation_service(session: Session) -> OpenItemInvoiceCancellationService:
+    return OpenItemInvoiceCancellationService(
+        OpenItemInvoiceCancellationRepository(
+            session=session,
+            booking_repository=BookingRepository(session),
+        )
+    )
+
+
+def test_payment_assessment_nets_multiple_payments_and_correction_roles():
+    (
+        engine, session, company, _other_company, partner, _other_partner,
+        receivables, _payables, payments, _credits, _offsets, corrections,
+        _overview,
+    ) = _environment()
+    try:
+        source = _invoice(
+            receivables, company, partner, year=FY26,
+            number="AR-ASSESS-SOURCE", date_value=date(2026, 3, 1),
+        )
+        target = _invoice(
+            receivables, company, partner, year=FY26,
+            number="AR-ASSESS-TARGET", date_value=date(2026, 3, 1),
+        )
+        source_id = _open_id(
+            session, ForderungsOP, foreign_key="invoice_id", foreign_id=source.invoice_id
+        )
+        target_id = _open_id(
+            session, ForderungsOP, foreign_key="invoice_id", foreign_id=target.invoice_id
+        )
+        first = _post_payment(
+            payments, company, partner, source_id,
+            direction=PaymentDirection.CUSTOMER_RECEIPT,
+            amount="50.00", booking_date=date(2026, 3, 3),
+        )
+        _post_payment(
+            payments, company, partner, source_id,
+            direction=PaymentDirection.CUSTOMER_RECEIPT,
+            amount="20.00", booking_date=date(2026, 3, 5),
+        )
+        event_id = UUID(
+            session.query(RechnungsOPZahlungsereignis.event_id)
+            .filter_by(payment_id=str(first.payment_id)).scalar()
+        )
+        corrections.correct(
+            company_id=company.company_id, fiscal_year=FY26,
+            original_event_id=event_id, target_open_item_id=target_id,
+            amount=Decimal("10.00"), correction_date=date(2026, 3, 8),
+            booking_date=date(2026, 3, 8), reason="Fehlzuordnung", confirmed=True,
+        )
+
+        service = _cancellation_service(session)
+        source_assessment = service.assess_payment_history(
+            company_id=company.company_id, fiscal_year=FY26,
+            open_item_id=source_id, proposed_booking_date=date(2026, 3, 8),
+        )
+        assert source_assessment.payment_event_amount == Decimal("70.00")
+        assert source_assessment.correction_delta == Decimal("-10.00")
+        assert source_assessment.effective_payment_amount == Decimal("60.00")
+        assert source_assessment.open_amount == Decimal("59.00")
+        assert source_assessment.latest_payment_booking_date == date(2026, 3, 5)
+        assert source_assessment.latest_correction_booking_date == date(2026, 3, 8)
+        assert source_assessment.latest_required_booking_date == date(2026, 3, 8)
+        assert source_assessment.payment_event_count == 2
+        assert source_assessment.correction_count == 1
+
+        target_assessment = service.assess_payment_history(
+            company_id=company.company_id, fiscal_year=FY26,
+            open_item_id=target_id, proposed_booking_date=date(2026, 3, 8),
+        )
+        assert target_assessment.payment_event_amount == Decimal("0.00")
+        assert target_assessment.correction_delta == Decimal("10.00")
+        assert target_assessment.effective_payment_amount == Decimal("10.00")
+        assert target_assessment.open_amount == Decimal("109.00")
+        with pytest.raises(ValueError, match="nicht vor dem spätesten"):
+            service.assess_payment_history(
+                company_id=company.company_id, fiscal_year=FY26,
+                open_item_id=source_id, proposed_booking_date=date(2026, 3, 7),
+            )
+        source_release = session.query(
+            Zahlungszuordnungskorrekturereignis
+        ).filter_by(event_role="SOURCE_RELEASE").one()
+        source_release.amount_delta = Decimal("-9.00")
+        session.commit()
+        with pytest.raises(ValueError, match="sind widersprüchlich"):
+            service.assess_payment_history(
+                company_id=company.company_id, fiscal_year=FY26,
+                open_item_id=source_id, proposed_booking_date=date(2026, 3, 8),
+            )
+    finally:
+        session.close()
+        engine.dispose()
+
+
+def test_payment_assessment_nets_repeated_partial_corrections_once():
+    (
+        engine, session, company, _other_company, partner, _other_partner,
+        receivables, _payables, payments, _credits, _offsets, corrections,
+        _overview,
+    ) = _environment()
+    try:
+        source = _invoice(
+            receivables, company, partner, year=FY26,
+            number="AR-ASSESS-REPEATED-SOURCE", date_value=date(2026, 3, 1),
+        )
+        target = _invoice(
+            receivables, company, partner, year=FY26,
+            number="AR-ASSESS-REPEATED-TARGET", date_value=date(2026, 3, 1),
+        )
+        source_id = _open_id(
+            session, ForderungsOP, foreign_key="invoice_id", foreign_id=source.invoice_id
+        )
+        target_id = _open_id(
+            session, ForderungsOP, foreign_key="invoice_id", foreign_id=target.invoice_id
+        )
+        payment = _post_payment(
+            payments, company, partner, source_id,
+            direction=PaymentDirection.CUSTOMER_RECEIPT,
+            amount="50.00", booking_date=date(2026, 3, 3),
+        )
+        event_id = UUID(
+            session.query(RechnungsOPZahlungsereignis.event_id)
+            .filter_by(payment_id=str(payment.payment_id)).scalar()
+        )
+        for amount, event_date in (
+            (Decimal("10.00"), date(2026, 3, 5)),
+            (Decimal("15.00"), date(2026, 3, 7)),
+        ):
+            corrections.correct(
+                company_id=company.company_id,
+                fiscal_year=FY26,
+                original_event_id=event_id,
+                target_open_item_id=target_id,
+                amount=amount,
+                correction_date=event_date,
+                booking_date=event_date,
+                reason="Teilkorrektur der Zahlungszuordnung",
+                confirmed=True,
+            )
+
+        source_release_total = session.query(
+            func.sum(Zahlungszuordnungskorrekturereignis.amount_delta)
+        ).filter_by(
+            receivable_open_item_id=str(source_id), event_role="SOURCE_RELEASE"
+        ).scalar()
+        target_apply_total = session.query(
+            func.sum(Zahlungszuordnungskorrekturereignis.amount_delta)
+        ).filter_by(
+            receivable_open_item_id=str(target_id), event_role="TARGET_APPLY"
+        ).scalar()
+        assert source_release_total == Decimal("-25.00")
+        assert target_apply_total == Decimal("25.00")
+
+        service = _cancellation_service(session)
+        source_assessment = service.assess_payment_history(
+            company_id=company.company_id,
+            fiscal_year=FY26,
+            open_item_id=source_id,
+            proposed_booking_date=date(2026, 3, 7),
+        )
+        target_assessment = service.assess_payment_history(
+            company_id=company.company_id,
+            fiscal_year=FY26,
+            open_item_id=target_id,
+            proposed_booking_date=date(2026, 3, 7),
+        )
+        assert source_assessment.payment_event_amount == Decimal("50.00")
+        assert source_assessment.correction_delta == Decimal("-25.00")
+        assert source_assessment.effective_payment_amount == Decimal("25.00")
+        assert source_assessment.open_amount == Decimal("94.00")
+        assert source_assessment.correction_count == 2
+        assert target_assessment.payment_event_amount == Decimal("0.00")
+        assert target_assessment.correction_delta == Decimal("25.00")
+        assert target_assessment.effective_payment_amount == Decimal("25.00")
+        assert target_assessment.open_amount == Decimal("94.00")
+        assert target_assessment.correction_count == 2
+    finally:
+        session.close()
+        engine.dispose()
+
+
+@pytest.mark.parametrize("supplier", (False, True), ids=("customer", "supplier"))
+def test_payment_assessment_supports_fully_paid_customer_and_supplier_invoices(supplier):
+    (
+        engine, session, company, _other_company, partner, _other_partner,
+        receivables, payables, payments, _credits, _offsets, _corrections,
+        _overview,
+    ) = _environment()
+    try:
+        invoice = _invoice(
+            payables if supplier else receivables,
+            company, partner, year=FY26,
+            number="AP-ASSESS-FULL" if supplier else "AR-ASSESS-FULL",
+            date_value=date(2026, 3, 1), supplier=supplier,
+        )
+        op_model = VerbindlichkeitsOP if supplier else ForderungsOP
+        open_item_id = _open_id(
+            session, op_model, foreign_key="invoice_id", foreign_id=invoice.invoice_id
+        )
+        direction = (
+            PaymentDirection.SUPPLIER_PAYMENT
+            if supplier
+            else PaymentDirection.CUSTOMER_RECEIPT
+        )
+        _post_payment(
+            payments, company, partner, open_item_id,
+            direction=direction, amount="70.00", booking_date=date(2026, 3, 3),
+        )
+        payments.post_payment(
+            company_id=company.company_id,
+            fiscal_year=FY26,
+            partner_id=partner.partner_id,
+            open_item_id=open_item_id,
+            direction=direction,
+            amount=Decimal("49.00"),
+            payment_date=date(2026, 3, 1),
+            booking_date=date(2026, 3, 5),
+            cash_bank_account_number="1000",
+        )
+        assessment = _cancellation_service(session).assess_payment_history(
+            company_id=company.company_id, fiscal_year=FY26,
+            open_item_id=open_item_id, proposed_booking_date=date(2026, 3, 5),
+        )
+        assert assessment.invoice_amount == Decimal("119.00")
+        assert assessment.effective_payment_amount == Decimal("119.00")
+        assert assessment.open_amount == Decimal("0.00")
+        assert assessment.payment_event_count == 2
+        assert assessment.latest_required_booking_date == date(2026, 3, 5)
+        with pytest.raises(ValueError, match="nicht vor dem spätesten"):
+            _cancellation_service(session).assess_payment_history(
+                company_id=company.company_id, fiscal_year=FY26,
+                open_item_id=open_item_id, proposed_booking_date=date(2026, 3, 4),
+            )
+    finally:
+        session.close()
+        engine.dispose()
+
+
+def test_payment_assessment_rejects_unknown_correction_booking_date():
+    (
+        engine, session, company, _other_company, partner, _other_partner,
+        receivables, _payables, payments, _credits, _offsets, corrections,
+        _overview,
+    ) = _environment()
+    try:
+        source = _invoice(
+            receivables, company, partner, year=FY26,
+            number="AR-ASSESS-NULL", date_value=date(2026, 3, 1),
+        )
+        target = _invoice(
+            receivables, company, partner, year=FY26,
+            number="AR-ASSESS-NULL-TARGET", date_value=date(2026, 3, 1),
+        )
+        source_id = _open_id(
+            session, ForderungsOP, foreign_key="invoice_id", foreign_id=source.invoice_id
+        )
+        target_id = _open_id(
+            session, ForderungsOP, foreign_key="invoice_id", foreign_id=target.invoice_id
+        )
+        payment = _post_payment(
+            payments, company, partner, source_id,
+            direction=PaymentDirection.CUSTOMER_RECEIPT,
+            amount="10.00", booking_date=date(2026, 3, 3),
+        )
+        event_id = UUID(
+            session.query(RechnungsOPZahlungsereignis.event_id)
+            .filter_by(payment_id=str(payment.payment_id)).scalar()
+        )
+        corrections.correct(
+            company_id=company.company_id, fiscal_year=FY26,
+            original_event_id=event_id, target_open_item_id=target_id,
+            amount=Decimal("2.00"), correction_date=date(2026, 3, 5),
+            booking_date=date(2026, 3, 5), reason="Korrekturdatum-Test", confirmed=True,
+        )
+        correction = session.query(Zahlungszuordnungskorrektur).one()
+        assert correction.booking_id is None
+        correction.booking_date = None
+        session.commit()
+        with pytest.raises(ValueError, match="kein gespeichertes Buchungsdatum"):
+            _cancellation_service(session).assess_payment_history(
+                company_id=company.company_id, fiscal_year=FY26,
+                open_item_id=source_id, proposed_booking_date=date(2026, 3, 5),
+            )
+    finally:
+        session.close()
+        engine.dispose()
+
+
+def test_payment_assessment_rejects_invoice_with_credit_offset_history():
+    (
+        engine, session, company, _other_company, partner, _other_partner,
+        receivables, _payables, _payments, credits, offsets, _corrections,
+        _overview,
+    ) = _environment()
+    try:
+        invoice = _invoice(
+            receivables, company, partner, year=FY26,
+            number="AR-ASSESS-OFFSET", date_value=date(2026, 3, 1),
+        )
+        open_item_id = _open_id(
+            session, ForderungsOP, foreign_key="invoice_id", foreign_id=invoice.invoice_id
+        )
+        credit = _credit(credits, company, partner, number="CN-ASSESS", amount="5.00")
+        credit_id = _open_id(
+            session, GuthabenOP, foreign_key="credit_note_id", foreign_id=credit.credit_note_id
+        )
+        _offset(
+            offsets, company, partner, invoice_id=open_item_id,
+            credit_id=credit_id, amount="1.00", direction=OffsetDirection.CUSTOMER,
+        )
+        with pytest.raises(ValueError, match="Verrechnungshistorie"):
+            _cancellation_service(session).assess_payment_history(
+                company_id=company.company_id, fiscal_year=FY26,
+                open_item_id=open_item_id, proposed_booking_date=date(2026, 4, 12),
+            )
+    finally:
+        session.close()
+        engine.dispose()
+
+
+def test_stornoed_invoice_rejects_later_payment_offset_and_correction():
+    (
+        engine, session, company, _other_company, partner, _other_partner,
+        receivables, _payables, payments, credits, offsets, corrections,
+        _overview,
+    ) = _environment()
+    try:
+        invoice = _invoice(
+            receivables, company, partner, year=FY26,
+            number="AR-STORNO-GUARD", date_value=date(2026, 3, 1),
+        )
+        open_item_id = _open_id(
+            session, ForderungsOP, foreign_key="invoice_id", foreign_id=invoice.invoice_id
+        )
+        storno_service = _cancellation_service(session)
+        storno_service.cancel_invoice(
+            company_id=company.company_id, fiscal_year=FY26,
+            open_item_id=open_item_id, booking_date=date(2026, 3, 10),
+            reason="4D-2-Schutztest", confirmed=True,
+        )
+        counts_before = (
+            session.query(Buchung).count(),
+            session.query(Zahlung).count(),
+            session.query(OPGuthabenverrechnung).count(),
+        )
+        with pytest.raises(ValueError, match="vollständig ausgeglichen"):
+            _post_payment(
+                payments, company, partner, open_item_id,
+                direction=PaymentDirection.CUSTOMER_RECEIPT,
+                amount="1.00", booking_date=date(2026, 3, 11),
+            )
+        credit = _credit(credits, company, partner, number="CN-GUARD", amount="1.00")
+        credit_id = _open_id(
+            session, GuthabenOP, foreign_key="credit_note_id", foreign_id=credit.credit_note_id
+        )
+        with pytest.raises(ValueError, match="storniert"):
+            _offset(
+                offsets, company, partner, invoice_id=open_item_id,
+                credit_id=credit_id, amount="1.00", direction=OffsetDirection.CUSTOMER,
+            )
+        with pytest.raises(ValueError, match="storniert"):
+            OpenItemPaymentRepository(session).ensure_not_cancelled(
+                open_item_id=open_item_id,
+                direction=PaymentDirection.CUSTOMER_RECEIPT,
+            )
+        assert (
+            session.query(Buchung).count(),
+            session.query(Zahlung).count(),
+            session.query(OPGuthabenverrechnung).count(),
+        ) == (counts_before[0] + 1, counts_before[1], counts_before[2])
+
+        # Für eine künftige bezahlte Stornostufe liegt eine Zahlungszuordnung
+        # vor; der Repository-Guard sperrt danach auch deren Korrektur.
+        paid_invoice = _invoice(
+            receivables, company, partner, year=FY26,
+            number="AR-STORNO-CORRECTION-GUARD", date_value=date(2026, 3, 1),
+        )
+        paid_id = _open_id(
+            session, ForderungsOP, foreign_key="invoice_id", foreign_id=paid_invoice.invoice_id
+        )
+        payment = _post_payment(
+            payments, company, partner, paid_id,
+            direction=PaymentDirection.CUSTOMER_RECEIPT,
+            amount="10.00", booking_date=date(2026, 3, 4),
+        )
+        mandate = session.query(Mandant).filter_by(
+            company_id=str(company.company_id)
+        ).one()
+        session.add(RechnungsOPStorno(
+            storno_id=str(uuid4()),
+            mandant_id=mandate.id,
+            partner_id=str(partner.partner_id),
+            receivable_invoice_id=str(paid_invoice.invoice_id),
+            payable_invoice_id=None,
+            receivable_open_item_id=str(paid_id),
+            payable_open_item_id=None,
+            booking_id=str(paid_invoice.booking_id),
+            credit_booking_id=None,
+            amount=Decimal("119.00"),
+            closed_open_amount=Decimal("109.00"),
+            recorded_at=datetime.now(timezone.utc),
+            reason="Guard-Fixture für später bezahltes Storno",
+        ))
+        session.commit()
+        event_id = UUID(
+            session.query(RechnungsOPZahlungsereignis.event_id)
+            .filter_by(payment_id=str(payment.payment_id)).scalar()
+        )
+        correction_counts = (
+            session.query(Buchung).count(),
+            session.query(Zahlungszuordnungskorrektur).count(),
+            session.query(Zahlungszuordnungskorrekturereignis).count(),
+        )
+        with pytest.raises(ValueError, match="storniert"):
+            corrections.correct(
+                company_id=company.company_id, fiscal_year=FY26,
+                original_event_id=event_id, target_open_item_id=open_item_id,
+                amount=Decimal("1.00"), correction_date=date(2026, 3, 12),
+                booking_date=date(2026, 3, 12), reason="Nachstornokorrektur",
+                confirmed=True,
+            )
+        assert (
+            session.query(Buchung).count(),
+            session.query(Zahlungszuordnungskorrektur).count(),
+            session.query(Zahlungszuordnungskorrekturereignis).count(),
+        ) == correction_counts
+    finally:
+        session.close()
         engine.dispose()

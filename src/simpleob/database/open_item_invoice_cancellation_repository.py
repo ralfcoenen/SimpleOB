@@ -4,7 +4,7 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 from uuid import UUID, uuid4
 
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from simpleob.database.booking_repository import BookingRepository
@@ -21,11 +21,13 @@ from simpleob.database.models import (
     RechnungsOPZahlungsereignis,
     VerbindlichkeitsOP,
     Wirtschaftsjahr,
+    Zahlung,
     Zahlungszuordnungskorrektur,
     Zahlungszuordnungskorrekturereignis,
 )
-from simpleob.database.models import (
-    Buchung as BuchungModel,
+from simpleob.database.models import Buchung as BuchungModel
+from simpleob.database.open_item_payment_repository import (
+    OpenItemPaymentRepository,
 )
 from simpleob.domain.booking import Booking
 from simpleob.domain.booking_line import BookingLine
@@ -34,8 +36,10 @@ from simpleob.domain.entry_side import EntrySide
 from simpleob.domain.fiscal_year import FiscalYear
 from simpleob.domain.money import ZERO
 from simpleob.domain.open_item_invoice_cancellation import (
+    InvoiceCancellationPaymentAssessment,
     InvoiceCancellationPreview,
 )
+from simpleob.domain.open_item_payment import PaymentDirection
 
 
 class OpenItemInvoiceCancellationRepository:
@@ -70,6 +74,249 @@ class OpenItemInvoiceCancellationRepository:
             open_item_id=open_item_id,
             for_update=False,
         )
+
+    def assess_payment_history(
+        self,
+        *,
+        company_id: UUID,
+        fiscal_year: FiscalYear,
+        open_item_id: UUID,
+        proposed_booking_date: date,
+    ) -> InvoiceCancellationPaymentAssessment:
+        """Prüft die Zahlungszuordnung für eine spätere Stornostufe.
+
+        Diese Methode erzeugt weder eine Stornierung noch eine Buchung. Der
+        aktuelle Storno- und Schreibpfad aus 4D-2 bleibt davon getrennt.
+        """
+        if not isinstance(proposed_booking_date, date):
+            raise TypeError("Das vorgesehene Stornobuchungsdatum muss ein Datum sein.")
+        company = self._company(company_id)
+        target_year = self._booking_repository.require_open_fiscal_year(
+            company_id=company_id,
+            fiscal_year=fiscal_year,
+            booking_date=proposed_booking_date,
+            for_update=False,
+        )
+        invoice = self._load_eligible_invoice(
+            company=company,
+            target_year=target_year,
+            open_item_id=open_item_id,
+            for_update=False,
+            allow_payment_history=True,
+        )
+        direction = (
+            PaymentDirection.SUPPLIER_PAYMENT
+            if invoice.supplier_invoice
+            else PaymentDirection.CUSTOMER_RECEIPT
+        )
+        payment_event_amount, correction_delta, payment_dates, correction_dates, correction_count = (
+            self._payment_history_totals(
+                company=company,
+                partner_id=invoice.partner_id,
+                open_item_id=open_item_id,
+                direction=direction,
+            )
+        )
+        effective_payment_amount = payment_event_amount + correction_delta
+        original_amount = invoice.amount
+        if effective_payment_amount < ZERO or effective_payment_amount > original_amount:
+            raise ValueError(
+                "Die Zahlungszuordnungshistorie ist widersprüchlich: "
+                "wirksame Zahlungen liegen außerhalb des Rechnungsbetrags."
+            )
+        open_amount = original_amount - effective_payment_amount
+        current = OpenItemPaymentRepository(self._session).get_open_invoice(
+            company_id=company_id,
+            open_item_id=open_item_id,
+            direction=direction,
+        )
+        if current is None or current.open_amount != open_amount:
+            raise ValueError(
+                "Die Zahlungs- und OP-Historie ist widersprüchlich; "
+                "eine spätere Stornierung ist nicht sicher prüfbar."
+            )
+
+        latest_payment_date = max(payment_dates, default=None)
+        latest_correction_date = max(correction_dates, default=None)
+        latest_required_date = max(
+            (value for value in (latest_payment_date, latest_correction_date) if value is not None),
+            default=None,
+        )
+        if latest_required_date is not None and proposed_booking_date < latest_required_date:
+            raise ValueError(
+                "Das Stornobuchungsdatum darf nicht vor dem spätesten "
+                "Zahlungs- oder Korrekturbuchungsdatum liegen."
+            )
+        return InvoiceCancellationPaymentAssessment(
+            company_id=invoice.company_id,
+            partner_id=invoice.partner_id,
+            open_item_id=invoice.open_item_id,
+            invoice_number=invoice.invoice_number,
+            invoice_amount=original_amount,
+            payment_event_amount=payment_event_amount,
+            correction_delta=correction_delta,
+            effective_payment_amount=effective_payment_amount,
+            open_amount=open_amount,
+            latest_payment_booking_date=latest_payment_date,
+            latest_correction_booking_date=latest_correction_date,
+            latest_required_booking_date=latest_required_date,
+            payment_event_count=len(payment_dates),
+            correction_count=correction_count,
+        )
+
+    def _payment_history_totals(
+        self,
+        *,
+        company: Mandant,
+        partner_id: UUID,
+        open_item_id: UUID,
+        direction: PaymentDirection,
+    ) -> tuple[Decimal, Decimal, list[date], list[date], int]:
+        is_supplier = direction is PaymentDirection.SUPPLIER_PAYMENT
+        item_column = (
+            RechnungsOPZahlungsereignis.payable_open_item_id
+            if is_supplier
+            else RechnungsOPZahlungsereignis.receivable_open_item_id
+        )
+        payment_rows = (
+            self._session.query(
+                RechnungsOPZahlungsereignis,
+                Zahlung,
+                BuchungModel,
+                Wirtschaftsjahr,
+            )
+            .join(Zahlung, Zahlung.payment_id == RechnungsOPZahlungsereignis.payment_id)
+            .join(BuchungModel, BuchungModel.booking_id == Zahlung.booking_id)
+            .join(Wirtschaftsjahr, Wirtschaftsjahr.id == BuchungModel.wirtschaftsjahr_id)
+            .filter(item_column == str(open_item_id))
+            .all()
+        )
+        payment_total = ZERO
+        payment_dates: list[date] = []
+        seen_payment_ids: set[str] = set()
+        for event, payment, booking, fiscal_year in payment_rows:
+            if (
+                event.direction != direction.value
+                or payment.direction != direction.value
+                or payment.mandant_id != company.id
+                or payment.partner_id != str(partner_id)
+                or fiscal_year.mandant_id != company.id
+            ):
+                raise ValueError(
+                    "Eine Zahlungszuordnung verweist auf einen unpassenden "
+                    "Mandanten, Geschäftspartner oder Zahlungsrichtung."
+                )
+            payment_total += Decimal(event.amount)
+            payment_dates.append(booking.booking_date)
+            seen_payment_ids.add(payment.payment_id)
+
+        for payment_id in seen_payment_ids:
+            payment = self._session.query(Zahlung).filter_by(payment_id=payment_id).one()
+            total_allocated = (
+                self._session.query(func.sum(RechnungsOPZahlungsereignis.amount))
+                .filter(RechnungsOPZahlungsereignis.payment_id == payment_id)
+                .scalar()
+            ) or ZERO
+            if Decimal(total_allocated) != Decimal(payment.amount):
+                raise ValueError(
+                    "Die Summe der Zahlungszuordnungen stimmt nicht mit "
+                    "dem Zahlungsbetrag überein."
+                )
+
+        source_column = (
+            Zahlungszuordnungskorrektur.source_payable_open_item_id
+            if is_supplier
+            else Zahlungszuordnungskorrektur.source_receivable_open_item_id
+        )
+        target_column = (
+            Zahlungszuordnungskorrektur.target_payable_open_item_id
+            if is_supplier
+            else Zahlungszuordnungskorrektur.target_receivable_open_item_id
+        )
+        corrections = (
+            self._session.query(Zahlungszuordnungskorrektur)
+            .filter(
+                or_(
+                    source_column == str(open_item_id),
+                    target_column == str(open_item_id),
+                )
+            )
+            .all()
+        )
+        correction_delta = ZERO
+        correction_dates: list[date] = []
+        event_item_column = (
+            Zahlungszuordnungskorrekturereignis.payable_open_item_id
+            if is_supplier
+            else Zahlungszuordnungskorrekturereignis.receivable_open_item_id
+        )
+        for correction in corrections:
+            if (
+                correction.mandant_id != company.id
+                or correction.partner_id != str(partner_id)
+                or correction.direction != direction.value
+            ):
+                raise ValueError(
+                    "Eine Zahlungszuordnungskorrektur verweist auf einen "
+                    "unpassenden Mandanten, Geschäftspartner oder Richtung."
+                )
+            original_payment = (
+                self._session.query(Zahlung)
+                .filter_by(payment_id=correction.original_payment_id)
+                .one_or_none()
+            )
+            original_event = (
+                self._session.query(RechnungsOPZahlungsereignis)
+                .filter_by(event_id=correction.original_allocation_event_id)
+                .one_or_none()
+            )
+            if (
+                original_payment is None
+                or original_event is None
+                or original_payment.mandant_id != company.id
+                or original_payment.partner_id != str(partner_id)
+                or original_payment.direction != direction.value
+                or original_event.payment_id != correction.original_payment_id
+                or original_event.direction != direction.value
+            ):
+                raise ValueError(
+                    "Die Zahlungszuordnungskorrektur verweist nicht auf "
+                    "ihre passende ursprüngliche Zahlung."
+                )
+            if correction.booking_date is None:
+                raise ValueError(
+                    "Eine zugehörige Zahlungszuordnungskorrektur hat kein "
+                    "gespeichertes Buchungsdatum; die Stornierung kann zeitlich "
+                    "nicht sicher geprüft werden."
+                )
+            is_source = (
+                getattr(correction, source_column.key) == str(open_item_id)
+            )
+            expected_role = "SOURCE_RELEASE" if is_source else "TARGET_APPLY"
+            expected_delta = -Decimal(correction.amount) if is_source else Decimal(correction.amount)
+            matching_events = (
+                self._session.query(Zahlungszuordnungskorrekturereignis)
+                .filter(
+                    Zahlungszuordnungskorrekturereignis.correction_id
+                    == correction.correction_id,
+                    event_item_column == str(open_item_id),
+                )
+                .all()
+            )
+            if (
+                len(matching_events) != 1
+                or matching_events[0].event_role != expected_role
+                or matching_events[0].direction != direction.value
+                or Decimal(matching_events[0].amount_delta) != expected_delta
+            ):
+                raise ValueError(
+                    "Die Zahlungszuordnungskorrektur und ihre OP-Ereignisse "
+                    "sind widersprüchlich."
+                )
+            correction_delta += Decimal(matching_events[0].amount_delta)
+            correction_dates.append(correction.booking_date)
+
+        return payment_total, correction_delta, payment_dates, correction_dates, len(corrections)
 
     def add_atomic(
         self,
@@ -186,6 +433,7 @@ class OpenItemInvoiceCancellationRepository:
         target_year: Wirtschaftsjahr,
         open_item_id: UUID,
         for_update: bool,
+        allow_payment_history: bool = False,
     ) -> InvoiceCancellationPreview:
         receivable_query = self._session.query(ForderungsOP).filter(
             ForderungsOP.open_item_id == str(open_item_id)
@@ -276,10 +524,16 @@ class OpenItemInvoiceCancellationRepository:
         if storno_query.first():
             raise ValueError("Die Rechnung wurde bereits storniert.")
 
-        self._ensure_no_history(
-            open_item_id=open_item_id,
-            supplier_invoice=supplier_invoice,
-        )
+        if allow_payment_history:
+            self._ensure_no_offset_history(
+                open_item_id=open_item_id,
+                supplier_invoice=supplier_invoice,
+            )
+        else:
+            self._ensure_no_history(
+                open_item_id=open_item_id,
+                supplier_invoice=supplier_invoice,
+            )
 
         booking_lines = tuple(
             BookingLine(
@@ -347,19 +601,14 @@ class OpenItemInvoiceCancellationRepository:
             if supplier_invoice
             else RechnungsOPZahlungsereignis.receivable_open_item_id
         )
-        offset_column = (
-            RechnungsOPVerrechnungsereignis.payable_open_item_id
-            if supplier_invoice
-            else RechnungsOPVerrechnungsereignis.receivable_open_item_id
-        )
         if self._session.query(RechnungsOPZahlungsereignis.id).filter(
             payment_column == str(open_item_id)
         ).first():
             raise ValueError("Die Rechnung hat Zahlungshistorie und kann in dieser Stufe nicht storniert werden.")
-        if self._session.query(RechnungsOPVerrechnungsereignis.id).filter(
-            offset_column == str(open_item_id)
-        ).first():
-            raise ValueError("Die Rechnung hat Verrechnungshistorie und kann in dieser Stufe nicht storniert werden.")
+        self._ensure_no_offset_history(
+            open_item_id=open_item_id,
+            supplier_invoice=supplier_invoice,
+        )
         source_column = (
             Zahlungszuordnungskorrektur.source_payable_open_item_id
             if supplier_invoice
@@ -386,6 +635,22 @@ class OpenItemInvoiceCancellationRepository:
             correction_event_column == str(open_item_id)
         ).first():
             raise ValueError("Die Rechnung hat Korrekturhistorie und kann in dieser Stufe nicht storniert werden.")
+
+    def _ensure_no_offset_history(
+        self,
+        *,
+        open_item_id: UUID,
+        supplier_invoice: bool,
+    ) -> None:
+        offset_column = (
+            RechnungsOPVerrechnungsereignis.payable_open_item_id
+            if supplier_invoice
+            else RechnungsOPVerrechnungsereignis.receivable_open_item_id
+        )
+        if self._session.query(RechnungsOPVerrechnungsereignis.id).filter(
+            offset_column == str(open_item_id)
+        ).first():
+            raise ValueError("Die Rechnung hat Verrechnungshistorie und kann in dieser Stufe nicht storniert werden.")
 
     def _company(self, company_id: UUID) -> Mandant:
         if not isinstance(company_id, UUID):

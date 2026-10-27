@@ -8,6 +8,7 @@ from simpleob.database.open_item_invoice_cancellation_repository import (
 )
 from simpleob.domain.fiscal_year import FiscalYear
 from simpleob.domain.open_item_invoice_cancellation import (
+    InvoiceCancellationPaymentAssessment,
     InvoiceCancellationPreview,
 )
 
@@ -32,6 +33,22 @@ class OpenItemInvoiceCancellationService:
             company_id=company_id,
             fiscal_year=fiscal_year,
             open_item_id=open_item_id,
+        )
+
+    def assess_payment_history(
+        self,
+        *,
+        company_id: UUID,
+        fiscal_year: FiscalYear,
+        open_item_id: UUID,
+        proposed_booking_date: date,
+    ) -> InvoiceCancellationPaymentAssessment:
+        """Liefert nur eine Zulassungs-/Betragsprüfung, keine Stornierung."""
+        return self._repository.assess_payment_history(
+            company_id=company_id,
+            fiscal_year=fiscal_year,
+            open_item_id=open_item_id,
+            proposed_booking_date=proposed_booking_date,
         )
 
     def cancel_invoice(
