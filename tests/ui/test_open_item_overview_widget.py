@@ -1,8 +1,11 @@
+from dataclasses import replace
 from datetime import date
 from decimal import Decimal
 from types import SimpleNamespace
 from uuid import uuid4
 
+from PySide6.QtCore import Qt
+from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QMessageBox, QPushButton
 
 from simpleob.domain.booking_line import BookingLine
@@ -17,6 +20,7 @@ from simpleob.domain.open_item_overview import (
     OpenItemOverviewReport,
     OpenItemPartnerOption,
 )
+from simpleob.ui_qt.open_item_detail_dialog import OpenItemDetailDialog
 from simpleob.ui_qt.open_item_overview_widget import OpenItemOverviewWidget
 
 
@@ -29,14 +33,13 @@ class _OverviewService:
 
     def list_items(self, *, company_id, include_settled=False):
         self.list_calls.append((company_id, include_settled))
+        items = self.report.items
+        if not include_settled:
+            items = tuple(item for item in items if item.open_amount > 0)
         return OpenItemOverviewReport(
             company_id=company_id,
             partners=self.report.partners,
-            items=(
-                self.report.items
-                if include_settled
-                else tuple(item for item in self.report.items if item.open_amount > 0)
-            ),
+            items=items,
             include_settled=include_settled,
         )
 
@@ -64,57 +67,20 @@ def _item(company_id, partner_id, name, kind, number, amount, open_amount):
     )
 
 
-def test_widget_filters_partner_and_settled_items_and_shows_read_only_details():
-    app = QApplication.instance() or QApplication([])
+def _environment():
     company_id = uuid4()
-    first_partner = uuid4()
-    second_partner = uuid4()
+    dual_partner = uuid4()
+    customer_partner = uuid4()
+    supplier_partner = uuid4()
     items = (
-        _item(
-            company_id,
-            first_partner,
-            "Alpha",
-            OpenItemKind.CUSTOMER_RECEIVABLE,
-            "AR-1",
-            "119.00",
-            "104.00",
-        ),
-        _item(
-            company_id,
-            first_partner,
-            "Alpha",
-            OpenItemKind.CUSTOMER_CREDIT,
-            "CN-1",
-            "30.00",
-            "25.00",
-        ),
-        _item(
-            company_id,
-            second_partner,
-            "Beta",
-            OpenItemKind.SUPPLIER_PAYABLE,
-            "AP-1",
-            "50.00",
-            "35.00",
-        ),
-        _item(
-            company_id,
-            second_partner,
-            "Beta",
-            OpenItemKind.SUPPLIER_CREDIT,
-            "CN-2",
-            "20.00",
-            "15.00",
-        ),
-        _item(
-            company_id,
-            first_partner,
-            "Alpha",
-            OpenItemKind.CUSTOMER_RECEIVABLE,
-            "AR-SETTLED",
-            "20.00",
-            "0.00",
-        ),
+        _item(company_id, dual_partner, "Dual", OpenItemKind.CUSTOMER_RECEIVABLE, "AR-OPEN", "119.00", "104.00"),
+        _item(company_id, dual_partner, "Dual", OpenItemKind.CUSTOMER_CREDIT, "CC-SETTLED", "30.00", "0.00"),
+        _item(company_id, dual_partner, "Dual", OpenItemKind.SUPPLIER_PAYABLE, "AP-OPEN", "50.00", "35.00"),
+        _item(company_id, dual_partner, "Dual", OpenItemKind.SUPPLIER_CREDIT, "SC-SETTLED", "20.00", "0.00"),
+        _item(company_id, customer_partner, "Customer", OpenItemKind.CUSTOMER_RECEIVABLE, "AR-SETTLED", "40.00", "0.00"),
+        _item(company_id, customer_partner, "Customer", OpenItemKind.CUSTOMER_CREDIT, "CC-OPEN", "10.00", "10.00"),
+        _item(company_id, supplier_partner, "Supplier", OpenItemKind.SUPPLIER_PAYABLE, "AP-SETTLED", "60.00", "0.00"),
+        _item(company_id, supplier_partner, "Supplier", OpenItemKind.SUPPLIER_CREDIT, "SC-OPEN", "15.00", "15.00"),
     )
     details = {
         item.open_item_id: OpenItemOverviewDetail(
@@ -126,7 +92,7 @@ def test_widget_filters_partner_and_settled_items_and_shows_read_only_details():
                     booking_date=item.booking_date,
                     amount=item.original_amount,
                     reference=item.document_number,
-                    description="Ursprungsrechnung",
+                    description="Ursprungsbeleg",
                     booking_id="booking-reference",
                 ),
                 OpenItemActivity(
@@ -134,10 +100,20 @@ def test_widget_filters_partner_and_settled_items_and_shows_read_only_details():
                     activity_date=date(2026, 1, 5),
                     booking_date=date(2026, 1, 6),
                     amount=Decimal("10.00"),
-                    reference="Kundenzahlung · Alpha · Rechnung AR-1",
+                    reference="Kundenzahlung · Dual · Rechnung AR-OPEN",
                     description="Zahlungszuordnung",
                     payment_id="payment-id",
                     booking_id="payment-booking",
+                    payment_total=Decimal("25.00"),
+                ),
+                OpenItemActivity(
+                    kind=OpenItemActivityKind.OFFSET,
+                    activity_date=date(2026, 1, 6),
+                    booking_date=date(2026, 1, 6),
+                    amount=Decimal("5.00"),
+                    reference="Gutschriftenverrechnung · Gutschrift CN-1",
+                    description="Dual: Rechnung AR-OPEN mit Gutschrift verrechnet",
+                    booking_id="offset-booking",
                 ),
                 OpenItemActivity(
                     kind=OpenItemActivityKind.PAYMENT_CORRECTION,
@@ -145,122 +121,183 @@ def test_widget_filters_partner_and_settled_items_and_shows_read_only_details():
                     booking_date=date(2026, 1, 7),
                     amount=Decimal("-2.00"),
                     reference=(
-                        "Zahlungszuordnungskorrektur · Alpha · Rechnung AR-1 · "
+                        "Zahlungszuordnungskorrektur · Dual · Rechnung AR-OPEN · "
                         "ursprüngliche Zahlung 05.01.2026"
                     ),
                     description="Zuordnung entlastet: Begründung",
                     payment_id="payment-id",
                 ),
+                OpenItemActivity(
+                    kind=OpenItemActivityKind.INVOICE_CANCELLATION,
+                    activity_date=date(2026, 1, 8),
+                    booking_date=date(2026, 1, 8),
+                    amount=Decimal("119.00"),
+                    reference="Storno AR-OPEN",
+                    description="Rechnungsstorno · Fehlerhafte Rechnung",
+                    booking_id="reversal-booking",
+                ),
             ),
         )
         for item in items
     }
-    service = _OverviewService(
-        OpenItemOverviewReport(
-            company_id=company_id,
-            partners=(
-                OpenItemPartnerOption(first_partner, "Alpha"),
-                OpenItemPartnerOption(second_partner, "Beta"),
-            ),
-            items=items,
-            include_settled=False,
+    report = OpenItemOverviewReport(
+        company_id=company_id,
+        partners=(
+            OpenItemPartnerOption(dual_partner, "Dual"),
+            OpenItemPartnerOption(customer_partner, "Customer"),
+            OpenItemPartnerOption(supplier_partner, "Supplier"),
         ),
-        details,
+        items=items,
+        include_settled=True,
     )
+    return company_id, items, _OverviewService(report, details)
+
+
+def _shown_numbers(table):
+    return {table.item(row, 2).text() for row in range(table.rowCount())}
+
+
+def test_nine_combined_filter_states_apply_to_items_and_summaries():
+    app = QApplication.instance() or QApplication([])
+    company_id, items, service = _environment()
     widget = OpenItemOverviewWidget(company_id=company_id, service=service)
 
-    assert service.list_calls == [(company_id, False)]
-    assert widget._items_table.rowCount() == 4
-    assert widget._summary_table.rowCount() == 4
-    assert widget._activity_table.rowCount() == 3
-    assert widget._activity_table.item(2, 3).text() == "-2,00"
-    assert "Alpha" in widget._activity_table.item(1, 4).text()
-    assert "AR-1" in widget._activity_table.item(1, 4).text()
-    assert widget._activity_table.item(1, 1).text() == "05.01.2026"
-    assert widget._activity_table.item(1, 2).text() == "06.01.2026"
-    assert widget._activity_table.item(1, 3).text() == "10,00"
-    assert "05.01.2026" in widget._activity_table.item(2, 4).text()
-    assert widget._activity_table.item(2, 1).text() == "07.01.2026"
-    assert widget._activity_table.item(2, 2).text() == "07.01.2026"
-    displayed_references = " ".join(
-        widget._activity_table.item(row, 4).text()
-        for row in range(widget._activity_table.rowCount())
-    )
-    assert "payment-id" not in displayed_references
-    assert "payment-booking" not in displayed_references
-    assert "booking-reference" not in displayed_references
-    assert widget._items_table.horizontalHeaderItem(9).text() == "Offen"
-    assert widget._summary_table.horizontalHeaderItem(1).text() == "OP-Art"
-    assert len(widget.findChildren(QPushButton)) == 1
+    assert len(widget.findChildren(QPushButton)) == 2
+    assert widget._partner_type_filter.count() == 3
     assert widget._status_filter.count() == 3
-    assert widget._status_filter.currentText() == "Nur offene Posten"
+    assert widget._views.tabText(0) == "Einzelposten"
+    assert widget._views.tabText(1) == "Summen"
+    assert not hasattr(widget, "_activity_table")
+    assert service.list_calls == [(company_id, False)]
 
-    widget._partner_box.setCurrentIndex(1)
-    assert widget._items_table.rowCount() == 2
-    assert all(
-        widget._items_table.item(row, 0).text() == "Alpha"
-        for row in range(widget._items_table.rowCount())
-    )
+    for partner_type_index in range(3):
+        for status_index in range(3):
+            widget._partner_box.setCurrentIndex(0)
+            widget._partner_type_filter.setCurrentIndex(partner_type_index)
+            widget._status_filter.setCurrentIndex(status_index)
+            if status_index == 0:
+                expected = [item for item in items if item.open_amount > 0]
+            elif status_index == 1:
+                expected = [item for item in items if item.open_amount == 0]
+            else:
+                expected = list(items)
+            if partner_type_index == 1:
+                expected = [
+                    item for item in expected
+                    if item.kind in {
+                        OpenItemKind.CUSTOMER_RECEIVABLE,
+                        OpenItemKind.CUSTOMER_CREDIT,
+                    }
+                ]
+            elif partner_type_index == 2:
+                expected = [
+                    item for item in expected
+                    if item.kind in {
+                        OpenItemKind.SUPPLIER_PAYABLE,
+                        OpenItemKind.SUPPLIER_CREDIT,
+                    }
+                ]
 
-    widget._status_filter.setCurrentIndex(1)
-    assert service.list_calls[-1] == (company_id, True)
-    assert widget._items_table.rowCount() == 1
-    assert widget._summary_table.rowCount() == 1
-    assert widget._summary_table.item(0, 2).text() == "1"
-    assert widget._summary_table.item(0, 6).text() == "0,00"
-    assert {
-        widget._items_table.item(row, 2).text()
-        for row in range(widget._items_table.rowCount())
-    } == {"AR-SETTLED"}
+            assert _shown_numbers(widget._items_table) == {
+                item.document_number for item in expected
+            }
+            assert sum(
+                int(widget._summary_table.item(row, 2).text())
+                for row in range(widget._summary_table.rowCount())
+            ) == len(expected)
+            assert {
+                widget._summary_table.item(row, 1).text()
+                for row in range(widget._summary_table.rowCount())
+            } == {item.kind.label for item in expected}
 
-    widget._status_filter.setCurrentIndex(2)
-    assert service.list_calls[-1] == (company_id, True)
-    assert widget._items_table.rowCount() == 3
-    assert widget._summary_table.rowCount() == 2
-    assert {
-        widget._items_table.item(row, 2).text()
-        for row in range(widget._items_table.rowCount())
-    } == {"AR-1", "CN-1", "AR-SETTLED"}
-    receivable_summary_row = next(
-        row
+    # Dual-role partner's customer and supplier items appear in their respective filters.
+    widget._partner_type_filter.setCurrentIndex(1)
+    assert "AR-OPEN" in _shown_numbers(widget._items_table)
+    assert "AP-OPEN" not in _shown_numbers(widget._items_table)
+    widget._partner_type_filter.setCurrentIndex(2)
+    assert "AP-OPEN" in _shown_numbers(widget._items_table)
+    assert "AR-OPEN" not in _shown_numbers(widget._items_table)
+
+    # The partner selector independently narrows both views.
+    widget._partner_type_filter.setCurrentIndex(0)
+    widget._status_filter.setCurrentIndex(0)
+    partner_index = widget._partner_box.findText("Dual")
+    widget._partner_box.setCurrentIndex(partner_index)
+    assert _shown_numbers(widget._items_table) == {"AR-OPEN", "AP-OPEN"}
+    assert sum(
+        int(widget._summary_table.item(row, 2).text())
         for row in range(widget._summary_table.rowCount())
-        if widget._summary_table.item(row, 1).text() == "Kundenforderung"
-    )
-    assert widget._summary_table.item(receivable_summary_row, 2).text() == "2"
-    assert widget._summary_table.item(receivable_summary_row, 6).text() == "104,00"
-
-    widget._partner_box.setCurrentIndex(0)
-    assert widget._items_table.rowCount() == 5
-    assert widget._summary_table.rowCount() == 4
-    assert all(call[0] == company_id for call in service.detail_calls)
+    ) == 2
+    widget._views.setCurrentIndex(1)
+    assert not widget._details_button.isEnabled()
+    widget._views.setCurrentIndex(0)
+    assert widget._details_button.isEnabled()
     widget.close()
     app.processEvents()
 
 
-def test_widget_exposes_explicit_invoice_cancellation_confirmation(monkeypatch):
+def test_detail_dialog_is_read_only_and_shows_existing_event_history(monkeypatch):
     app = QApplication.instance() or QApplication([])
-    company_id = uuid4()
-    partner_id = uuid4()
-    item = _item(
-        company_id,
-        partner_id,
-        "Kunde",
-        OpenItemKind.CUSTOMER_RECEIVABLE,
-        "AR-1",
-        "119.00",
-        "119.00",
+    company_id, items, service = _environment()
+    item = items[0]
+    dialog = OpenItemDetailDialog(
+        None, company_id=company_id, item=item, service=service
     )
-    overview = _OverviewService(
-        OpenItemOverviewReport(
-            company_id=company_id,
-            partners=(OpenItemPartnerOption(partner_id, "Kunde"),),
-            items=(item,),
-            include_settled=False,
-        ),
-        {
-            item.open_item_id: OpenItemOverviewDetail(item=item, activities=()),
-        },
+
+    assert dialog.windowTitle() == "OP-Details · AR-OPEN"
+    assert dialog._activity_table.rowCount() == 5
+    displayed = " ".join(
+        dialog._activity_table.item(row, column).text()
+        for row in range(dialog._activity_table.rowCount())
+        for column in range(6)
     )
+    assert "Ursprungsbeleg" in displayed
+    assert "Kundenzahlung" in displayed
+    assert "Gesamtzahlung 25,00 EUR" in displayed
+    assert "Verrechnung" in displayed
+    assert "Gutschriftenverrechnung · Gutschrift CN-1" in displayed
+    assert "5,00 €" in displayed
+    assert "Korrektur der Zahlungszuordnung" in displayed
+    assert "Rechnungsstorno" in displayed
+    assert "payment-id" not in displayed
+    assert "payment-booking" not in displayed
+    assert "booking-reference" not in displayed
+    assert service.detail_calls == [(company_id, item.open_item_id)]
+    assert not hasattr(dialog, "_service_write_method")
+    dialog.close()
+
+    opened = []
+    monkeypatch.setattr(
+        "simpleob.ui_qt.open_item_overview_widget.OpenItemDetailDialog.exec",
+        lambda instance: opened.append(instance.windowTitle()) or 0,
+    )
+    widget = OpenItemOverviewWidget(company_id=company_id, service=service)
+    widget.show()
+    widget._items_table.setFocus()
+    app.processEvents()
+    widget._items_table.cellDoubleClicked.emit(0, 0)
+    QTest.keyClick(widget._items_table, Qt.Key.Key_Return)
+    QTest.keyClick(widget._items_table, Qt.Key.Key_Enter)
+    widget._details_button.click()
+    assert opened == ["OP-Details · AR-OPEN"] * 4
+    assert service.detail_calls[-4:] == [
+        (company_id, item.open_item_id),
+        (company_id, item.open_item_id),
+        (company_id, item.open_item_id),
+        (company_id, item.open_item_id),
+    ]
+    widget._items_table.clearSelection()
+    widget._items_table.setCurrentCell(-1, -1)
+    widget._update_action_availability()
+    assert not widget._details_button.isEnabled()
+    widget.close()
+    app.processEvents()
+
+
+def test_context_menu_and_visible_actions_share_storno_eligibility(monkeypatch):
+    app = QApplication.instance() or QApplication([])
+    company_id, items, overview = _environment()
+    receivable = items[0]
 
     class CancellationService:
         def __init__(self):
@@ -270,8 +307,8 @@ def test_widget_exposes_explicit_invoice_cancellation_confirmation(monkeypatch):
         def preview(self, **kwargs):
             self.preview_calls.append(kwargs)
             return SimpleNamespace(
-                partner_name="Kunde",
-                invoice_number="AR-1",
+                partner_name="Dual",
+                invoice_number="AR-OPEN",
                 amount=Decimal("119.00"),
                 original_booking=SimpleNamespace(
                     lines=(BookingLine("1200", EntrySide.DEBIT, Decimal("119.00")),)
@@ -280,13 +317,22 @@ def test_widget_exposes_explicit_invoice_cancellation_confirmation(monkeypatch):
 
         def cancel_invoice(self, **kwargs):
             self.cancel_calls.append(kwargs)
+            overview.report = replace(
+                overview.report,
+                items=tuple(
+                    replace(item, open_amount=Decimal("0.00"))
+                    if item.open_item_id == receivable.open_item_id
+                    else item
+                    for item in overview.report.items
+                ),
+            )
 
     cancellation = CancellationService()
-    text_answers = iter(("15.04.2026", "Rechnungsfehler"))
+    answers = iter(("15.04.2026", "Rechnungsfehler"))
     confirmation_text = []
     monkeypatch.setattr(
         "simpleob.ui_qt.open_item_overview_widget.QInputDialog.getText",
-        lambda *args, **kwargs: (next(text_answers), True),
+        lambda *args, **kwargs: (next(answers), True),
     )
     monkeypatch.setattr(
         "simpleob.ui_qt.open_item_overview_widget.QMessageBox.question",
@@ -295,25 +341,63 @@ def test_widget_exposes_explicit_invoice_cancellation_confirmation(monkeypatch):
             or QMessageBox.StandardButton.Yes
         ),
     )
+    fiscal_year = FiscalYear(date(2026, 1, 1), date(2026, 12, 31))
     widget = OpenItemOverviewWidget(
         company_id=company_id,
         service=overview,
         cancellation_service=cancellation,
-        fiscal_year=FiscalYear(date(2026, 1, 1), date(2026, 12, 31)),
+        fiscal_year=fiscal_year,
+        on_cancelled=lambda: confirmation_text.append("refreshed main window"),
     )
-    button = next(
-        control for control in widget.findChildren(QPushButton)
-        if control.text() == "Rechnung vollständig stornieren"
+    cancel_button = next(
+        button for button in widget.findChildren(QPushButton)
+        if button.text() == "Rechnung vollständig stornieren"
     )
-    assert button.isEnabled()
-    button.click()
+    assert cancel_button.isEnabled()
+    menu = widget._build_context_menu()
+    assert menu.actions()[0].text() == "Details anzeigen"
+    assert menu.actions()[1].text() == "Rechnung vollständig stornieren"
+    assert menu.actions()[1].isEnabled()
+
+    widget._status_filter.setCurrentIndex(2)
+    credit_row = next(
+        row for row in range(widget._items_table.rowCount())
+        if widget._items_table.item(row, 2).text() == "CC-SETTLED"
+    )
+    widget._items_table.setCurrentCell(credit_row, 0)
+    assert not cancel_button.isEnabled()
+    assert not widget._build_context_menu().actions()[1].isEnabled()
+    widget._items_table.setCurrentCell(0, 0)
+    cancel_button.click()
+
     assert cancellation.preview_calls == [
-        {"company_id": company_id, "fiscal_year": FiscalYear(date(2026, 1, 1), date(2026, 12, 31)), "open_item_id": item.open_item_id}
+        {
+            "company_id": company_id,
+            "fiscal_year": fiscal_year,
+            "open_item_id": receivable.open_item_id,
+        }
     ]
     assert cancellation.cancel_calls[0]["booking_date"] == date(2026, 4, 15)
     assert cancellation.cancel_calls[0]["reason"] == "Rechnungsfehler"
     assert cancellation.cancel_calls[0]["confirmed"] is True
     assert "Haben" in confirmation_text[0]
     assert "keine Bank- oder Kassenbewegung" in confirmation_text[0]
+    assert "refreshed main window" in confirmation_text
+    assert overview.list_calls[-1] == (company_id, True)
+    receivable_row = next(
+        row for row in range(widget._items_table.rowCount())
+        if widget._items_table.item(row, 2).text() == receivable.document_number
+    )
+    assert widget._items_table.item(receivable_row, 6).text() == "0,00"
+    assert not cancel_button.isEnabled()
+
+    # Cleared invoice and credit items cannot be canceled.
+    widget._status_filter.setCurrentIndex(1)
+    settled_invoice_row = next(
+        row for row in range(widget._items_table.rowCount())
+        if widget._items_table.item(row, 2).text() == "AR-SETTLED"
+    )
+    widget._items_table.setCurrentCell(settled_invoice_row, 0)
+    assert not cancel_button.isEnabled()
     widget.close()
     app.processEvents()
