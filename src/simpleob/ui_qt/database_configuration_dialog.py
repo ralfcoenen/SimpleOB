@@ -111,6 +111,18 @@ class DatabaseConfigurationDialog(QDialog):
 
         layout.addLayout(form)
 
+        self._user_management_buttons = []
+        for label, new_database in (
+            ("Neue Datenbank samt neuem Benutzer …", True),
+            ("Neuen Benutzer für vorhandene Datenbank anlegen …", False),
+        ):
+            button = QPushButton(label)
+            button.clicked.connect(
+                lambda checked=False, new=new_database: self._open_user_management(new)
+            )
+            self._user_management_buttons.append(button)
+            layout.addWidget(button)
+
         self._status_label = QLabel()
         layout.addWidget(self._status_label)
 
@@ -193,6 +205,8 @@ class DatabaseConfigurationDialog(QDialog):
         self._initialize_button.setEnabled(
             is_postgresql
         )
+        for button in self._user_management_buttons:
+            button.setEnabled(is_postgresql)
 
         self._invalidate_connection_check()
 
@@ -402,6 +416,21 @@ class DatabaseConfigurationDialog(QDialog):
                 "„OK“ übernommen werden."
             ),
         )
+
+    def _open_user_management(self, new_database: bool) -> None:
+        from simpleob.ui_qt.postgresql_user_dialog import PostgreSQLUserDialog
+
+        try:
+            database_url = self._selected_url()
+        except ValueError as exc:
+            QMessageBox.warning(self, "Benutzerverwaltung", str(exc))
+            return
+        if database_url is None:
+            return
+        PostgreSQLUserDialog(
+            config=replace(self._config, database_url_override=database_url),
+            new_database=new_database, parent=self,
+        ).exec()
 
     def _request_admin_username(self) -> tuple[str, bool]:
         from PySide6.QtWidgets import QInputDialog

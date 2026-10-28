@@ -9,6 +9,7 @@ import pytest
 from PySide6.QtWidgets import QApplication, QDialog
 
 from simpleob.core.config import ApplicationConfig
+from simpleob.database.connection_credentials import PostgreSQLCredentials
 from simpleob.ui_qt.database_configuration_dialog import (
     DatabaseConfigurationDialog,
 )
@@ -89,10 +90,16 @@ def test_postgresql_connection_is_checked(
     dialog._user_edit.setText("testuser")
     dialog._database_edit.setText("testdatabase")
 
-    with patch(
-        "simpleob.ui_qt.database_configuration_dialog."
-        "DatabaseMigrationService"
-    ) as migration_service:
+    credentials = PostgreSQLCredentials("test-password")
+    with (
+        patch.object(
+            dialog, "_request_credentials", return_value=credentials
+        ) as request_credentials,
+        patch(
+            "simpleob.ui_qt.database_configuration_dialog."
+            "DatabaseMigrationService"
+        ) as migration_service,
+    ):
         database_url = dialog._check_connection()
 
     assert database_url == (
@@ -101,6 +108,8 @@ def test_postgresql_connection_is_checked(
     )
 
     migration_service.return_value.check_ready_for_start.assert_called_once()
+    request_credentials.assert_called_once_with(database_url)
+    assert migration_service.call_args.kwargs["credentials"] is credentials
 
 
 def test_accept_sqlite_configuration(
