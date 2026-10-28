@@ -38,6 +38,7 @@ class CreditOffsetSummary:
     account_number: str
     cancellation_booking_date: date | None = None
     origin_booking_date: date | None = None
+    refund_reversal_booking_date: date | None = None
 
 
 @dataclass(frozen=True, slots=True)

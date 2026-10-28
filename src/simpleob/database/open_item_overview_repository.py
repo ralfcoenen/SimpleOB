@@ -16,6 +16,7 @@ from simpleob.database.models import (
     GuthabenOP,
     GuthabenOPEreignis,
     GuthabenOPRueckerstattung,
+    GuthabenOPRueckerstattungsruecknahme,
     Gutschrift,
     Mandant,
     OPGuthabenverrechnung,
@@ -315,6 +316,7 @@ class OpenItemOverviewRepository:
                     OpenItemActivityKind.PAYMENT_CORRECTION: 3,
                     OpenItemActivityKind.INVOICE_CANCELLATION: 4,
                     OpenItemActivityKind.REFUND: 5,
+                    OpenItemActivityKind.REFUND_REVERSAL: 6,
                 }[activity.kind],
                 activity.reference,
             )
@@ -677,15 +679,67 @@ class OpenItemOverviewRepository:
             )
             for refund, booking in refund_rows
         )
+        reversal_rows = (
+            self._session.query(
+                GuthabenOPRueckerstattungsruecknahme,
+                GuthabenOPRueckerstattung,
+                Buchung,
+            )
+            .join(
+                GuthabenOPRueckerstattung,
+                GuthabenOPRueckerstattungsruecknahme.refund_id
+                == GuthabenOPRueckerstattung.refund_id,
+            )
+            .join(
+                Buchung,
+                GuthabenOPRueckerstattungsruecknahme.reversal_booking_id
+                == Buchung.booking_id,
+            )
+            .filter(GuthabenOPRueckerstattung.open_item_id == str(item.open_item_id))
+            .all()
+        )
+        activities.extend(
+            OpenItemActivity(
+                kind=OpenItemActivityKind.REFUND_REVERSAL,
+                activity_date=booking.booking_date,
+                booking_date=booking.booking_date,
+                amount=-refund.amount,
+                reference=(
+                    f"Rücknahme Guthabenrückerstattung · {item.partner_name} · "
+                    f"Rückerstattung {refund.refund_id} · Gegenbuchung "
+                    f"{booking.voucher_no or booking.booking_id}"
+                ),
+                description=(
+                    f"Guthabenrückerstattung vom {refund.refund_date:%d.%m.%Y} "
+                    f"über {refund.amount:.2f} EUR zurückgenommen; "
+                    f"Grund: {reversal.reason}"
+                ),
+                booking_id=reversal.reversal_booking_id,
+                recorded_at=reversal.recorded_at,
+            )
+            for reversal, refund, booking in reversal_rows
+        )
         return activities
 
     def _credit_refund_amount(self, open_item_id: str) -> Decimal:
-        return (
+        refunded = (
             self._session.query(func.sum(GuthabenOPRueckerstattung.amount))
             .filter(GuthabenOPRueckerstattung.open_item_id == str(open_item_id))
             .scalar()
             or ZERO
         )
+        returned = (
+            self._session.query(func.sum(GuthabenOPRueckerstattung.amount))
+            .join(
+                GuthabenOPRueckerstattungsruecknahme,
+                GuthabenOPRueckerstattungsruecknahme.refund_id
+                == GuthabenOPRueckerstattung.refund_id,
+            )
+            .filter(GuthabenOPRueckerstattung.open_item_id == str(open_item_id))
+            .scalar()
+            or ZERO
+        )
+        return refunded - returned
 
     def _credit_note_number(self, open_item_id: str) -> str:
         number = (

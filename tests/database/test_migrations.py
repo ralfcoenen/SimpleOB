@@ -9,7 +9,7 @@ from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.exc import IntegrityError
 
 BASELINE_REVISION = "7392d6cc6892"
-HEAD_REVISION = "f2a91c7d5e30"
+HEAD_REVISION = "c4e27a91b6d0"
 
 
 def _alembic_config(
@@ -750,6 +750,173 @@ def test_paid_invoice_cancellation_schema_backfills_and_checks_origins(
                 "guthaben_op_rueckerstattungen"
             )
         } >= {"ix_guthaben_op_refund_open_item"}
+        assert _current_revision(database_path) == HEAD_REVISION
+        assert _foreign_key_check(database_path) == []
+    finally:
+        engine.dispose()
+
+
+def test_credit_refund_reversal_migration_preserves_refunds_and_constraints(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """Die Rücknahmemigration erhält Rückerstattungen und sichert Referenzen."""
+
+    database_path = tmp_path / "credit-refund-reversal.db"
+    database_url = f"sqlite:///{database_path}"
+    monkeypatch.setenv("OPENBILANZ_DATABASE_URL", database_url)
+    config = _alembic_config(database_path)
+    command.upgrade(config, "f2a91c7d5e30")
+
+    engine = create_engine(database_url)
+
+    @event.listens_for(engine, "connect")
+    def _enable_foreign_keys(connection, _record) -> None:
+        connection.execute("PRAGMA foreign_keys=ON")
+
+    try:
+        with engine.begin() as connection:
+            connection.execute(text(
+                "INSERT INTO mandanten (id, company_id, name) "
+                "VALUES (1, 'company-1', 'Migrationstest')"
+            ))
+            connection.execute(text(
+                "INSERT INTO geschaeftspartner "
+                "(id, partner_id, mandant_id, name, is_customer, is_supplier, is_active) "
+                "VALUES (1, 'partner-1', 1, 'Partner', 1, 0, 1)"
+            ))
+            connection.execute(text(
+                "INSERT INTO wirtschaftsjahre "
+                "(id, mandant_id, start_date, end_date, status) "
+                "VALUES (1, 1, '2026-01-01', '2026-12-31', 'OPEN')"
+            ))
+            connection.execute(text(
+                "INSERT INTO buchungen "
+                "(booking_id, wirtschaftsjahr_id, booking_date, booking_type) "
+                "VALUES ('refund-booking', 1, '2026-03-01', 'REGULAR'), "
+                "('refund-booking-2', 1, '2026-03-01', 'REGULAR'), "
+                "('refund-reversal', 1, '2026-03-02', 'REVERSAL'), "
+                "('refund-reversal-2', 1, '2026-03-03', 'REVERSAL')"
+            ))
+            connection.execute(text(
+                "INSERT INTO gutschriften "
+                "(credit_note_id, mandant_id, partner_id, credit_note_kind, "
+                "note_number, note_date, booking_id) "
+                "VALUES ('credit-1', 1, 'partner-1', 'CUSTOMER', 'GS-1', "
+                "'2026-02-28', 'refund-booking')"
+            ))
+            connection.execute(text(
+                "INSERT INTO guthaben_ops (open_item_id, credit_note_id, amount) "
+                "VALUES ('credit-op-1', 'credit-1', 75.00)"
+            ))
+            connection.execute(text(
+                "INSERT INTO guthaben_op_rueckerstattungen "
+                "(refund_id, mandant_id, partner_id, open_item_id, direction, "
+                "amount, refund_date, booking_id, recorded_at) VALUES "
+                "('refund-1', 1, 'partner-1', 'credit-op-1', 'CUSTOMER', "
+                "25.00, '2026-03-01', 'refund-booking', '2026-03-01 10:00:00+00:00'), "
+                "('refund-2', 1, 'partner-1', 'credit-op-1', 'CUSTOMER', "
+                "5.00, '2026-03-01', 'refund-booking-2', '2026-03-01 11:00:00+00:00')"
+            ))
+            before = connection.execute(text(
+                "SELECT refund_id, mandant_id, partner_id, open_item_id, direction, "
+                "amount, refund_date, booking_id, recorded_at "
+                "FROM guthaben_op_rueckerstattungen WHERE refund_id='refund-1'"
+            )).one()
+    finally:
+        engine.dispose()
+
+    command.upgrade(config, HEAD_REVISION)
+    engine = create_engine(database_url)
+
+    @event.listens_for(engine, "connect")
+    def _enable_foreign_keys_after_upgrade(connection, _record) -> None:
+        connection.execute("PRAGMA foreign_keys=ON")
+
+    try:
+        with engine.begin() as connection:
+            after = connection.execute(text(
+                "SELECT refund_id, mandant_id, partner_id, open_item_id, direction, "
+                "amount, refund_date, booking_id, recorded_at "
+                "FROM guthaben_op_rueckerstattungen WHERE refund_id='refund-1'"
+            )).one()
+            assert tuple(after) == tuple(before)
+
+            connection.execute(text(
+                "INSERT INTO guthaben_op_rueckerstattungsruecknahmen "
+                "(reversal_id, refund_id, reversal_booking_id, recorded_at, reason) "
+                "VALUES ('undo-1', 'refund-1', 'refund-reversal', "
+                "'2026-03-02 12:00:00+00:00', 'Irrtümlich erfasst')"
+            ))
+
+        with pytest.raises(IntegrityError):
+            with engine.begin() as connection:
+                connection.execute(text(
+                    "INSERT INTO guthaben_op_rueckerstattungsruecknahmen "
+                    "(reversal_id, refund_id, reversal_booking_id, recorded_at, reason) "
+                    "VALUES ('undo-duplicate', 'refund-1', 'refund-reversal-2', "
+                    "'2026-03-03 12:00:00+00:00', 'Doppelversuch')"
+                ))
+
+        with pytest.raises(IntegrityError):
+            with engine.begin() as connection:
+                connection.execute(text(
+                    "INSERT INTO guthaben_op_rueckerstattungsruecknahmen "
+                    "(reversal_id, refund_id, reversal_booking_id, recorded_at, reason) "
+                    "VALUES ('undo-empty-reason', 'refund-2', 'refund-reversal-2', "
+                    "'2026-03-03 12:00:00+00:00', '   ')"
+                ))
+
+        with pytest.raises(IntegrityError):
+            with engine.begin() as connection:
+                connection.execute(text(
+                    "INSERT INTO guthaben_op_rueckerstattungsruecknahmen "
+                    "(reversal_id, refund_id, reversal_booking_id, recorded_at, reason) "
+                    "VALUES ('undo-missing-refund', 'missing-refund', 'refund-reversal-2', "
+                    "'2026-03-03 12:00:00+00:00', 'Test')"
+                ))
+
+        with pytest.raises(IntegrityError):
+            with engine.begin() as connection:
+                connection.execute(text(
+                    "INSERT INTO guthaben_op_rueckerstattungsruecknahmen "
+                    "(reversal_id, refund_id, reversal_booking_id, recorded_at, reason) "
+                    "VALUES ('undo-missing-booking', 'refund-2', 'missing-booking', "
+                    "'2026-03-03 12:00:00+00:00', 'Test')"
+                ))
+
+        inspector = inspect(engine)
+        table = "guthaben_op_rueckerstattungsruecknahmen"
+        columns = {column["name"]: column for column in inspector.get_columns(table)}
+        assert set(columns) == {
+            "id", "reversal_id", "refund_id", "reversal_booking_id",
+            "recorded_at", "reason",
+        }
+        assert all(
+            not columns[name]["nullable"]
+            for name in (
+                "reversal_id", "refund_id", "reversal_booking_id",
+                "recorded_at", "reason",
+            )
+        )
+        foreign_keys = inspector.get_foreign_keys(table)
+        assert {
+            (tuple(fk["constrained_columns"]), fk["referred_table"])
+            for fk in foreign_keys
+        } == {
+            (("refund_id",), "guthaben_op_rueckerstattungen"),
+            (("reversal_booking_id",), "buchungen"),
+        }
+        unique_columns = {
+            tuple(item["column_names"])
+            for item in inspector.get_unique_constraints(table)
+        }
+        assert unique_columns == {
+            ("reversal_id",), ("refund_id",), ("reversal_booking_id",),
+        }
+        assert {
+            item["name"] for item in inspector.get_check_constraints(table)
+        } == {"ck_guthaben_op_ruecknahme_grund_nichtleer"}
         assert _current_revision(database_path) == HEAD_REVISION
         assert _foreign_key_check(database_path) == []
     finally:

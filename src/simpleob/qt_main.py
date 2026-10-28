@@ -57,6 +57,9 @@ from simpleob.database.migration_service import (
 from simpleob.database.open_item_credit_refund_repository import (
     OpenItemCreditRefundRepository,
 )
+from simpleob.database.open_item_credit_refund_reversal_repository import (
+    OpenItemCreditRefundReversalRepository,
+)
 from simpleob.database.open_item_invoice_cancellation_repository import (
     OpenItemInvoiceCancellationRepository,
 )
@@ -135,6 +138,9 @@ from simpleob.services.fixed_asset_disposal_workflow import (
 )
 from simpleob.services.fixed_asset_schedule_service import (
     FixedAssetScheduleService,
+)
+from simpleob.services.open_item_credit_refund_reversal_service import (
+    OpenItemCreditRefundReversalService,
 )
 from simpleob.services.open_item_credit_refund_service import (
     OpenItemCreditRefundService,
@@ -562,6 +568,15 @@ def main() -> None:
             ),
             offset_repository=open_item_offset_repository,
             chart_of_accounts_repository=chart_of_accounts_repository,
+        )
+        open_item_credit_refund_reversal_service = (
+            OpenItemCreditRefundReversalService(
+                OpenItemCreditRefundReversalRepository(
+                    session=session,
+                    booking_repository=booking_repository,
+                    offset_repository=open_item_offset_repository,
+                )
+            )
         )
         payment_allocation_correction_service = PaymentAllocationCorrectionService(
             booking_repository=booking_repository,
@@ -1084,6 +1099,9 @@ def main() -> None:
                 open_item_invoice_cancellation_service=open_item_invoice_cancellation_service,
                 open_item_offset_service=open_item_offset_service,
                 open_item_credit_refund_service=open_item_credit_refund_service,
+                open_item_credit_refund_reversal_service=(
+                    open_item_credit_refund_reversal_service
+                ),
                 payment_allocation_correction_service=payment_allocation_correction_service,
                 eric_certificate_path=(
                     config.eric_certificate_path

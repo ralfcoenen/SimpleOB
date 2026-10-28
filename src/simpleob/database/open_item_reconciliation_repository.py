@@ -17,6 +17,7 @@ from simpleob.database.models import (
     GuthabenOP,
     GuthabenOPEreignis,
     GuthabenOPRueckerstattung,
+    GuthabenOPRueckerstattungsruecknahme,
     Gutschrift,
     Kontenrolle,
     Konto,
@@ -227,6 +228,35 @@ class OpenItemReconciliationRepository:
             state = item_state.get(refund.open_item_id)
             if booking.booking_date <= as_of_date and state is not None:
                 state["balance"] -= refund.amount
+        for reversal, refund, booking in (
+            self._session.query(
+                GuthabenOPRueckerstattungsruecknahme,
+                GuthabenOPRueckerstattung,
+                Buchung,
+            )
+            .join(
+                GuthabenOPRueckerstattung,
+                GuthabenOPRueckerstattungsruecknahme.refund_id
+                == GuthabenOPRueckerstattung.refund_id,
+            )
+            .join(
+                Buchung,
+                GuthabenOPRueckerstattungsruecknahme.reversal_booking_id
+                == Buchung.booking_id,
+            )
+            .join(Wirtschaftsjahr, Buchung.wirtschaftsjahr_id == Wirtschaftsjahr.id)
+            .filter(
+                GuthabenOPRueckerstattung.mandant_id == company.id,
+                Wirtschaftsjahr.mandant_id == company.id,
+            )
+            .all()
+        ):
+            # A journal reversal is a known OP movement only once its
+            # corresponding immutable OP-return record exists (Case B).
+            known_booking_ids.add(booking.booking_id)
+            state = item_state.get(refund.open_item_id)
+            if booking.booking_date <= as_of_date and state is not None:
+                state["balance"] += refund.amount
         for event, correction in (
             self._session.query(Zahlungszuordnungskorrekturereignis, Zahlungszuordnungskorrektur)
             .join(Zahlungszuordnungskorrektur, Zahlungszuordnungskorrekturereignis.correction_id == Zahlungszuordnungskorrektur.correction_id)

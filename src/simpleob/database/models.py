@@ -13,6 +13,7 @@ from sqlalchemy import (
     Integer,
     Numeric,
     String,
+    Text,
     UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -882,6 +883,40 @@ class GuthabenOPRueckerstattung(Base):
     recorded_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )
+
+
+class GuthabenOPRueckerstattungsruecknahme(Base):
+    """Unveränderliche Rücknahme einer vollständigen Guthabenrückerstattung.
+
+    Mandant, Geschäftsjahr, Partner, Guthaben-OP und Rücknahmebetrag ergeben
+    sich über die Rückerstattung und die referenzierte Hauptbuchbuchung.
+    """
+
+    __tablename__ = "guthaben_op_rueckerstattungsruecknahmen"
+    __table_args__ = (
+        CheckConstraint(
+            "length(trim(reason)) > 0",
+            name="ck_guthaben_op_ruecknahme_grund_nichtleer",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    reversal_id: Mapped[str] = mapped_column(String(36), unique=True, nullable=False)
+    refund_id: Mapped[str] = mapped_column(
+        ForeignKey("guthaben_op_rueckerstattungen.refund_id"),
+        unique=True,
+        nullable=False,
+    )
+    reversal_booking_id: Mapped[str] = mapped_column(
+        ForeignKey("buchungen.booking_id"), unique=True, nullable=False
+    )
+    recorded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+
+    refund: Mapped[GuthabenOPRueckerstattung] = relationship()
+    reversal_booking: Mapped[Buchung] = relationship()
 
 
 class GuthabenOPEreignis(Base):

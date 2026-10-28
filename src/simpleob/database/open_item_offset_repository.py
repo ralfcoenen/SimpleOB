@@ -18,6 +18,8 @@ from simpleob.database.models import (
     Geschaeftspartner,
     GuthabenOP,
     GuthabenOPEreignis,
+    GuthabenOPRueckerstattung,
+    GuthabenOPRueckerstattungsruecknahme,
     Gutschrift,
     Konto,
     Mandant,
@@ -275,6 +277,21 @@ class OpenItemOffsetRepository:
             open_item_id=open_item_id,
             original_amount=open_item.amount,
         )
+        refund_reversal_booking_date = (
+            self._session.query(func.max(Buchung.booking_date))
+            .join(
+                GuthabenOPRueckerstattungsruecknahme,
+                GuthabenOPRueckerstattungsruecknahme.reversal_booking_id
+                == Buchung.booking_id,
+            )
+            .join(
+                GuthabenOPRueckerstattung,
+                GuthabenOPRueckerstattung.refund_id
+                == GuthabenOPRueckerstattungsruecknahme.refund_id,
+            )
+            .filter(GuthabenOPRueckerstattung.open_item_id == str(open_item_id))
+            .scalar()
+        )
         account_number = self._source_account_number(
             mandant_id=company.id,
             booking_id=source_booking_id,
@@ -302,6 +319,7 @@ class OpenItemOffsetRepository:
             account_number=account_number,
             cancellation_booking_date=cancellation_booking_date,
             origin_booking_date=origin_booking_date,
+            refund_reversal_booking_date=refund_reversal_booking_date,
         )
 
     def reserve_credit_mutation(self) -> None:
@@ -340,6 +358,15 @@ class OpenItemOffsetRepository:
                 "Das Buchungsdatum der Verrechnung darf nicht vor dem "
                 "Entstehungsdatum des stornobasierten Guthabens liegen "
                 f"({credit.cancellation_booking_date:%d.%m.%Y})."
+            )
+        if (
+            credit.refund_reversal_booking_date is not None
+            and booking_date < credit.refund_reversal_booking_date
+        ):
+            raise ValueError(
+                "Das Buchungsdatum der Verrechnung darf nicht vor dem "
+                "Buchungsdatum der Guthabenrücknahme liegen "
+                f"({credit.refund_reversal_booking_date:%d.%m.%Y})."
             )
 
     def list_open_invoices(

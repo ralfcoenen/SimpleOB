@@ -20,10 +20,12 @@ from simpleob.database.database import Base
 from simpleob.database.lock_error import DatabaseLockError
 from simpleob.database.models import (
     Buchung,
+    Buchungszeile,
     ForderungsOP,
     GuthabenOP,
     GuthabenOPEreignis,
     GuthabenOPRueckerstattung,
+    GuthabenOPRueckerstattungsruecknahme,
     Gutschrift,
     Kontenrolle,
     Konto,
@@ -36,6 +38,9 @@ from simpleob.database.models import (
 from simpleob.database.open_item_credit_refund_repository import (
     OpenItemCreditRefundRepository,
 )
+from simpleob.database.open_item_credit_refund_reversal_repository import (
+    OpenItemCreditRefundReversalRepository,
+)
 from simpleob.database.open_item_invoice_cancellation_repository import (
     OpenItemInvoiceCancellationRepository,
 )
@@ -44,6 +49,7 @@ from simpleob.database.open_item_payment_repository import OpenItemPaymentReposi
 from simpleob.database.payable_invoice_repository import PayableInvoiceRepository
 from simpleob.database.receivable_invoice_repository import ReceivableInvoiceRepository
 from simpleob.domain.account_type import AccountType
+from simpleob.domain.booking_type import BookingType
 from simpleob.domain.business_partner import BusinessPartner
 from simpleob.domain.company import Company
 from simpleob.domain.entry_side import EntrySide
@@ -55,6 +61,9 @@ from simpleob.domain.open_item_payment import PaymentDirection
 from simpleob.domain.vat_accounts import VatAccounts
 from simpleob.domain.vat_booking_item import VatBookingItem
 from simpleob.services.credit_note_posting_service import CreditNotePostingService
+from simpleob.services.open_item_credit_refund_reversal_service import (
+    OpenItemCreditRefundReversalService,
+)
 from simpleob.services.open_item_credit_refund_service import (
     OpenItemCreditRefundService,
 )
@@ -186,6 +195,18 @@ def _refund_service(session):
         refund_repository=refund_repository,
         offset_repository=offset_repository,
         chart_of_accounts_repository=ChartOfAccountsRepository(session),
+    )
+
+
+def _refund_reversal_service(session):
+    booking_repository = BookingRepository(session)
+    offset_repository = OpenItemOffsetRepository(session)
+    return OpenItemCreditRefundReversalService(
+        OpenItemCreditRefundReversalRepository(
+            session=session,
+            booking_repository=booking_repository,
+            offset_repository=offset_repository,
+        )
     )
 
 
@@ -731,6 +752,573 @@ def test_sqlite_credit_reservation_does_not_nest_in_physical_transaction():
             OpenItemOffsetRepository(session).reserve_credit_mutation()
     finally:
         session.rollback()
+        session.close()
+        engine.dispose()
+
+
+@pytest.mark.parametrize("direction", [OffsetDirection.CUSTOMER, OffsetDirection.SUPPLIER])
+def test_credit_refund_reversal_case_a_creates_exact_reversal_and_restores_credit(direction):
+    engine, session, company, partner, receivable, payable, credit_service, _offsets, _payments = _environment()
+    try:
+        _invoice, _note, _invoice_id, credit_id = _create_invoice_and_credit(
+            session, company, partner, receivable, payable, credit_service, direction
+        )
+        refund = _post_refund(
+            _refund_service(session), company, partner, direction, credit_id, "119.00"
+        )
+        original = session.query(Buchung).filter_by(booking_id=str(refund.booking_id)).one()
+        booking_count = session.query(Buchung).count()
+
+        result = _refund_reversal_service(session).reverse_refund(
+            company_id=company.company_id,
+            fiscal_year=FY,
+            refund_id=refund.refund_id,
+            booking_date=date(2026, 4, 20),
+            reason="Irrtümlich erfasste Rückerstattung",
+        )
+
+        reversal = session.query(Buchung).filter_by(
+            booking_id=str(result.reversal_booking_id)
+        ).one()
+        assert result.created_booking is True
+        assert result.amount == Decimal("119.00")
+        assert session.query(Buchung).count() == booking_count + 1
+        assert reversal.booking_type == BookingType.REVERSAL.value
+        assert reversal.reversal_of_booking_id == original.booking_id
+        returned = OpenItemOffsetRepository(session).get_credit(
+            company_id=company.company_id,
+            partner_id=partner.partner_id,
+            open_item_id=credit_id,
+            direction=direction,
+        )
+        assert returned.available_amount == Decimal("119.00")
+        assert session.query(GuthabenOPRueckerstattungsruecknahme).count() == 1
+    finally:
+        session.close()
+        engine.dispose()
+
+
+@pytest.mark.parametrize("existing_journal_reversal", [False, True])
+def test_credit_refund_reversal_rejects_booking_date_before_original_refund(
+    existing_journal_reversal,
+):
+    engine, session, company, partner, receivable, payable, credit_service, _offsets, _payments = _environment()
+    try:
+        _invoice, _note, _invoice_id, credit_id = _create_invoice_and_credit(
+            session,
+            company,
+            partner,
+            receivable,
+            payable,
+            credit_service,
+            OffsetDirection.CUSTOMER,
+        )
+        refund = _post_refund(
+            _refund_service(session),
+            company,
+            partner,
+            OffsetDirection.CUSTOMER,
+            credit_id,
+            "119.00",
+        )
+        original = session.query(Buchung).filter_by(
+            booking_id=str(refund.booking_id)
+        ).one()
+        if existing_journal_reversal:
+            session.add(
+                Buchung(
+                    booking_id=str(uuid4()),
+                    wirtschaftsjahr_id=original.wirtschaftsjahr_id,
+                    booking_date=date(2026, 4, 15),
+                    description="Vorhandene Journalgegenbuchung mit unzulässigem Datum",
+                    booking_type=BookingType.REVERSAL.value,
+                    reversal_of_booking_id=original.booking_id,
+                    zeilen=[
+                        Buchungszeile(
+                            position=index,
+                            account_number=line.account_number,
+                            side=(
+                                EntrySide.CREDIT.value
+                                if line.side == EntrySide.DEBIT.value
+                                else EntrySide.DEBIT.value
+                            ),
+                            amount=line.amount,
+                        )
+                        for index, line in enumerate(original.zeilen)
+                    ],
+                )
+            )
+            session.commit()
+
+        booking_count = session.query(Buchung).count()
+        with pytest.raises(ValueError, match="darf nicht vor|nicht zulässig"):
+            _refund_reversal_service(session).reverse_refund(
+                company_id=company.company_id,
+                fiscal_year=FY,
+                refund_id=refund.refund_id,
+                booking_date=date(2026, 4, 15),
+                reason="Rücknahme mit unzulässigem Buchungsdatum",
+            )
+
+        assert session.query(Buchung).count() == booking_count
+        assert session.query(GuthabenOPRueckerstattungsruecknahme).count() == 0
+    finally:
+        session.close()
+        engine.dispose()
+
+
+@pytest.mark.parametrize("direction", [OffsetDirection.CUSTOMER, OffsetDirection.SUPPLIER])
+def test_credit_refund_reversal_case_b_uses_exact_existing_journal_reversal(direction):
+    engine, session, company, partner, receivable, payable, credit_service, _offsets, _payments = _environment()
+    try:
+        _invoice, _note, _invoice_id, credit_id = _create_invoice_and_credit(
+            session, company, partner, receivable, payable, credit_service, direction
+        )
+        refund = _post_refund(
+            _refund_service(session), company, partner, direction, credit_id, "119.00"
+        )
+        original = session.query(Buchung).filter_by(booking_id=str(refund.booking_id)).one()
+        reversal = Buchung(
+            booking_id=str(uuid4()),
+            wirtschaftsjahr_id=original.wirtschaftsjahr_id,
+            booking_date=date(2026, 4, 20),
+            description="Vorhandene Journalgegenbuchung",
+            booking_type=BookingType.REVERSAL.value,
+            reversal_of_booking_id=original.booking_id,
+            zeilen=[
+                Buchungszeile(
+                    position=index,
+                    account_number=line.account_number,
+                    side=(
+                        EntrySide.CREDIT.value
+                        if line.side == EntrySide.DEBIT.value
+                        else EntrySide.DEBIT.value
+                    ),
+                    amount=line.amount,
+                )
+                for index, line in enumerate(original.zeilen)
+            ],
+        )
+        session.add(reversal)
+        session.commit()
+        booking_count = session.query(Buchung).count()
+
+        result = _refund_reversal_service(session).reverse_refund(
+            company_id=company.company_id,
+            fiscal_year=FY,
+            refund_id=refund.refund_id,
+            booking_date=date(2026, 4, 20),
+            reason="OP-Korrektur zur vorhandenen Journalstornierung",
+        )
+
+        assert result.created_booking is False
+        assert result.reversal_booking_id == UUID(reversal.booking_id)
+        assert session.query(Buchung).count() == booking_count
+        assert session.query(GuthabenOPRueckerstattungsruecknahme).count() == 1
+        assert OpenItemOffsetRepository(session).get_credit(
+            company_id=company.company_id,
+            partner_id=partner.partner_id,
+            open_item_id=credit_id,
+            direction=direction,
+        ).available_amount == Decimal("119.00")
+    finally:
+        session.close()
+        engine.dispose()
+
+
+def test_credit_refund_reversal_rejects_existing_reversal_from_another_year():
+    engine, session, company, partner, receivable, payable, credit_service, _offsets, _payments = _environment()
+    try:
+        _invoice, _note, _invoice_id, credit_id = _create_invoice_and_credit(
+            session, company, partner, receivable, payable, credit_service, OffsetDirection.CUSTOMER
+        )
+        refund = _post_refund(
+            _refund_service(session), company, partner, OffsetDirection.CUSTOMER, credit_id, "119.00"
+        )
+        original = session.query(Buchung).filter_by(booking_id=str(refund.booking_id)).one()
+        next_year = FiscalYear(date(2027, 1, 1), date(2027, 12, 31))
+        CompanyRepository(session).add_fiscal_year(company.company_id, next_year)
+        year_model = session.query(Wirtschaftsjahr).filter_by(start_date=next_year.start_date).one()
+        foreign_year_reversal = Buchung(
+            booking_id=str(uuid4()),
+            wirtschaftsjahr_id=year_model.id,
+            booking_date=date(2027, 1, 2),
+            description="Fremdjähriger Kandidat",
+            booking_type=BookingType.REVERSAL.value,
+            reversal_of_booking_id=original.booking_id,
+            zeilen=[
+                Buchungszeile(
+                    position=index,
+                    account_number=line.account_number,
+                    side=(EntrySide.CREDIT.value if line.side == EntrySide.DEBIT.value else EntrySide.DEBIT.value),
+                    amount=line.amount,
+                )
+                for index, line in enumerate(original.zeilen)
+            ],
+        )
+        session.add(foreign_year_reversal)
+        session.commit()
+        booking_count = session.query(Buchung).count()
+
+        with pytest.raises(ValueError, match="nicht zulässig"):
+            _refund_reversal_service(session).reverse_refund(
+                company_id=company.company_id,
+                fiscal_year=FY,
+                refund_id=refund.refund_id,
+                reason="Unzulässige fremdjährige Gegenbuchung",
+                booking_date=None,
+            )
+        assert session.query(Buchung).count() == booking_count
+        assert session.query(GuthabenOPRueckerstattungsruecknahme).count() == 0
+    finally:
+        session.close()
+        engine.dispose()
+
+
+def test_credit_refund_reversal_rejects_refund_from_another_company():
+    engine, session, company, partner, receivable, payable, credit_service, _offsets, _payments = _environment()
+    try:
+        _invoice, _note, _invoice_id, credit_id = _create_invoice_and_credit(
+            session, company, partner, receivable, payable, credit_service, OffsetDirection.CUSTOMER
+        )
+        refund = _post_refund(
+            _refund_service(session), company, partner, OffsetDirection.CUSTOMER, credit_id, "119.00"
+        )
+        other_company = Company(uuid4(), "Anderer Mandant")
+        companies = CompanyRepository(session)
+        companies.add(other_company)
+        companies.add_fiscal_year(other_company.company_id, FY)
+        session.commit()
+        booking_count = session.query(Buchung).count()
+
+        with pytest.raises(ValueError, match="anderen Mandanten"):
+            _refund_reversal_service(session).reverse_refund(
+                company_id=other_company.company_id,
+                fiscal_year=FY,
+                refund_id=refund.refund_id,
+                booking_date=date(2026, 4, 20),
+                reason="Mandantentrennung",
+            )
+        assert session.query(Buchung).count() == booking_count
+        assert session.query(GuthabenOPRueckerstattungsruecknahme).count() == 0
+    finally:
+        session.close()
+        engine.dispose()
+
+
+def test_credit_refund_reversal_rejects_duplicate_and_closed_year():
+    engine, session, company, partner, receivable, payable, credit_service, _offsets, _payments = _environment()
+    try:
+        _invoice, _note, _invoice_id, credit_id = _create_invoice_and_credit(
+            session, company, partner, receivable, payable, credit_service, OffsetDirection.CUSTOMER
+        )
+        refund = _post_refund(
+            _refund_service(session), company, partner, OffsetDirection.CUSTOMER, credit_id, "119.00"
+        )
+        service = _refund_reversal_service(session)
+        kwargs = dict(
+            company_id=company.company_id,
+            fiscal_year=FY,
+            refund_id=refund.refund_id,
+            reason="Doppelte Rücknahme verhindern",
+            booking_date=date(2026, 4, 20),
+        )
+        service.reverse_refund(**kwargs)
+        counts = (session.query(Buchung).count(), session.query(GuthabenOPRueckerstattungsruecknahme).count())
+        with pytest.raises(ValueError, match="bereits zurückgenommen"):
+            service.reverse_refund(**kwargs)
+        assert (session.query(Buchung).count(), session.query(GuthabenOPRueckerstattungsruecknahme).count()) == counts
+    finally:
+        session.close()
+        engine.dispose()
+
+
+def test_restored_credit_cannot_be_offset_before_its_return_booking_date():
+    engine, session, company, partner, receivable, payable, credit_service, offsets, _payments = _environment()
+    try:
+        _invoice, _note, invoice_id, credit_id = _create_invoice_and_credit(
+            session, company, partner, receivable, payable, credit_service, OffsetDirection.CUSTOMER
+        )
+        refund = _post_refund(
+            _refund_service(session), company, partner, OffsetDirection.CUSTOMER, credit_id, "119.00"
+        )
+        _refund_reversal_service(session).reverse_refund(
+            company_id=company.company_id,
+            fiscal_year=FY,
+            refund_id=refund.refund_id,
+            booking_date=date(2026, 4, 20),
+            reason="Rücknahme zeitlich abgrenzen",
+        )
+        booking_count = session.query(Buchung).count()
+        with pytest.raises(ValueError, match="Buchungsdatum der Guthabenrücknahme"):
+            _post_offset(
+                offsets,
+                company,
+                partner,
+                OffsetDirection.CUSTOMER,
+                invoice_id,
+                credit_id,
+                "119.00",
+            )
+        assert session.query(Buchung).count() == booking_count
+        assert session.query(OPGuthabenverrechnung).count() == 0
+        assert session.query(GuthabenOPEreignis).count() == 0
+    finally:
+        session.close()
+        engine.dispose()
+
+    engine, session, company, partner, receivable, payable, credit_service, _offsets, _payments = _environment()
+    try:
+        _invoice, _note, _invoice_id, credit_id = _create_invoice_and_credit(
+            session, company, partner, receivable, payable, credit_service, OffsetDirection.CUSTOMER
+        )
+        refund = _post_refund(
+            _refund_service(session), company, partner, OffsetDirection.CUSTOMER, credit_id, "119.00"
+        )
+        session.query(Wirtschaftsjahr).one().status = FiscalYearStatus.CLOSED.value
+        session.commit()
+        with pytest.raises(ValueError, match="nicht offen"):
+            _refund_reversal_service(session).reverse_refund(
+                company_id=company.company_id,
+                fiscal_year=FY,
+                refund_id=refund.refund_id,
+                booking_date=date(2026, 4, 20),
+                reason="Geschlossenes Jahr",
+            )
+        assert session.query(GuthabenOPRueckerstattungsruecknahme).count() == 0
+    finally:
+        session.close()
+        engine.dispose()
+
+
+def test_credit_refund_reversal_rolls_back_booking_when_return_record_fails():
+    engine, session, company, partner, receivable, payable, credit_service, _offsets, _payments = _environment()
+    try:
+        _invoice, _note, _invoice_id, credit_id = _create_invoice_and_credit(
+            session, company, partner, receivable, payable, credit_service, OffsetDirection.CUSTOMER
+        )
+        refund = _post_refund(
+            _refund_service(session), company, partner, OffsetDirection.CUSTOMER, credit_id, "119.00"
+        )
+        booking_count = session.query(Buchung).count()
+
+        def fail_return_flush(_session, _flush_context, instances):
+            pending = list(_session.new) + list(instances or ())
+            if any(isinstance(obj, GuthabenOPRueckerstattungsruecknahme) for obj in pending):
+                raise RuntimeError("simulierter Persistenzfehler")
+
+        event.listen(session, "before_flush", fail_return_flush)
+        with pytest.raises(RuntimeError, match="simulierter Persistenzfehler"):
+            _refund_reversal_service(session).reverse_refund(
+                company_id=company.company_id,
+                fiscal_year=FY,
+                refund_id=refund.refund_id,
+                booking_date=date(2026, 4, 20),
+                reason="Rollback prüfen",
+            )
+        event.remove(session, "before_flush", fail_return_flush)
+        assert session.query(Buchung).count() == booking_count
+        assert session.query(GuthabenOPRueckerstattungsruecknahme).count() == 0
+    finally:
+        session.close()
+        engine.dispose()
+
+
+def test_sqlite_concurrent_credit_refund_reversals_create_only_one_booking(tmp_path: Path):
+    database_url = f"sqlite:///{tmp_path / 'refund-reversal-race.db'}"
+    engine, session, company, partner, receivable, payable, credit_service, _offsets, _payments = _environment(database_url)
+    try:
+        _invoice, _note, _invoice_id, credit_id = _create_invoice_and_credit(
+            session, company, partner, receivable, payable, credit_service, OffsetDirection.CUSTOMER
+        )
+        refund = _post_refund(
+            _refund_service(session), company, partner, OffsetDirection.CUSTOMER, credit_id, "119.00"
+        )
+        refund_id = refund.refund_id
+        original_booking_id = refund.booking_id
+        initial_booking_count = session.query(Buchung).count()
+    finally:
+        session.close()
+
+    barrier = Barrier(2)
+
+    def reverse_once():
+        worker = Session(engine)
+        try:
+            barrier.wait(timeout=5)
+            return _refund_reversal_service(worker).reverse_refund(
+                company_id=company.company_id,
+                fiscal_year=FY,
+                refund_id=refund_id,
+                booking_date=date(2026, 4, 20),
+                reason="Parallele Rücknahme",
+            )
+        finally:
+            worker.close()
+
+    try:
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            futures = [executor.submit(reverse_once) for _ in range(2)]
+            results = []
+            for future in futures:
+                try:
+                    results.append(("success", future.result(timeout=10)))
+                except Exception as exc:
+                    results.append(("failure", exc))
+        assert [result[0] for result in results].count("success") == 1
+        assert [result[0] for result in results].count("failure") == 1
+        check = Session(engine)
+        try:
+            assert check.query(Buchung).count() == initial_booking_count + 1
+            assert check.query(GuthabenOPRueckerstattungsruecknahme).count() == 1
+            assert check.query(Buchung).filter_by(booking_id=str(original_booking_id)).count() == 1
+        finally:
+            check.close()
+    finally:
+        engine.dispose()
+
+
+def test_sqlite_refund_reversal_serializes_with_credit_offset(tmp_path: Path):
+    database_url = f"sqlite:///{tmp_path / 'refund-reversal-offset-race.db'}"
+    engine, session, company, partner, receivable, payable, credit_service, _offsets, _payments = _environment(database_url)
+    try:
+        _invoice, _note, invoice_id, credit_id = _create_invoice_and_credit(
+            session, company, partner, receivable, payable, credit_service, OffsetDirection.CUSTOMER
+        )
+        refund = _post_refund(
+            _refund_service(session), company, partner, OffsetDirection.CUSTOMER, credit_id, "119.00"
+        )
+        refund_id = refund.refund_id
+        initial_bookings = session.query(Buchung).count()
+    finally:
+        session.close()
+
+    barrier = Barrier(2)
+
+    def mutate(kind):
+        worker = Session(engine)
+        try:
+            barrier.wait(timeout=5)
+            if kind == "reversal":
+                return _refund_reversal_service(worker).reverse_refund(
+                    company_id=company.company_id,
+                    fiscal_year=FY,
+                    refund_id=refund_id,
+                    booking_date=date(2026, 4, 20),
+                    reason="Parallele OP-Verrechnung absichern",
+                )
+            offset_repository = OpenItemOffsetRepository(worker)
+            return OpenItemOffsetService(
+                booking_repository=BookingRepository(worker),
+                offset_repository=offset_repository,
+            ).post_offset(
+                company_id=company.company_id,
+                fiscal_year=FY,
+                partner_id=partner.partner_id,
+                direction=OffsetDirection.CUSTOMER,
+                invoice_open_item_id=invoice_id,
+                credit_open_item_id=credit_id,
+                amount=Decimal("119.00"),
+                settlement_date=date(2026, 4, 21),
+                booking_date=date(2026, 4, 21),
+            )
+        finally:
+            worker.close()
+
+    try:
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            futures = [executor.submit(mutate, kind) for kind in ("reversal", "offset")]
+            outcomes = []
+            for future in futures:
+                try:
+                    outcomes.append(("success", future.result(timeout=10)))
+                except Exception as exc:
+                    outcomes.append(("failure", exc))
+        assert [status for status, _ in outcomes].count("success") in (1, 2)
+        reversal_result = next(
+            result for status, result in outcomes
+            if status == "success" and hasattr(result, "reversal_booking_id")
+        )
+        assert reversal_result.created_booking is True
+        check = Session(engine)
+        try:
+            assert check.query(GuthabenOPRueckerstattungsruecknahme).count() == 1
+            offset_count = check.query(OPGuthabenverrechnung).count()
+            assert offset_count in (0, 1)
+            assert check.query(Buchung).count() == initial_bookings + 1 + offset_count
+            assert OpenItemOffsetRepository(check).get_credit(
+                company_id=company.company_id,
+                partner_id=partner.partner_id,
+                open_item_id=credit_id,
+                direction=OffsetDirection.CUSTOMER,
+            ).available_amount in (ZERO, Decimal("119.00"))
+        finally:
+            check.close()
+    finally:
+        engine.dispose()
+
+
+def test_refund_reversal_candidates_exclude_returned_and_identify_existing_journal_reversal():
+    engine, session, company, partner, receivable, payable, credit_service, _offsets, _payments = _environment()
+    try:
+        refunds = {}
+        for direction in (OffsetDirection.CUSTOMER, OffsetDirection.SUPPLIER):
+            _invoice, _note, _invoice_id, credit_id = _create_invoice_and_credit(
+                session, company, partner, receivable, payable, credit_service, direction
+            )
+            refunds[direction] = _post_refund(
+                _refund_service(session), company, partner, direction, credit_id, "20.00"
+            )
+        supplier_refund = refunds[OffsetDirection.SUPPLIER]
+        source_booking = session.query(Buchung).filter_by(
+            booking_id=str(supplier_refund.booking_id)
+        ).one()
+        session.add(
+            Buchung(
+                booking_id=str(uuid4()),
+                wirtschaftsjahr_id=source_booking.wirtschaftsjahr_id,
+                booking_date=date(2026, 4, 20),
+                description="Vorhandenes Journalstorno",
+                booking_type=BookingType.REVERSAL.value,
+                reversal_of_booking_id=source_booking.booking_id,
+                zeilen=[
+                    Buchungszeile(
+                        position=index,
+                        account_number=line.account_number,
+                        side=(
+                            EntrySide.CREDIT.value
+                            if line.side == EntrySide.DEBIT.value
+                            else EntrySide.DEBIT.value
+                        ),
+                        amount=line.amount,
+                    )
+                    for index, line in enumerate(source_booking.zeilen)
+                ],
+            )
+        )
+        session.commit()
+
+        return_service = _refund_reversal_service(session)
+        return_service.reverse_refund(
+            company_id=company.company_id,
+            fiscal_year=FY,
+            refund_id=refunds[OffsetDirection.CUSTOMER].refund_id,
+            booking_date=date(2026, 4, 20),
+            reason="Kundenrückerstattung war irrtümlich",
+        )
+        candidates = return_service.list_candidates(
+            company_id=company.company_id,
+            fiscal_year=FY,
+        )
+
+        assert len(candidates) == 1
+        assert candidates[0].refund_id == supplier_refund.refund_id
+        assert candidates[0].direction is OffsetDirection.SUPPLIER
+        assert candidates[0].amount == Decimal("20.00")
+        assert candidates[0].booking_date == date(2026, 4, 16)
+        assert candidates[0].journal_reversal_count == 1
+        assert candidates[0].journal_reversal_booking_date == date(2026, 4, 20)
+    finally:
         session.close()
         engine.dispose()
 

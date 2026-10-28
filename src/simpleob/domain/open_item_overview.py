@@ -30,6 +30,7 @@ class OpenItemActivityKind(StrEnum):
     PAYMENT_CORRECTION = "PAYMENT_CORRECTION"
     INVOICE_CANCELLATION = "INVOICE_CANCELLATION"
     REFUND = "REFUND"
+    REFUND_REVERSAL = "REFUND_REVERSAL"
 
     @property
     def label(self) -> str:
@@ -42,6 +43,7 @@ class OpenItemActivityKind(StrEnum):
             ),
             OpenItemActivityKind.INVOICE_CANCELLATION: "Rechnungsstorno",
             OpenItemActivityKind.REFUND: "Rückerstattung",
+            OpenItemActivityKind.REFUND_REVERSAL: "Rücknahme Rückerstattung",
         }[self]
 
 

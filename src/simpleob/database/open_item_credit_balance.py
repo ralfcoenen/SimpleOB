@@ -6,7 +6,11 @@ from uuid import UUID
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from simpleob.database.models import GuthabenOPEreignis, GuthabenOPRueckerstattung
+from simpleob.database.models import (
+    GuthabenOPEreignis,
+    GuthabenOPRueckerstattung,
+    GuthabenOPRueckerstattungsruecknahme,
+)
 from simpleob.domain.money import ZERO
 
 
@@ -28,7 +32,22 @@ def available_credit_amount(
         .filter(GuthabenOPRueckerstattung.open_item_id == stored_id)
         .scalar()
     )
-    amount = original_amount + (event_total or ZERO) - (refund_total or ZERO)
+    returned_total = (
+        session.query(func.sum(GuthabenOPRueckerstattung.amount))
+        .join(
+            GuthabenOPRueckerstattungsruecknahme,
+            GuthabenOPRueckerstattungsruecknahme.refund_id
+            == GuthabenOPRueckerstattung.refund_id,
+        )
+        .filter(GuthabenOPRueckerstattung.open_item_id == stored_id)
+        .scalar()
+    )
+    amount = (
+        original_amount
+        + (event_total or ZERO)
+        - (refund_total or ZERO)
+        + (returned_total or ZERO)
+    )
     if amount < ZERO:
         raise ValueError("Verrechnungen und Rückerstattungen reduzieren den Guthaben-OP unter null.")
     return amount

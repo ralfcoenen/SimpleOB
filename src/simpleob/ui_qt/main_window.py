@@ -76,6 +76,9 @@ from simpleob.services.credit_note_posting_service import (
     CreditNotePostingService,
 )
 from simpleob.services.fiscal_year_workspace import FiscalYearWorkspace
+from simpleob.services.open_item_credit_refund_reversal_service import (
+    OpenItemCreditRefundReversalService,
+)
 from simpleob.services.open_item_credit_refund_service import (
     OpenItemCreditRefundService,
 )
@@ -135,6 +138,9 @@ from simpleob.ui_qt.income_statement_frame import (
 )
 from simpleob.ui_qt.new_fixed_asset_dialog import NewFixedAssetDialog
 from simpleob.ui_qt.open_item_credit_refund_dialog import OpenItemCreditRefundDialog
+from simpleob.ui_qt.open_item_credit_refund_reversal_dialog import (
+    OpenItemCreditRefundReversalDialog,
+)
 from simpleob.ui_qt.open_item_offset_dialog import OpenItemOffsetDialog
 from simpleob.ui_qt.open_item_overview_widget import OpenItemOverviewWidget
 from simpleob.ui_qt.open_item_payment_dialog import OpenItemPaymentDialog
@@ -202,6 +208,7 @@ class MainWindow(QMainWindow):
         open_item_overview_service: OpenItemOverviewService | None = None,
         open_item_invoice_cancellation_service: OpenItemInvoiceCancellationService | None = None,
         open_item_credit_refund_service: OpenItemCreditRefundService | None = None,
+        open_item_credit_refund_reversal_service: OpenItemCreditRefundReversalService | None = None,
     ) -> None:
         super().__init__()
 
@@ -250,6 +257,7 @@ class MainWindow(QMainWindow):
         self._open_item_overview_service = open_item_overview_service
         self._open_item_invoice_cancellation_service = open_item_invoice_cancellation_service
         self._open_item_credit_refund_service = open_item_credit_refund_service
+        self._open_item_credit_refund_reversal_service = open_item_credit_refund_reversal_service
         self._eric_certificate_path = (
             Path(eric_certificate_path).expanduser()
             if eric_certificate_path is not None
@@ -2072,6 +2080,17 @@ class MainWindow(QMainWindow):
         self._credit_refund_button.clicked.connect(self._open_credit_refund_dialog)
         layout.addWidget(self._credit_refund_button)
 
+        self._credit_refund_reversal_button = QPushButton(
+            "Guthabenrückerstattung zurücknehmen…"
+        )
+        self._credit_refund_reversal_button.setEnabled(
+            self._open_item_credit_refund_reversal_service is not None
+        )
+        self._credit_refund_reversal_button.clicked.connect(
+            self._open_credit_refund_reversal_dialog
+        )
+        layout.addWidget(self._credit_refund_reversal_button)
+
         self._payment_correction_button = QPushButton("Zahlungszuordnung korrigieren…")
         self._payment_correction_button.setEnabled(self._payment_allocation_correction_service is not None)
         self._payment_correction_button.clicked.connect(self._open_payment_correction_dialog)
@@ -2281,6 +2300,20 @@ class MainWindow(QMainWindow):
         self._refresh_journal()
         self._refresh_balance_sheet()
         self._refresh_visible_open_item_view()
+
+    def _open_credit_refund_reversal_dialog(self) -> None:
+        """Nimmt eine versehentlich gebuchte Guthabenrückerstattung zurück."""
+        service = self._open_item_credit_refund_reversal_service
+        if service is None or self._workspace.is_closed:
+            return
+        dialog = OpenItemCreditRefundReversalDialog(
+            self,
+            company_id=self._context.company.company_id,
+            fiscal_year=self._context.fiscal_year,
+            service=service,
+        )
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self._refresh_after_credit_refund()
 
     def _open_payment_correction_dialog(self) -> None:
         service = self._payment_allocation_correction_service

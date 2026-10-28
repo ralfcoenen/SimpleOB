@@ -26,6 +26,7 @@ from simpleob.database.models import (
     GuthabenOP,
     GuthabenOPEreignis,
     GuthabenOPRueckerstattung,
+    GuthabenOPRueckerstattungsruecknahme,
     Kontenrolle,
     Konto,
     Mandant,
@@ -42,6 +43,9 @@ from simpleob.database.models import (
 from simpleob.database.open_item_credit_refund_repository import (
     OpenItemCreditRefundRepository,
 )
+from simpleob.database.open_item_credit_refund_reversal_repository import (
+    OpenItemCreditRefundReversalRepository,
+)
 from simpleob.database.open_item_invoice_cancellation_repository import (
     OpenItemInvoiceCancellationRepository,
 )
@@ -57,8 +61,10 @@ from simpleob.database.payment_allocation_correction_repository import (
 )
 from simpleob.database.receivable_invoice_repository import ReceivableInvoiceRepository
 from simpleob.domain.account_type import AccountType
+from simpleob.domain.booking_type import BookingType
 from simpleob.domain.business_partner import BusinessPartner
 from simpleob.domain.company import Company
+from simpleob.domain.entry_side import EntrySide
 from simpleob.domain.fiscal_year import FiscalYear
 from simpleob.domain.fiscal_year_status import FiscalYearStatus
 from simpleob.domain.open_item_offset import OffsetDirection
@@ -67,6 +73,9 @@ from simpleob.domain.open_item_payment import PaymentDirection
 from simpleob.domain.vat_accounts import VatAccounts
 from simpleob.domain.vat_booking_item import VatBookingItem
 from simpleob.services.credit_note_posting_service import CreditNotePostingService
+from simpleob.services.open_item_credit_refund_reversal_service import (
+    OpenItemCreditRefundReversalService,
+)
 from simpleob.services.open_item_credit_refund_service import (
     OpenItemCreditRefundService,
 )
@@ -360,6 +369,17 @@ def _credit_refund_service(session):
         ),
         offset_repository=offset_repository,
         chart_of_accounts_repository=ChartOfAccountsRepository(session),
+    )
+
+
+def _credit_refund_reversal_service(session):
+    booking_repository = BookingRepository(session)
+    return OpenItemCreditRefundReversalService(
+        OpenItemCreditRefundReversalRepository(
+            session=session,
+            booking_repository=booking_repository,
+            offset_repository=OpenItemOffsetRepository(session),
+        )
     )
 
 
@@ -2538,6 +2558,76 @@ def test_refunds_are_separate_overview_history_and_historical_reconciliation(
         assert session.query(GuthabenOPRueckerstattung).filter_by(
             open_item_id=str(credit_id)
         ).count() == 2
+
+        credit_role = (
+            "SUPPLIER_CREDIT_BALANCES"
+            if supplier
+            else "CUSTOMER_CREDIT_BALANCES"
+        )
+        reconciliation = OpenItemReconciliationRepository(session)
+        before_refund = {
+            row.role: row
+            for row in reconciliation.reconcile(
+                company_id=company.company_id,
+                as_of_date=date(2026, 4, 15),
+            ).rows
+        }[credit_role]
+        before_return = {
+            row.role: row
+            for row in reconciliation.reconcile(
+                company_id=company.company_id,
+                as_of_date=date(2026, 4, 17),
+            ).rows
+        }[credit_role]
+        assert before_refund.ledger_balance == before_refund.open_item_balance == Decimal("109.00")
+        assert before_return.ledger_balance == before_return.open_item_balance == Decimal("0.00")
+        assert before_return.status == "ABGESTIMMT"
+
+        reversal = _credit_refund_reversal_service(session).reverse_refund(
+            company_id=company.company_id,
+            fiscal_year=FY26,
+            refund_id=first_refund.refund_id,
+            booking_date=date(2026, 4, 18),
+            reason="Die erste Rückerstattung war irrtümlich erfasst",
+        )
+        assert reversal.created_booking is True
+        current_item = next(
+            row for row in overview.list_items(
+                company_id=company.company_id, include_settled=True
+            ).items if row.open_item_id == credit_id
+        )
+        assert current_item.open_amount == Decimal("20.00")
+        assert current_item.refunds_amount == Decimal("89.00")
+        assert current_item.offsets_amount == Decimal("10.00")
+        detail = overview.get_detail(
+            company_id=company.company_id, open_item_id=credit_id
+        )
+        assert detail is not None
+        refund_activities = [
+            activity for activity in detail.activities
+            if activity.kind.value == "REFUND"
+        ]
+        reversal_activity = next(
+            activity for activity in detail.activities
+            if activity.kind.value == "REFUND_REVERSAL"
+        )
+        assert len(refund_activities) == 2
+        assert reversal_activity.amount == Decimal("-20.00")
+        assert reversal_activity.booking_date == date(2026, 4, 18)
+        assert "Die erste Rückerstattung war irrtümlich erfasst" in reversal_activity.description
+        assert str(first_refund.refund_id) in reversal_activity.reference
+        assert str(reversal.reversal_booking_id) in reversal_activity.reference
+
+        after_return = {
+            row.role: row
+            for row in reconciliation.reconcile(
+                company_id=company.company_id,
+                as_of_date=date(2026, 4, 18),
+            ).rows
+        }[credit_role]
+        assert after_return.ledger_balance == after_return.open_item_balance == Decimal("20.00")
+        assert after_return.status == "ABGESTIMMT"
+        assert not after_return.unexplained_movements
     finally:
         session.close()
         engine.dispose()
@@ -2585,6 +2675,116 @@ def test_paid_invoice_cancellation_requires_configured_credit_account():
             session.query(RechnungsOPStorno).count(),
             session.query(GuthabenOP).count(),
         ) == before
+    finally:
+        session.close()
+        engine.dispose()
+
+
+@pytest.mark.parametrize("supplier", (False, True), ids=("customer", "supplier"))
+def test_existing_journal_reversal_becomes_known_after_credit_refund_return(supplier):
+    (
+        engine, session, company, _other_company, partner, _other_partner,
+        _receivables, _payables, _payments, credits, _offsets, _corrections,
+        _overview,
+    ) = _environment()
+    try:
+        direction = OffsetDirection.SUPPLIER if supplier else OffsetDirection.CUSTOMER
+        credit_note = _credit(
+            credits,
+            company,
+            partner,
+            number=f"CN-RETURN-CASE-B-{direction.value}",
+            amount="119.00",
+            supplier=supplier,
+        )
+        credit_id = _open_id(
+            session,
+            GuthabenOP,
+            foreign_key="credit_note_id",
+            foreign_id=credit_note.credit_note_id,
+        )
+        refund = _refund(
+            _credit_refund_service(session),
+            company,
+            partner,
+            credit_id,
+            "20.00",
+            direction=direction,
+            booking_date=date(2026, 4, 16),
+        )
+        original = session.query(Buchung).filter_by(
+            booking_id=str(refund.booking_id)
+        ).one()
+        reversal = Buchung(
+            booking_id=str(uuid4()),
+            wirtschaftsjahr_id=original.wirtschaftsjahr_id,
+            booking_date=date(2026, 4, 20),
+            description="Bereits vorhandene Journalgegenbuchung",
+            booking_type=BookingType.REVERSAL.value,
+            reversal_of_booking_id=original.booking_id,
+            zeilen=[
+                Buchungszeile(
+                    position=index,
+                    account_number=line.account_number,
+                    side=(
+                        EntrySide.CREDIT.value
+                        if line.side == EntrySide.DEBIT.value
+                        else EntrySide.DEBIT.value
+                    ),
+                    amount=line.amount,
+                )
+                for index, line in enumerate(original.zeilen)
+            ],
+        )
+        session.add(reversal)
+        session.commit()
+        booking_count = session.query(Buchung).count()
+
+        role = (
+            "SUPPLIER_CREDIT_BALANCES"
+            if supplier
+            else "CUSTOMER_CREDIT_BALANCES"
+        )
+        reconciliation = OpenItemReconciliationRepository(session)
+        before_return = {
+            row.role: row
+            for row in reconciliation.reconcile(
+                company_id=company.company_id,
+                as_of_date=date(2026, 4, 20),
+            ).rows
+        }[role]
+        assert before_return.status == "UNGEKLAERTE_BEWEGUNG"
+        assert len(before_return.unexplained_movements) == 1
+
+        reversal_result = _credit_refund_reversal_service(session).reverse_refund(
+            company_id=company.company_id,
+            fiscal_year=FY26,
+            refund_id=refund.refund_id,
+            booking_date=date(2026, 4, 20),
+            reason="OP-Rücknahme für vorhandene Journalgegenbuchung",
+        )
+        assert reversal_result.created_booking is False
+        assert session.query(Buchung).count() == booking_count
+        assert session.query(GuthabenOPRueckerstattungsruecknahme).count() == 1
+
+        before = {
+            row.role: row
+            for row in reconciliation.reconcile(
+                company_id=company.company_id,
+                as_of_date=date(2026, 4, 19),
+            ).rows
+        }[role]
+        after = {
+            row.role: row
+            for row in reconciliation.reconcile(
+                company_id=company.company_id,
+                as_of_date=date(2026, 4, 20),
+            ).rows
+        }[role]
+        assert before.ledger_balance == before.open_item_balance == Decimal("99.00")
+        assert after.ledger_balance == after.open_item_balance == Decimal("119.00")
+        assert after.status == "ABGESTIMMT"
+        assert not after.unexplained_movements
     finally:
         session.close()
         engine.dispose()
