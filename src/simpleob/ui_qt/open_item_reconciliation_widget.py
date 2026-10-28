@@ -4,11 +4,10 @@ from datetime import date
 from decimal import Decimal
 from uuid import UUID
 
-from PySide6.QtCore import QDate
 from PySide6.QtWidgets import (
-    QDateEdit,
     QHBoxLayout,
     QLabel,
+    QMessageBox,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
@@ -16,6 +15,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from simpleob.date_input import GermanDateEdit
 from simpleob.services.open_item_reconciliation_service import (
     OpenItemReconciliationService,
 )
@@ -29,10 +29,7 @@ class OpenItemReconciliationWidget(QWidget):
         self._company_id = company_id
         self._service = service
         self._rows = ()
-        self._date = QDateEdit()
-        self._date.setCalendarPopup(True)
-        self._date.setDisplayFormat("dd.MM.yyyy")
-        self._date.setDate(QDate.currentDate())
+        self._date = GermanDateEdit(value=date.today())
         refresh = QPushButton("Aktualisieren")
         refresh.clicked.connect(self.refresh)
         controls = QHBoxLayout()
@@ -65,10 +62,21 @@ class OpenItemReconciliationWidget(QWidget):
         self.refresh()
 
     def refresh(self) -> None:
-        qdate = self._date.date()
+        try:
+            as_of_date = self._date.date_value()
+        except ValueError as exc:
+            QMessageBox.warning(self, "Ungültiger Stichtag", str(exc))
+            return
+        if as_of_date is None:
+            QMessageBox.warning(
+                self,
+                "Ungültiger Stichtag",
+                "Bitte geben Sie einen Stichtag ein.",
+            )
+            return
         report = self._service.reconcile(
             company_id=self._company_id,
-            as_of_date=date(qdate.year(), qdate.month(), qdate.day()),
+            as_of_date=as_of_date,
         )
         self._rows = report.rows
         self._table.setRowCount(len(self._rows))

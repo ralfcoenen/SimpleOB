@@ -12,7 +12,9 @@ from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
     QDialog,
+    QDialogButtonBox,
     QFileDialog,
+    QFormLayout,
     QHBoxLayout,
     QHeaderView,
     QInputDialog,
@@ -51,7 +53,7 @@ from simpleob.core.config import (
 from simpleob.core.context import ApplicationContext
 from simpleob.database.business_partner_repository import BusinessPartnerRepository
 from simpleob.database.lock_error import DatabaseLockError
-from simpleob.date_input import parse_german_date
+from simpleob.date_input import GermanDateEdit
 from simpleob.domain.account import Account
 from simpleob.domain.account_type import AccountType
 from simpleob.domain.booking_type import BookingType
@@ -4090,6 +4092,35 @@ class MainWindow(QMainWindow):
 
                 first_line = False
 
+    def _request_german_date(
+        self,
+        *,
+        title: str,
+        prompt: str,
+        default_date: date,
+    ) -> date | None:
+        """Fragt ein Datum über das zentrale Texteingabefeld ab."""
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle(title)
+        layout = QVBoxLayout(dialog)
+        form = QFormLayout()
+        entry = GermanDateEdit(dialog, value=default_date)
+        form.addRow(f"{prompt} (TT.MM.JJJJ)", entry)
+        layout.addLayout(form)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok
+            | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return None
+        return entry.date_value()
+
     def _reverse_selected_journal_booking(
         self,
     ) -> None:
@@ -4181,28 +4212,19 @@ class MainWindow(QMainWindow):
                 self._context.fiscal_year.end_date
             )
 
-        reversal_date_text, accepted = (
-            QInputDialog.getText(
-                self,
-                "Buchung stornieren",
-                (
-                    "Bitte geben Sie das Stornodatum ein "
-                    "(TT.MM.JJJJ):"
-                ),
-                text=default_date.strftime(
-                    "%d.%m.%Y"
-                ),
+        try:
+            reversal_date = self._request_german_date(
+                title="Buchung stornieren",
+                prompt="Bitte geben Sie das Stornodatum ein",
+                default_date=default_date,
             )
-        )
-
-        if not accepted:
+        except ValueError as exc:
+            QMessageBox.critical(self, "Buchung stornieren", str(exc))
+            return
+        if reversal_date is None:
             return
 
         try:
-            reversal_date = parse_german_date(
-                reversal_date_text
-            )
-
             reversal_booking = (
                 self._workspace
                 .create_reversal_booking(
@@ -4508,24 +4530,23 @@ class MainWindow(QMainWindow):
         ):
             default_date = managed_fiscal_year.fiscal_year.start_date
 
-        booking_date_text, accepted = QInputDialog.getText(
-            self,
-            "Ergebnisverwendung Vorjahr buchen",
-            (
-                "Bitte geben Sie das Buchungsdatum ein "
-                "(TT.MM.JJJJ):"
-            ),
-            text=default_date.strftime("%d.%m.%Y"),
-        )
-
-        if not accepted:
+        try:
+            booking_date = self._request_german_date(
+                title="Ergebnisverwendung Vorjahr buchen",
+                prompt="Bitte geben Sie das Buchungsdatum ein",
+                default_date=default_date,
+            )
+        except ValueError as exc:
+            QMessageBox.critical(
+                self,
+                "Ergebnisverwendung konnte nicht vorbereitet werden",
+                str(exc),
+            )
+            return
+        if booking_date is None:
             return
 
         try:
-            booking_date = parse_german_date(
-                booking_date_text
-            )
-
             proposals = (
                 self._workspace
                 .build_profit_appropriation_posting_proposals(

@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
 
 from simpleob.amount_input import parse_german_amount
 from simpleob.database.business_partner_repository import BusinessPartnerRepository
-from simpleob.date_input import parse_german_date
+from simpleob.date_input import GermanDateEdit
 from simpleob.domain.open_item_offset import OffsetDirection
 from simpleob.services.open_item_offset_service import OpenItemOffsetService
 
@@ -50,9 +50,8 @@ class OpenItemOffsetDialog(QDialog):
         self._credit_box = QComboBox()
         self._amount = QLineEdit()
         self._amount.setPlaceholderText("0,00")
-        today = date.today().strftime("%d.%m.%Y")
-        self._settlement_date = QLineEdit(today)
-        self._booking_date = QLineEdit(today)
+        self._settlement_date = GermanDateEdit(value=date.today())
+        self._booking_date = GermanDateEdit(value=date.today())
         self._description = QLineEdit()
 
         form.addRow("Guthabenart", self._direction_box)
@@ -151,8 +150,8 @@ class OpenItemOffsetDialog(QDialog):
                 invoice_open_item_id=UUID(str(self._invoice_box.currentData())),
                 credit_open_item_id=UUID(str(self._credit_box.currentData())),
                 amount=amount,
-                settlement_date=parse_german_date(self._settlement_date.text()),
-                booking_date=parse_german_date(self._booking_date.text()),
+                settlement_date=self._settlement_date.date_value(),
+                booking_date=self._booking_date.date_value(),
                 description=self._description.text() or None,
             )
         except Exception as exc:

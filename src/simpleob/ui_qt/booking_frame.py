@@ -23,10 +23,7 @@ from PySide6.QtWidgets import (
 )
 
 from simpleob.amount_input import normalize_german_amount
-from simpleob.date_input import (
-    normalize_german_date,
-    parse_german_date,
-)
+from simpleob.date_input import GermanDateEdit
 from simpleob.domain.account import Account
 from simpleob.domain.booking import Booking
 from simpleob.domain.booking_line import BookingLine
@@ -99,13 +96,8 @@ class BookingFrame(QWidget):
             QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow
         )
 
-        self._booking_date_entry = QLineEdit(
-            date.today().strftime("%d.%m.%Y")
-        )
+        self._booking_date_entry = GermanDateEdit(value=date.today())
         self._booking_date_entry.setMaximumWidth(140)
-        self._booking_date_entry.editingFinished.connect(
-            self._normalize_booking_date
-        )
         form.addRow(
             "Datum",
             self._booking_date_entry,
@@ -898,9 +890,7 @@ class BookingFrame(QWidget):
         valid = rows_valid
 
         try:
-            self._parse_booking_date(
-                self._booking_date_entry.text()
-            )
+            self._booking_date_entry.date_value()
         except ValueError:
             valid = False
 
@@ -929,15 +919,11 @@ class BookingFrame(QWidget):
             return
 
         try:
-            booking_date = self._parse_booking_date(
-                self._booking_date_entry.text()
-            )
+            booking_date = self._booking_date_entry.date_value()
         except ValueError:
             return
 
-        self._booking_date_entry.setText(
-            booking_date.strftime("%d.%m.%Y")
-        )
+        self._booking_date_entry.set_date(booking_date)
 
         lines: list[BookingLine] = []
         equity_contribution_line_positions: list[int] = []
@@ -1091,16 +1077,6 @@ class BookingFrame(QWidget):
         return f"{account.number} – {account.name}"
 
     @staticmethod
-    def _parse_booking_date(
-        value: str,
-    ):
-        """Liest eine deutsche Datumseingabe."""
-
-        return parse_german_date(
-            value
-        )
-
-    @staticmethod
     def _parse_amount(
         value: str,
     ) -> Decimal:
@@ -1145,23 +1121,4 @@ class BookingFrame(QWidget):
             .replace(",", "\0")
             .replace(".", ",")
             .replace("\0", ".")
-        )
-
-    def _normalize_booking_date(self) -> None:
-        """Normalisiert das Buchungsdatum beim Verlassen des Feldes."""
-
-        value = self._booking_date_entry.text().strip()
-
-        if not value:
-            return
-
-        try:
-            normalized = normalize_german_date(
-                value
-            )
-        except ValueError:
-            return
-
-        self._booking_date_entry.setText(
-            normalized
         )

@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
 )
 
 from simpleob.amount_input import parse_german_amount
-from simpleob.date_input import parse_german_date
+from simpleob.date_input import GermanDateEdit
 from simpleob.domain.open_item_payment import PaymentDirection
 from simpleob.services.payment_allocation_correction_service import (
     PaymentAllocationCorrectionService,
@@ -33,9 +33,8 @@ class PaymentAllocationCorrectionDialog(QDialog):
         self._source.setMinimumContentsLength(90)
         self._target = QComboBox()
         self._amount = QLineEdit()
-        today = date.today().strftime("%d.%m.%Y")
-        self._correction_date = QLineEdit(today)
-        self._booking_date = QLineEdit(today)
+        self._correction_date = GermanDateEdit(value=date.today())
+        self._booking_date = GermanDateEdit(value=date.today())
         self._reason = QLineEdit()
         form.addRow("Ursprüngliche Zuordnung", self._source)
         form.addRow("Zielrechnung", self._target)
@@ -129,8 +128,8 @@ class PaymentAllocationCorrectionDialog(QDialog):
             self._service.correct(
                 company_id=self._company_id, fiscal_year=self._fiscal_year,
                 original_event_id=UUID(str(event_id)), target_open_item_id=UUID(str(target_id)),
-                amount=amount, correction_date=parse_german_date(self._correction_date.text()),
-                booking_date=parse_german_date(self._booking_date.text()), reason=reason, confirmed=True,
+                amount=amount, correction_date=self._correction_date.date_value(),
+                booking_date=self._booking_date.date_value(), reason=reason, confirmed=True,
             )
         except Exception as exc:
             QMessageBox.critical(self, "Korrektur nicht gespeichert", str(exc))

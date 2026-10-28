@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
 )
 
 from simpleob.amount_input import format_german_amount
-from simpleob.date_input import format_german_date, parse_german_date
+from simpleob.date_input import GermanDateEdit, format_german_date
 from simpleob.domain.open_item_credit_refund_reversal import (
     OpenItemCreditRefundReversalCandidate,
 )
@@ -69,7 +69,7 @@ class OpenItemCreditRefundReversalDialog(QDialog):
         self._refund_booking_date.setReadOnly(True)
         self._refund_booking_date.setMinimumWidth(280)
         self._existing_reversal = QLabel("Keine Journalgegenbuchung gefunden.")
-        self._return_booking_date = QLineEdit(format_german_date(date.today()))
+        self._return_booking_date = GermanDateEdit(value=date.today())
         self._date_error = QLabel()
         self._date_error.setWordWrap(True)
         self._reason = QLineEdit()
@@ -185,7 +185,7 @@ class OpenItemCreditRefundReversalDialog(QDialog):
             self._existing_reversal.setText("Keine vorhanden.")
             self._return_booking_date.setReadOnly(False)
             try:
-                proposed_date = parse_german_date(self._return_booking_date.text())
+                proposed_date = self._return_booking_date.date_value()
             except ValueError:
                 proposed_date = date.today()
             if proposed_date < candidate.booking_date:
@@ -225,7 +225,7 @@ class OpenItemCreditRefundReversalDialog(QDialog):
         candidate = self._selected_candidate()
         date_error = ""
         try:
-            effective_date = parse_german_date(self._return_booking_date.text())
+            effective_date = self._return_booking_date.date_value()
             valid_date = True
         except ValueError:
             valid_date = False
@@ -282,7 +282,7 @@ class OpenItemCreditRefundReversalDialog(QDialog):
                     self._date_error.text()
                     or "Das Rücknahmebuchungsdatum ist nicht zulässig."
                 )
-            booking_date = parse_german_date(self._return_booking_date.text())
+            booking_date = self._return_booking_date.date_value()
             scenario = (
                 "Die Rücknahme erzeugt eine Hauptbuchgegenbuchung und ein OP-Rücknahmeereignis."
                 if candidate.journal_reversal_count == 0

@@ -140,8 +140,8 @@ def test_partial_and_full_refund_pass_confirmed_values_to_service(
     dialog._credit_box.setCurrentIndex(credit_index)
     dialog._account_box.setCurrentIndex(0)
     dialog._amount.setText(amount)
-    dialog._refund_date.setText("15.04.2026")
-    dialog._booking_date.setText("16.04.2026")
+    dialog._refund_date.setText("15.4.2026")
+    dialog._booking_date.setText("16.4.2026")
     confirmations = []
     monkeypatch.setattr(
         "simpleob.ui_qt.open_item_credit_refund_dialog.QMessageBox.question",
@@ -165,6 +165,8 @@ def test_partial_and_full_refund_pass_confirmed_values_to_service(
     assert call["cash_bank_account_number"] == "1600"
     assert call["refund_date"] == date(2026, 4, 15)
     assert call["booking_date"] == date(2026, 4, 16)
+    assert dialog._refund_date.text() == "15.04.2026"
+    assert dialog._booking_date.text() == "16.04.2026"
     assert "Kundenguthaben auszahlen" in confirmations[0]
     expected_origin = (
         "Guthaben-OP: Gutschrift CN-2026-01"

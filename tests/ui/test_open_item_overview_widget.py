@@ -396,8 +396,13 @@ def test_context_menu_and_visible_actions_share_storno_eligibility(monkeypatch):
             )
 
     cancellation = CancellationService()
-    answers = iter(("15.04.2026", "Rechnungsfehler"))
+    answers = iter(("Rechnungsfehler",))
     confirmation_text = []
+    monkeypatch.setattr(
+        OpenItemOverviewWidget,
+        "_request_cancellation_date",
+        lambda self, default_date, fiscal_year_name: date(2026, 4, 15),
+    )
     monkeypatch.setattr(
         "simpleob.ui_qt.open_item_overview_widget.QInputDialog.getText",
         lambda *args, **kwargs: (next(answers), True),
@@ -590,8 +595,13 @@ def test_invoice_cancellation_confirmation_shows_payment_assessment(
             )
 
     cancellation = CancellationService()
-    answers = iter(("15.04.2026", "Fehlerhafte Rechnung"))
+    answers = iter(("Fehlerhafte Rechnung",))
     confirmation_text = []
+    monkeypatch.setattr(
+        OpenItemOverviewWidget,
+        "_request_cancellation_date",
+        lambda self, default_date, fiscal_year_name: date(2026, 4, 15),
+    )
     monkeypatch.setattr(
         "simpleob.ui_qt.open_item_overview_widget.QInputDialog.getText",
         lambda *args, **kwargs: (next(answers), True),
@@ -697,9 +707,14 @@ def test_invoice_cancellation_rejections_show_warning_without_confirmation(
         def cancel_invoice(self, **kwargs):
             raise AssertionError("Bei abgelehnter Prüfung darf nicht storniert werden.")
 
-    answers = iter(("15.04.2026", "Fehlerhafte Rechnung"))
+    answers = iter(("Fehlerhafte Rechnung",))
     warnings = []
     confirmations = []
+    monkeypatch.setattr(
+        OpenItemOverviewWidget,
+        "_request_cancellation_date",
+        lambda self, default_date, fiscal_year_name: date(2026, 4, 15),
+    )
     monkeypatch.setattr(
         "simpleob.ui_qt.open_item_overview_widget.QInputDialog.getText",
         lambda *args, **kwargs: (next(answers), True),

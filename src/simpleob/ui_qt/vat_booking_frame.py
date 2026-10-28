@@ -23,10 +23,7 @@ from PySide6.QtWidgets import (
 
 from simpleob.amount_input import normalize_german_amount
 from simpleob.database.business_partner_repository import BusinessPartnerRepository
-from simpleob.date_input import (
-    normalize_german_date,
-    parse_german_date,
-)
+from simpleob.date_input import GermanDateEdit
 from simpleob.domain.account import Account
 from simpleob.domain.account_type import AccountType
 from simpleob.domain.booking import Booking
@@ -125,13 +122,8 @@ class VatBookingFrame(QWidget):
             self._invoice_type_box,
         )
 
-        self._booking_date_entry = QLineEdit(
-            date.today().strftime("%d.%m.%Y")
-        )
+        self._booking_date_entry = GermanDateEdit(value=date.today())
         self._booking_date_entry.setMaximumWidth(140)
-        self._booking_date_entry.editingFinished.connect(
-            self._normalize_booking_date
-        )
         form.addRow(
             "Datum",
             self._booking_date_entry,
@@ -155,7 +147,7 @@ class VatBookingFrame(QWidget):
         partner_row.addWidget(self._partner_add_button)
         self._partner_label = QLabel("Geschäftspartner")
         form.addRow(self._partner_label, partner_row)
-        self._due_date_entry = QLineEdit(date.today().strftime("%d.%m.%Y"))
+        self._due_date_entry = GermanDateEdit(value=date.today())
         self._due_date_entry.setMaximumWidth(140)
         self._due_date_entry.setVisible(False)
         form.addRow("Fällig am", self._due_date_entry)
@@ -558,9 +550,7 @@ class VatBookingFrame(QWidget):
         valid = True
 
         try:
-            self._parse_booking_date(
-                self._booking_date_entry.text()
-            )
+            self._booking_date_entry.date_value()
         except ValueError:
             valid = False
 
@@ -583,7 +573,7 @@ class VatBookingFrame(QWidget):
                 valid = False
         if target_invoice:
             try:
-                self._parse_booking_date(self._due_date_entry.text())
+                self._due_date_entry.date_value()
             except ValueError:
                 valid = False
 
@@ -695,9 +685,7 @@ class VatBookingFrame(QWidget):
             return
 
         try:
-            booking_date = self._parse_booking_date(
-                self._booking_date_entry.text()
-            )
+            booking_date = self._booking_date_entry.date_value()
 
             items = tuple(
                 VatBookingItem(
@@ -727,7 +715,7 @@ class VatBookingFrame(QWidget):
 
         if target_invoice:
             try:
-                due_date = self._parse_booking_date(self._due_date_entry.text())
+                due_date = self._due_date_entry.date_value()
                 partner_id = self._partner_box.currentData()
                 if not isinstance(partner_id, UUID):
                     return
@@ -983,16 +971,6 @@ class VatBookingFrame(QWidget):
 
         return str(account)
 
-    @staticmethod
-    def _parse_booking_date(
-        value: str,
-    ) -> date:
-        """Liest ein deutsches Buchungsdatum."""
-
-        return parse_german_date(
-            value
-        )
-
     def _normalize_amount_entry(
         self,
         entry: QLineEdit,
@@ -1069,19 +1047,3 @@ class VatBookingFrame(QWidget):
             )
 
         return tax_rate
-
-    def _normalize_booking_date(self) -> None:
-        """Normalisiert das Buchungsdatum."""
-
-        try:
-            normalized = (
-                normalize_german_date(
-                    self._booking_date_entry.text()
-                )
-            )
-        except ValueError:
-            return
-
-        self._booking_date_entry.setText(
-            normalized
-        )

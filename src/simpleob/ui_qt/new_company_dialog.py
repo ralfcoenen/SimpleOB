@@ -1,5 +1,6 @@
 """PySide6-Dialog zum Anlegen einer neuen Buchhaltung."""
 
+from datetime import date
 from uuid import uuid4
 
 from PySide6.QtWidgets import (
@@ -15,12 +16,9 @@ from PySide6.QtWidgets import (
 
 from simpleob.core.context import ApplicationContext
 from simpleob.database.company_repository import CompanyRepository
+from simpleob.date_input import GermanDateEdit
 from simpleob.domain.company import Company
 from simpleob.domain.fiscal_year import FiscalYear
-from simpleob.date_input import (
-    normalize_german_date,
-    parse_german_date,
-)
 
 
 class NewCompanyDialog(QDialog):
@@ -65,23 +63,13 @@ class NewCompanyDialog(QDialog):
             self._company_name_entry,
         )
 
-        self._start_date_entry = QLineEdit("01.01.2026")
-        self._start_date_entry.editingFinished.connect(
-            lambda: self._normalize_date_entry(
-                self._start_date_entry
-            )
-        )
+        self._start_date_entry = GermanDateEdit(value=date(2026, 1, 1))
         form_layout.addRow(
             "Beginn Geschäftsjahr",
             self._start_date_entry,
         )
 
-        self._end_date_entry = QLineEdit("31.12.2026")
-        self._end_date_entry.editingFinished.connect(
-            lambda: self._normalize_date_entry(
-                self._end_date_entry
-            )
-        )
+        self._end_date_entry = GermanDateEdit(value=date(2026, 12, 31))
         form_layout.addRow(
             "Ende Geschäftsjahr",
             self._end_date_entry,
@@ -91,7 +79,7 @@ class NewCompanyDialog(QDialog):
 
         date_hint = QLabel(
             "Datum: TT.MM.JJJJ · "
-            "auch TTMMJJJJ oder TTMMJJ möglich"
+            "Kurzformate wie 1.2.2026 werden übernommen und normalisiert."
         )
         layout.addWidget(date_hint)
 
@@ -115,32 +103,6 @@ class NewCompanyDialog(QDialog):
 
         layout.addWidget(button_box)
 
-    @staticmethod
-    def _parse_date(
-        value: str,
-    ):
-        """Liest eine deutsche Datumseingabe."""
-
-        return parse_german_date(value)
-
-    @staticmethod
-    def _normalize_date_entry(
-        entry: QLineEdit,
-    ) -> None:
-        """Normalisiert eine gültige Datumseingabe."""
-
-        value = entry.text().strip()
-
-        if not value:
-            return
-
-        try:
-            normalized = normalize_german_date(value)
-        except ValueError:
-            return
-
-        entry.setText(normalized)
-
     def _create_company(self) -> None:
         """Erzeugt und speichert die neue Buchhaltung."""
 
@@ -155,19 +117,8 @@ class NewCompanyDialog(QDialog):
             return
 
         try:
-            start_date = self._parse_date(
-                self._start_date_entry.text()
-            )
-            end_date = self._parse_date(
-                self._end_date_entry.text()
-            )
-
-            self._start_date_entry.setText(
-                start_date.strftime("%d.%m.%Y")
-            )
-            self._end_date_entry.setText(
-                end_date.strftime("%d.%m.%Y")
-            )
+            start_date = self._start_date_entry.date_value()
+            end_date = self._end_date_entry.date_value()
 
             company = Company(
                 company_id=uuid4(),

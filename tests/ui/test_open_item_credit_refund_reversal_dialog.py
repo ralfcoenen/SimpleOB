@@ -98,7 +98,7 @@ def test_selection_displays_case_and_calls_service_only_after_confirmation(
     if direction is OffsetDirection.SUPPLIER:
         dialog._direction_box.setCurrentIndex(1)
     if reversal_count == 0:
-        dialog._return_booking_date.setText("15.04.2026")
+        dialog._return_booking_date.setText("15.4.2026")
 
     assert dialog._partner_box.currentText() == candidate.partner_name
     assert dialog._refund_box.count() == 1
@@ -140,6 +140,9 @@ def test_selection_displays_case_and_calls_service_only_after_confirmation(
         "reason": "Versehentlich gebucht",
         "booking_date": booking_date,
     }
+    assert dialog._return_booking_date.text() == (
+        "15.04.2026" if reversal_count == 0 else "14.04.2026"
+    )
     assert (
         "Hauptbuchgegenbuchung"
         if reversal_count == 0

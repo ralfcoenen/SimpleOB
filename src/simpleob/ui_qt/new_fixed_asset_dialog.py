@@ -16,10 +16,7 @@ from PySide6.QtWidgets import (
 )
 
 from simpleob.amount_input import normalize_german_amount
-from simpleob.date_input import (
-    normalize_german_date,
-    parse_german_date,
-)
+from simpleob.date_input import GermanDateEdit
 from simpleob.domain.fixed_asset import FixedAsset
 
 
@@ -118,14 +115,7 @@ class NewFixedAssetDialog(QDialog):
             self._asset_type_box,
         )
 
-        self._acquisition_date_entry = QLineEdit(
-            date.today().strftime("%d.%m.%Y")
-        )
-        self._acquisition_date_entry.editingFinished.connect(
-            lambda: self._normalize_date_entry(
-                self._acquisition_date_entry
-            )
-        )
+        self._acquisition_date_entry = GermanDateEdit(value=date.today())
         form.addRow(
             "Anschaffungsdatum",
             self._acquisition_date_entry,
@@ -143,14 +133,7 @@ class NewFixedAssetDialog(QDialog):
             self._acquisition_cost_entry,
         )
 
-        self._depreciation_start_date_entry = QLineEdit(
-            date.today().strftime("%d.%m.%Y")
-        )
-        self._depreciation_start_date_entry.editingFinished.connect(
-            lambda: self._normalize_date_entry(
-                self._depreciation_start_date_entry
-            )
-        )
+        self._depreciation_start_date_entry = GermanDateEdit(value=date.today())
         form.addRow(
             "AfA-Beginn",
             self._depreciation_start_date_entry,
@@ -269,20 +252,14 @@ class NewFixedAssetDialog(QDialog):
 
         self._asset_type_box.setCurrentIndex(account_index)
 
-        self._acquisition_date_entry.setText(
-            fixed_asset.acquisition_date.strftime(
-                "%d.%m.%Y"
-            )
-        )
+        self._acquisition_date_entry.set_date(fixed_asset.acquisition_date)
         self._acquisition_cost_entry.setText(
             self._format_amount_for_input(
                 fixed_asset.acquisition_cost
             )
         )
-        self._depreciation_start_date_entry.setText(
-            fixed_asset.depreciation_start_date.strftime(
-                "%d.%m.%Y"
-            )
+        self._depreciation_start_date_entry.set_date(
+            fixed_asset.depreciation_start_date
         )
         self._useful_life_months_entry.setText(
             str(
@@ -302,38 +279,6 @@ class NewFixedAssetDialog(QDialog):
         ).replace(
             ".",
             ",",
-        )
-
-    @staticmethod
-    def _parse_date(
-        value: str,
-    ):
-        """Liest eine deutsche Datumseingabe."""
-
-        return parse_german_date(
-            value
-        )
-
-    def _normalize_date_entry(
-        self,
-        entry: QLineEdit,
-    ) -> None:
-        """Normalisiert eine gültige Datumseingabe."""
-
-        value = entry.text().strip()
-
-        if not value:
-            return
-
-        try:
-            normalized = normalize_german_date(
-                value
-            )
-        except ValueError:
-            return
-
-        entry.setText(
-            normalized
         )
 
     def _normalize_acquisition_cost(self) -> None:
@@ -380,23 +325,10 @@ class NewFixedAssetDialog(QDialog):
         """Erzeugt das neue oder geänderte Anlagegut."""
 
         try:
-            acquisition_date = self._parse_date(
-                self._acquisition_date_entry.text()
-            )
+            acquisition_date = self._acquisition_date_entry.date_value()
 
-            depreciation_start_date = self._parse_date(
-                self._depreciation_start_date_entry.text()
-            )
-
-            self._acquisition_date_entry.setText(
-                acquisition_date.strftime(
-                    "%d.%m.%Y"
-                )
-            )
-            self._depreciation_start_date_entry.setText(
-                depreciation_start_date.strftime(
-                    "%d.%m.%Y"
-                )
+            depreciation_start_date = (
+                self._depreciation_start_date_entry.date_value()
             )
 
             acquisition_cost = self._parse_amount(

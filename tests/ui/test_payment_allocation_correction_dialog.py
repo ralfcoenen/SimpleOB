@@ -3,7 +3,7 @@ from decimal import Decimal
 from uuid import uuid4
 
 import pytest
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QMessageBox
 
 from simpleob.domain.open_item_payment import (
     OpenInvoiceSummary,
@@ -21,6 +21,7 @@ class _CorrectionService:
     def __init__(self, allocation, target):
         self.allocation = allocation
         self.target = target
+        self.correction_call = None
 
     def list_correctable_allocations(self, _company_id):
         return (self.allocation,)
@@ -30,6 +31,9 @@ class _CorrectionService:
         assert partner_id == self.allocation.partner_id
         assert direction is self.allocation.direction
         return (self.target,)
+
+    def correct(self, **kwargs):
+        self.correction_call = kwargs
 
 
 @pytest.mark.parametrize(
@@ -50,6 +54,7 @@ class _CorrectionService:
     ),
 )
 def test_correction_dialog_shows_readable_payment_and_invoice_references(
+    monkeypatch,
     direction,
     document_number,
     target_number,
@@ -92,11 +97,12 @@ def test_correction_dialog_shows_readable_payment_and_invoice_references(
         open_amount=Decimal("119.00"),
         partner_name="Holger Grosser",
     )
+    service = _CorrectionService(allocation, target)
     dialog = PaymentAllocationCorrectionDialog(
         None,
         company_id=company_id,
         fiscal_year=None,
-        service=_CorrectionService(allocation, target),
+        service=service,
     )
 
     source_label = dialog._source.currentText()
@@ -113,6 +119,20 @@ def test_correction_dialog_shows_readable_payment_and_invoice_references(
     assert "Holger Grosser" in dialog._target.currentText()
     assert target_number in dialog._target.currentText()
     assert str(target_open_item_id) not in dialog._target.currentText()
+
+    dialog._amount.setText("10,00")
+    dialog._correction_date.setText("1.2.2026")
+    dialog._booking_date.setText("2.2.2026")
+    dialog._reason.setText("Falsche Zuordnung")
+    monkeypatch.setattr(
+        "simpleob.ui_qt.payment_allocation_correction_dialog.QMessageBox.question",
+        lambda *_args: QMessageBox.StandardButton.Yes,
+    )
+    dialog._correct()
+    assert service.correction_call["correction_date"] == date(2026, 2, 1)
+    assert service.correction_call["booking_date"] == date(2026, 2, 2)
+    assert dialog._correction_date.text() == "01.02.2026"
+    assert dialog._booking_date.text() == "02.02.2026"
 
     dialog.close()
     app.processEvents()

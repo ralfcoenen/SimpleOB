@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
 )
 
 from simpleob.amount_input import parse_german_amount
-from simpleob.date_input import parse_german_date
+from simpleob.date_input import GermanDateEdit
 from simpleob.domain.open_item_payment import PaymentDirection
 from simpleob.services.open_item_payment_service import OpenItemPaymentService
 
@@ -68,9 +68,8 @@ class OpenItemPaymentDialog(QDialog):
                 )
         form.addRow("Bank-/Kassenkonto", self._account_box)
 
-        today = date.today().strftime("%d.%m.%Y")
-        self._payment_date = QLineEdit(today)
-        self._booking_date = QLineEdit(today)
+        self._payment_date = GermanDateEdit(value=date.today())
+        self._booking_date = GermanDateEdit(value=date.today())
         self._amount = QLineEdit()
         self._amount.setPlaceholderText("0,00")
         self._voucher = QLineEdit()
@@ -205,8 +204,8 @@ class OpenItemPaymentDialog(QDialog):
                 direction=PaymentDirection(self._direction_box.currentData()),
                 amount=amount,
                 allocations=allocations,
-                payment_date=parse_german_date(self._payment_date.text()),
-                booking_date=parse_german_date(self._booking_date.text()),
+                payment_date=self._payment_date.date_value(),
+                booking_date=self._booking_date.date_value(),
                 cash_bank_account_number=self._account_box.currentData(),
                 voucher_no=self._voucher.text() or None,
                 description=self._description.text() or None,

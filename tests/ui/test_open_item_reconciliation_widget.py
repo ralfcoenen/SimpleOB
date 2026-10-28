@@ -45,8 +45,28 @@ def test_widget_shows_date_reconciliation_and_only_refresh_action():
     assert widget._uncertain_corrections.item(0, 2).text() == "Unbekannt (Altbestand)"
     assert widget._uncertain_corrections.item(0, 6).text() == "Buchungsdatum unbekannt"
     assert len(widget.findChildren(QPushButton)) == 1
-    widget._date.setDate(widget._date.date().addDays(1))
+    next_day = date.today() + timedelta(days=1)
+    widget._date.set_date(next_day)
     widget.refresh()
-    assert service.calls[-1] == (company_id, date.today() + timedelta(days=1))
+    assert service.calls[-1] == (company_id, next_day)
+    widget.close()
+    app.processEvents()
+
+
+def test_widget_rejects_invalid_stichtag_without_calling_service(monkeypatch):
+    app = QApplication.instance() or QApplication([])
+    service = _ReconciliationService()
+    widget = OpenItemReconciliationWidget(company_id=uuid4(), service=service)
+    calls = []
+    monkeypatch.setattr(
+        "simpleob.ui_qt.open_item_reconciliation_widget.QMessageBox.warning",
+        lambda *_args: calls.append(_args[2]),
+    )
+
+    widget._date.setText("31.02.2026")
+    widget.refresh()
+
+    assert len(service.calls) == 1
+    assert calls and "Ungültiges Datum" in calls[0]
     widget.close()
     app.processEvents()

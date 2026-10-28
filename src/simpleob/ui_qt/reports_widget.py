@@ -9,7 +9,6 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
     QLabel,
-    QLineEdit,
     QListWidget,
     QListWidgetItem,
     QMessageBox,
@@ -22,10 +21,7 @@ from PySide6.QtWidgets import (
 )
 
 from simpleob.core.context import ApplicationContext
-from simpleob.date_input import (
-    normalize_german_date,
-    parse_german_date,
-)
+from simpleob.date_input import GermanDateEdit
 from simpleob.domain.account import Account
 from simpleob.domain.entry_side import EntrySide
 from simpleob.services.fiscal_year_workspace import FiscalYearWorkspace
@@ -119,33 +115,19 @@ class ReportsWidget(QWidget):
         filter_layout = QHBoxLayout()
 
         filter_layout.addWidget(QLabel("Von:"))
-        self._trial_balance_start_date = QLineEdit(
-            self._context.fiscal_year.start_date.strftime(
-                "%d.%m.%Y"
-            )
+        self._trial_balance_start_date = GermanDateEdit(
+            value=self._context.fiscal_year.start_date
         )
         self._trial_balance_start_date.setMaximumWidth(110)
-        self._trial_balance_start_date.editingFinished.connect(
-            lambda: self._normalize_date_entry(
-                self._trial_balance_start_date
-            )
-        )
         filter_layout.addWidget(
             self._trial_balance_start_date
         )
 
         filter_layout.addWidget(QLabel("Bis:"))
-        self._trial_balance_end_date = QLineEdit(
-            self._context.fiscal_year.end_date.strftime(
-                "%d.%m.%Y"
-            )
+        self._trial_balance_end_date = GermanDateEdit(
+            value=self._context.fiscal_year.end_date
         )
         self._trial_balance_end_date.setMaximumWidth(110)
-        self._trial_balance_end_date.editingFinished.connect(
-            lambda: self._normalize_date_entry(
-                self._trial_balance_end_date
-            )
-        )
         filter_layout.addWidget(
             self._trial_balance_end_date
         )
@@ -194,12 +176,8 @@ class ReportsWidget(QWidget):
         """Aktualisiert die Summen- und Saldenliste."""
 
         try:
-            start_date = parse_german_date(
-                self._trial_balance_start_date.text()
-            )
-            end_date = parse_german_date(
-                self._trial_balance_end_date.text()
-            )
+            start_date = self._trial_balance_start_date.date_value()
+            end_date = self._trial_balance_end_date.date_value()
 
             report = self._workspace.build_trial_balance_report(
                 start_date=start_date,
@@ -218,12 +196,8 @@ class ReportsWidget(QWidget):
 
         self._current_trial_balance_report = report
 
-        self._trial_balance_start_date.setText(
-            start_date.strftime("%d.%m.%Y")
-        )
-        self._trial_balance_end_date.setText(
-            end_date.strftime("%d.%m.%Y")
-        )
+        self._trial_balance_start_date.set_date(start_date)
+        self._trial_balance_end_date.set_date(end_date)
 
         self._trial_balance_table.setRowCount(
             len(report.rows)
@@ -277,33 +251,19 @@ class ReportsWidget(QWidget):
         filter_layout = QHBoxLayout()
 
         filter_layout.addWidget(QLabel("Von:"))
-        self._account_activity_start_date = QLineEdit(
-            self._context.fiscal_year.start_date.strftime(
-                "%d.%m.%Y"
-            )
+        self._account_activity_start_date = GermanDateEdit(
+            value=self._context.fiscal_year.start_date
         )
         self._account_activity_start_date.setMaximumWidth(110)
-        self._account_activity_start_date.editingFinished.connect(
-            lambda: self._normalize_date_entry(
-                self._account_activity_start_date
-            )
-        )
         filter_layout.addWidget(
             self._account_activity_start_date
         )
 
         filter_layout.addWidget(QLabel("Bis:"))
-        self._account_activity_end_date = QLineEdit(
-            self._context.fiscal_year.end_date.strftime(
-                "%d.%m.%Y"
-            )
+        self._account_activity_end_date = GermanDateEdit(
+            value=self._context.fiscal_year.end_date
         )
         self._account_activity_end_date.setMaximumWidth(110)
-        self._account_activity_end_date.editingFinished.connect(
-            lambda: self._normalize_date_entry(
-                self._account_activity_end_date
-            )
-        )
         filter_layout.addWidget(
             self._account_activity_end_date
         )
@@ -410,24 +370,6 @@ class ReportsWidget(QWidget):
             self._account_activity_balance_label
         )
 
-    @staticmethod
-    def _normalize_date_entry(
-        entry: QLineEdit,
-    ) -> None:
-        """Normalisiert eine gültige deutsche Datumseingabe."""
-
-        value = entry.text().strip()
-
-        if not value:
-            return
-
-        try:
-            normalized = normalize_german_date(value)
-        except ValueError:
-            return
-
-        entry.setText(normalized)
-
     def _selected_account_activity_numbers(
         self,
     ) -> tuple[str, ...]:
@@ -459,12 +401,8 @@ class ReportsWidget(QWidget):
         """Aktualisiert die gefilterte Kontenauswertung."""
 
         try:
-            start_date = parse_german_date(
-                self._account_activity_start_date.text()
-            )
-            end_date = parse_german_date(
-                self._account_activity_end_date.text()
-            )
+            start_date = self._account_activity_start_date.date_value()
+            end_date = self._account_activity_end_date.date_value()
 
             if end_date < start_date:
                 raise ValueError(
@@ -512,12 +450,8 @@ class ReportsWidget(QWidget):
             include_opening_balance
         )
 
-        self._account_activity_start_date.setText(
-            start_date.strftime("%d.%m.%Y")
-        )
-        self._account_activity_end_date.setText(
-            end_date.strftime("%d.%m.%Y")
-        )
+        self._account_activity_start_date.set_date(start_date)
+        self._account_activity_end_date.set_date(end_date)
 
         rows = []
 
@@ -594,31 +528,17 @@ class ReportsWidget(QWidget):
         filter_layout = QHBoxLayout()
 
         filter_layout.addWidget(QLabel("Von:"))
-        self._journal_start_date = QLineEdit(
-            self._context.fiscal_year.start_date.strftime(
-                "%d.%m.%Y"
-            )
+        self._journal_start_date = GermanDateEdit(
+            value=self._context.fiscal_year.start_date
         )
         self._journal_start_date.setMaximumWidth(110)
-        self._journal_start_date.editingFinished.connect(
-            lambda: self._normalize_date_entry(
-                self._journal_start_date
-            )
-        )
         filter_layout.addWidget(self._journal_start_date)
 
         filter_layout.addWidget(QLabel("Bis:"))
-        self._journal_end_date = QLineEdit(
-            self._context.fiscal_year.end_date.strftime(
-                "%d.%m.%Y"
-            )
+        self._journal_end_date = GermanDateEdit(
+            value=self._context.fiscal_year.end_date
         )
         self._journal_end_date.setMaximumWidth(110)
-        self._journal_end_date.editingFinished.connect(
-            lambda: self._normalize_date_entry(
-                self._journal_end_date
-            )
-        )
         filter_layout.addWidget(self._journal_end_date)
 
         refresh_button = QPushButton("Aktualisieren")
@@ -660,12 +580,8 @@ class ReportsWidget(QWidget):
         """Aktualisiert die gefilterte Journalauswertung."""
 
         try:
-            start_date = parse_german_date(
-                self._journal_start_date.text()
-            )
-            end_date = parse_german_date(
-                self._journal_end_date.text()
-            )
+            start_date = self._journal_start_date.date_value()
+            end_date = self._journal_end_date.date_value()
 
             report = self._workspace.build_journal_report(
                 start_date=start_date,
@@ -681,12 +597,8 @@ class ReportsWidget(QWidget):
 
         self._current_journal_report = report
 
-        self._journal_start_date.setText(
-            start_date.strftime("%d.%m.%Y")
-        )
-        self._journal_end_date.setText(
-            end_date.strftime("%d.%m.%Y")
-        )
+        self._journal_start_date.set_date(start_date)
+        self._journal_end_date.set_date(end_date)
 
         self._journal_table.setRowCount(
             len(report.lines)

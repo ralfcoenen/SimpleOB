@@ -16,10 +16,7 @@ from PySide6.QtWidgets import (
 )
 
 from simpleob.amount_input import normalize_german_amount
-from simpleob.date_input import (
-    normalize_german_date,
-    parse_german_date,
-)
+from simpleob.date_input import GermanDateEdit
 from simpleob.domain.account import Account
 from simpleob.domain.fixed_asset import FixedAsset
 
@@ -102,12 +99,7 @@ class FixedAssetDisposalDialog(QDialog):
             acquisition_cost_label,
         )
 
-        self._disposal_date_entry = QLineEdit(
-            date.today().strftime("%d.%m.%Y")
-        )
-        self._disposal_date_entry.editingFinished.connect(
-            self._normalize_disposal_date
-        )
+        self._disposal_date_entry = GermanDateEdit(value=date.today())
         form.addRow(
             "Abgangsdatum",
             self._disposal_date_entry,
@@ -184,21 +176,6 @@ class FixedAssetDisposalDialog(QDialog):
 
         layout.addWidget(buttons)
 
-    def _normalize_disposal_date(self) -> None:
-        """Normalisiert eine gültige Datumseingabe."""
-
-        value = self._disposal_date_entry.text().strip()
-
-        if not value:
-            return
-
-        try:
-            normalized = normalize_german_date(value)
-        except ValueError:
-            return
-
-        self._disposal_date_entry.setText(normalized)
-
     def _normalize_gross_proceeds(self) -> None:
         """Normalisiert den Bruttoverkaufspreis."""
 
@@ -259,13 +236,7 @@ class FixedAssetDisposalDialog(QDialog):
         """Übernimmt die eingegebenen Verkaufsdaten."""
 
         try:
-            disposal_date = parse_german_date(
-                self._disposal_date_entry.text()
-            )
-
-            self._disposal_date_entry.setText(
-                disposal_date.strftime("%d.%m.%Y")
-            )
+            disposal_date = self._disposal_date_entry.date_value()
 
             gross_proceeds = self._parse_amount(
                 self._gross_proceeds_entry.text()

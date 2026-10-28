@@ -9,6 +9,9 @@ from PySide6.QtCore import QPoint, Qt
 from PySide6.QtGui import QAction, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QFormLayout,
     QHBoxLayout,
     QHeaderView,
     QInputDialog,
@@ -23,7 +26,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from simpleob.date_input import parse_german_date
+from simpleob.date_input import GermanDateEdit
 from simpleob.domain.fiscal_year import FiscalYear
 from simpleob.domain.open_item_overview import (
     OpenItemActivityKind,
@@ -449,22 +452,22 @@ class OpenItemOverviewWidget(QWidget):
         default_date = date.today()
         if not fiscal_year.contains(default_date):
             default_date = fiscal_year.end_date
-        date_text, accepted = QInputDialog.getText(
-            self,
-            "Rechnungsstorno",
-            f"Stornobuchungsdatum innerhalb {fiscal_year.display_name} (TT.MM.JJJJ):",
-            text=default_date.strftime("%d.%m.%Y"),
-        )
-        if not accepted:
-            return
         try:
-            booking_date = parse_german_date(date_text)
-            if not fiscal_year.contains(booking_date):
-                raise ValueError(
-                    "Das Stornobuchungsdatum liegt außerhalb des geöffneten Geschäftsjahrs."
-                )
-        except (TypeError, ValueError) as error:
+            booking_date = self._request_cancellation_date(
+                default_date,
+                fiscal_year.display_name,
+            )
+        except ValueError as error:
             QMessageBox.warning(self, "Ungültiges Buchungsdatum", str(error))
+            return
+        if booking_date is None:
+            return
+        if not fiscal_year.contains(booking_date):
+            QMessageBox.warning(
+                self,
+                "Ungültiges Buchungsdatum",
+                "Das Stornobuchungsdatum liegt außerhalb des geöffneten Geschäftsjahrs.",
+            )
             return
         try:
             assessment = service.assess_payment_history(
@@ -542,6 +545,34 @@ class OpenItemOverviewWidget(QWidget):
         self.refresh()
         if self._on_cancelled is not None:
             self._on_cancelled()
+
+    def _request_cancellation_date(
+        self,
+        default_date: date,
+        fiscal_year_name: str,
+    ) -> date | None:
+        """Fragt ein Stornodatum über das zentrale Texteingabefeld ab."""
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Rechnungsstorno")
+        layout = QVBoxLayout(dialog)
+        form = QFormLayout()
+        entry = GermanDateEdit(dialog, value=default_date)
+        form.addRow(
+            f"Stornobuchungsdatum innerhalb {fiscal_year_name}",
+            entry,
+        )
+        layout.addLayout(form)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok
+            | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return None
+        return entry.date_value()
 
 
 def _sum(values) -> Decimal:

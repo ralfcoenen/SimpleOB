@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
 
 from simpleob.amount_input import format_german_amount, parse_german_amount
 from simpleob.database.business_partner_repository import BusinessPartnerRepository
-from simpleob.date_input import format_german_date, parse_german_date
+from simpleob.date_input import GermanDateEdit, format_german_date
 from simpleob.domain.open_item_offset import CreditOffsetSummary, OffsetDirection
 from simpleob.services.open_item_credit_refund_service import (
     OpenItemCreditRefundService,
@@ -62,11 +62,10 @@ class OpenItemCreditRefundDialog(QDialog):
                     f"{account.number} – {account.name}", account.number
                 )
 
-        today = format_german_date(date.today())
         self._amount = QLineEdit()
         self._amount.setPlaceholderText("0,00")
-        self._refund_date = QLineEdit(today)
-        self._booking_date = QLineEdit(today)
+        self._refund_date = GermanDateEdit(value=date.today())
+        self._booking_date = GermanDateEdit(value=date.today())
         form.addRow("Geschäftsvorfall", self._direction_box)
         form.addRow("Geschäftspartner", self._partner_box)
         form.addRow("Offenes Guthaben", self._credit_box)
@@ -160,8 +159,8 @@ class OpenItemCreditRefundDialog(QDialog):
                     "Der Rückerstattungsbetrag übersteigt den verfügbaren Rest "
                     f"von {format_german_amount(credit.available_amount)} EUR."
                 )
-            refund_date = parse_german_date(self._refund_date.text())
-            booking_date = parse_german_date(self._booking_date.text())
+            refund_date = self._refund_date.date_value()
+            booking_date = self._booking_date.date_value()
             direction = OffsetDirection(self._direction_box.currentData())
             partner_name = self._partner_box.currentText()
             account_label = self._account_box.currentText()

@@ -1,25 +1,22 @@
 """PySide6-Dialog zum Anlegen eines neuen Geschäftsjahres."""
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFormLayout,
     QLabel,
-    QLineEdit,
     QMessageBox,
     QPushButton,
     QVBoxLayout,
 )
-from simpleob.database.lock_error import DatabaseLockError
+
 from simpleob.database.company_repository import CompanyRepository
+from simpleob.database.lock_error import DatabaseLockError
+from simpleob.date_input import GermanDateEdit
 from simpleob.domain.company import Company
 from simpleob.domain.fiscal_year import FiscalYear
-from simpleob.date_input import (
-    normalize_german_date,
-    parse_german_date,
-)
 
 
 class NewFiscalYearDialog(QDialog):
@@ -66,25 +63,15 @@ class NewFiscalYearDialog(QDialog):
 
         form_layout = QFormLayout()
 
-        self._start_date_entry = QLineEdit()
+        self._start_date_entry = GermanDateEdit()
         self._start_date_entry.setMaximumWidth(160)
-        self._start_date_entry.editingFinished.connect(
-            lambda: self._normalize_date_entry(
-                self._start_date_entry
-            )
-        )
         form_layout.addRow(
             "Beginn",
             self._start_date_entry,
         )
 
-        self._end_date_entry = QLineEdit()
+        self._end_date_entry = GermanDateEdit()
         self._end_date_entry.setMaximumWidth(160)
-        self._end_date_entry.editingFinished.connect(
-            lambda: self._normalize_date_entry(
-                self._end_date_entry
-            )
-        )
         form_layout.addRow(
             "Ende",
             self._end_date_entry,
@@ -129,20 +116,8 @@ class NewFiscalYearDialog(QDialog):
         else:
             next_year = datetime.now().year
 
-        self._start_date_entry.setText(
-            f"01.01.{next_year}"
-        )
-        self._end_date_entry.setText(
-            f"31.12.{next_year}"
-        )
-
-    @staticmethod
-    def _parse_date(
-        value: str,
-    ):
-        """Liest eine deutsche Datumseingabe."""
-
-        return parse_german_date(value)
+        self._start_date_entry.set_date(date(next_year, 1, 1))
+        self._end_date_entry.set_date(date(next_year, 12, 31))
 
     def _find_immediate_predecessor(
         self,
@@ -249,19 +224,8 @@ class NewFiscalYearDialog(QDialog):
         """Erzeugt und speichert das Geschäftsjahr."""
 
         try:
-            start_date = self._parse_date(
-                self._start_date_entry.text()
-            )
-            end_date = self._parse_date(
-                self._end_date_entry.text()
-            )
-
-            self._start_date_entry.setText(
-                start_date.strftime("%d.%m.%Y")
-            )
-            self._end_date_entry.setText(
-                end_date.strftime("%d.%m.%Y")
-            )
+            start_date = self._start_date_entry.date_value()
+            end_date = self._end_date_entry.date_value()
 
             fiscal_year = FiscalYear(
                 start_date=start_date,
@@ -288,21 +252,3 @@ class NewFiscalYearDialog(QDialog):
 
         self.result = fiscal_year
         self.accept()
-
-    @staticmethod
-    def _normalize_date_entry(
-        entry: QLineEdit,
-    ) -> None:
-        """Normalisiert eine gültige Datumseingabe."""
-
-        value = entry.text().strip()
-
-        if not value:
-            return
-
-        try:
-            normalized = normalize_german_date(value)
-        except ValueError:
-            return
-
-        entry.setText(normalized)
