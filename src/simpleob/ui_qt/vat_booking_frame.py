@@ -123,6 +123,7 @@ class VatBookingFrame(QWidget):
         )
 
         self._booking_date_entry = GermanDateEdit(value=date.today())
+        self._booking_date_entry.setMinimumWidth(120)
         self._booking_date_entry.setMaximumWidth(140)
         form.addRow(
             "Datum",
@@ -130,6 +131,7 @@ class VatBookingFrame(QWidget):
         )
 
         self._voucher_no_entry = QLineEdit()
+        self._voucher_no_entry.setMinimumWidth(160)
         self._voucher_no_entry.setMaximumWidth(220)
         self._voucher_no_label = QLabel("Belegnummer")
         form.addRow(self._voucher_no_label, self._voucher_no_entry)
@@ -148,10 +150,12 @@ class VatBookingFrame(QWidget):
         self._partner_label = QLabel("Geschäftspartner")
         form.addRow(self._partner_label, partner_row)
         self._due_date_entry = GermanDateEdit(value=date.today())
+        self._due_date_entry.setMinimumWidth(120)
         self._due_date_entry.setMaximumWidth(140)
         self._due_date_entry.setVisible(False)
         form.addRow("Fällig am", self._due_date_entry)
         self._original_invoice_number_entry = QLineEdit()
+        self._original_invoice_number_entry.setMinimumWidth(160)
         self._original_invoice_number_entry.setMaximumWidth(220)
         self._original_invoice_number_entry.setVisible(False)
         form.addRow("Rechnungsbezug (optional)", self._original_invoice_number_entry)
@@ -395,7 +399,8 @@ class VatBookingFrame(QWidget):
         amount_entry.setAlignment(
             Qt.AlignmentFlag.AlignRight
         )
-        amount_entry.setMaximumWidth(140)
+        amount_entry.setMinimumWidth(120)
+        amount_entry.setMaximumWidth(160)
         amount_entry.setPlaceholderText(
             "0,00"
         )
@@ -411,6 +416,7 @@ class VatBookingFrame(QWidget):
         tax_rate_box.setCurrentText(
             "19 %"
         )
+        tax_rate_box.setMinimumWidth(80)
         tax_rate_box.setMaximumWidth(100)
 
         row_index = len(

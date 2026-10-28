@@ -48,6 +48,7 @@ def test_imports_openbilanz_standard_chart_of_accounts() -> None:
     assert "1776" in account_numbers
     assert "8990" in account_numbers
     assert "9000" in account_numbers
+    assert {"1400", "1410", "1600", "1610"} <= account_numbers
 
     assert len(account_numbers) == len(template.accounts)
     mapped_account_numbers = {
@@ -59,6 +60,7 @@ def test_imports_openbilanz_standard_chart_of_accounts() -> None:
     assert "1576" in mapped_account_numbers
     assert "1771" in mapped_account_numbers
     assert "1776" in mapped_account_numbers
+    assert {"1400", "1410", "1600", "1610"} <= mapped_account_numbers
 
     assert len(mapped_account_numbers) == len(
         template.account_mapping_rules
@@ -84,6 +86,15 @@ def test_imports_openbilanz_standard_chart_of_accounts() -> None:
     assert revenue.name == "Umsatzerlöse 19 %"
     assert revenue.account_type is AccountType.REVENUE
 
+    account_types = {
+        account.account_number: account.account_type
+        for account in template.accounts
+    }
+    assert account_types["1400"] is AccountType.ASSET
+    assert account_types["1410"] is AccountType.ASSET
+    assert account_types["1600"] is AccountType.LIABILITY
+    assert account_types["1610"] is AccountType.LIABILITY
+
     bank_rule = next(
         rule
         for rule in template.account_mapping_rules
@@ -100,3 +111,22 @@ def test_imports_openbilanz_standard_chart_of_accounts() -> None:
 
     assert revenue_rule.credit_position is not None
     assert revenue_rule.credit_position.code == "HGB.275.GKV.1"
+
+    expected_hgb_positions = {
+        "1400": ("HGB.266.AKTIVA.B.II.1", None),
+        "1410": ("HGB.266.AKTIVA.B.II.4", None),
+        "1600": (None, "HGB.266.PASSIVA.C.4"),
+        "1610": (None, "HGB.266.PASSIVA.C.8"),
+    }
+    rules_by_account_number = {
+        rule.account_number: rule
+        for rule in template.account_mapping_rules
+    }
+    for account_number, (debit_code, credit_code) in expected_hgb_positions.items():
+        rule = rules_by_account_number[account_number]
+        assert (
+            rule.debit_position.code if rule.debit_position else None
+        ) == debit_code
+        assert (
+            rule.credit_position.code if rule.credit_position else None
+        ) == credit_code

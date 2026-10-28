@@ -16,6 +16,9 @@ from simpleob.database.company_repository import (
 )
 from simpleob.database.database import Base
 from simpleob.domain.account_type import AccountType
+from simpleob.domain.accounting_account_roles import (
+    AccountingAccountRoles,
+)
 from simpleob.domain.chart_of_accounts_template import (
     ChartOfAccountsTemplate,
 )
@@ -90,6 +93,26 @@ def _standard_chart_of_accounts() -> ChartOfAccountsTemplate:
                 account_number="1200",
                 name="Bank",
                 account_type=AccountType.ASSET,
+            ),
+            TemplateAccount(
+                account_number="1400",
+                name="Forderungen aus Lieferungen und Leistungen",
+                account_type=AccountType.ASSET,
+            ),
+            TemplateAccount(
+                account_number="1410",
+                name="Lieferantenguthaben",
+                account_type=AccountType.ASSET,
+            ),
+            TemplateAccount(
+                account_number="1600",
+                name="Verbindlichkeiten aus Lieferungen und Leistungen",
+                account_type=AccountType.LIABILITY,
+            ),
+            TemplateAccount(
+                account_number="1610",
+                name="Kundenguthaben",
+                account_type=AccountType.LIABILITY,
             ),
             TemplateAccount(
                 account_number="1571",
@@ -251,6 +274,10 @@ def test_initializes_chart_of_accounts_for_company() -> None:
         loaded_account_roles.general_rate_sales_accounts
         == frozenset({"8400"})
     )
+    assert loaded_account_roles.customer_receivables == frozenset({"1400"})
+    assert loaded_account_roles.supplier_payables == frozenset({"1600"})
+    assert loaded_account_roles.customer_credit_balances == frozenset({"1610"})
+    assert loaded_account_roles.supplier_credit_balances == frozenset({"1410"})
     assert loaded_account_taxonomy_concepts == {
         "4900": (
             "is.netIncome.regular.operatingTC."
@@ -307,6 +334,20 @@ def test_does_not_replace_existing_chart_of_accounts() -> None:
 
         session.commit()
 
+        custom_roles = AccountingAccountRoles(
+            cash_accounts=frozenset(("1000",)),
+            bank_accounts=frozenset(("1200",)),
+            general_rate_sales_accounts=frozenset(("8400",)),
+            customer_receivables=frozenset(("1410",)),
+            supplier_payables=frozenset(("1600",)),
+            customer_credit_balances=frozenset(("0755",)),
+            supplier_credit_balances=frozenset(("1400",)),
+        )
+        repository.save_account_roles(
+            company_id=company.company_id,
+            account_roles=custom_roles,
+        )
+
         second = service.initialize(
             company=company,
             standard_chart_of_accounts=(
@@ -321,10 +362,12 @@ def test_does_not_replace_existing_chart_of_accounts() -> None:
             company_id=company.company_id,
             position_provider=provider,
         )
+        loaded_roles = repository.load_account_roles(company.company_id)
 
     assert first is True
     assert second is False
     assert loaded is not None
+    assert loaded_roles == custom_roles
 
     chart_of_accounts, _ = loaded
 
@@ -337,6 +380,10 @@ def test_does_not_replace_existing_chart_of_accounts() -> None:
                 "0846",
                 "1000",
                 "1200",
+                "1400",
+                "1410",
+                "1600",
+                "1610",
                 "1571",
                 "1576",
                 "1771",

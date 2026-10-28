@@ -15,6 +15,8 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
     QFileDialog,
     QFormLayout,
+    QGridLayout,
+    QGroupBox,
     QHBoxLayout,
     QHeaderView,
     QInputDialog,
@@ -24,6 +26,8 @@ from PySide6.QtWidgets import (
     QMenu,
     QMessageBox,
     QPushButton,
+    QScrollArea,
+    QSizePolicy,
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
@@ -2025,13 +2029,84 @@ class MainWindow(QMainWindow):
     def _create_booking_tab(self) -> None:
         """Erzeugt den Arbeitsbereich Buchen."""
 
-        layout = QVBoxLayout(self._booking_tab)
-
-        booking_label = QLabel("Neue Buchung")
-        booking_label.setStyleSheet(
-            "font-size: 18px; font-weight: bold;"
+        tab_layout = QVBoxLayout(self._booking_tab)
+        scroll_area = QScrollArea(self._booking_tab)
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAsNeeded
         )
-        layout.addWidget(booking_label)
+        scroll_area.setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAsNeeded
+        )
+        tab_layout.addWidget(scroll_area)
+
+        content = QWidget()
+        scroll_area.setWidget(content)
+        layout = QVBoxLayout(content)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(10)
+
+        op_group = QGroupBox("OP-Verwaltung")
+        op_layout = QGridLayout(op_group)
+        op_layout.setHorizontalSpacing(10)
+        op_layout.setVerticalSpacing(6)
+
+        def add_op_action(button: QPushButton, row: int, column: int) -> None:
+            button.setSizePolicy(
+                QSizePolicy.Policy.Maximum,
+                QSizePolicy.Policy.Fixed,
+            )
+            op_layout.addWidget(
+                button,
+                row,
+                column,
+                Qt.AlignmentFlag.AlignLeft,
+            )
+
+        self._payment_button = QPushButton("Zahlung auf Rechnung erfassen…")
+        self._payment_button.setEnabled(
+            self._open_item_payment_service is not None
+        )
+        self._payment_button.clicked.connect(self._open_payment_dialog)
+        add_op_action(self._payment_button, 0, 0)
+
+        self._offset_button = QPushButton("Guthaben mit Rechnung verrechnen…")
+        self._offset_button.setEnabled(
+            self._open_item_offset_service is not None
+            and self._business_partner_repository is not None
+        )
+        self._offset_button.clicked.connect(self._open_offset_dialog)
+        add_op_action(self._offset_button, 0, 1)
+
+        self._credit_refund_button = QPushButton("Guthaben erstatten…")
+        self._credit_refund_button.setEnabled(
+            self._open_item_credit_refund_service is not None
+            and self._open_item_offset_service is not None
+            and self._business_partner_repository is not None
+        )
+        self._credit_refund_button.clicked.connect(self._open_credit_refund_dialog)
+        add_op_action(self._credit_refund_button, 0, 2)
+
+        self._credit_refund_reversal_button = QPushButton(
+            "Guthabenrückerstattung zurücknehmen…"
+        )
+        self._credit_refund_reversal_button.setEnabled(
+            self._open_item_credit_refund_reversal_service is not None
+        )
+        self._credit_refund_reversal_button.clicked.connect(
+            self._open_credit_refund_reversal_dialog
+        )
+        add_op_action(self._credit_refund_reversal_button, 1, 0)
+
+        self._payment_correction_button = QPushButton("Zahlungszuordnung korrigieren…")
+        self._payment_correction_button.setEnabled(self._payment_allocation_correction_service is not None)
+        self._payment_correction_button.clicked.connect(self._open_payment_correction_dialog)
+        add_op_action(self._payment_correction_button, 1, 1)
+        op_layout.setColumnStretch(3, 1)
+        layout.addWidget(op_group)
+
+        booking_group = QGroupBox("Neue Buchung")
+        booking_layout = QVBoxLayout(booking_group)
 
         mode_layout = QHBoxLayout()
 
@@ -2056,47 +2131,7 @@ class MainWindow(QMainWindow):
         )
         mode_layout.addStretch()
 
-        layout.addLayout(mode_layout)
-
-        self._payment_button = QPushButton("Zahlung auf Rechnung erfassen…")
-        self._payment_button.setEnabled(
-            self._open_item_payment_service is not None
-        )
-        self._payment_button.clicked.connect(self._open_payment_dialog)
-        layout.addWidget(self._payment_button)
-
-        self._offset_button = QPushButton("Guthaben mit Rechnung verrechnen…")
-        self._offset_button.setEnabled(
-            self._open_item_offset_service is not None
-            and self._business_partner_repository is not None
-        )
-        self._offset_button.clicked.connect(self._open_offset_dialog)
-        layout.addWidget(self._offset_button)
-
-        self._credit_refund_button = QPushButton("Guthaben erstatten…")
-        self._credit_refund_button.setEnabled(
-            self._open_item_credit_refund_service is not None
-            and self._open_item_offset_service is not None
-            and self._business_partner_repository is not None
-        )
-        self._credit_refund_button.clicked.connect(self._open_credit_refund_dialog)
-        layout.addWidget(self._credit_refund_button)
-
-        self._credit_refund_reversal_button = QPushButton(
-            "Guthabenrückerstattung zurücknehmen…"
-        )
-        self._credit_refund_reversal_button.setEnabled(
-            self._open_item_credit_refund_reversal_service is not None
-        )
-        self._credit_refund_reversal_button.clicked.connect(
-            self._open_credit_refund_reversal_dialog
-        )
-        layout.addWidget(self._credit_refund_reversal_button)
-
-        self._payment_correction_button = QPushButton("Zahlungszuordnung korrigieren…")
-        self._payment_correction_button.setEnabled(self._payment_allocation_correction_service is not None)
-        self._payment_correction_button.clicked.connect(self._open_payment_correction_dialog)
-        layout.addWidget(self._payment_correction_button)
+        booking_layout.addLayout(mode_layout)
 
         technical_account_numbers = {
             self._opening_balance_account_number,
@@ -2194,9 +2229,11 @@ class MainWindow(QMainWindow):
             self._vat_booking_frame
         )
 
-        layout.addWidget(
+        booking_layout.addWidget(
             self._booking_frame_container
         )
+        layout.addWidget(booking_group)
+        layout.addStretch()
 
         self._booking_mode_box.currentTextChanged.connect(
             self._update_booking_mode

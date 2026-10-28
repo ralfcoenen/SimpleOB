@@ -97,6 +97,7 @@ class BookingFrame(QWidget):
         )
 
         self._booking_date_entry = GermanDateEdit(value=date.today())
+        self._booking_date_entry.setMinimumWidth(120)
         self._booking_date_entry.setMaximumWidth(140)
         form.addRow(
             "Datum",
@@ -104,6 +105,7 @@ class BookingFrame(QWidget):
         )
 
         self._voucher_no_entry = QLineEdit()
+        self._voucher_no_entry.setMinimumWidth(160)
         self._voucher_no_entry.setMaximumWidth(220)
         form.addRow(
             "Belegnummer",
@@ -394,6 +396,7 @@ class BookingFrame(QWidget):
         """Erzeugt ein Betragsfeld für Soll oder Haben."""
 
         entry = QLineEdit()
+        entry.setMinimumWidth(120)
         entry.setMaximumWidth(160)
         entry.setAlignment(
             Qt.AlignmentFlag.AlignRight
