@@ -7,7 +7,7 @@ from uuid import uuid4
 import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QMessageBox, QPushButton
+from PySide6.QtWidgets import QApplication, QLabel, QMessageBox, QPushButton
 
 from simpleob.domain.booking_line import BookingLine
 from simpleob.domain.entry_side import EntrySide
@@ -291,6 +291,64 @@ def test_detail_dialog_is_read_only_and_shows_existing_event_history(monkeypatch
     widget._items_table.setCurrentCell(-1, -1)
     widget._update_action_availability()
     assert not widget._details_button.isEnabled()
+    widget.close()
+    app.processEvents()
+
+
+def test_refund_amount_is_separate_from_offsets_in_summary_and_detail():
+    app = QApplication.instance() or QApplication([])
+    company_id, items, service = _environment()
+    credit_item = next(
+        item for item in items
+        if item.kind is OpenItemKind.CUSTOMER_CREDIT and item.open_amount > 0
+    )
+    credit_item = replace(
+        credit_item,
+        offsets_amount=Decimal("5.00"),
+        refunds_amount=Decimal("4.00"),
+        open_amount=Decimal("1.00"),
+    )
+    service.report = replace(
+        service.report,
+        items=tuple(
+            credit_item if item.open_item_id == credit_item.open_item_id else item
+            for item in service.report.items
+        ),
+    )
+    service.details[credit_item.open_item_id] = OpenItemOverviewDetail(
+        item=credit_item,
+        activities=(
+            OpenItemActivity(
+                kind=OpenItemActivityKind.REFUND,
+                activity_date=date(2026, 4, 15),
+                booking_date=date(2026, 4, 16),
+                amount=Decimal("4.00"),
+                reference="Auszahlung Kundenguthaben · Hauptbuch V-16",
+                description="Tatsächliche Auszahlung 15.04.2026",
+                booking_id="refund-booking-id",
+            ),
+        ),
+    )
+
+    widget = OpenItemOverviewWidget(company_id=company_id, service=service)
+    summary_row = next(
+        row for row in range(widget._summary_table.rowCount())
+        if widget._summary_table.item(row, 1).text() == "Kundenguthaben"
+    )
+    assert widget._summary_table.horizontalHeaderItem(5).text() == "Verrechnet"
+    assert widget._summary_table.horizontalHeaderItem(6).text() == "Rückerstattet"
+    assert widget._summary_table.item(summary_row, 5).text() == "5,00"
+    assert widget._summary_table.item(summary_row, 6).text() == "4,00"
+
+    dialog = OpenItemDetailDialog(
+        None, company_id=company_id, item=credit_item, service=service
+    )
+    labels = [label.text() for label in dialog.findChildren(QLabel)]
+    assert "4,00 €" in labels
+    assert dialog._activity_table.item(0, 0).text() == "Rückerstattung"
+    assert dialog._activity_table.item(0, 2).text() == "16.04.2026"
+    assert "Hauptbuch V-16" in dialog._activity_table.item(0, 4).text()
+    dialog.close()
     widget.close()
     app.processEvents()
 

@@ -72,6 +72,7 @@ class OpenItemOffsetService:
             amount = to_decimal(amount)
             if amount <= ZERO:
                 raise ValueError("Der Verrechnungsbetrag muss größer als 0,00 sein.")
+            self._offset_repository.reserve_credit_mutation()
             invoice = self._offset_repository.get_invoice(
                 company_id=company_id,
                 partner_id=partner_id,

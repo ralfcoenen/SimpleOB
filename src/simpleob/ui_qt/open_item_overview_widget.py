@@ -139,7 +139,7 @@ class OpenItemOverviewWidget(QWidget):
         )
         self._views.addTab(self._items_table, "Einzelposten")
 
-        self._summary_table = QTableWidget(0, 7)
+        self._summary_table = QTableWidget(0, 8)
         self._summary_table.setHorizontalHeaderLabels(
             (
                 "Geschäftspartner",
@@ -148,6 +148,7 @@ class OpenItemOverviewWidget(QWidget):
                 "Ursprung",
                 "Zahlungen netto",
                 "Verrechnet",
+                "Rückerstattet",
                 "Offen",
             )
         )
@@ -335,6 +336,7 @@ class OpenItemOverviewWidget(QWidget):
                 _money(_sum(item.original_amount for item in group)),
                 _money(_sum(item.payments_amount for item in group)),
                 _money(_sum(item.offsets_amount for item in group)),
+                _money(_sum(item.refunds_amount for item in group)),
                 _money(_sum(item.open_amount for item in group)),
             )
             for column, value in enumerate(values):

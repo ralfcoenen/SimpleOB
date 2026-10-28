@@ -846,6 +846,44 @@ class GuthabenOP(Base):
     amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
 
 
+class GuthabenOPRueckerstattung(Base):
+    """Unveränderliche Rückerstattung eines konkreten Guthaben-OPs."""
+
+    __tablename__ = "guthaben_op_rueckerstattungen"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["mandant_id", "partner_id"],
+            ["geschaeftspartner.mandant_id", "geschaeftspartner.partner_id"],
+            name="fk_guthaben_op_refund_mandant_partner",
+        ),
+        CheckConstraint(
+            "direction IN ('CUSTOMER', 'SUPPLIER')",
+            name="ck_guthaben_op_refund_richtung",
+        ),
+        CheckConstraint("amount > 0", name="ck_guthaben_op_refund_betrag_positiv"),
+        Index("ix_guthaben_op_refund_open_item", "open_item_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    refund_id: Mapped[str] = mapped_column(String(36), unique=True, nullable=False)
+    mandant_id: Mapped[int] = mapped_column(
+        ForeignKey("mandanten.id"), nullable=False
+    )
+    partner_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    open_item_id: Mapped[str] = mapped_column(
+        ForeignKey("guthaben_ops.open_item_id"), nullable=False
+    )
+    direction: Mapped[str] = mapped_column(String(16), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
+    refund_date: Mapped[date] = mapped_column(Date, nullable=False)
+    booking_id: Mapped[str] = mapped_column(
+        ForeignKey("buchungen.booking_id"), unique=True, nullable=False
+    )
+    recorded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+
+
 class GuthabenOPEreignis(Base):
     """Unveränderliche Betragsänderung eines Guthaben-OPs."""
 

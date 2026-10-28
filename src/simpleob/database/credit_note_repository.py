@@ -3,7 +3,6 @@
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from simpleob.database.models import (
@@ -12,11 +11,11 @@ from simpleob.database.models import (
     Eingangsrechnung,
     Geschaeftspartner,
     GuthabenOP,
-    GuthabenOPEreignis,
     Gutschrift,
     Mandant,
     Wirtschaftsjahr,
 )
+from simpleob.database.open_item_credit_balance import available_credit_amount
 from simpleob.domain.credit_note import (
     CreditBalanceOpenItem,
     CreditNote,
@@ -24,7 +23,6 @@ from simpleob.domain.credit_note import (
     DuplicateSupplierCreditNoteError,
 )
 from simpleob.domain.fiscal_year import FiscalYear
-from simpleob.domain.money import ZERO
 
 
 class CreditNoteRepository:
@@ -308,18 +306,11 @@ class CreditNoteRepository:
         )
         if model is None:
             return None
-        event_total = (
-            self._session.query(func.sum(GuthabenOPEreignis.amount_delta))
-            .filter(GuthabenOPEreignis.open_item_id == str(open_item_id))
-            .scalar()
+        return available_credit_amount(
+            self._session,
+            open_item_id=open_item_id,
+            original_amount=model.amount,
         )
-        open_amount = model.amount + (event_total or ZERO)
-        if open_amount < ZERO:
-            raise ValueError(
-                "Die Guthaben-OP-Ereignisse reduzieren den Ursprungsbetrag "
-                "unter null."
-            )
-        return open_amount
 
     def count_for_company(self, company_id: UUID) -> int:
         company = (

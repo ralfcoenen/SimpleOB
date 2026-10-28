@@ -1,5 +1,6 @@
 """Lesende Abfragen für die aktuelle OP-Übersicht."""
 
+from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import func
@@ -14,6 +15,7 @@ from simpleob.database.models import (
     Geschaeftspartner,
     GuthabenOP,
     GuthabenOPEreignis,
+    GuthabenOPRueckerstattung,
     Gutschrift,
     Mandant,
     OPGuthabenverrechnung,
@@ -149,6 +151,7 @@ class OpenItemOverviewRepository:
             )
             if credit is None:
                 continue
+            refunds_amount = self._credit_refund_amount(open_item.open_item_id)
             item = OpenItemOverviewItem(
                 company_id=company_id,
                 partner_id=credit.partner_id,
@@ -161,9 +164,12 @@ class OpenItemOverviewRepository:
                 due_date=None,
                 original_amount=credit.original_amount,
                 payments_amount=ZERO,
-                offsets_amount=credit.original_amount - credit.available_amount,
+                offsets_amount=(
+                    credit.original_amount - credit.available_amount - refunds_amount
+                ),
                 open_amount=credit.available_amount,
                 source_booking_id=credit_note.booking_id,
+                refunds_amount=refunds_amount,
             )
             if include_settled or item.open_amount > ZERO:
                 items.append(item)
@@ -212,6 +218,7 @@ class OpenItemOverviewRepository:
             )
             if credit is None:
                 continue
+            refunds_amount = self._credit_refund_amount(open_item.open_item_id)
             kind = (
                 OpenItemKind.CUSTOMER_CREDIT
                 if direction is OffsetDirection.CUSTOMER
@@ -229,9 +236,12 @@ class OpenItemOverviewRepository:
                 due_date=None,
                 original_amount=credit.original_amount,
                 payments_amount=ZERO,
-                offsets_amount=credit.original_amount - credit.available_amount,
+                offsets_amount=(
+                    credit.original_amount - credit.available_amount - refunds_amount
+                ),
                 open_amount=credit.available_amount,
                 source_booking_id=cancellation.credit_booking_id,
+                refunds_amount=refunds_amount,
             )
             if include_settled or item.open_amount > ZERO:
                 items.append(item)
@@ -304,6 +314,7 @@ class OpenItemOverviewRepository:
                     OpenItemActivityKind.OFFSET: 2,
                     OpenItemActivityKind.PAYMENT_CORRECTION: 3,
                     OpenItemActivityKind.INVOICE_CANCELLATION: 4,
+                    OpenItemActivityKind.REFUND: 5,
                 }[activity.kind],
                 activity.reference,
             )
@@ -614,7 +625,7 @@ class OpenItemOverviewRepository:
             if item.document_number.startswith("Storno ")
             else f"Gutschrift {item.document_number}"
         )
-        return [
+        activities = [
             OpenItemActivity(
                 kind=OpenItemActivityKind.OFFSET,
                 activity_date=settlement.settlement_date,
@@ -634,6 +645,47 @@ class OpenItemOverviewRepository:
             )
             for event, settlement, booking in rows
         ]
+        refund_rows = (
+            self._session.query(GuthabenOPRueckerstattung, Buchung)
+            .join(Buchung, GuthabenOPRueckerstattung.booking_id == Buchung.booking_id)
+            .filter(
+                GuthabenOPRueckerstattung.open_item_id == str(item.open_item_id),
+                GuthabenOPRueckerstattung.mandant_id
+                == self._session.query(Mandant.id)
+                .filter(Mandant.company_id == str(item.company_id))
+                .scalar_subquery(),
+            )
+            .all()
+        )
+        activities.extend(
+            OpenItemActivity(
+                kind=OpenItemActivityKind.REFUND,
+                activity_date=refund.refund_date,
+                booking_date=booking.booking_date,
+                amount=refund.amount,
+                reference=(
+                    f"{'Auszahlung Kundenguthaben' if refund.direction == 'CUSTOMER' else 'Lieferantenerstattung'} · "
+                    f"{item.partner_name} · {credit_reference} · "
+                    f"Hauptbuch {booking.voucher_no or booking.booking_id}"
+                ),
+                description=(
+                    f"Rückerstattung {refund.amount:.2f} EUR; tatsächliches "
+                    f"Zahlungs-/Erstattungsdatum {refund.refund_date:%d.%m.%Y}"
+                ),
+                booking_id=refund.booking_id,
+                recorded_at=refund.recorded_at,
+            )
+            for refund, booking in refund_rows
+        )
+        return activities
+
+    def _credit_refund_amount(self, open_item_id: str) -> Decimal:
+        return (
+            self._session.query(func.sum(GuthabenOPRueckerstattung.amount))
+            .filter(GuthabenOPRueckerstattung.open_item_id == str(open_item_id))
+            .scalar()
+            or ZERO
+        )
 
     def _credit_note_number(self, open_item_id: str) -> str:
         number = (

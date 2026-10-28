@@ -76,6 +76,9 @@ from simpleob.services.credit_note_posting_service import (
     CreditNotePostingService,
 )
 from simpleob.services.fiscal_year_workspace import FiscalYearWorkspace
+from simpleob.services.open_item_credit_refund_service import (
+    OpenItemCreditRefundService,
+)
 from simpleob.services.open_item_invoice_cancellation_service import (
     OpenItemInvoiceCancellationService,
 )
@@ -131,6 +134,7 @@ from simpleob.ui_qt.income_statement_frame import (
     IncomeStatementFrame,
 )
 from simpleob.ui_qt.new_fixed_asset_dialog import NewFixedAssetDialog
+from simpleob.ui_qt.open_item_credit_refund_dialog import OpenItemCreditRefundDialog
 from simpleob.ui_qt.open_item_offset_dialog import OpenItemOffsetDialog
 from simpleob.ui_qt.open_item_overview_widget import OpenItemOverviewWidget
 from simpleob.ui_qt.open_item_payment_dialog import OpenItemPaymentDialog
@@ -197,6 +201,7 @@ class MainWindow(QMainWindow):
         open_item_reconciliation_service: OpenItemReconciliationService | None = None,
         open_item_overview_service: OpenItemOverviewService | None = None,
         open_item_invoice_cancellation_service: OpenItemInvoiceCancellationService | None = None,
+        open_item_credit_refund_service: OpenItemCreditRefundService | None = None,
     ) -> None:
         super().__init__()
 
@@ -244,6 +249,7 @@ class MainWindow(QMainWindow):
         self._open_item_reconciliation_service = open_item_reconciliation_service
         self._open_item_overview_service = open_item_overview_service
         self._open_item_invoice_cancellation_service = open_item_invoice_cancellation_service
+        self._open_item_credit_refund_service = open_item_credit_refund_service
         self._eric_certificate_path = (
             Path(eric_certificate_path).expanduser()
             if eric_certificate_path is not None
@@ -420,6 +426,8 @@ class MainWindow(QMainWindow):
         self._e_bilanz_tab = QWidget()
         self._open_item_reconciliation_tab = QWidget()
         self._open_item_overview_tab = QWidget()
+        self._open_item_overview_widget = None
+        self._open_item_reconciliation_widget = None
 
         self._notebook.addTab(
             self._accounts_tab,
@@ -477,21 +485,21 @@ class MainWindow(QMainWindow):
         self._create_reports_tab()
         if self._open_item_overview_service is not None:
             overview_layout = QVBoxLayout(self._open_item_overview_tab)
-            overview_layout.addWidget(
-                OpenItemOverviewWidget(
-                    company_id=self._context.company.company_id,
-                    service=self._open_item_overview_service,
-                    cancellation_service=self._open_item_invoice_cancellation_service,
-                    fiscal_year=self._context.fiscal_year,
-                    on_cancelled=self._refresh_after_open_item_cancellation,
-                )
+            self._open_item_overview_widget = OpenItemOverviewWidget(
+                company_id=self._context.company.company_id,
+                service=self._open_item_overview_service,
+                cancellation_service=self._open_item_invoice_cancellation_service,
+                fiscal_year=self._context.fiscal_year,
+                on_cancelled=self._refresh_after_open_item_cancellation,
             )
+            overview_layout.addWidget(self._open_item_overview_widget)
         if self._open_item_reconciliation_service is not None:
             reconciliation_layout = QVBoxLayout(self._open_item_reconciliation_tab)
-            reconciliation_layout.addWidget(OpenItemReconciliationWidget(
+            self._open_item_reconciliation_widget = OpenItemReconciliationWidget(
                 company_id=self._context.company.company_id,
                 service=self._open_item_reconciliation_service,
-            ))
+            )
+            reconciliation_layout.addWidget(self._open_item_reconciliation_widget)
         self._create_closing_tab()
         self._create_e_bilanz_tab()
 
@@ -518,6 +526,22 @@ class MainWindow(QMainWindow):
         self._refresh_journal()
         self._refresh_balance_sheet()
         self._refresh_closing()
+        self._refresh_visible_open_item_view()
+
+    def _refresh_visible_open_item_view(self) -> None:
+        """Aktualisiert nur die gerade sichtbare OP-Ansicht."""
+
+        current_widget = self._notebook.currentWidget()
+        if (
+            current_widget is self._open_item_overview_tab
+            and self._open_item_overview_widget is not None
+        ):
+            self._open_item_overview_widget.refresh()
+        elif (
+            current_widget is self._open_item_reconciliation_tab
+            and self._open_item_reconciliation_widget is not None
+        ):
+            self._open_item_reconciliation_widget.refresh()
 
     def closeEvent(self, event) -> None:
         """Kehrt beim Schließen des Hauptfensters zur Buchhaltungsauswahl zurück."""
@@ -2039,6 +2063,15 @@ class MainWindow(QMainWindow):
         self._offset_button.clicked.connect(self._open_offset_dialog)
         layout.addWidget(self._offset_button)
 
+        self._credit_refund_button = QPushButton("Guthaben erstatten…")
+        self._credit_refund_button.setEnabled(
+            self._open_item_credit_refund_service is not None
+            and self._open_item_offset_service is not None
+            and self._business_partner_repository is not None
+        )
+        self._credit_refund_button.clicked.connect(self._open_credit_refund_dialog)
+        layout.addWidget(self._credit_refund_button)
+
         self._payment_correction_button = QPushButton("Zahlungszuordnung korrigieren…")
         self._payment_correction_button.setEnabled(self._payment_allocation_correction_service is not None)
         self._payment_correction_button.clicked.connect(self._open_payment_correction_dialog)
@@ -2168,6 +2201,12 @@ class MainWindow(QMainWindow):
             and self._open_item_offset_service is not None
             and self._business_partner_repository is not None
         )
+        self._credit_refund_button.setEnabled(
+            enabled
+            and self._open_item_credit_refund_service is not None
+            and self._open_item_offset_service is not None
+            and self._business_partner_repository is not None
+        )
         self._payment_correction_button.setEnabled(
             enabled and self._payment_allocation_correction_service is not None
         )
@@ -2189,6 +2228,7 @@ class MainWindow(QMainWindow):
             self._refresh_accounts()
             self._refresh_journal()
             self._refresh_balance_sheet()
+            self._refresh_visible_open_item_view()
 
     def _open_offset_dialog(self) -> None:
         """Erfasst eine manuelle Verrechnung zweier offener Posten."""
@@ -2208,6 +2248,39 @@ class MainWindow(QMainWindow):
             self._refresh_accounts()
             self._refresh_journal()
             self._refresh_balance_sheet()
+            self._refresh_visible_open_item_view()
+
+    def _open_credit_refund_dialog(self) -> None:
+        """Erfasst eine Auszahlung oder Erstattung eines Guthaben-OPs."""
+        service = self._open_item_credit_refund_service
+        offset_service = self._open_item_offset_service
+        partner_repository = self._business_partner_repository
+        if (
+            service is None
+            or offset_service is None
+            or partner_repository is None
+            or self._workspace.is_closed
+        ):
+            return
+        dialog = OpenItemCreditRefundDialog(
+            self,
+            company_id=self._context.company.company_id,
+            fiscal_year=self._context.fiscal_year,
+            service=service,
+            offset_service=offset_service,
+            partner_repository=partner_repository,
+            accounts=self._accounts,
+        )
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self._refresh_after_credit_refund()
+
+    def _refresh_after_credit_refund(self) -> None:
+        """Aktualisiert Hauptbuch und OP-Ansichten nach einer Rückerstattung."""
+        self._workspace.reload()
+        self._refresh_accounts()
+        self._refresh_journal()
+        self._refresh_balance_sheet()
+        self._refresh_visible_open_item_view()
 
     def _open_payment_correction_dialog(self) -> None:
         service = self._payment_allocation_correction_service
@@ -2222,6 +2295,7 @@ class MainWindow(QMainWindow):
             self._refresh_accounts()
             self._refresh_journal()
             self._refresh_balance_sheet()
+            self._refresh_visible_open_item_view()
 
     def _update_booking_mode(
         self,
@@ -2368,6 +2442,7 @@ class MainWindow(QMainWindow):
         self._refresh_accounts()
         self._refresh_journal()
         self._refresh_balance_sheet()
+        self._refresh_visible_open_item_view()
 
     def _post_payable_invoice(
         self,
@@ -2401,6 +2476,7 @@ class MainWindow(QMainWindow):
         self._refresh_accounts()
         self._refresh_journal()
         self._refresh_balance_sheet()
+        self._refresh_visible_open_item_view()
 
     def _post_credit_note(
         self,
@@ -2442,6 +2518,7 @@ class MainWindow(QMainWindow):
         self._refresh_accounts()
         self._refresh_journal()
         self._refresh_balance_sheet()
+        self._refresh_visible_open_item_view()
 
     def _create_fixed_assets_tab(self) -> None:
         """Erzeugt den Arbeitsbereich Anlagen."""
@@ -5350,6 +5427,8 @@ class MainWindow(QMainWindow):
                 self._refresh_e_bilanz()
             else:
                 self._e_bilanz_frame.clear_bvv_evaluation()
+
+            self._refresh_visible_open_item_view()
 
             self._journal_status.setText(
                 f"Journal: {len(self._workspace.journal)} Buchungen"

@@ -5,8 +5,10 @@ from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import func
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
+from simpleob.database.lock_error import DatabaseLockError
 from simpleob.database.models import (
     Ausgangsrechnung,
     Buchung,
@@ -25,6 +27,7 @@ from simpleob.database.models import (
     VerbindlichkeitsOP,
     Wirtschaftsjahr,
 )
+from simpleob.database.open_item_credit_balance import available_credit_amount
 from simpleob.database.open_item_payment_repository import OpenItemPaymentRepository
 from simpleob.domain.account_type import AccountType
 from simpleob.domain.entry_side import EntrySide
@@ -136,6 +139,7 @@ class OpenItemOffsetRepository:
         if open_item is None:
             return None
         cancellation_booking_date = None
+        origin_booking_date = None
         if open_item.credit_note_id is not None:
             credit_note = (
                 self._session.query(Gutschrift)
@@ -230,10 +234,25 @@ class OpenItemOffsetRepository:
                     "dasselbe Geschäftsjahr und Buchungsdatum haben."
                 )
             cancellation_booking_date = transfer_booking.booking_date
+            origin_booking_date = transfer_booking.booking_date
         else:
             raise ValueError("Der Guthaben-OP hat keine unterstützte Herkunft.")
         if company.company_id != str(company_id):
             raise ValueError("Der Guthaben-OP gehört nicht zum geöffneten Mandanten.")
+        if origin_booking_date is None:
+            source_booking = (
+                self._session.query(Buchung, Wirtschaftsjahr)
+                .join(Wirtschaftsjahr, Buchung.wirtschaftsjahr_id == Wirtschaftsjahr.id)
+                .filter(
+                    Buchung.booking_id == source_booking_id,
+                    Wirtschaftsjahr.mandant_id == company.id,
+                )
+                .one_or_none()
+            )
+            if source_booking is None:
+                raise ValueError("Die Buchung zur Guthabenentstehung fehlt oder gehört zu einem anderen Mandanten.")
+            source_booking_model, _source_year = source_booking
+            origin_booking_date = source_booking_model.booking_date
         partner = (
             self._session.query(Geschaeftspartner)
             .filter(
@@ -251,14 +270,11 @@ class OpenItemOffsetRepository:
         )
         if not partner_role:
             raise ValueError("Der Geschäftspartner gehört nicht zum Mandanten oder hat nicht die passende Rolle.")
-        event_total = (
-            self._session.query(func.sum(GuthabenOPEreignis.amount_delta))
-            .filter(GuthabenOPEreignis.open_item_id == str(open_item_id))
-            .scalar()
+        available_amount = available_credit_amount(
+            self._session,
+            open_item_id=open_item_id,
+            original_amount=open_item.amount,
         )
-        available_amount = open_item.amount + (event_total or ZERO)
-        if available_amount < ZERO:
-            raise ValueError("Die Guthaben-OP-Ereignisse reduzieren den Ursprungsbetrag unter null.")
         account_number = self._source_account_number(
             mandant_id=company.id,
             booking_id=source_booking_id,
@@ -285,7 +301,31 @@ class OpenItemOffsetRepository:
             available_amount=available_amount,
             account_number=account_number,
             cancellation_booking_date=cancellation_booking_date,
+            origin_booking_date=origin_booking_date,
         )
+
+    def reserve_credit_mutation(self) -> None:
+        """Reserviert unter SQLite Schreibzugriff vor OP-Leseprüfungen."""
+        connection = self._session.connection()
+        if connection.dialect.name != "sqlite":
+            return
+        driver_connection = connection.connection.driver_connection
+        transaction = self._session.get_transaction()
+        if self._session.info.get("_sqlite_credit_mutation_transaction") is transaction:
+            return
+        if driver_connection.in_transaction:
+            raise DatabaseLockError(
+                "Die SQLite-Sitzung hat bereits eine Datenbanktransaktion begonnen. "
+                "Die Guthabenänderung wurde abgebrochen; bitte erneut versuchen."
+            )
+        try:
+            connection.exec_driver_sql("BEGIN IMMEDIATE")
+        except OperationalError as exc:
+            raise DatabaseLockError(
+                "Das Guthaben wird gerade durch einen anderen Vorgang geändert. "
+                "Es wurden keine Änderungen gespeichert; bitte erneut versuchen."
+            ) from exc
+        self._session.info["_sqlite_credit_mutation_transaction"] = transaction
 
     @staticmethod
     def ensure_credit_booking_date(
@@ -396,6 +436,7 @@ class OpenItemOffsetRepository:
     ) -> None:
         if not isinstance(offset, OpenItemOffset):
             raise TypeError("offset must be an OpenItemOffset")
+        self.reserve_credit_mutation()
         company = self._company(offset.company_id)
         fiscal_year_model = (
             self._session.query(Wirtschaftsjahr)

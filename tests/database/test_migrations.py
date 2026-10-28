@@ -9,7 +9,7 @@ from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.exc import IntegrityError
 
 BASELINE_REVISION = "7392d6cc6892"
-HEAD_REVISION = "a6d18f2c94b7"
+HEAD_REVISION = "f2a91c7d5e30"
 
 
 def _alembic_config(
@@ -521,6 +521,9 @@ def test_paid_invoice_cancellation_schema_backfills_and_checks_origins(
                 ('source-2', '2026-01-11', 'REGULAR', None),
                 ('reversal-2', '2026-02-11', 'REVERSAL', 'source-2'),
                 ('credit-booking', '2026-01-12', 'REGULAR', None),
+                ('refund-booking-1', '2026-03-01', 'REGULAR', None),
+                ('refund-booking-2', '2026-03-02', 'REGULAR', None),
+                ('refund-booking-3', '2026-03-03', 'REGULAR', None),
             ):
                 connection.execute(text(
                     "INSERT INTO buchungen "
@@ -615,6 +618,22 @@ def test_paid_invoice_cancellation_schema_backfills_and_checks_origins(
                 "WHERE invoice_cancellation_id='storno-old'"
             )).scalar_one() == 1
 
+            connection.execute(text(
+                "INSERT INTO guthaben_op_rueckerstattungen "
+                "(refund_id, mandant_id, partner_id, open_item_id, direction, "
+                "amount, refund_date, booking_id, recorded_at) VALUES "
+                "('refund-credit-note', 1, 'partner-1', 'credit-op-1', "
+                "'CUSTOMER', 5.00, '2026-03-01', 'refund-booking-1', "
+                "'2026-03-01 10:00:00+00:00'), "
+                "('refund-cancellation', 1, 'partner-1', 'storno-credit-op', "
+                "'CUSTOMER', 10.00, '2026-03-02', 'refund-booking-2', "
+                "'2026-03-02 10:00:00+00:00')"
+            ))
+            assert connection.execute(text(
+                "SELECT count(*) FROM guthaben_op_rueckerstattungen "
+                "WHERE open_item_id='credit-op-1'"
+            )).scalar_one() == 1
+
         with pytest.raises(IntegrityError):
             with engine.begin() as connection:
                 connection.execute(text(
@@ -630,6 +649,39 @@ def test_paid_invoice_cancellation_schema_backfills_and_checks_origins(
                     "VALUES ('no-source', NULL, NULL, 10.00)"
                 ))
 
+        with pytest.raises(IntegrityError):
+            with engine.begin() as connection:
+                connection.execute(text(
+                    "INSERT INTO guthaben_op_rueckerstattungen "
+                    "(refund_id, mandant_id, partner_id, open_item_id, direction, "
+                    "amount, refund_date, booking_id, recorded_at) VALUES "
+                    "('refund-invalid-direction', 1, 'partner-1', 'credit-op-1', "
+                    "'INVALID', 1.00, '2026-03-03', 'refund-booking-3', "
+                    "'2026-03-03 10:00:00+00:00')"
+                ))
+
+        with pytest.raises(IntegrityError):
+            with engine.begin() as connection:
+                connection.execute(text(
+                    "INSERT INTO guthaben_op_rueckerstattungen "
+                    "(refund_id, mandant_id, partner_id, open_item_id, direction, "
+                    "amount, refund_date, booking_id, recorded_at) VALUES "
+                    "('refund-invalid-amount', 1, 'partner-1', 'credit-op-1', "
+                    "'CUSTOMER', 0.00, '2026-03-03', 'refund-booking-3', "
+                    "'2026-03-03 10:00:00+00:00')"
+                ))
+
+        with pytest.raises(IntegrityError):
+            with engine.begin() as connection:
+                connection.execute(text(
+                    "INSERT INTO guthaben_op_rueckerstattungen "
+                    "(refund_id, mandant_id, partner_id, open_item_id, direction, "
+                    "amount, refund_date, booking_id, recorded_at) VALUES "
+                    "('refund-invalid-partner', 1, 'foreign-partner', 'credit-op-1', "
+                    "'CUSTOMER', 1.00, '2026-03-03', 'refund-booking-3', "
+                    "'2026-03-03 10:00:00+00:00')"
+                ))
+
         inspector = inspect(engine)
         storno_columns = {
             column["name"]
@@ -641,6 +693,63 @@ def test_paid_invoice_cancellation_schema_backfills_and_checks_origins(
             and fk["referred_table"] == "rechnungs_op_stornos"
             for fk in inspector.get_foreign_keys("guthaben_ops")
         )
+        refund_columns = {
+            column["name"]
+            for column in inspector.get_columns(
+                "guthaben_op_rueckerstattungen"
+            )
+        }
+        assert refund_columns == {
+            "id",
+            "refund_id",
+            "mandant_id",
+            "partner_id",
+            "open_item_id",
+            "direction",
+            "amount",
+            "refund_date",
+            "booking_id",
+            "recorded_at",
+        }
+        refund_foreign_keys = inspector.get_foreign_keys(
+            "guthaben_op_rueckerstattungen"
+        )
+        assert any(
+            fk["constrained_columns"] == ["mandant_id", "partner_id"]
+            and fk["referred_table"] == "geschaeftspartner"
+            and fk["referred_columns"] == ["mandant_id", "partner_id"]
+            for fk in refund_foreign_keys
+        )
+        assert any(
+            fk["constrained_columns"] == ["open_item_id"]
+            and fk["referred_table"] == "guthaben_ops"
+            for fk in refund_foreign_keys
+        )
+        assert any(
+            fk["constrained_columns"] == ["booking_id"]
+            and fk["referred_table"] == "buchungen"
+            for fk in refund_foreign_keys
+        )
+        refund_uniques = inspector.get_unique_constraints(
+            "guthaben_op_rueckerstattungen"
+        )
+        assert {tuple(item["column_names"]) for item in refund_uniques} == {
+            ("refund_id",),
+            ("booking_id",),
+        }
+        refund_checks = inspector.get_check_constraints(
+            "guthaben_op_rueckerstattungen"
+        )
+        assert {item["name"] for item in refund_checks} == {
+            "ck_guthaben_op_refund_richtung",
+            "ck_guthaben_op_refund_betrag_positiv",
+        }
+        assert {
+            item["name"]
+            for item in inspector.get_indexes(
+                "guthaben_op_rueckerstattungen"
+            )
+        } >= {"ix_guthaben_op_refund_open_item"}
         assert _current_revision(database_path) == HEAD_REVISION
         assert _foreign_key_check(database_path) == []
     finally:

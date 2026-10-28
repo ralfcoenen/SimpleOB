@@ -54,6 +54,9 @@ from simpleob.database.fixed_asset_repository import FixedAssetRepository
 from simpleob.database.migration_service import (
     DatabaseMigrationService,
 )
+from simpleob.database.open_item_credit_refund_repository import (
+    OpenItemCreditRefundRepository,
+)
 from simpleob.database.open_item_invoice_cancellation_repository import (
     OpenItemInvoiceCancellationRepository,
 )
@@ -132,6 +135,9 @@ from simpleob.services.fixed_asset_disposal_workflow import (
 )
 from simpleob.services.fixed_asset_schedule_service import (
     FixedAssetScheduleService,
+)
+from simpleob.services.open_item_credit_refund_service import (
+    OpenItemCreditRefundService,
 )
 from simpleob.services.open_item_invoice_cancellation_service import (
     OpenItemInvoiceCancellationService,
@@ -543,9 +549,19 @@ def main() -> None:
                 booking_repository=booking_repository,
             )
         )
+        open_item_offset_repository = OpenItemOffsetRepository(session)
         open_item_offset_service = OpenItemOffsetService(
             booking_repository=booking_repository,
-            offset_repository=OpenItemOffsetRepository(session),
+            offset_repository=open_item_offset_repository,
+        )
+        open_item_credit_refund_service = OpenItemCreditRefundService(
+            booking_repository=booking_repository,
+            refund_repository=OpenItemCreditRefundRepository(
+                session,
+                offset_repository=open_item_offset_repository,
+            ),
+            offset_repository=open_item_offset_repository,
+            chart_of_accounts_repository=chart_of_accounts_repository,
         )
         payment_allocation_correction_service = PaymentAllocationCorrectionService(
             booking_repository=booking_repository,
@@ -1067,6 +1083,7 @@ def main() -> None:
                 open_item_overview_service=open_item_overview_service,
                 open_item_invoice_cancellation_service=open_item_invoice_cancellation_service,
                 open_item_offset_service=open_item_offset_service,
+                open_item_credit_refund_service=open_item_credit_refund_service,
                 payment_allocation_correction_service=payment_allocation_correction_service,
                 eric_certificate_path=(
                     config.eric_certificate_path

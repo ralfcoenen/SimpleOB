@@ -53,6 +53,7 @@ class OpenItemDetailDialog(QDialog):
         form.addRow("Ursprungsbetrag", QLabel(f"{_money(displayed_item.original_amount)} €"))
         form.addRow("Zahlungen netto", QLabel(f"{_money(displayed_item.payments_amount)} €"))
         form.addRow("Verrechnet", QLabel(f"{_money(displayed_item.offsets_amount)} €"))
+        form.addRow("Rückerstattet", QLabel(f"{_money(displayed_item.refunds_amount)} €"))
         form.addRow("Aktuell offen", QLabel(f"{_money(displayed_item.open_amount)} €"))
 
         self._activity_table = QTableWidget(0, 6)

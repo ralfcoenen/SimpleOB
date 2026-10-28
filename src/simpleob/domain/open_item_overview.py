@@ -29,6 +29,7 @@ class OpenItemActivityKind(StrEnum):
     OFFSET = "OFFSET"
     PAYMENT_CORRECTION = "PAYMENT_CORRECTION"
     INVOICE_CANCELLATION = "INVOICE_CANCELLATION"
+    REFUND = "REFUND"
 
     @property
     def label(self) -> str:
@@ -40,6 +41,7 @@ class OpenItemActivityKind(StrEnum):
                 "Korrektur der Zahlungszuordnung"
             ),
             OpenItemActivityKind.INVOICE_CANCELLATION: "Rechnungsstorno",
+            OpenItemActivityKind.REFUND: "Rückerstattung",
         }[self]
 
 
@@ -65,6 +67,7 @@ class OpenItemOverviewItem:
     offsets_amount: Decimal
     open_amount: Decimal
     source_booking_id: str
+    refunds_amount: Decimal = Decimal("0.00")
 
 
 @dataclass(frozen=True, slots=True)

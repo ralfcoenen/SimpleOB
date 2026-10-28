@@ -16,6 +16,7 @@ from simpleob.database.models import (
     ForderungsOP,
     GuthabenOP,
     GuthabenOPEreignis,
+    GuthabenOPRueckerstattung,
     Gutschrift,
     Kontenrolle,
     Konto,
@@ -212,6 +213,20 @@ class OpenItemReconciliationRepository:
         ):
             if booking.booking_date <= as_of_date and event.open_item_id in item_state:
                 item_state[event.open_item_id]["balance"] += event.amount_delta
+        for refund, booking in (
+            self._session.query(GuthabenOPRueckerstattung, Buchung)
+            .join(Buchung, GuthabenOPRueckerstattung.booking_id == Buchung.booking_id)
+            .join(Wirtschaftsjahr, Buchung.wirtschaftsjahr_id == Wirtschaftsjahr.id)
+            .filter(
+                GuthabenOPRueckerstattung.mandant_id == company.id,
+                Wirtschaftsjahr.mandant_id == company.id,
+            )
+            .all()
+        ):
+            known_booking_ids.add(booking.booking_id)
+            state = item_state.get(refund.open_item_id)
+            if booking.booking_date <= as_of_date and state is not None:
+                state["balance"] -= refund.amount
         for event, correction in (
             self._session.query(Zahlungszuordnungskorrekturereignis, Zahlungszuordnungskorrektur)
             .join(Zahlungszuordnungskorrektur, Zahlungszuordnungskorrekturereignis.correction_id == Zahlungszuordnungskorrektur.correction_id)

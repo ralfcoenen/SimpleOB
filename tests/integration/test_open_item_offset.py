@@ -1,7 +1,10 @@
 """Integrationstests für manuelle Verrechnung von Guthaben- und Rechnungs-OPs."""
 
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 from decimal import Decimal
+from pathlib import Path
+from threading import Barrier
 from uuid import UUID, uuid4
 
 import pytest
@@ -14,11 +17,13 @@ from simpleob.database.chart_of_accounts_repository import ChartOfAccountsReposi
 from simpleob.database.company_repository import CompanyRepository
 from simpleob.database.credit_note_repository import CreditNoteRepository
 from simpleob.database.database import Base
+from simpleob.database.lock_error import DatabaseLockError
 from simpleob.database.models import (
     Buchung,
     ForderungsOP,
     GuthabenOP,
     GuthabenOPEreignis,
+    GuthabenOPRueckerstattung,
     Gutschrift,
     Kontenrolle,
     Konto,
@@ -27,6 +32,12 @@ from simpleob.database.models import (
     RechnungsOPVerrechnungsereignis,
     VerbindlichkeitsOP,
     Wirtschaftsjahr,
+)
+from simpleob.database.open_item_credit_refund_repository import (
+    OpenItemCreditRefundRepository,
+)
+from simpleob.database.open_item_invoice_cancellation_repository import (
+    OpenItemInvoiceCancellationRepository,
 )
 from simpleob.database.open_item_offset_repository import OpenItemOffsetRepository
 from simpleob.database.open_item_payment_repository import OpenItemPaymentRepository
@@ -44,6 +55,12 @@ from simpleob.domain.open_item_payment import PaymentDirection
 from simpleob.domain.vat_accounts import VatAccounts
 from simpleob.domain.vat_booking_item import VatBookingItem
 from simpleob.services.credit_note_posting_service import CreditNotePostingService
+from simpleob.services.open_item_credit_refund_service import (
+    OpenItemCreditRefundService,
+)
+from simpleob.services.open_item_invoice_cancellation_service import (
+    OpenItemInvoiceCancellationService,
+)
 from simpleob.services.open_item_offset_service import OpenItemOffsetService
 from simpleob.services.open_item_payment_service import OpenItemPaymentService
 from simpleob.services.payable_invoice_posting_service import (
@@ -57,8 +74,8 @@ FY = FiscalYear(date(2026, 1, 1), date(2026, 12, 31))
 VAT = VatAccounts("1576", "1570", "1776", "1770")
 
 
-def _environment():
-    engine = create_engine("sqlite:///:memory:")
+def _environment(database_url="sqlite:///:memory:"):
+    engine = create_engine(database_url)
 
     @event.listens_for(engine, "connect")
     def enable_foreign_keys(connection, _record):
@@ -74,6 +91,7 @@ def _environment():
     session.query(Wirtschaftsjahr).one().status = FiscalYearStatus.OPEN.value
     accounts = (
         ("1000", "Bank", AccountType.ASSET),
+        ("1010", "Kasse", AccountType.ASSET),
         ("1100", "Forderungen", AccountType.ASSET),
         ("3300", "Verbindlichkeiten", AccountType.LIABILITY),
         ("2400", "Kundenguthaben", AccountType.LIABILITY),
@@ -93,6 +111,7 @@ def _environment():
     )
     roles = (
         ("BANK", "1000"),
+        ("CASH", "1010"),
         ("CUSTOMER_RECEIVABLES", "1100"),
         ("SUPPLIER_PAYABLES", "3300"),
         ("CUSTOMER_CREDIT_BALANCES", "2400"),
@@ -153,6 +172,121 @@ def _environment():
         offset_service,
         payment_service,
     )
+
+
+def _refund_service(session):
+    booking_repository = BookingRepository(session)
+    offset_repository = OpenItemOffsetRepository(session)
+    refund_repository = OpenItemCreditRefundRepository(
+        session,
+        offset_repository=offset_repository,
+    )
+    return OpenItemCreditRefundService(
+        booking_repository=booking_repository,
+        refund_repository=refund_repository,
+        offset_repository=offset_repository,
+        chart_of_accounts_repository=ChartOfAccountsRepository(session),
+    )
+
+
+def _post_refund(
+    service,
+    company,
+    partner,
+    direction,
+    credit_id,
+    amount,
+    *,
+    account="1000",
+    booking_date=date(2026, 4, 16),
+    refund_date=date(2026, 4, 15),
+):
+    return service.post_refund(
+        company_id=company.company_id,
+        fiscal_year=FY,
+        partner_id=partner.partner_id,
+        open_item_id=credit_id,
+        direction=direction,
+        amount=Decimal(amount),
+        refund_date=refund_date,
+        booking_date=booking_date,
+        cash_bank_account_number=account,
+    )
+
+
+def _create_storno_credit(
+    session,
+    company,
+    partner,
+    receivable,
+    payable,
+    direction,
+):
+    booking_repository = BookingRepository(session)
+    if direction is OffsetDirection.CUSTOMER:
+        invoice = receivable.post_output_invoice_on_account(
+            company_id=company.company_id,
+            fiscal_year=FY,
+            partner_id=partner.partner_id,
+            invoice_number=f"AR-STORNO-{uuid4().hex[:6]}",
+            booking_date=date(2026, 4, 1),
+            due_date=date(2026, 5, 1),
+            items=(VatBookingItem("4000", Decimal("119.00"), 0),),
+            vat_accounts=VAT,
+        )
+        open_item_id = UUID(session.query(ForderungsOP.open_item_id).filter_by(
+            invoice_id=str(invoice.invoice_id)
+        ).scalar())
+        payment_direction = PaymentDirection.CUSTOMER_RECEIPT
+    else:
+        invoice = payable.post_supplier_invoice_on_account(
+            company_id=company.company_id,
+            fiscal_year=FY,
+            partner_id=partner.partner_id,
+            invoice_number=f"AP-STORNO-{uuid4().hex[:6]}",
+            booking_date=date(2026, 4, 1),
+            due_date=date(2026, 5, 1),
+            items=(VatBookingItem("6100", Decimal("119.00"), 0),),
+            vat_accounts=VAT,
+        )
+        open_item_id = UUID(session.query(VerbindlichkeitsOP.open_item_id).filter_by(
+            invoice_id=str(invoice.invoice_id)
+        ).scalar())
+        payment_direction = PaymentDirection.SUPPLIER_PAYMENT
+    payment_service = OpenItemPaymentService(
+        booking_repository=booking_repository,
+        payment_repository=OpenItemPaymentRepository(session),
+        chart_of_accounts_repository=ChartOfAccountsRepository(session),
+    )
+    payment_service.post_payment(
+        company_id=company.company_id,
+        fiscal_year=FY,
+        partner_id=partner.partner_id,
+        open_item_id=open_item_id,
+        direction=payment_direction,
+        amount=Decimal("20.00"),
+        payment_date=date(2026, 4, 2),
+        booking_date=date(2026, 4, 2),
+        cash_bank_account_number="1000",
+    )
+    cancellation_service = OpenItemInvoiceCancellationService(
+        OpenItemInvoiceCancellationRepository(
+            session=session,
+            booking_repository=booking_repository,
+        )
+    )
+    storno_id = cancellation_service.cancel_invoice(
+        company_id=company.company_id,
+        fiscal_year=FY,
+        open_item_id=open_item_id,
+        booking_date=date(2026, 4, 3),
+        reason="Testguthaben erzeugen",
+        confirmed=True,
+    )
+    credit_id = UUID(session.query(GuthabenOP.open_item_id).filter_by(
+        invoice_cancellation_id=str(storno_id)
+    ).scalar())
+    return credit_id
 
 
 def _create_invoice_and_credit(
@@ -237,6 +371,368 @@ def _post_offset(service, company, partner, direction, invoice_id, credit_id, am
         settlement_date=date(2026, 4, 15),
         booking_date=date(2026, 4, 16),
     )
+
+
+@pytest.mark.parametrize(
+    ("direction", "account", "control_account", "control_side", "cash_side"),
+    [
+        (OffsetDirection.CUSTOMER, "1000", "2400", EntrySide.DEBIT, EntrySide.CREDIT),
+        (OffsetDirection.CUSTOMER, "1010", "2400", EntrySide.DEBIT, EntrySide.CREDIT),
+        (OffsetDirection.SUPPLIER, "1000", "1300", EntrySide.CREDIT, EntrySide.DEBIT),
+        (OffsetDirection.SUPPLIER, "1010", "1300", EntrySide.CREDIT, EntrySide.DEBIT),
+    ],
+)
+def test_credit_refunds_use_origin_control_account_and_configured_bank_or_cash(
+    direction, account, control_account, control_side, cash_side
+):
+    (
+        engine,
+        session,
+        company,
+        partner,
+        receivable,
+        payable,
+        credit_service,
+        offsets,
+        _payments,
+    ) = _environment()
+    try:
+        _invoice, _credit_note, _invoice_id, credit_id = _create_invoice_and_credit(
+            session,
+            company,
+            partner,
+            receivable,
+            payable,
+            credit_service,
+            direction,
+        )
+        refund = _post_refund(
+            _refund_service(session),
+            company,
+            partner,
+            direction,
+            credit_id,
+            "119.00",
+            account=account,
+        )
+        booking = session.query(Buchung).filter_by(
+            booking_id=str(refund.booking_id)
+        ).one()
+        lines = {line.account_number: line for line in booking.zeilen}
+        assert lines[control_account].side == control_side.value
+        assert lines[account].side == cash_side.value
+        assert lines[control_account].amount == lines[account].amount == Decimal("119.00")
+        assert refund.refund_date == date(2026, 4, 15)
+        assert session.query(GuthabenOPRueckerstattung).count() == 1
+        assert session.query(GuthabenOPEreignis).count() == 0
+        assert offsets._offset_repository.get_credit(
+            company_id=company.company_id,
+            partner_id=partner.partner_id,
+            open_item_id=credit_id,
+            direction=direction,
+        ).available_amount == ZERO
+        assert CreditNoteRepository(session).get_open_amount(credit_id) == ZERO
+    finally:
+        session.close()
+        engine.dispose()
+
+
+def test_credit_refund_partial_repeated_and_full_reduces_credit_once():
+    (
+        engine,
+        session,
+        company,
+        partner,
+        receivable,
+        payable,
+        credit_service,
+        offsets,
+        _payments,
+    ) = _environment()
+    try:
+        _invoice, _note, _invoice_id, credit_id = _create_invoice_and_credit(
+            session,
+            company,
+            partner,
+            receivable,
+            payable,
+            credit_service,
+            OffsetDirection.CUSTOMER,
+        )
+        service = _refund_service(session)
+        _post_refund(service, company, partner, OffsetDirection.CUSTOMER, credit_id, "30.00")
+        assert offsets._offset_repository.get_credit(
+            company_id=company.company_id,
+            partner_id=partner.partner_id,
+            open_item_id=credit_id,
+            direction=OffsetDirection.CUSTOMER,
+        ).available_amount == Decimal("89.00")
+        _post_refund(service, company, partner, OffsetDirection.CUSTOMER, credit_id, "40.00")
+        assert CreditNoteRepository(session).get_open_amount(credit_id) == Decimal("49.00")
+        _post_refund(service, company, partner, OffsetDirection.CUSTOMER, credit_id, "49.00")
+        assert CreditNoteRepository(session).get_open_amount(credit_id) == ZERO
+        assert session.query(GuthabenOPRueckerstattung).count() == 3
+        assert session.query(GuthabenOPEreignis).count() == 0
+    finally:
+        session.close()
+        engine.dispose()
+
+
+@pytest.mark.parametrize("direction", [OffsetDirection.CUSTOMER, OffsetDirection.SUPPLIER])
+def test_storno_based_credit_refund_uses_credit_transfer_date(direction):
+    (
+        engine,
+        session,
+        company,
+        partner,
+        receivable,
+        payable,
+        _credit_service,
+        offsets,
+        _payments,
+    ) = _environment()
+    try:
+        credit_id = _create_storno_credit(
+            session, company, partner, receivable, payable, direction
+        )
+        service = _refund_service(session)
+        before_booking_count = session.query(Buchung).count()
+        with pytest.raises(ValueError, match="nicht vor dem Entstehungsdatum"):
+            _post_refund(
+                service,
+                company,
+                partner,
+                direction,
+                credit_id,
+                "1.00",
+                booking_date=date(2026, 4, 2),
+            )
+        assert session.query(Buchung).count() == before_booking_count
+        assert session.query(GuthabenOPRueckerstattung).count() == 0
+        _post_refund(
+            service,
+            company,
+            partner,
+            direction,
+            credit_id,
+            "20.00",
+            booking_date=date(2026, 4, 3),
+        )
+        assert offsets._offset_repository.get_credit(
+            company_id=company.company_id,
+            partner_id=partner.partner_id,
+            open_item_id=credit_id,
+            direction=direction,
+        ).available_amount == ZERO
+    finally:
+        session.close()
+        engine.dispose()
+
+
+def test_credit_refund_rejects_overrefund_and_rolls_back_partial_booking(monkeypatch):
+    (
+        engine,
+        session,
+        company,
+        partner,
+        receivable,
+        payable,
+        credit_service,
+        _offsets,
+        _payments,
+    ) = _environment()
+    try:
+        _invoice, _note, _invoice_id, credit_id = _create_invoice_and_credit(
+            session,
+            company,
+            partner,
+            receivable,
+            payable,
+            credit_service,
+            OffsetDirection.CUSTOMER,
+        )
+        service = _refund_service(session)
+        before = session.query(Buchung).count()
+        with pytest.raises(ValueError, match="übersteigt das verfügbare Guthaben"):
+            _post_refund(
+                service,
+                company,
+                partner,
+                OffsetDirection.CUSTOMER,
+                credit_id,
+                "119.01",
+            )
+        assert session.query(Buchung).count() == before
+        assert session.query(GuthabenOPRueckerstattung).count() == 0
+
+        def fail_add(**_kwargs):
+            raise RuntimeError("Nebenbuchfehler")
+
+        monkeypatch.setattr(service._refund_repository, "add", fail_add)
+        with pytest.raises(RuntimeError, match="Nebenbuchfehler"):
+            _post_refund(
+                service,
+                company,
+                partner,
+                OffsetDirection.CUSTOMER,
+                credit_id,
+                "10.00",
+            )
+        assert session.query(Buchung).count() == before
+        assert session.query(GuthabenOPRueckerstattung).count() == 0
+    finally:
+        session.close()
+        engine.dispose()
+
+
+def test_regular_credit_refund_cannot_precede_credit_booking_date():
+    (
+        engine,
+        session,
+        company,
+        partner,
+        receivable,
+        payable,
+        credit_service,
+        _offsets,
+        _payments,
+    ) = _environment()
+    try:
+        _invoice, _note, _invoice_id, credit_id = _create_invoice_and_credit(
+            session,
+            company,
+            partner,
+            receivable,
+            payable,
+            credit_service,
+            OffsetDirection.CUSTOMER,
+        )
+        before = session.query(Buchung).count()
+        with pytest.raises(ValueError, match="nicht vor dem Entstehungsdatum"):
+            _post_refund(
+                _refund_service(session),
+                company,
+                partner,
+                OffsetDirection.CUSTOMER,
+                credit_id,
+                "1.00",
+                booking_date=date(2026, 4, 1),
+            )
+        assert session.query(Buchung).count() == before
+        assert session.query(GuthabenOPRueckerstattung).count() == 0
+    finally:
+        session.close()
+        engine.dispose()
+
+
+def test_sqlite_concurrent_offset_and_credit_refund_cannot_overconsume(tmp_path: Path):
+    database_url = f"sqlite:///{tmp_path / 'credit-consumption-race.db'}"
+    (
+        engine,
+        session,
+        company,
+        partner,
+        receivable,
+        payable,
+        credit_service,
+        _offsets,
+        _payments,
+    ) = _environment(database_url)
+    invoice_id = credit_id = None
+    try:
+        _invoice, _note, invoice_id, credit_id = _create_invoice_and_credit(
+            session,
+            company,
+            partner,
+            receivable,
+            payable,
+            credit_service,
+            OffsetDirection.CUSTOMER,
+        )
+    finally:
+        session.close()
+
+    start = Barrier(2)
+
+    def consume(kind):
+        worker_session = Session(engine)
+        try:
+            worker_offsets_repo = OpenItemOffsetRepository(worker_session)
+            booking_repository = BookingRepository(worker_session)
+            start.wait(timeout=5)
+            if kind == "offset":
+                service = OpenItemOffsetService(
+                    booking_repository=booking_repository,
+                    offset_repository=worker_offsets_repo,
+                )
+                return _post_offset(
+                    service,
+                    company,
+                    partner,
+                    OffsetDirection.CUSTOMER,
+                    invoice_id,
+                    credit_id,
+                    "80.00",
+                )
+            return _post_refund(
+                OpenItemCreditRefundService(
+                    booking_repository=booking_repository,
+                    refund_repository=OpenItemCreditRefundRepository(
+                        worker_session,
+                        offset_repository=worker_offsets_repo,
+                    ),
+                    offset_repository=worker_offsets_repo,
+                    chart_of_accounts_repository=ChartOfAccountsRepository(
+                        worker_session
+                    ),
+                ),
+                company,
+                partner,
+                OffsetDirection.CUSTOMER,
+                credit_id,
+                "80.00",
+            )
+        finally:
+            worker_session.close()
+
+    try:
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            futures = [executor.submit(consume, kind) for kind in ("offset", "refund")]
+            outcomes = []
+            for future in futures:
+                try:
+                    outcomes.append(("success", future.result(timeout=10)))
+                except Exception as exc:
+                    outcomes.append(("failure", exc))
+        assert [outcome[0] for outcome in outcomes].count("success") == 1
+        assert [outcome[0] for outcome in outcomes].count("failure") == 1
+        failure = next(outcome[1] for outcome in outcomes if outcome[0] == "failure")
+        assert isinstance(failure, (ValueError, DatabaseLockError))
+
+        check_session = Session(engine)
+        try:
+            remaining = CreditNoteRepository(check_session).get_open_amount(credit_id)
+            assert remaining == Decimal("39.00")
+            assert check_session.query(OPGuthabenverrechnung).count() + check_session.query(
+                GuthabenOPRueckerstattung
+            ).count() == 1
+        finally:
+            check_session.close()
+    finally:
+        engine.dispose()
+
+
+def test_sqlite_credit_reservation_does_not_nest_in_physical_transaction():
+    engine, session, *_rest = _environment()
+    try:
+        connection = session.connection()
+        connection.exec_driver_sql("BEGIN")
+        with pytest.raises(DatabaseLockError, match="bereits eine Datenbanktransaktion"):
+            OpenItemOffsetRepository(session).reserve_credit_mutation()
+    finally:
+        session.rollback()
+        session.close()
+        engine.dispose()
 
 
 @pytest.mark.parametrize(

@@ -37,6 +37,7 @@ class CreditOffsetSummary:
     available_amount: Decimal
     account_number: str
     cancellation_booking_date: date | None = None
+    origin_booking_date: date | None = None
 
 
 @dataclass(frozen=True, slots=True)
