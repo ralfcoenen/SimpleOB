@@ -295,6 +295,44 @@ def test_detail_dialog_is_read_only_and_shows_existing_event_history(monkeypatch
     app.processEvents()
 
 
+def test_detail_history_keeps_long_text_and_scrolls_when_narrow():
+    app = QApplication.instance() or QApplication([])
+    company_id, items, service = _environment()
+    item = items[0]
+    detail = service.details[item.open_item_id]
+    long_reference = "Zahlungszuordnung · " + "Rechnungsreferenz " * 12
+    long_note = "Hinweis zur Zahlung: " + "vollständiger Erläuterungstext " * 12
+    service.details[item.open_item_id] = replace(
+        detail,
+        activities=(
+            replace(
+                detail.activities[0],
+                reference=long_reference,
+                description=long_note,
+            ),
+            *detail.activities[1:],
+        ),
+    )
+
+    dialog = OpenItemDetailDialog(
+        None, company_id=company_id, item=item, service=service
+    )
+    reference_cell = dialog._activity_table.item(0, 4)
+    note_cell = dialog._activity_table.item(0, 5)
+    assert reference_cell.text() == long_reference
+    assert reference_cell.toolTip() == long_reference
+    assert note_cell.text() == long_note
+    assert note_cell.toolTip() == long_note
+    assert not dialog._activity_table.wordWrap()
+
+    dialog.resize(700, 600)
+    dialog.show()
+    app.processEvents()
+    assert dialog._activity_table.horizontalScrollBar().maximum() > 0
+    dialog.close()
+    app.processEvents()
+
+
 def test_refund_amount_is_separate_from_offsets_in_summary_and_detail():
     app = QApplication.instance() or QApplication([])
     company_id, items, service = _environment()

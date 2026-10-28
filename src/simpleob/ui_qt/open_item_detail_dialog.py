@@ -4,6 +4,7 @@ from datetime import date
 from decimal import Decimal
 from uuid import UUID
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -74,12 +75,18 @@ class OpenItemDetailDialog(QDialog):
         self._activity_table.setSelectionBehavior(
             QTableWidget.SelectionBehavior.SelectRows
         )
+        self._activity_table.setWordWrap(False)
+        self._activity_table.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAsNeeded
+        )
         header = self._activity_table.horizontalHeader()
+        header.setMinimumSectionSize(90)
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.Interactive)
+        header.resizeSection(4, 240)
         header.setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)
         activities = detail.activities if detail is not None else ()
         self._activity_table.setRowCount(len(activities))
