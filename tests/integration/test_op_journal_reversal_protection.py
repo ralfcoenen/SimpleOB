@@ -1,6 +1,6 @@
 """Schützt OP-Ursprungsbuchungen vor isoliertem Journalstorno."""
 
-from datetime import date
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from uuid import uuid4
 
@@ -18,6 +18,7 @@ from simpleob.database.models import (
     ForderungsOP,
     GuthabenOP,
     GuthabenOPEreignis,
+    GuthabenOPRueckerstattung,
     Gutschrift,
     Mandant,
     OPGuthabenverrechnung,
@@ -222,6 +223,123 @@ def test_ordinary_booking_can_still_be_reversed():
         )
 
         assert session.query(BookingModel).count() == 2
+    finally:
+        session.close()
+        engine.dispose()
+
+
+@pytest.mark.parametrize(
+    ("direction", "credit_note_kind", "refund_sides"),
+    [
+        ("CUSTOMER", "CUSTOMER", (EntrySide.DEBIT, EntrySide.CREDIT)),
+        ("SUPPLIER", "SUPPLIER", (EntrySide.CREDIT, EntrySide.DEBIT)),
+    ],
+    ids=("customer-refund", "supplier-refund"),
+)
+def test_journal_reversal_of_customer_and_supplier_refunds_is_rejected(
+    direction, credit_note_kind, refund_sides
+):
+    engine, session, company, mandate, partner = _environment()
+    try:
+        repository = BookingRepository(session)
+        credit_note_booking = Booking(
+            booking_date=date(2026, 3, 2),
+            description="Ursprungsgutschrift",
+            lines=(
+                BookingLine("8400", EntrySide.DEBIT, AMOUNT),
+                BookingLine("2210", EntrySide.CREDIT, AMOUNT),
+            ),
+        )
+        repository.add(
+            company_id=company.company_id,
+            fiscal_year=FY,
+            booking=credit_note_booking,
+        )
+        credit_note = Gutschrift(
+            credit_note_id=str(uuid4()),
+            mandant_id=mandate.id,
+            partner_id=str(partner.partner_id),
+            credit_note_kind=credit_note_kind,
+            note_number=f"GS-{direction}",
+            note_date=date(2026, 3, 2),
+            booking_id=str(credit_note_booking.booking_id),
+        )
+        open_item = GuthabenOP(
+            open_item_id=str(uuid4()),
+            credit_note_id=credit_note.credit_note_id,
+            amount=AMOUNT,
+        )
+        session.add(credit_note)
+        session.flush()
+        session.add(open_item)
+        session.commit()
+
+        control_side, cash_side = refund_sides
+        refund_booking = Booking(
+            booking_date=date(2026, 3, 3),
+            description=f"{direction} Guthabenrückerstattung",
+            lines=(
+                BookingLine("2210", control_side, AMOUNT),
+                BookingLine("1000", cash_side, AMOUNT),
+            ),
+        )
+        repository.add(
+            company_id=company.company_id,
+            fiscal_year=FY,
+            booking=refund_booking,
+        )
+        session.add(
+            GuthabenOPRueckerstattung(
+                refund_id=str(uuid4()),
+                mandant_id=mandate.id,
+                partner_id=str(partner.partner_id),
+                open_item_id=open_item.open_item_id,
+                direction=direction,
+                amount=AMOUNT,
+                refund_date=date(2026, 3, 3),
+                booking_id=str(refund_booking.booking_id),
+                recorded_at=datetime.now(timezone.utc),
+            )
+        )
+        session.commit()
+
+        reversal = Booking(
+            booking_date=date(2026, 3, 4),
+            description="Unzulässiges Journalstorno der Rückerstattung",
+            booking_type=BookingType.REVERSAL,
+            reversal_of_booking_id=refund_booking.booking_id,
+            lines=(
+                BookingLine(
+                    "2210",
+                    EntrySide.CREDIT
+                    if control_side is EntrySide.DEBIT
+                    else EntrySide.DEBIT,
+                    AMOUNT,
+                ),
+                BookingLine(
+                    "1000",
+                    EntrySide.CREDIT
+                    if cash_side is EntrySide.DEBIT
+                    else EntrySide.DEBIT,
+                    AMOUNT,
+                ),
+            ),
+        )
+        with pytest.raises(ValueError, match=STORNO_ERROR):
+            repository.add(
+                company_id=company.company_id,
+                fiscal_year=FY,
+                booking=reversal,
+            )
+
+        session.expire_all()
+        assert session.query(BookingModel).count() == 2
+        assert session.query(BookingModel).filter(
+            BookingModel.reversal_of_booking_id == str(refund_booking.booking_id)
+        ).count() == 0
+        assert session.query(GuthabenOPRueckerstattung).count() == 1
+        assert session.query(GuthabenOP).one().amount == AMOUNT
+        assert session.query(GuthabenOPEreignis).count() == 0
     finally:
         session.close()
         engine.dispose()

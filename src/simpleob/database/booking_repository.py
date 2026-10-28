@@ -13,6 +13,7 @@ from simpleob.database.models import (
     Buchung,
     Buchungszeile,
     Eingangsrechnung,
+    GuthabenOPRueckerstattung,
     Gutschrift,
     Mandant,
     Wirtschaftsjahr,
@@ -25,10 +26,11 @@ from simpleob.domain.fiscal_year import FiscalYear
 from simpleob.domain.fiscal_year_status import FiscalYearStatus
 
 _OPEN_ITEM_REVERSAL_MESSAGE = (
-    "Diese Buchung gehört zu einem OP-Beleg. Für Kunden- und "
-    "Lieferantenrechnungen sowie Kunden- und Lieferantengutschriften "
-    "ist eine spezielle OP-Stornierung erforderlich; diese Funktion "
-    "wird in einer späteren Stufe implementiert."
+    "Diese Buchung gehört zu einem OP-Vorgang und kann nicht isoliert im "
+    "Journal storniert werden. Für Kunden- und Lieferantenrechnungen sowie "
+    "Kunden- und Lieferantengutschriften ist eine spezielle OP-Stornierung "
+    "erforderlich. Für Guthabenrückerstattungen ist derzeit keine "
+    "OP-Rücknahmefunktion verfügbar."
 )
 
 
@@ -216,6 +218,17 @@ class BookingRepository:
             )
             if document is not None:
                 raise ValueError(_OPEN_ITEM_REVERSAL_MESSAGE)
+
+        refund = (
+            self._session.query(GuthabenOPRueckerstattung.id)
+            .filter(
+                GuthabenOPRueckerstattung.mandant_id == mandant_id,
+                GuthabenOPRueckerstattung.booking_id == booking_id,
+            )
+            .one_or_none()
+        )
+        if refund is not None:
+            raise ValueError(_OPEN_ITEM_REVERSAL_MESSAGE)
 
     def commit(self) -> None:
         """Bestätigt die aktuelle Datenbanktransaktion."""
