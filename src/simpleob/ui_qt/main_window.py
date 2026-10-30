@@ -362,47 +362,8 @@ class MainWindow(QMainWindow):
         layout.addWidget(fiscal_year_label)
 
         administration_layout = QHBoxLayout()
-
-        self._company_master_data_button = QPushButton(
-            "Unternehmensstammdaten"
-        )
-        self._company_master_data_button.clicked.connect(
-            self._open_company_master_data
-        )
-        administration_layout.addWidget(
-            self._company_master_data_button
-        )
-
-        self._shareholders_button = QPushButton(
-            "Gesellschafter"
-        )
-        self._shareholders_button.clicked.connect(
-            self._open_shareholders
-        )
-        administration_layout.addWidget(
-            self._shareholders_button
-        )
-
-        self._account_configuration_button = QPushButton(
-            "Kontenkonfiguration"
-        )
-        self._account_configuration_button.clicked.connect(
-            self._open_account_configuration
-        )
-        administration_layout.addWidget(
-            self._account_configuration_button
-        )
-        self._export_company_button = QPushButton(
-            "Mandant exportieren …"
-        )
-        self._export_company_button.setEnabled(
-            self._export_client_transfer is not None
-        )
-        self._export_company_button.clicked.connect(
-            self._export_company
-        )
-        administration_layout.addWidget(
-            self._export_company_button
+        self._create_administration_controls(
+            administration_layout
         )
         self._return_to_start_button = QPushButton(
             "Buchhaltung wechseln"
@@ -531,6 +492,51 @@ class MainWindow(QMainWindow):
         self._notebook.currentChanged.connect(
             self._reload_bookkeeping_data
         )
+
+    def _create_administration_controls(
+        self,
+        layout: QHBoxLayout,
+    ) -> None:
+        """Gruppiert die vorhandenen Mandantenfunktionen in einem Menü."""
+
+        self._administration_menu = QMenu("Verwaltung", self)
+        self._company_master_data_button = (
+            self._administration_menu.addAction(
+                "Unternehmensstammdaten…"
+            )
+        )
+        self._company_master_data_button.triggered.connect(
+            self._open_company_master_data
+        )
+        self._shareholders_button = self._administration_menu.addAction(
+            "Gesellschafter…"
+        )
+        self._shareholders_button.triggered.connect(
+            self._open_shareholders
+        )
+        self._administration_menu.addSeparator()
+        self._account_configuration_button = (
+            self._administration_menu.addAction(
+                "Kontenkonfiguration…"
+            )
+        )
+        self._account_configuration_button.triggered.connect(
+            self._open_account_configuration
+        )
+        self._administration_menu.addSeparator()
+        self._export_company_button = self._administration_menu.addAction(
+            "Mandant exportieren…"
+        )
+        self._export_company_button.setEnabled(
+            self._export_client_transfer is not None
+        )
+        self._export_company_button.triggered.connect(
+            self._export_company
+        )
+
+        self._administration_button = QPushButton("Verwaltung")
+        self._administration_button.setMenu(self._administration_menu)
+        layout.addWidget(self._administration_button)
 
     def _refresh_after_open_item_cancellation(self) -> None:
         """Aktualisiert Hauptbuchanzeigen nach einem OP-Rechnungsstorno."""
