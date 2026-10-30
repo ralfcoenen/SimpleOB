@@ -1,5 +1,6 @@
 """PySide6-Dialog zur mandantenspezifischen Kontenkonfiguration."""
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -11,6 +12,7 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QMessageBox,
     QPushButton,
+    QSizePolicy,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -54,6 +56,20 @@ class AccountConfigurationDialog(QDialog):
         self._control_accounts = control_accounts
         self._vat_accounts = vat_accounts
         self._account_roles = account_roles
+        self._role_definitions = (
+            ("Kasse", "cash_accounts"),
+            ("Bank", "bank_accounts"),
+            ("Umsatzerlöse allgemeiner Steuersatz", "general_rate_sales_accounts"),
+            ("Kundenforderungen", "customer_receivables"),
+            ("Lieferantenverbindlichkeiten", "supplier_payables"),
+            ("Kundenguthaben", "customer_credit_balances"),
+            ("Lieferantenguthaben", "supplier_credit_balances"),
+        )
+        self._role_assignments = {
+            field_name: set(getattr(account_roles, field_name))
+            for _label, field_name in self._role_definitions
+        }
+        self._current_role_key: str | None = None
 
         self.result: (
             tuple[
@@ -264,7 +280,7 @@ class AccountConfigurationDialog(QDialog):
         self,
         parent: QWidget,
     ) -> None:
-        """Erzeugt die Mehrfachauswahl für funktionale Kontenrollen."""
+        """Erzeugt die zweigeteilte Auswahl funktionaler Kontenrollen."""
 
         layout = QVBoxLayout(parent)
 
@@ -275,41 +291,124 @@ class AccountConfigurationDialog(QDialog):
         description.setWordWrap(True)
         layout.addWidget(description)
 
-        roles_layout = QHBoxLayout()
-        layout.addLayout(roles_layout)
+        panes = QHBoxLayout()
+        panes.setSpacing(12)
+        layout.addLayout(panes, 1)
 
-        self._cash_list = self._create_role_list(
-            roles_layout,
-            title="Kasse",
+        roles_pane = QWidget()
+        roles_layout = QVBoxLayout(roles_pane)
+        roles_layout.setContentsMargins(0, 0, 0, 0)
+        roles_title = QLabel("Kontenrollen")
+        roles_title.setStyleSheet("font-weight: bold;")
+        roles_layout.addWidget(roles_title)
+        self._role_list = QListWidget()
+        self._role_list.setMinimumWidth(230)
+        self._role_list.setSelectionMode(
+            QAbstractItemView.SelectionMode.SingleSelection
         )
-        self._bank_list = self._create_role_list(
-            roles_layout,
-            title="Bank",
+        for label, field_name in self._role_definitions:
+            item = QListWidgetItem(label)
+            item.setData(Qt.ItemDataRole.UserRole, field_name)
+            self._role_list.addItem(item)
+        self._role_list.currentRowChanged.connect(self._on_role_changed)
+        roles_layout.addWidget(self._role_list, 1)
+        roles_pane.setSizePolicy(
+            QSizePolicy.Policy.Preferred,
+            QSizePolicy.Policy.Expanding,
         )
-        self._general_rate_sales_list = (
-            self._create_role_list(
-                roles_layout,
-                title=(
-                    "Umsatzerlöse allgemeiner Steuersatz"
-                ),
+        panes.addWidget(roles_pane)
+
+        accounts_pane = QWidget()
+        accounts_layout = QVBoxLayout(accounts_pane)
+        accounts_layout.setContentsMargins(0, 0, 0, 0)
+        accounts_title = QLabel("Konten der ausgewählten Rolle")
+        accounts_title.setStyleSheet("font-weight: bold;")
+        accounts_layout.addWidget(accounts_title)
+        self._role_account_list = QListWidget()
+        self._role_account_list.setSelectionMode(
+            QAbstractItemView.SelectionMode.SingleSelection
+        )
+        self._role_account_list.itemChanged.connect(
+            self._on_role_account_changed
+        )
+        accounts_layout.addWidget(self._role_account_list, 1)
+        accounts_pane.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Expanding,
+        )
+        panes.addWidget(accounts_pane, 1)
+
+        self._role_list.setCurrentRow(0)
+
+    def _on_role_changed(self, _row: int) -> None:
+        """Speichert den sichtbaren Entwurf und zeigt die neue Rolle."""
+
+        self._capture_visible_role_assignments()
+        current_item = self._role_list.currentItem()
+        self._current_role_key = (
+            current_item.data(Qt.ItemDataRole.UserRole)
+            if current_item is not None
+            else None
+        )
+        self._populate_role_account_list()
+
+    def _capture_visible_role_assignments(self) -> None:
+        if self._current_role_key is None:
+            return
+        self._role_assignments[self._current_role_key] = {
+            str(
+                self._role_account_list.item(index).data(
+                    Qt.ItemDataRole.UserRole
+                )
             )
-        )
-        self._customer_receivables_list = self._create_role_list(
-            roles_layout,
-            title="Kundenforderungen",
-        )
-        self._supplier_payables_list = self._create_role_list(
-            roles_layout,
-            title="Lieferantenverbindlichkeiten",
-        )
-        self._customer_credit_balances_list = self._create_role_list(
-            roles_layout,
-            title="Kundenguthaben",
-        )
-        self._supplier_credit_balances_list = self._create_role_list(
-            roles_layout,
-            title="Lieferantenguthaben",
-        )
+            for index in range(self._role_account_list.count())
+            if self._role_account_list.item(index).checkState()
+            == Qt.CheckState.Checked
+        }
+
+    def _populate_role_account_list(self) -> None:
+        self._role_account_list.blockSignals(True)
+        try:
+            self._role_account_list.clear()
+            if self._current_role_key is None:
+                return
+            assigned_here = self._role_assignments[self._current_role_key]
+            assigned_elsewhere = {
+                account_number: label
+                for label, field_name in self._role_definitions
+                if field_name != self._current_role_key
+                for account_number in self._role_assignments[field_name]
+            }
+            for account in self._accounts:
+                other_role = assigned_elsewhere.get(account.number)
+                item = QListWidgetItem(str(account))
+                item.setData(Qt.ItemDataRole.UserRole, account.number)
+                if other_role is None:
+                    item.setFlags(
+                        item.flags()
+                        | Qt.ItemFlag.ItemIsUserCheckable
+                        | Qt.ItemFlag.ItemIsEnabled
+                    )
+                    item.setCheckState(
+                        Qt.CheckState.Checked
+                        if account.number in assigned_here
+                        else Qt.CheckState.Unchecked
+                    )
+                else:
+                    item.setFlags(
+                        item.flags()
+                        & ~Qt.ItemFlag.ItemIsUserCheckable
+                        & ~Qt.ItemFlag.ItemIsEnabled
+                    )
+                    item.setToolTip(
+                        f"Dieses Konto ist bereits der Rolle „{other_role}“ zugeordnet."
+                    )
+                self._role_account_list.addItem(item)
+        finally:
+            self._role_account_list.blockSignals(False)
+
+    def _on_role_account_changed(self, _item: QListWidgetItem) -> None:
+        self._capture_visible_role_assignments()
 
     def _create_account_combobox(
         self,
@@ -444,38 +543,6 @@ class AccountConfigurationDialog(QDialog):
             self._vat_accounts.output_tax_19,
         )
 
-        self._select_role_accounts(
-            self._cash_list,
-            self._account_roles.cash_accounts,
-        )
-        self._select_role_accounts(
-            self._bank_list,
-            self._account_roles.bank_accounts,
-        )
-        self._select_role_accounts(
-            self._general_rate_sales_list,
-            (
-                self._account_roles
-                .general_rate_sales_accounts
-            ),
-        )
-        self._select_role_accounts(
-            self._customer_receivables_list,
-            self._account_roles.customer_receivables,
-        )
-        self._select_role_accounts(
-            self._supplier_payables_list,
-            self._account_roles.supplier_payables,
-        )
-        self._select_role_accounts(
-            self._customer_credit_balances_list,
-            self._account_roles.customer_credit_balances,
-        )
-        self._select_role_accounts(
-            self._supplier_credit_balances_list,
-            self._account_roles.supplier_credit_balances,
-        )
-
     @staticmethod
     def _select_account(
         combo_box: QComboBox,
@@ -489,31 +556,6 @@ class AccountConfigurationDialog(QDialog):
             combo_box.setCurrentIndex(index)
         else:
             combo_box.setCurrentIndex(-1)
-
-    @staticmethod
-    def _select_role_accounts(
-        list_widget: QListWidget,
-        account_numbers: frozenset[str],
-    ) -> None:
-        """Markiert die Konten einer vorhandenen Kontenrolle."""
-
-        for index in range(list_widget.count()):
-            item = list_widget.item(index)
-
-            item.setSelected(
-                item.data(256) in account_numbers
-            )
-
-    @staticmethod
-    def _selected_account_numbers(
-        list_widget: QListWidget,
-    ) -> frozenset[str]:
-        """Liefert die Kontonummern der markierten Einträge."""
-
-        return frozenset(
-            str(item.data(256))
-            for item in list_widget.selectedItems()
-        )
 
     @staticmethod
     def _selected_account_number(
@@ -533,6 +575,7 @@ class AccountConfigurationDialog(QDialog):
     def _save(self) -> None:
         """Prüft die Eingaben und stellt das Dialogergebnis bereit."""
 
+        self._capture_visible_role_assignments()
         try:
             control_accounts = AccountingControlAccounts(
                 opening_balance_account=(
@@ -616,40 +659,22 @@ class AccountConfigurationDialog(QDialog):
             )
 
             account_roles = AccountingAccountRoles(
-                cash_accounts=(
-                    self._selected_account_numbers(
-                        self._cash_list
-                    )
+                cash_accounts=frozenset(self._role_assignments["cash_accounts"]),
+                bank_accounts=frozenset(self._role_assignments["bank_accounts"]),
+                general_rate_sales_accounts=frozenset(
+                    self._role_assignments["general_rate_sales_accounts"]
                 ),
-                bank_accounts=(
-                    self._selected_account_numbers(
-                        self._bank_list
-                    )
+                customer_receivables=frozenset(
+                    self._role_assignments["customer_receivables"]
                 ),
-                general_rate_sales_accounts=(
-                    self._selected_account_numbers(
-                        self._general_rate_sales_list
-                    )
+                supplier_payables=frozenset(
+                    self._role_assignments["supplier_payables"]
                 ),
-                customer_receivables=(
-                    self._selected_account_numbers(
-                        self._customer_receivables_list
-                    )
+                customer_credit_balances=frozenset(
+                    self._role_assignments["customer_credit_balances"]
                 ),
-                supplier_payables=(
-                    self._selected_account_numbers(
-                        self._supplier_payables_list
-                    )
-                ),
-                customer_credit_balances=(
-                    self._selected_account_numbers(
-                        self._customer_credit_balances_list
-                    )
-                ),
-                supplier_credit_balances=(
-                    self._selected_account_numbers(
-                        self._supplier_credit_balances_list
-                    )
+                supplier_credit_balances=frozenset(
+                    self._role_assignments["supplier_credit_balances"]
                 ),
             )
 
