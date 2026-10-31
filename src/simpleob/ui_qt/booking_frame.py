@@ -10,7 +10,6 @@ from PySide6.QtGui import QKeyEvent
 from PySide6.QtWidgets import (
     QCheckBox,
     QCompleter,
-    QFormLayout,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -90,33 +89,42 @@ class BookingFrame(QWidget):
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
 
-        form = QFormLayout()
-        form.setFieldGrowthPolicy(
-            QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow
-        )
+        form = QVBoxLayout()
+        form.setContentsMargins(0, 0, 0, 0)
+        form.setSpacing(4)
+
+        header_row = QHBoxLayout()
+        header_row.setSpacing(6)
 
         self._booking_date_entry = GermanDateEdit(value=date.today())
         self._booking_date_entry.setMinimumWidth(120)
         self._booking_date_entry.setMaximumWidth(140)
-        form.addRow(
-            "Datum",
-            self._booking_date_entry,
-        )
+        date_label = QLabel("Datum")
+        date_label.setBuddy(self._booking_date_entry)
+        header_row.addWidget(date_label)
+        header_row.addWidget(self._booking_date_entry)
+        header_row.addSpacing(12)
 
         self._voucher_no_entry = QLineEdit()
-        self._voucher_no_entry.setMinimumWidth(160)
+        self._voucher_no_entry.setMinimumWidth(140)
         self._voucher_no_entry.setMaximumWidth(220)
-        form.addRow(
-            "Belegnummer",
-            self._voucher_no_entry,
-        )
+        voucher_no_label = QLabel("Belegnummer")
+        voucher_no_label.setBuddy(self._voucher_no_entry)
+        header_row.addWidget(voucher_no_label)
+        header_row.addWidget(self._voucher_no_entry)
+        header_row.addStretch()
+        form.addLayout(header_row)
 
         self._description_entry = QLineEdit()
-        form.addRow(
-            "Buchungstext",
-            self._description_entry,
-        )
+        description_label = QLabel("Buchungstext")
+        description_label.setBuddy(self._description_entry)
+        description_row = QHBoxLayout()
+        description_row.setSpacing(6)
+        description_row.addWidget(description_label)
+        description_row.addWidget(self._description_entry, 1)
+        form.addLayout(description_row)
 
         layout.addLayout(form)
 
@@ -167,7 +175,7 @@ class BookingFrame(QWidget):
             QHeaderView.ResizeMode.ResizeToContents,
         )
 
-        self._booking_table.setMinimumHeight(220)
+        self._booking_table.setMinimumHeight(135)
         layout.addWidget(self._booking_table)
 
         totals_layout = QHBoxLayout()
@@ -176,7 +184,7 @@ class BookingFrame(QWidget):
         totals_layout.addWidget(QLabel("Soll:"))
 
         self._debit_total_label = QLabel("0,00")
-        self._debit_total_label.setMinimumWidth(100)
+        self._debit_total_label.setMinimumWidth(84)
         self._debit_total_label.setAlignment(
             Qt.AlignmentFlag.AlignRight
         )
@@ -184,11 +192,11 @@ class BookingFrame(QWidget):
             self._debit_total_label
         )
 
-        totals_layout.addSpacing(20)
+        totals_layout.addSpacing(12)
         totals_layout.addWidget(QLabel("Haben:"))
 
         self._credit_total_label = QLabel("0,00")
-        self._credit_total_label.setMinimumWidth(100)
+        self._credit_total_label.setMinimumWidth(84)
         self._credit_total_label.setAlignment(
             Qt.AlignmentFlag.AlignRight
         )
@@ -196,11 +204,11 @@ class BookingFrame(QWidget):
             self._credit_total_label
         )
 
-        totals_layout.addSpacing(20)
+        totals_layout.addSpacing(12)
         totals_layout.addWidget(QLabel("Differenz:"))
 
         self._difference_label = QLabel("0,00")
-        self._difference_label.setMinimumWidth(100)
+        self._difference_label.setMinimumWidth(84)
         self._difference_label.setAlignment(
             Qt.AlignmentFlag.AlignRight
         )
@@ -228,8 +236,6 @@ class BookingFrame(QWidget):
 
         self._status_label = QLabel()
         layout.addWidget(self._status_label)
-
-        layout.addStretch()
 
         self._booking_date_entry.textChanged.connect(
             self._on_form_changed
@@ -396,8 +402,8 @@ class BookingFrame(QWidget):
         """Erzeugt ein Betragsfeld für Soll oder Haben."""
 
         entry = QLineEdit()
-        entry.setMinimumWidth(120)
-        entry.setMaximumWidth(160)
+        entry.setMinimumWidth(100)
+        entry.setMaximumWidth(140)
         entry.setAlignment(
             Qt.AlignmentFlag.AlignRight
         )

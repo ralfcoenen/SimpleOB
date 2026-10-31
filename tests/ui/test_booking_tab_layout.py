@@ -1,9 +1,11 @@
 from types import SimpleNamespace
 from uuid import uuid4
 
+from PySide6.QtCore import QPoint
 from PySide6.QtWidgets import (
     QApplication,
     QGroupBox,
+    QLabel,
     QMainWindow,
     QPushButton,
     QScrollArea,
@@ -15,7 +17,20 @@ from simpleob.domain.vat_accounts import VatAccounts
 from simpleob.ui_qt.main_window import MainWindow
 
 
-def _booking_window() -> MainWindow:
+def _assert_label_close_to_field(frame: QWidget, field: QWidget) -> None:
+    labels = [
+        label
+        for label in frame.findChildren(QLabel)
+        if label.buddy() is field
+    ]
+    assert len(labels) == 1
+    label = labels[0]
+    label_right = label.mapTo(frame, QPoint()).x() + label.width()
+    field_left = field.mapTo(frame, QPoint()).x()
+    assert 0 <= field_left - label_right <= 12
+
+
+def _booking_window(*, enable_invoice_actions: bool = False) -> MainWindow:
     window = MainWindow.__new__(MainWindow)
     QMainWindow.__init__(window)
     window._booking_tab = QWidget(window)
@@ -30,6 +45,13 @@ def _booking_window() -> MainWindow:
         "_credit_note_posting_service",
     ):
         setattr(window, attribute, None)
+    if enable_invoice_actions:
+        for attribute in (
+            "_receivable_invoice_posting_service",
+            "_payable_invoice_posting_service",
+            "_credit_note_posting_service",
+        ):
+            setattr(window, attribute, object())
 
     window._business_partner_repository = None
     window._opening_balance_account_number = "9000"
@@ -87,6 +109,89 @@ def test_booking_tab_groups_op_actions_and_fits_reduced_width():
     assert op_group.isVisible()
     assert all(button.width() >= button.sizeHint().width() for button in action_buttons)
     assert all(button.width() < op_group.width() for button in action_buttons)
+
+    date_geometry = window._booking_frame._booking_date_entry.geometry()
+    voucher_geometry = window._booking_frame._voucher_no_entry.geometry()
+    assert date_geometry.y() == voucher_geometry.y()
+    assert date_geometry.right() < voucher_geometry.left()
+    assert window._booking_frame._booking_table.minimumHeight() < 220
+    window.resize(1600, 700)
+    app.processEvents()
+    _assert_label_close_to_field(
+        window._booking_frame,
+        window._booking_frame._booking_date_entry,
+    )
+    _assert_label_close_to_field(
+        window._booking_frame,
+        window._booking_frame._voucher_no_entry,
+    )
+
+    window.close()
+    app.processEvents()
+
+
+def test_invoice_booking_layout_switches_related_fields_without_clipping():
+    app = QApplication.instance() or QApplication([])
+    window = _booking_window(enable_invoice_actions=True)
+    window.resize(1100, 700)
+    window.show()
+    app.processEvents()
+
+    window._booking_mode_box.setCurrentText("Rechnung mit Umsatzsteuer")
+    app.processEvents()
+    frame = window._vat_booking_frame
+    scroll_area = window.findChild(QScrollArea)
+    assert frame.isVisible()
+    assert not window._booking_frame.isVisible()
+    assert scroll_area is not None
+    assert scroll_area.horizontalScrollBar().maximum() == 0
+    assert frame._on_account.isVisible()
+    assert not frame._partner_box.isVisible()
+    assert not frame._due_date_entry.isVisible()
+    assert not frame._original_invoice_number_entry.isVisible()
+    window.resize(1600, 700)
+    app.processEvents()
+    _assert_label_close_to_field(frame, frame._invoice_type_box)
+    _assert_label_close_to_field(frame, frame._booking_date_entry)
+    _assert_label_close_to_field(frame, frame._voucher_no_entry)
+    assert scroll_area.horizontalScrollBar().maximum() == 0
+
+    frame._on_account.setChecked(True)
+    app.processEvents()
+    assert frame._partner_box.isVisible()
+    assert frame._due_date_entry.isVisible()
+    assert not frame._original_invoice_number_entry.isVisible()
+    _assert_label_close_to_field(frame, frame._on_account)
+    _assert_label_close_to_field(frame, frame._partner_box)
+    _assert_label_close_to_field(frame, frame._due_date_entry)
+
+    frame._invoice_type_box.setCurrentText("Ausgangsrechnung")
+    app.processEvents()
+    assert frame._on_account.isVisible()
+    assert not frame._on_account.isChecked()
+    assert not frame._due_date_entry.isVisible()
+
+    frame._invoice_type_box.setCurrentText("Kundengutschrift")
+    app.processEvents()
+    assert not frame._on_account.isVisible()
+    assert frame._partner_box.isVisible()
+    assert frame._original_invoice_number_entry.isVisible()
+    assert frame._original_invoice_number_label.isVisible()
+    assert not frame._due_date_label.isVisible()
+    _assert_label_close_to_field(
+        frame,
+        frame._original_invoice_number_entry,
+    )
+
+    frame._invoice_type_box.setCurrentText("Lieferantengutschrift")
+    app.processEvents()
+    assert frame._partner_label.text() == "Lieferant"
+    assert frame._original_invoice_number_entry.isVisible()
+
+    window._booking_mode_box.setCurrentText("Einfache Buchung")
+    app.processEvents()
+    assert window._booking_frame.isVisible()
+    assert not frame.isVisible()
 
     window.close()
     app.processEvents()

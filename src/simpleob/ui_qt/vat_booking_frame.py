@@ -9,7 +9,6 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
-    QFormLayout,
     QGridLayout,
     QHBoxLayout,
     QInputDialog,
@@ -99,12 +98,13 @@ class VatBookingFrame(QWidget):
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
 
-        form = QFormLayout()
-        form.setFieldGrowthPolicy(
-            QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow
-        )
+        form = QVBoxLayout()
+        form.setContentsMargins(0, 0, 0, 0)
+        form.setSpacing(4)
 
+        self._invoice_type_label = QLabel("Rechnungsart")
         self._invoice_type_box = QComboBox()
         self._invoice_type_box.addItems(
             (
@@ -117,56 +117,93 @@ class VatBookingFrame(QWidget):
         self._invoice_type_box.setCurrentText(
             _INPUT_INVOICE
         )
-        form.addRow(
-            "Rechnungsart",
-            self._invoice_type_box,
-        )
+        self._invoice_type_box.setMaximumWidth(260)
+        self._invoice_type_label.setBuddy(self._invoice_type_box)
+        header_row = QHBoxLayout()
+        header_row.setSpacing(6)
+        header_row.addWidget(self._invoice_type_label)
+        header_row.addWidget(self._invoice_type_box)
 
+        self._booking_date_label = QLabel("Datum")
         self._booking_date_entry = GermanDateEdit(value=date.today())
         self._booking_date_entry.setMinimumWidth(120)
         self._booking_date_entry.setMaximumWidth(140)
-        form.addRow(
-            "Datum",
-            self._booking_date_entry,
-        )
+        self._booking_date_label.setBuddy(self._booking_date_entry)
+        header_row.addSpacing(12)
+        header_row.addWidget(self._booking_date_label)
+        header_row.addWidget(self._booking_date_entry)
+        header_row.addStretch()
+        form.addLayout(header_row)
 
         self._voucher_no_entry = QLineEdit()
-        self._voucher_no_entry.setMinimumWidth(160)
+        self._voucher_no_entry.setMinimumWidth(140)
         self._voucher_no_entry.setMaximumWidth(220)
         self._voucher_no_label = QLabel("Belegnummer")
-        form.addRow(self._voucher_no_label, self._voucher_no_entry)
+        self._voucher_no_label.setBuddy(self._voucher_no_entry)
 
         self._on_account = QCheckBox("Rechnung auf Ziel")
         self._on_account.setVisible(False)
         self._on_account_label = QLabel("Forderung")
-        form.addRow(self._on_account_label, self._on_account)
+        self._on_account_label.setBuddy(self._on_account)
+        invoice_reference_row = QHBoxLayout()
+        invoice_reference_row.setSpacing(6)
+        invoice_reference_row.addWidget(self._voucher_no_label)
+        invoice_reference_row.addWidget(self._voucher_no_entry)
+        invoice_reference_row.addSpacing(12)
+        invoice_reference_row.addWidget(self._on_account_label)
+        invoice_reference_row.addWidget(self._on_account)
+        invoice_reference_row.addStretch()
+        form.addLayout(invoice_reference_row)
         self._partner_box = QComboBox()
         self._partner_box.setVisible(False)
         self._partner_add_button = QPushButton("Geschäftspartner verwalten")
         self._partner_add_button.setVisible(False)
-        partner_row = QHBoxLayout()
-        partner_row.addWidget(self._partner_box)
-        partner_row.addWidget(self._partner_add_button)
         self._partner_label = QLabel("Geschäftspartner")
-        form.addRow(self._partner_label, partner_row)
+        self._partner_label.setBuddy(self._partner_box)
+        partner_row = QHBoxLayout()
+        partner_row.setSpacing(6)
+        partner_row.addWidget(self._partner_label)
+        partner_row.addWidget(self._partner_box, 1)
+        partner_row.addWidget(self._partner_add_button)
+        form.addLayout(partner_row)
+
+        self._due_date_label = QLabel("Fällig am")
         self._due_date_entry = GermanDateEdit(value=date.today())
         self._due_date_entry.setMinimumWidth(120)
         self._due_date_entry.setMaximumWidth(140)
         self._due_date_entry.setVisible(False)
-        form.addRow("Fällig am", self._due_date_entry)
+        self._due_date_label.setBuddy(self._due_date_entry)
+
         self._original_invoice_number_entry = QLineEdit()
-        self._original_invoice_number_entry.setMinimumWidth(160)
+        self._original_invoice_number_entry.setMinimumWidth(140)
         self._original_invoice_number_entry.setMaximumWidth(220)
         self._original_invoice_number_entry.setVisible(False)
-        form.addRow("Rechnungsbezug (optional)", self._original_invoice_number_entry)
+        self._original_invoice_number_label = QLabel(
+            "Rechnungsbezug (optional)"
+        )
+        self._original_invoice_number_label.setBuddy(
+            self._original_invoice_number_entry
+        )
+        document_detail_row = QHBoxLayout()
+        document_detail_row.setSpacing(6)
+        document_detail_row.addWidget(self._due_date_label)
+        document_detail_row.addWidget(self._due_date_entry)
+        document_detail_row.addSpacing(12)
+        document_detail_row.addWidget(self._original_invoice_number_label)
+        document_detail_row.addWidget(self._original_invoice_number_entry)
+        document_detail_row.addStretch()
+        form.addLayout(document_detail_row)
         self._refresh_customer_list()
         self._partner_add_button.clicked.connect(self._manage_partners)
 
         self._description_entry = QLineEdit()
-        form.addRow(
-            "Buchungstext",
-            self._description_entry,
-        )
+        self._description_label = QLabel("Buchungstext")
+        self._description_label.setBuddy(self._description_entry)
+        description_row = QHBoxLayout()
+        description_row.setSpacing(6)
+        description_row.addWidget(self._description_label)
+        description_row.addWidget(self._description_entry, 1)
+        form.addLayout(description_row)
 
         self._counter_account_box = QComboBox()
         self._counter_account_box.setEditable(True)
@@ -177,10 +214,13 @@ class VatBookingFrame(QWidget):
         self._counter_account_box.setInsertPolicy(
             QComboBox.InsertPolicy.NoInsert
         )
-        form.addRow(
-            "Gegenkonto",
-            self._counter_account_box,
-        )
+        self._counter_account_label = QLabel("Gegenkonto")
+        self._counter_account_label.setBuddy(self._counter_account_box)
+        counter_account_row = QHBoxLayout()
+        counter_account_row.setSpacing(6)
+        counter_account_row.addWidget(self._counter_account_label)
+        counter_account_row.addWidget(self._counter_account_box, 1)
+        form.addLayout(counter_account_row)
 
         layout.addLayout(form)
 
@@ -196,12 +236,9 @@ class VatBookingFrame(QWidget):
         self._positions_layout = QGridLayout(
             self._positions_widget
         )
-        self._positions_layout.setContentsMargins(
-            0,
-            0,
-            0,
-            0,
-        )
+        self._positions_layout.setContentsMargins(0, 0, 0, 0)
+        self._positions_layout.setHorizontalSpacing(8)
+        self._positions_layout.setVerticalSpacing(4)
 
         self._positions_layout.addWidget(
             QLabel("Sachkonto"),
@@ -272,8 +309,6 @@ class VatBookingFrame(QWidget):
         layout.addWidget(
             self._status_label
         )
-
-        layout.addStretch()
 
         self._invoice_type_box.currentTextChanged.connect(
             self._on_form_changed
@@ -364,6 +399,7 @@ class VatBookingFrame(QWidget):
         self._partner_label.setText(
             "Kunde" if output_invoice or customer_credit else "Lieferant"
         )
+        self._partner_label.setVisible(document_uses_partner)
         self._voucher_no_label.setText(
             "Gutschriftnummer"
             if credit_note
@@ -377,6 +413,8 @@ class VatBookingFrame(QWidget):
         )
         self._due_date_entry.setVisible(target)
         self._original_invoice_number_entry.setVisible(credit_note)
+        self._original_invoice_number_label.setVisible(credit_note)
+        self._due_date_label.setVisible(target)
         self._counter_account_box.setEnabled(
             self._enabled and not (target or credit_note)
         )
@@ -399,8 +437,8 @@ class VatBookingFrame(QWidget):
         amount_entry.setAlignment(
             Qt.AlignmentFlag.AlignRight
         )
-        amount_entry.setMinimumWidth(120)
-        amount_entry.setMaximumWidth(160)
+        amount_entry.setMinimumWidth(100)
+        amount_entry.setMaximumWidth(140)
         amount_entry.setPlaceholderText(
             "0,00"
         )
