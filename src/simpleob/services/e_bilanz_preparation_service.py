@@ -18,6 +18,7 @@ from simpleob.domain.money import ZERO
 from simpleob.services.closing_result import ClosingResult
 from simpleob.services.closing_service import ClosingService
 
+
 @dataclass(frozen=True, slots=True)
 class EBilanzPreparationResult:
     """Enthält die aufbereiteten HGB-Werte für die E-Bilanz."""

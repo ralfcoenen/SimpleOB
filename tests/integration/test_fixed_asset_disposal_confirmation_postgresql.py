@@ -15,10 +15,10 @@ from sqlalchemy.orm import sessionmaker
 from simpleob.core.context import ApplicationContext
 from simpleob.database.booking_repository import BookingRepository
 from simpleob.database.company_repository import CompanyRepository
-from simpleob.database.fixed_asset_repository import FixedAssetRepository
 from simpleob.database.fixed_asset_movement_repository import (
     FixedAssetMovementRepository,
 )
+from simpleob.database.fixed_asset_repository import FixedAssetRepository
 from simpleob.database.lock_error import DatabaseLockError
 from simpleob.database.models import Anlagebewegung, Anlagegut, Mandant
 from simpleob.domain.booking import Booking

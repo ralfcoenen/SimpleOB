@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from datetime import date, datetime
+from decimal import Decimal, InvalidOperation
 from uuid import UUID
 
 CLIENT_TRANSFER_FORMAT_NAME = "SimpleOB Client Transfer"
@@ -194,6 +195,65 @@ class ClientTransferMasterData:
                 field_name,
                 normalized,
             )
+
+
+@dataclass(frozen=True, slots=True)
+class ClientTransferKrAnnualTurnover:
+    """Externe Umsatzergänzung mit festem Kalenderjahr."""
+
+    calendar_year: int
+    amount: str
+
+    def __post_init__(self) -> None:
+        if (
+            isinstance(self.calendar_year, bool)
+            or not isinstance(self.calendar_year, int)
+            or not 1 <= self.calendar_year <= 9999
+        ):
+            raise ValueError("calendar_year must be between 1 and 9999")
+        amount_text = _validate_required_text(
+            self.amount,
+            field_name="kr_settings.external_turnover.amount",
+        )
+        try:
+            amount = Decimal(amount_text)
+        except InvalidOperation as exc:
+            raise ValueError("KR external turnover amount must be decimal text") from exc
+        if not amount.is_finite() or amount < Decimal("0.00"):
+            raise ValueError("KR external turnover amount must be non-negative")
+        if amount != amount.quantize(Decimal("0.01")):
+            raise ValueError("KR external turnover amount must use cents")
+        object.__setattr__(self, "amount", format(amount, ".2f"))
+
+
+@dataclass(frozen=True, slots=True)
+class ClientTransferKrSettings:
+    """Portable KR-Einstellungen eines Mandanten."""
+
+    activity_start_date: date | None = None
+    waiver_declared: bool = False
+    waiver_date: date | None = None
+    external_turnovers: tuple[ClientTransferKrAnnualTurnover, ...] = ()
+
+    def __post_init__(self) -> None:
+        if self.activity_start_date is not None and not isinstance(
+            self.activity_start_date, date
+        ):
+            raise TypeError("activity_start_date must be a date or None")
+        if not isinstance(self.waiver_declared, bool):
+            raise TypeError("waiver_declared must be a bool")
+        if self.waiver_date is not None and not isinstance(self.waiver_date, date):
+            raise TypeError("waiver_date must be a date or None")
+        if self.waiver_declared != (self.waiver_date is not None):
+            raise ValueError("waiver_date must match waiver_declared")
+        if not isinstance(self.external_turnovers, tuple) or not all(
+            isinstance(item, ClientTransferKrAnnualTurnover)
+            for item in self.external_turnovers
+        ):
+            raise TypeError("external_turnovers must contain KR annual turnover values")
+        years = [item.calendar_year for item in self.external_turnovers]
+        if len(years) != len(set(years)):
+            raise ValueError("KR annual turnover years must be unique")
 
 
 @dataclass(frozen=True, slots=True)
@@ -1456,6 +1516,8 @@ class ClientTransferClient:
         ...,
     ] = ()
 
+    kr_settings: ClientTransferKrSettings | None = None
+
     def __post_init__(self) -> None:
         if not isinstance(self.company_id, UUID):
             raise TypeError(
@@ -1470,6 +1532,12 @@ class ClientTransferClient:
                 "master_data must be a "
                 "ClientTransferMasterData"
             )
+
+        if self.kr_settings is not None and not isinstance(
+            self.kr_settings,
+            ClientTransferKrSettings,
+        ):
+            raise TypeError("kr_settings must be ClientTransferKrSettings or None")
 
         if not isinstance(self.accounts, tuple):
             raise TypeError(

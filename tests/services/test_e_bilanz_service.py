@@ -32,8 +32,8 @@ from simpleob.eric.bilanz_generation.fact_plan import (
 from simpleob.services.e_bilanz_service import (
     APPROPRIATION_PROFITS_ROLE,
     BALANCE_SHEET_ROLE,
-    EBilanzService,
     INCOME_STATEMENT_ROLE,
+    EBilanzService,
 )
 from simpleob.taxonomy.arelle_adapter import (
     ArelleValidationResult,
@@ -509,7 +509,7 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
             "simpleob.services.e_bilanz_service."
             "FixedAssetScheduleBuilder",
             return_value=fixed_asset_schedule_builder,
-        ) as fixed_asset_schedule_builder_class,
+        ),
         patch(
             "simpleob.services.e_bilanz_service."
             "AccountBalanceBuilder",

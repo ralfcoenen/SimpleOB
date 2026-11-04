@@ -2,13 +2,11 @@
 
 from uuid import UUID
 
-
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
-
-from simpleob.database.lock_error import DatabaseLockError
 from sqlalchemy.orm import Session
 
+from simpleob.database.lock_error import DatabaseLockError
 from simpleob.database.models import Gesellschafter, Mandant
 from simpleob.domain.shareholder import Shareholder
 

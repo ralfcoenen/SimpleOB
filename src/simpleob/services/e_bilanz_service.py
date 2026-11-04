@@ -19,36 +19,44 @@ from simpleob.domain.company_master_data import (
 from simpleob.domain.e_bilanz_account_detail import (
     EBilanzAccountDetail,
 )
+from simpleob.domain.fiscal_year import FiscalYear
 from simpleob.domain.fixed_asset_disposal_detail import (
     FixedAssetDisposalDetail,
 )
-from simpleob.domain.fiscal_year import FiscalYear
 from simpleob.domain.profit_appropriation_annual_data import (
     ProfitAppropriationAnnualData,
 )
 from simpleob.domain.shareholder import Shareholder
 from simpleob.domain.vat_accounts import VatAccounts
+from simpleob.eric.bilanz_generation.bvv_value_builder import (
+    BvvValueBuilder,
+)
+from simpleob.eric.bilanz_generation.fact_plan import (
+    FactPlanState,
+)
 from simpleob.eric.bilanz_generation.fact_plan_resolver import (
     FactPlanResolver,
 )
 from simpleob.eric.bilanz_generation.gaap_ci_6_9_account_detail_values import (
     GaapCi69AccountDetailValueBuilder,
 )
-from simpleob.eric.bilanz_generation.fact_plan import (
-    FactPlanState,
-)
-
 from simpleob.eric.bilanz_generation.gaap_ci_6_9_balance_sheet_values import (
     GaapCi69BalanceSheetValueBuilder,
-)
-from simpleob.eric.bilanz_generation.gaap_ci_6_9_profit_appropriation_values import (
-    GaapCi69ProfitAppropriationValueBuilder,
 )
 from simpleob.eric.bilanz_generation.gaap_ci_6_9_income_statement_values import (
     GaapCi69IncomeStatementValueBuilder,
 )
+from simpleob.eric.bilanz_generation.gaap_ci_6_9_profit_appropriation_values import (
+    GaapCi69ProfitAppropriationValueBuilder,
+)
 from simpleob.eric.bilanz_generation.gaap_ci_6_9_values import (
     GaapCi69ValueCalculator,
+)
+from simpleob.eric.bilanz_generation.hgbm_fixed_asset_schedule_builder import (
+    HgbmFixedAssetScheduleBuilder,
+)
+from simpleob.eric.bilanz_generation.tax_depreciation_reconciliation_builder import (
+    TaxDepreciationReconciliationBuilder,
 )
 from simpleob.eric.bilanz_generation.taxonomy_6_9 import (
     create_profile_6_9,
@@ -58,15 +66,6 @@ from simpleob.eric.bilanz_generation.taxonomy_6_9_values import (
 )
 from simpleob.eric.bilanz_generation.taxonomy_6_9_xbrl_document_builder import (
     Taxonomy69XbrlDocumentBuilder,
-)
-from simpleob.eric.bilanz_generation.hgbm_fixed_asset_schedule_builder import (
-    HgbmFixedAssetScheduleBuilder,
-)
-from simpleob.eric.bilanz_generation.tax_depreciation_reconciliation_builder import (
-    TaxDepreciationReconciliationBuilder,
-)
-from simpleob.eric.bilanz_generation.bvv_value_builder import (
-    BvvValueBuilder,
 )
 from simpleob.services.closing_service import ClosingService
 from simpleob.services.fixed_asset_schedule_service import (
@@ -84,12 +83,12 @@ from simpleob.taxonomy.e_bilanz_builder import EBilanzDocument
 from simpleob.taxonomy.entry_point import (
     TaxonomyEntryPoint,
 )
-from simpleob.taxonomy.fixed_asset_schedule_builder import (
-    FixedAssetScheduleBuilder,
-)
 from simpleob.taxonomy.fact import TaxonomyFact
 from simpleob.taxonomy.fiscal_requirement_reader import (
     FiscalRequirementReader,
+)
+from simpleob.taxonomy.fixed_asset_schedule_builder import (
+    FixedAssetScheduleBuilder,
 )
 from simpleob.taxonomy.gaap_ci_mandatory_fact_completer import (
     GaapCiMandatoryFactCompleter,

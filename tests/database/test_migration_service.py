@@ -18,7 +18,7 @@ from simpleob.database.migration_service import (
 
 BASELINE_REVISION = "7392d6cc6892"
 PRE_CORRECTION_BOOKING_DATE_REVISION = "7d0c4a28b9f1"
-HEAD_REVISION = "c4e27a91b6d0"
+HEAD_REVISION = "b7d41a8f2c60"
 
 
 def _application_config(
@@ -417,7 +417,7 @@ def test_postgresql_start_check_rejects_empty_database(
     monkeypatch.setattr(
         module,
         "create_engine",
-        lambda url: engine,
+        lambda url, **kwargs: engine,
     )
     monkeypatch.setattr(
         module,
@@ -555,7 +555,7 @@ def test_postgresql_inspection_without_alembic_version(
     monkeypatch.setattr(
         module,
         "create_engine",
-        lambda url: engine,
+        lambda url, **kwargs: engine,
     )
     monkeypatch.setattr(
         module,
@@ -656,7 +656,7 @@ def test_postgresql_inspection_outdated_schema(
     monkeypatch.setattr(
         module,
         "create_engine",
-        lambda url: engine,
+        lambda url, **kwargs: engine,
     )
     monkeypatch.setattr(
         module,
@@ -718,7 +718,7 @@ def test_postgresql_inspection_unknown_revision(
     monkeypatch.setattr(
         module,
         "create_engine",
-        lambda url: engine,
+        lambda url, **kwargs: engine,
     )
     monkeypatch.setattr(
         module,

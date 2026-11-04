@@ -31,7 +31,6 @@ from simpleob.domain.profit_appropriation_posting_type import (
     ProfitAppropriationPostingType,
 )
 
-
 COMPANY_ID = UUID(
     "12345678-1234-5678-1234-567812345678"
 )
@@ -77,7 +76,7 @@ ACCOUNT_NUMBERS = (
 
 
 def _build_repositories() -> dict[str, Mock]:
-    return {
+    repositories = {
         "company_repository": Mock(),
         "chart_of_accounts_repository": Mock(),
         "booking_repository": Mock(),
@@ -90,6 +89,8 @@ def _build_repositories() -> dict[str, Mock]:
         "profit_appropriation_posting_repository": Mock(),
         "equity_contribution_repository": Mock(),
     }
+    repositories["company_repository"].get_kr_settings.return_value = None
+    return repositories
 
 
 def _configure_master_data(

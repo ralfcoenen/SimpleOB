@@ -51,6 +51,7 @@ from simpleob.database.fixed_asset_movement_repository import (
     FixedAssetMovementRepository,
 )
 from simpleob.database.fixed_asset_repository import FixedAssetRepository
+from simpleob.database.kr_monitoring_repository import KrMonitoringRepository
 from simpleob.database.migration_service import (
     DatabaseMigrationService,
 )
@@ -139,6 +140,7 @@ from simpleob.services.fixed_asset_disposal_workflow import (
 from simpleob.services.fixed_asset_schedule_service import (
     FixedAssetScheduleService,
 )
+from simpleob.services.kr_monitoring_service import KrMonitoringService
 from simpleob.services.open_item_credit_refund_reversal_service import (
     OpenItemCreditRefundReversalService,
 )
@@ -583,6 +585,10 @@ def main() -> None:
             correction_repository=PaymentAllocationCorrectionRepository(session),
             offset_repository=OpenItemOffsetRepository(session),
             payment_repository=OpenItemPaymentRepository(session),
+        )
+        kr_monitoring_service = KrMonitoringService(
+            KrMonitoringRepository(session),
+            company_repository,
         )
         posting_service = PostingService()
 
@@ -1103,6 +1109,7 @@ def main() -> None:
                     open_item_credit_refund_reversal_service
                 ),
                 payment_allocation_correction_service=payment_allocation_correction_service,
+                kr_monitoring_service=kr_monitoring_service,
                 eric_certificate_path=(
                     config.eric_certificate_path
                 ),

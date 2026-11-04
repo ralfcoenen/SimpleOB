@@ -11,6 +11,24 @@ from simpleob.database.database import Base
 CLIENT_TABLE_NAMES = frozenset(
     {
         "mandanten",
+        "kr_jahresumsatz_ergaenzungen",
+        "geschaeftspartner",
+        "ausgangsrechnungen",
+        "forderungs_ops",
+        "eingangsrechnungen",
+        "verbindlichkeits_ops",
+        "rechnungs_op_stornos",
+        "gutschriften",
+        "guthaben_ops",
+        "guthaben_op_rueckerstattungen",
+        "guthaben_op_rueckerstattungsruecknahmen",
+        "guthaben_op_ereignisse",
+        "op_guthabenverrechnungen",
+        "rechnungs_op_verrechnungsereignisse",
+        "zahlungen",
+        "rechnungs_op_zahlungsereignisse",
+        "zahlungszuordnungskorrekturen",
+        "zahlungszuordnungskorrekturereignisse",
         "konten",
         "konten_taxonomie_zuordnungen",
         "kontenrahmen_konfiguration",
@@ -103,8 +121,12 @@ class ClientDeletionRepository:
                 for fk in actual_fks
             }
             expected_fks = {
-                ((fk.parent.name,), fk.column.table.name, (fk.column.name,))
-                for fk in table.foreign_keys
+                (
+                    tuple(element.parent.name for element in constraint.elements),
+                    constraint.elements[0].column.table.name,
+                    tuple(element.column.name for element in constraint.elements),
+                )
+                for constraint in table.foreign_key_constraints
             }
             if columns != set(table.c.keys()) or fks != expected_fks:
                 raise ValueError(
@@ -228,6 +250,22 @@ class ClientDeletionRepository:
                 "anlagegueter": "fixed_asset_id",
                 "anlagebewegungen": "movement_id",
                 "anlageabschreibungen": "depreciation_id",
+                "geschaeftspartner": "partner_id",
+                "ausgangsrechnungen": "invoice_id",
+                "forderungs_ops": "open_item_id",
+                "eingangsrechnungen": "invoice_id",
+                "verbindlichkeits_ops": "open_item_id",
+                "rechnungs_op_stornos": "storno_id",
+                "gutschriften": "credit_note_id",
+                "guthaben_ops": "open_item_id",
+                "guthaben_op_rueckerstattungen": "refund_id",
+                "guthaben_op_rueckerstattungsruecknahmen": "reversal_id",
+                "guthaben_op_ereignisse": "event_id",
+                "op_guthabenverrechnungen": "settlement_id",
+                "zahlungen": "payment_id",
+                "rechnungs_op_zahlungsereignisse": "event_id",
+                "zahlungszuordnungskorrekturen": "correction_id",
+                "zahlungszuordnungskorrekturereignisse": "event_id",
             }
             if name in natural:
                 return row[natural[name]]

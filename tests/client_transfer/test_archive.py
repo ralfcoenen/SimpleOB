@@ -24,7 +24,6 @@ from simpleob.client_transfer.model import (
     ClientTransferMasterData,
 )
 
-
 COMPANY_ID = UUID(
     "12345678-1234-5678-1234-567812345678"
 )

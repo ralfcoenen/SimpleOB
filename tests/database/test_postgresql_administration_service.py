@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
@@ -18,8 +19,6 @@ from simpleob.database.postgresql_administration_service import (
 from simpleob.database.postgresql_migration_lock import (
     MIGRATION_LOCK_KEY,
 )
-from pathlib import Path
-
 from simpleob.database.postgresql_migration_safety import (
     PostgreSQLMigrationAction,
     PostgreSQLMigrationApproval,
@@ -531,7 +530,6 @@ def test_execute_migration_on_connection_commits(
     monkeypatch,
 ) -> None:
     """Erfolgreiche simulierte Migration beendet die Transaktion."""
-    from simpleob.database import postgresql_administration_service as module
 
     service = _service(database_url)
     calls = []
@@ -791,7 +789,6 @@ def test_execute_migration_outdated_success_simulated(
     monkeypatch,
 ) -> None:
     """Simulierte Migration: Backup, Wartung, Alembic und Endprüfung."""
-    from simpleob.database import postgresql_administration_service as module
     from simpleob.database.migration_service import PostgreSQLSchemaInspection
 
     service = _service(database_url)
@@ -1002,20 +999,63 @@ def test_execute_migration_empty_success_simulated(
 
 
 def test_execute_migration_rejects_unknown_schema(
-    database_url: str,
     tmp_path: Path,
     monkeypatch,
 ) -> None:
     """Ein unbekannter Schemazustand verhindert die Migration."""
+    from contextlib import nullcontext
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock
+
+    import simpleob.database.postgresql_administration_service as module
     from simpleob.database.migration_service import (
         PostgreSQLSchemaInspection,
     )
 
+    database_url = (
+        "postgresql+psycopg://testuser@localhost:5432/"
+        "simpleob_migration_test"
+    )
     service = _service(database_url)
-    head = service._migration_service.inspect_postgresql_schema().head_revision
-
     unknown = PostgreSQLSchemaInspection(
         status=PostgreSQLSchemaStatus.UNKNOWN,
         current_revision="unknown_revision",
-        head_revision=head,
+        head_revision="current_head",
     )
+    engine = MagicMock()
+
+    monkeypatch.setattr(
+        module,
+        "create_engine",
+        lambda *args, **kwargs: engine,
+    )
+    monkeypatch.setattr(
+        module,
+        "postgresql_migration_lock",
+        lambda connection: nullcontext(),
+    )
+    monkeypatch.setattr(
+        module,
+        "inspect_postgresql_sessions",
+        lambda connection: SimpleNamespace(has_other_sessions=False),
+    )
+
+    def inspect_unknown_schema(connection):
+        return unknown
+
+    monkeypatch.setattr(
+        service._migration_service,
+        "inspect_postgresql_schema_on_connection",
+        inspect_unknown_schema,
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="Unbekannter PostgreSQL-Schemazustand",
+    ):
+        service.execute_migration(
+            approval=PostgreSQLMigrationApproval(),
+            backup_path=tmp_path / "must_not_be_created.dump",
+        )
+
+    assert not (tmp_path / "must_not_be_created.dump").exists()

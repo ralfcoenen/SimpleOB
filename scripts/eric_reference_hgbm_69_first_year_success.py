@@ -37,12 +37,12 @@ Der Test:
 
 from __future__ import annotations
 
+import xml.etree.ElementTree as ET
 from copy import deepcopy
 from dataclasses import replace
 from decimal import Decimal
 from io import StringIO
 from pathlib import Path
-import xml.etree.ElementTree as ET
 
 from simpleob.accounting.balance_sheet import BalanceSheet
 from simpleob.accounting.financial_statement_context import (
@@ -103,7 +103,6 @@ from simpleob.eric.bilanz_generation.taxonomy_6_9_values import (
 from simpleob.eric.bilanz_generation.taxonomy_6_9_xbrl_document_builder import (
     Taxonomy69XbrlDocumentBuilder,
 )
-
 from simpleob.eric.elster_bilanz_payload_service import (
     ElsterBilanzPayloadService,
 )
@@ -131,29 +130,29 @@ from simpleob.taxonomy.concept import TaxonomyPeriodType
 from simpleob.taxonomy.concept_set import TaxonomyConceptSet
 from simpleob.taxonomy.context import TaxonomyContext
 from simpleob.taxonomy.entry_point import TaxonomyEntryPoint
+from simpleob.taxonomy.fact import TaxonomyFact
+from simpleob.taxonomy.fiscal_requirement_reader import (
+    FiscalRequirement,
+    FiscalRequirementReader,
+)
+from simpleob.taxonomy.fixed_asset_schedule_builder import (
+    FixedAssetScheduleBuilder,
+)
+from simpleob.taxonomy.gaap_ci_mandatory_fact_completer import (
+    GaapCiMandatoryFactCompleter,
+)
 from simpleob.taxonomy.gcd_company_data_mapper import (
     GcdCompanyDataMapper,
 )
 from simpleob.taxonomy.gcd_fact_builder import GcdFactBuilder
+from simpleob.taxonomy.gcd_report_profile import GcdReportProfile
 from simpleob.taxonomy.gcd_shareholder import (
     GcdShareDivideKey,
     GcdShareholder,
     GcdShareholderLegalStatus,
 )
-from simpleob.taxonomy.gcd_report_profile import GcdReportProfile
 from simpleob.taxonomy.hgb_gaap_ci_mapping import (
     create_hgb_gaap_ci_mapping,
-)
-from simpleob.taxonomy.gaap_ci_mandatory_fact_completer import (
-    GaapCiMandatoryFactCompleter,
-)
-from simpleob.taxonomy.fact import TaxonomyFact
-from simpleob.taxonomy.fixed_asset_schedule_builder import (
-    FixedAssetScheduleBuilder,
-)
-from simpleob.taxonomy.fiscal_requirement_reader import (
-    FiscalRequirement,
-    FiscalRequirementReader,
 )
 from simpleob.taxonomy.mapper import TaxonomyMapper
 from simpleob.taxonomy.nil_fact import TaxonomyNilFact
@@ -531,7 +530,9 @@ def _append_hgbm_transfer(
 ) -> None:
     """Erzeugt den kontrollierten UG-0002-HGBM-Testtuple."""
 
-    qname = lambda name: f"{{{gaap_namespace}}}{name}"
+    def qname(name: str) -> str:
+        return f"{{{gaap_namespace}}}{name}"
+
     transfer = ET.Element(qname("hbst.transfer"))
     kind = ET.SubElement(transfer, qname("hbst.transfer.kind"))
     kind_value = ET.SubElement(

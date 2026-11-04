@@ -12,27 +12,26 @@ from simpleob.client_transfer.model import (
     ClientTransferAccount,
     ClientTransferAccountRoles,
     ClientTransferApplication,
-    ClientTransferClient,
-    ClientTransferControlAccounts,
-    ClientTransferFormat,
-    ClientTransferMasterData,
-    ClientTransferTaxonomyMapping,
-    ClientTransferVatAccounts,
     ClientTransferBooking,
     ClientTransferBookingLine,
+    ClientTransferBookingLineReference,
+    ClientTransferClient,
+    ClientTransferControlAccounts,
+    ClientTransferEquityContribution,
     ClientTransferFiscalYear,
     ClientTransferFiscalYearReference,
-    ClientTransferBookingLineReference,
     ClientTransferFixedAsset,
     ClientTransferFixedAssetDepreciation,
     ClientTransferFixedAssetMovement,
-    ClientTransferShareholder,
-    ClientTransferTaxDepreciationAdjustment,
-    ClientTransferEquityContribution,
+    ClientTransferFormat,
+    ClientTransferMasterData,
     ClientTransferProfitAppropriationAnnualData,
     ClientTransferProfitAppropriationPosting,
+    ClientTransferShareholder,
+    ClientTransferTaxDepreciationAdjustment,
+    ClientTransferTaxonomyMapping,
+    ClientTransferVatAccounts,
 )
-
 
 COMPANY_ID = UUID(
     "12345678-1234-5678-1234-567812345678"
@@ -710,8 +709,25 @@ def test_client_rejects_duplicate_equity_contributions() -> None:
                 legal_form="UG (haftungsbeschränkt)",
             ),
             accounts=(),
-            control_accounts=ClientTransferControlAccounts(),
-            vat_accounts=ClientTransferVatAccounts(),
+            control_accounts=ClientTransferControlAccounts(
+                opening_balance_account="9000",
+                income_summary_account="8020",
+                profit_account="8020",
+                loss_account="8021",
+                profit_loss_carryforward_account="2970",
+                statutory_reserve_account="0846",
+                other_revenue_reserves_account="0855",
+                distribution_liability_account="0755",
+                depreciation_expense_account="4830",
+                fixed_asset_disposal_gain_account="4900",
+                fixed_asset_disposal_loss_account="8500",
+            ),
+            vat_accounts=ClientTransferVatAccounts(
+                input_tax_7="1571",
+                input_tax_19="1576",
+                output_tax_7="1771",
+                output_tax_19="1776",
+            ),
             account_roles=ClientTransferAccountRoles(),
             equity_contributions=(
                 contribution,
@@ -720,7 +736,7 @@ def test_client_rejects_duplicate_equity_contributions() -> None:
         )
 
 
-def test_client_rejects_duplicate_equity_contributions() -> None:
+def test_client_rejects_duplicate_equity_contributions_without_optional_accounts() -> None:
     contribution = ClientTransferEquityContribution(
         booking_line=ClientTransferBookingLineReference(
             booking_id=UUID(

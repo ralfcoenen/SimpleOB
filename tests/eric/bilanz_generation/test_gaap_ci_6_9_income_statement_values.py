@@ -9,6 +9,7 @@ from simpleob.eric.bilanz_generation.gaap_ci_6_9_income_statement_values import 
     GaapCi69IncomeStatementValueBuilder,
 )
 
+
 def test_adds_fixed_asset_disposal_details() -> None:
     """Gewinn und Verlust aus Anlagenabgängen bleiben getrennt."""
 

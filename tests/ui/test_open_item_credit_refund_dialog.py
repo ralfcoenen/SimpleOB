@@ -248,6 +248,7 @@ def test_successful_refund_refreshes_main_ledger_and_open_item_views():
         _refresh_accounts=lambda: calls.append("accounts"),
         _refresh_journal=lambda: calls.append("journal"),
         _refresh_balance_sheet=lambda: calls.append("balance sheet"),
+        _refresh_kr_monitoring=lambda: calls.append("KR"),
         _notebook=SimpleNamespace(currentWidget=lambda: overview_tab),
         _open_item_overview_tab=overview_tab,
         _open_item_reconciliation_tab=object(),
@@ -265,7 +266,7 @@ def test_successful_refund_refreshes_main_ledger_and_open_item_views():
     MainWindow._refresh_after_credit_refund(fake_window)
 
     assert calls == [
-        "workspace", "accounts", "journal", "balance sheet",
+        "KR", "workspace", "accounts", "journal", "balance sheet",
         "overview",
     ]
 

@@ -14,17 +14,17 @@ from simpleob.client_transfer.model import (
     ClientTransferApplication,
     ClientTransferBooking,
     ClientTransferBookingLine,
+    ClientTransferBookingLineReference,
     ClientTransferClient,
+    ClientTransferControlAccounts,
     ClientTransferEquityContribution,
     ClientTransferFiscalYear,
     ClientTransferFiscalYearReference,
-    ClientTransferFormat,
-    ClientTransferMasterData,
-    ClientTransferBookingLineReference,
-    ClientTransferControlAccounts,
     ClientTransferFixedAsset,
     ClientTransferFixedAssetDepreciation,
     ClientTransferFixedAssetMovement,
+    ClientTransferFormat,
+    ClientTransferMasterData,
     ClientTransferProfitAppropriationAnnualData,
     ClientTransferProfitAppropriationPosting,
     ClientTransferTaxonomyMapping,
@@ -33,7 +33,6 @@ from simpleob.client_transfer.model import (
 from simpleob.client_transfer.validation import (
     validate_client_transfer_references,
 )
-
 
 COMPANY_ID = UUID(
     "12345678-1234-5678-1234-567812345678"

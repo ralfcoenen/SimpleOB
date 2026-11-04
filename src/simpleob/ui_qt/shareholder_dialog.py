@@ -26,7 +26,6 @@ from simpleob.ui_qt.company_master_data_dialog import (
     FEDERAL_STATES,
 )
 
-
 LEGAL_STATUSES = (
     ("NPP", "Natürliche Person"),
     ("NPB", "Juristische Person"),

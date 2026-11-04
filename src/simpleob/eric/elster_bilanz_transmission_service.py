@@ -24,7 +24,6 @@ from simpleob.eric.eric_validate_adapter import (
     EricValidationResult,
 )
 
-
 ELSTER_TEST_MARKER = "700000004"
 DEFAULT_BILANZ_DATENART_VERSION = "Bilanz_6.9"
 

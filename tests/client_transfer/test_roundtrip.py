@@ -1,8 +1,9 @@
 """Roundtrip-Tests für den portablen Mandantentransfer."""
 
+from dataclasses import replace
 from datetime import date, datetime, timezone
-from uuid import UUID
 from pathlib import Path
+from uuid import UUID
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
@@ -42,6 +43,8 @@ from simpleob.client_transfer.model import (
     ClientTransferFixedAssetDepreciation,
     ClientTransferFixedAssetMovement,
     ClientTransferFormat,
+    ClientTransferKrAnnualTurnover,
+    ClientTransferKrSettings,
     ClientTransferMasterData,
     ClientTransferProfitAppropriationAnnualData,
     ClientTransferProfitAppropriationPosting,
@@ -84,7 +87,6 @@ from simpleob.database.shareholder_repository import (
 from simpleob.database.tax_depreciation_adjustment_repository import (
     TaxDepreciationAdjustmentRepository,
 )
-
 
 COMPANY_ID = UUID(
     "12345678-1234-5678-1234-567812345678"
@@ -550,6 +552,15 @@ def _build_rich_transfer() -> ClientTransfer:
                 federal_state="NW",
                 business="Softwareentwicklung",
             ),
+            kr_settings=ClientTransferKrSettings(
+                activity_start_date=date(2019, 8, 1),
+                waiver_declared=True,
+                waiver_date=date(2025, 4, 1),
+                external_turnovers=(
+                    ClientTransferKrAnnualTurnover(2024, "2500.10"),
+                    ClientTransferKrAnnualTurnover(2025, "3000.20"),
+                ),
+            ),
             accounts=accounts,
             control_accounts=(
                 ClientTransferControlAccounts(
@@ -822,3 +833,20 @@ def test_client_transfer_archive_roundtrip_preserves_client_data(
         first_export.client
         == second_export.client
     )
+
+
+def test_import_of_legacy_transfer_defaults_kr_settings() -> None:
+    source_transfer = _build_rich_transfer()
+    legacy_transfer = replace(
+        source_transfer,
+        client=replace(source_transfer.client, kr_settings=None),
+    )
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+
+    exported = _import_and_export(engine=engine, transfer=legacy_transfer)
+
+    assert exported.client.kr_settings is not None
+    assert exported.client.kr_settings.activity_start_date is None
+    assert exported.client.kr_settings.waiver_declared is False
+    assert exported.client.kr_settings.external_turnovers == ()

@@ -27,20 +27,20 @@ from simpleob.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
 from simpleob.accounting.income_statement import IncomeStatement
-from simpleob.domain.entry_side import EntrySide
 from simpleob.domain.bvv_evaluation import BvvEvaluation
+from simpleob.domain.entry_side import EntrySide
 from simpleob.domain.money import ZERO
 from simpleob.reporting.account_activity_report import (
     AccountActivityReport,
 )
+from simpleob.reporting.journal_report import JournalReport
+from simpleob.reporting.trial_balance_report import TrialBalanceReport
 from simpleob.services.e_bilanz_preparation_service import (
     EBilanzPreparationResult,
 )
 from simpleob.services.fixed_asset_schedule_service import (
     FixedAssetSchedulePosition,
 )
-from simpleob.reporting.journal_report import JournalReport
-from simpleob.reporting.trial_balance_report import TrialBalanceReport
 
 
 class PdfReportingService:

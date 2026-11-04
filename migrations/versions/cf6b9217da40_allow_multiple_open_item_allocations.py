@@ -47,4 +47,7 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_index(_PAYMENT_ID_INDEX, table_name=_TABLE)
     with op.batch_alter_table(_TABLE) as batch_op:
-        batch_op.create_unique_constraint(None, ["payment_id"])
+        batch_op.create_unique_constraint(
+            "uq_rechnungs_op_zahlungsereignisse_payment_id",
+            ["payment_id"],
+        )

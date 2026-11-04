@@ -1,16 +1,16 @@
 """Tests für den Arelle-Adapter."""
 
-from pathlib import Path
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 
 from simpleob.taxonomy.arelle_adapter import ArelleAdapter
-from simpleob.taxonomy.calculation_set import (
-    TaxonomyCalculationSet,
-)
 from simpleob.taxonomy.calculation import (
     TaxonomyCalculationRelation,
+)
+from simpleob.taxonomy.calculation_set import (
+    TaxonomyCalculationSet,
 )
 from simpleob.taxonomy.concept import (
     TaxonomyBalance,

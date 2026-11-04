@@ -12,7 +12,6 @@ from simpleob.core.config import ApplicationConfig
 from simpleob.ui_qt import start_dialog as module
 from simpleob.ui_qt.start_dialog import StartDialog
 
-
 POSTGRES_URL = (
     "postgresql+psycopg://"
     "testuser@localhost:5432/testdatabase"

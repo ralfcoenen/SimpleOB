@@ -1,14 +1,13 @@
 """PostgreSQL-Konkurrenztest für Ergebnisverwendungsbuchungen."""
 
 import os
-from pathlib import Path
 from datetime import date
 from decimal import Decimal
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import create_engine, delete, select
-from sqlalchemy import MetaData, text
+from sqlalchemy import create_engine, select, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 
@@ -19,11 +18,7 @@ from simpleob.database.chart_of_accounts_repository import (
 from simpleob.database.company_repository import CompanyRepository
 from simpleob.database.lock_error import DatabaseLockError
 from simpleob.database.models import (
-    Gewinnverwendungsbuchung,
     Mandant,
-    Wirtschaftsjahr,
-    GewinnverwendungsJahresdaten,
-    Kontenrolle,
 )
 from simpleob.database.profit_appropriation_annual_data_repository import (
     ProfitAppropriationAnnualDataRepository,
@@ -54,6 +49,7 @@ from simpleob.services.profit_appropriation_posting_service import (
 from simpleob.services.profit_appropriation_posting_workflow import (
     ProfitAppropriationPostingWorkflow,
 )
+
 
 def _cleanup_profit_appropriation_test_company(
     session,

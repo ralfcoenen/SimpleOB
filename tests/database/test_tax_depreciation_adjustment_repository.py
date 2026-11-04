@@ -18,32 +18,29 @@ from simpleob.database.database import Base
 from simpleob.database.fixed_asset_depreciation_repository import (
     FixedAssetDepreciationRepository,
 )
+from simpleob.database.fixed_asset_movement_repository import (
+    FixedAssetMovementRepository,
+)
 from simpleob.database.fixed_asset_repository import (
     FixedAssetRepository,
 )
 from simpleob.database.tax_depreciation_adjustment_repository import (
     TaxDepreciationAdjustmentRepository,
 )
-from simpleob.database.fixed_asset_movement_repository import (
-    FixedAssetMovementRepository,
-)
 from simpleob.domain.booking import Booking
 from simpleob.domain.booking_line import BookingLine
+from simpleob.domain.company import Company
 from simpleob.domain.entry_side import EntrySide
+from simpleob.domain.fiscal_year import FiscalYear
+from simpleob.domain.fixed_asset import FixedAsset
 from simpleob.domain.fixed_asset_movement import FixedAssetMovement
 from simpleob.domain.fixed_asset_movement_type import (
     FixedAssetMovementType,
 )
-from simpleob.services.depreciation_service import DepreciationService
-from simpleob.domain.company import Company
-from simpleob.domain.depreciation_proposal import (
-    DepreciationProposal,
-)
-from simpleob.domain.fiscal_year import FiscalYear
-from simpleob.domain.fixed_asset import FixedAsset
 from simpleob.services.depreciation_booking_service import (
     DepreciationBookingService,
 )
+from simpleob.services.depreciation_service import DepreciationService
 from simpleob.services.fixed_asset_depreciation_workflow import (
     FixedAssetDepreciationWorkflow,
 )

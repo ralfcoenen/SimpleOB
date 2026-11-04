@@ -7,13 +7,18 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from simpleob.database.lock_error import DatabaseLockError
-from simpleob.database.models import Mandant, Wirtschaftsjahr
+from simpleob.database.models import (
+    KrJahresumsatzErgaenzung,
+    Mandant,
+    Wirtschaftsjahr,
+)
 from simpleob.domain.company import Company
 from simpleob.domain.company_master_data import (
     CompanyMasterData,
 )
 from simpleob.domain.fiscal_year import FiscalYear
 from simpleob.domain.fiscal_year_status import FiscalYearStatus
+from simpleob.domain.kr_settings import KrAnnualTurnoverAddition, KrSettings
 from simpleob.domain.managed_fiscal_year import ManagedFiscalYear
 
 
@@ -557,6 +562,112 @@ class CompanyRepository:
             federal_state=model.bundesland or "",
             business=model.geschaeftstaetigkeit or "",
         )
+
+    def get_kr_settings(self, company_id: UUID) -> KrSettings | None:
+        """Lädt die KR-Einstellungen einschließlich jahresgebundener Beträge."""
+        model = (
+            self._session.query(Mandant)
+            .filter(Mandant.company_id == str(company_id))
+            .one_or_none()
+        )
+        if model is None:
+            return None
+        annual_amounts = (
+            self._session.query(KrJahresumsatzErgaenzung)
+            .filter(KrJahresumsatzErgaenzung.mandant_id == model.id)
+            .order_by(KrJahresumsatzErgaenzung.kalenderjahr)
+            .all()
+        )
+        return KrSettings(
+            company_id=UUID(model.company_id),
+            activity_start_date=model.taetigkeitsbeginn,
+            waiver_declared=model.kr_verzicht,
+            waiver_date=model.kr_verzicht_datum,
+            external_turnovers=tuple(
+                KrAnnualTurnoverAddition(
+                    calendar_year=item.kalenderjahr,
+                    amount=item.betrag,
+                )
+                for item in annual_amounts
+            ),
+        )
+
+    def save_kr_settings(
+        self,
+        settings: KrSettings,
+        *,
+        expected_settings: KrSettings | None = None,
+        commit: bool = True,
+    ) -> None:
+        """Speichert KR-Einstellungen atomar für genau einen Mandanten."""
+        if not isinstance(settings, KrSettings):
+            raise TypeError("settings must be KrSettings")
+        if expected_settings is not None and (
+            expected_settings.company_id != settings.company_id
+        ):
+            raise ValueError("Die erwarteten KR-Einstellungen gehören zu einem anderen Mandanten.")
+        query = self._session.query(Mandant).filter(
+            Mandant.company_id == str(settings.company_id)
+        )
+        if (
+            expected_settings is not None
+            and self._session.bind.dialect.name == "postgresql"
+        ):
+            try:
+                self._session.execute(
+                    text("SELECT set_config('lock_timeout', '3000ms', true)")
+                )
+                model = query.with_for_update().populate_existing().one_or_none()
+            except OperationalError as exc:
+                self._session.rollback()
+                if getattr(exc.orig, "sqlstate", None) == "55P03":
+                    raise DatabaseLockError(
+                        "KR-Einstellungen momentan gesperrt. Bitte versuchen Sie es später erneut."
+                    ) from exc
+                raise
+        else:
+            model = query.one_or_none()
+        if model is None:
+            raise ValueError("Unternehmen wurde nicht gefunden.")
+        if expected_settings is not None:
+            current = self.get_kr_settings(settings.company_id)
+            if current != expected_settings:
+                self._session.rollback()
+                raise ValueError(
+                    "Die KR-Einstellungen wurden zwischenzeitlich geändert. "
+                    "Bitte öffnen Sie den Dialog erneut."
+                )
+
+        model.taetigkeitsbeginn = settings.activity_start_date
+        model.kr_verzicht = settings.waiver_declared
+        model.kr_verzicht_datum = settings.waiver_date
+        new_amounts = {
+            item.calendar_year: item.amount
+            for item in settings.external_turnovers
+        }
+        existing = (
+            self._session.query(KrJahresumsatzErgaenzung)
+            .filter(KrJahresumsatzErgaenzung.mandant_id == model.id)
+            .all()
+        )
+        existing_by_year = {item.kalenderjahr: item for item in existing}
+        for calendar_year, amount in new_amounts.items():
+            annual_amount = existing_by_year.pop(calendar_year, None)
+            if annual_amount is None:
+                self._session.add(
+                    KrJahresumsatzErgaenzung(
+                        mandant_id=model.id,
+                        kalenderjahr=calendar_year,
+                        betrag=amount,
+                    )
+                )
+            else:
+                annual_amount.betrag = amount
+        for obsolete in existing_by_year.values():
+            self._session.delete(obsolete)
+        self._session.flush()
+        if commit:
+            self._session.commit()
 
     def save_master_data(
         self,

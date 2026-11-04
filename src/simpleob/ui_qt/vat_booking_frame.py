@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QGridLayout,
+    QGroupBox,
     QHBoxLayout,
     QInputDialog,
     QLabel,
@@ -20,7 +21,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from simpleob.amount_input import normalize_german_amount
+from simpleob.amount_input import format_german_amount, normalize_german_amount
 from simpleob.database.business_partner_repository import BusinessPartnerRepository
 from simpleob.date_input import GermanDateEdit
 from simpleob.domain.account import Account
@@ -30,6 +31,7 @@ from simpleob.domain.credit_note import (
     CreditNoteKind,
     DuplicateSupplierCreditNoteError,
 )
+from simpleob.domain.kr_monitoring import KrMonitoringSummary
 from simpleob.domain.payable_invoice import DuplicateSupplierInvoiceError
 from simpleob.domain.vat_accounts import VatAccounts
 from simpleob.domain.vat_booking_item import VatBookingItem
@@ -61,6 +63,7 @@ class VatBookingFrame(QWidget):
         on_receivable_invoice_created: Callable[..., None] | None = None,
         on_payable_invoice_created: Callable[..., None] | None = None,
         on_credit_note_created: Callable[..., None] | None = None,
+        kr_summary_provider: Callable[[], KrMonitoringSummary] | None = None,
     ) -> None:
         super().__init__(parent)
 
@@ -74,6 +77,7 @@ class VatBookingFrame(QWidget):
         self._on_receivable_invoice_created = on_receivable_invoice_created
         self._on_payable_invoice_created = on_payable_invoice_created
         self._on_credit_note_created = on_credit_note_created
+        self._kr_summary_provider = kr_summary_provider
 
         self._accounts_by_display_name = {
             self._account_display_name(account): account
@@ -90,6 +94,7 @@ class VatBookingFrame(QWidget):
         )
 
         self._position_rows: list[dict[str, object]] = []
+        self._last_kr_warning_key: tuple[object, ...] | None = None
 
         self._create_ui()
 
@@ -310,6 +315,8 @@ class VatBookingFrame(QWidget):
             self._status_label
         )
 
+        self._create_kr_summary(layout)
+
         self._invoice_type_box.currentTextChanged.connect(
             self._on_form_changed
         )
@@ -336,6 +343,116 @@ class VatBookingFrame(QWidget):
 
         self._update_remove_button()
         self._update_invoice_fields()
+        self.refresh_kr_summary()
+
+    def _create_kr_summary(self, parent_layout: QVBoxLayout) -> None:
+        box = QGroupBox("KR – Vereinnahmte Kundenzahlungen")
+        grid = QGridLayout(box)
+        grid.setContentsMargins(8, 6, 8, 6)
+        grid.setHorizontalSpacing(12)
+        grid.setVerticalSpacing(2)
+        grid.addWidget(QLabel("Position"), 0, 0)
+        self._kr_previous_year_label = QLabel("Vorjahr")
+        self._kr_current_year_label = QLabel("Laufendes Jahr")
+        grid.addWidget(self._kr_previous_year_label, 0, 1)
+        grid.addWidget(self._kr_current_year_label, 0, 2)
+        self._kr_value_labels: dict[str, tuple[QLabel, QLabel]] = {}
+        for row, (key, caption) in enumerate(
+            (
+                ("payments", "Kundenzahlungen"),
+                ("refunds", "Kundenrückerstattungen"),
+                ("external", "Externe Umsatzergänzung"),
+                ("balance", "Saldo inkl. Ergänzung"),
+                ("limit", "KR-Grenze"),
+            ),
+            start=1,
+        ):
+            grid.addWidget(QLabel(caption), row, 0)
+            previous = QLabel("–")
+            current = QLabel("–")
+            previous.setAlignment(Qt.AlignmentFlag.AlignRight)
+            current.setAlignment(Qt.AlignmentFlag.AlignRight)
+            grid.addWidget(previous, row, 1)
+            grid.addWidget(current, row, 2)
+            self._kr_value_labels[key] = (previous, current)
+
+        self._kr_direct_revenue_warning = QLabel(
+            "Direkte Erlösbuchungen vorhanden. Die KR-Auswertung kann unvollständig sein."
+        )
+        self._kr_direct_revenue_warning.setWordWrap(True)
+        self._kr_direct_revenue_warning.setStyleSheet("font-weight: bold;")
+        self._kr_direct_revenue_warning.hide()
+        grid.addWidget(self._kr_direct_revenue_warning, 6, 0, 1, 3)
+        self._kr_activity_start_warning = QLabel(
+            "Beginn der Tätigkeit fehlt. Das Gründungsjahr und die passende KR-Grenze sind nicht bestimmbar."
+        )
+        self._kr_activity_start_warning.setWordWrap(True)
+        self._kr_activity_start_warning.hide()
+        grid.addWidget(self._kr_activity_start_warning, 7, 0, 1, 3)
+        self._kr_error_label = QLabel("KR-Auswertung derzeit nicht verfügbar.")
+        self._kr_error_label.setWordWrap(True)
+        self._kr_error_label.hide()
+        grid.addWidget(self._kr_error_label, 8, 0, 1, 3)
+        self._kr_scope_note = QLabel(
+            "Ausgewertet werden ausschließlich OP-zugeordnete Kundenzahlungen und "
+            "eindeutig zuordenbare Kundenrückerstattungen. Ausgangsrechnungen müssen "
+            "dafür grundsätzlich auf Ziel erfasst werden. Direktverkäufe, Anzahlungen "
+            "ohne Rechnung und nicht eindeutig erkennbare Entgeltminderungen fehlen; "
+            "die Anzeige ersetzt keine vollständige steuerrechtliche Prüfung."
+        )
+        self._kr_scope_note.setWordWrap(True)
+        grid.addWidget(self._kr_scope_note, 9, 0, 1, 3)
+        self._kr_summary_box = box
+        parent_layout.addWidget(box)
+
+    def refresh_kr_summary(self) -> None:
+        """Aktualisiert die informative kalenderjährliche KR-Ansicht."""
+        if self._kr_summary_provider is None:
+            self._kr_summary_box.hide()
+            return
+        try:
+            summary = self._kr_summary_provider()
+        except Exception:
+            for labels in self._kr_value_labels.values():
+                for label in labels:
+                    label.setText("–")
+            self._kr_direct_revenue_warning.hide()
+            self._kr_activity_start_warning.hide()
+            self._kr_error_label.show()
+            return
+        if not summary.is_visible:
+            self._kr_summary_box.hide()
+            return
+        self._kr_summary_box.show()
+        self._kr_error_label.hide()
+        years = (summary.previous_year, summary.current_year)
+        self._kr_previous_year_label.setText(f"Vorjahr {years[0].calendar_year}")
+        self._kr_current_year_label.setText(
+            f"Laufendes Jahr {years[1].calendar_year}"
+        )
+        values = {
+            "payments": tuple(year.customer_payments for year in years),
+            "refunds": tuple(year.customer_refunds for year in years),
+            "external": tuple(year.external_turnover for year in years),
+            "balance": tuple(year.balance for year in years),
+        }
+        for key, amounts in values.items():
+            for label, amount in zip(
+                self._kr_value_labels[key], amounts, strict=True
+            ):
+                label.setText(f"{format_german_amount(amount)} €")
+        for label, year in zip(
+            self._kr_value_labels["limit"], years, strict=True
+        ):
+            label.setText(
+                "–" if year.limit is None else f"{format_german_amount(year.limit)} €"
+            )
+        self._kr_direct_revenue_warning.setVisible(
+            summary.has_direct_revenue_bookings
+        )
+        self._kr_activity_start_warning.setVisible(
+            summary.activity_start_date is None
+        )
 
     def _refresh_customer_list(self) -> None:
         self._partner_box.clear()
@@ -356,6 +473,7 @@ class VatBookingFrame(QWidget):
             self._partner_box.addItem(partner.name, partner.partner_id)
 
     def _on_invoice_type_changed(self, *_args: object) -> None:
+        self._last_kr_warning_key = None
         self._on_account.setChecked(False)
         self._refresh_customer_list()
         self._update_invoice_fields()
@@ -445,6 +563,9 @@ class VatBookingFrame(QWidget):
         amount_entry.editingFinished.connect(
             lambda entry=amount_entry:
             self._normalize_amount_entry(entry)
+        )
+        amount_entry.editingFinished.connect(
+            lambda entry=amount_entry: self._check_kr_invoice_threshold(entry)
         )
 
         tax_rate_box = QComboBox()
@@ -964,6 +1085,7 @@ class VatBookingFrame(QWidget):
     def _clear(self) -> None:
         """Leert die Rechnungspositionen nach der Buchung."""
 
+        self._last_kr_warning_key = None
         self._voucher_no_entry.clear()
         self._original_invoice_number_entry.clear()
         self._description_entry.clear()
@@ -981,6 +1103,90 @@ class VatBookingFrame(QWidget):
         row["amount_entry"].clear()
         row["tax_rate_box"].setCurrentText(
             "19 %"
+        )
+
+    def _check_kr_invoice_threshold(self, amount_entry: QLineEdit) -> None:
+        """Warnt bei einer voraussichtlichen Überschreitung durch die Rechnung."""
+        if self._invoice_type_box.currentText() != _OUTPUT_INVOICE:
+            self._last_kr_warning_key = None
+            return
+
+        if self._kr_summary_provider is None:
+            self._last_kr_warning_key = None
+            return
+
+        try:
+            self._parse_amount(amount_entry.text())
+        except ValueError:
+            self._last_kr_warning_key = None
+            return
+
+        # Die Maske und die OP-Auswertung arbeiten mit Bruttobeträgen.
+        # Der eingegebene Bruttobetrag wird einmal angesetzt; der
+        # ausgewählte Steuersatz darf ihn für die Prognose nicht erhöhen.
+        entered_amounts = []
+        for row in self._position_rows:
+            try:
+                entered_amounts.append(
+                    self._parse_amount(row["amount_entry"].text())
+                )
+            except ValueError:
+                continue
+        invoice_amount = sum(entered_amounts, Decimal("0.00"))
+        if invoice_amount <= Decimal("0.00"):
+            self._last_kr_warning_key = None
+            return
+
+        try:
+            summary = self._kr_summary_provider()
+        except Exception:
+            self._last_kr_warning_key = None
+            return
+
+        current_year = summary.current_year
+        if (
+            not summary.is_visible
+            or summary.activity_start_date is None
+            or current_year.limit is None
+        ):
+            self._last_kr_warning_key = None
+            return
+
+        current_balance = current_year.balance
+        projected_turnover = current_balance + invoice_amount
+        warning_key = (
+            self._company_id,
+            current_year.calendar_year,
+            current_balance,
+            invoice_amount,
+            current_year.limit,
+        )
+        if (
+            projected_turnover <= current_year.limit
+            or warning_key == self._last_kr_warning_key
+        ):
+            self._last_kr_warning_key = warning_key
+            return
+
+        self._last_kr_warning_key = warning_key
+        message = (
+            "Bei vollständiger Vereinnahmung dieser Ausgangsrechnung im "
+            "laufenden Kalenderjahr würde die Grenze der "
+            "Kleinunternehmerregelung überschritten.\n\n"
+            f"Bisheriger KR-Umsatz: {format_german_amount(current_balance)} €\n"
+            f"Neue Ausgangsrechnung: {format_german_amount(invoice_amount)} €\n"
+            "Prognostizierter Umsatz: "
+            f"{format_german_amount(projected_turnover)} €\n"
+            "Maßgebliche Grenze: "
+            f"{format_german_amount(current_year.limit)} €\n\n"
+            "Bitte prüfen Sie vor der Buchung, ob für diese Rechnung "
+            "Umsatzsteuer mit 19 % beziehungsweise 7 % auszuweisen ist."
+        )
+        QMessageBox.warning(
+            self,
+            "KR-Grenze voraussichtlich überschritten",
+            message,
+            QMessageBox.StandardButton.Ok,
         )
 
     def _resolve_account(

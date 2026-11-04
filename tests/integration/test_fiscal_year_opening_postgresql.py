@@ -3,6 +3,7 @@
 import os
 from datetime import date
 from decimal import Decimal
+from unittest.mock import Mock
 from uuid import uuid4
 
 import pytest
@@ -10,10 +11,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 
-from unittest.mock import Mock
-
 from simpleob.core.context import ApplicationContext
-from simpleob.services.fiscal_year_workspace import FiscalYearWorkspace
 from simpleob.database.booking_repository import BookingRepository
 from simpleob.database.company_repository import CompanyRepository
 from simpleob.database.lock_error import DatabaseLockError
@@ -31,6 +29,7 @@ from simpleob.services.fiscal_year_opening_workflow import (
 from simpleob.services.fiscal_year_transfer_service import (
     FiscalYearTransferService,
 )
+from simpleob.services.fiscal_year_workspace import FiscalYearWorkspace
 from simpleob.services.posting_service import PostingService
 
 

@@ -25,6 +25,8 @@ from simpleob.client_transfer.model import (
     ClientTransferFixedAssetDepreciation,
     ClientTransferFixedAssetMovement,
     ClientTransferFormat,
+    ClientTransferKrAnnualTurnover,
+    ClientTransferKrSettings,
     ClientTransferMasterData,
     ClientTransferProfitAppropriationAnnualData,
     ClientTransferProfitAppropriationPosting,
@@ -36,7 +38,6 @@ from simpleob.client_transfer.model import (
 from simpleob.client_transfer.validation import (
     validate_client_transfer_references,
 )
-
 
 JsonObject = dict[str, Any]
 
@@ -211,6 +212,55 @@ def _master_data_from_dict(
         business=_optional_string_with_default(
             data,
             "business",
+        ),
+    )
+
+
+def _kr_settings_from_dict(data: JsonObject) -> ClientTransferKrSettings:
+    activity_start_value = data.get("activity_start_date")
+    waiver_date_value = data.get("waiver_date")
+    return ClientTransferKrSettings(
+        activity_start_date=(
+            None
+            if activity_start_value is None
+            else _parse_date(
+                activity_start_value,
+                field_name="kr_settings.activity_start_date",
+            )
+        ),
+        waiver_declared=_require_bool(
+            data.get("waiver_declared"),
+            field_name="kr_settings.waiver_declared",
+        ),
+        waiver_date=(
+            None
+            if waiver_date_value is None
+            else _parse_date(
+                waiver_date_value,
+                field_name="kr_settings.waiver_date",
+            )
+        ),
+        external_turnovers=tuple(
+            ClientTransferKrAnnualTurnover(
+                calendar_year=_require_int(
+                    item.get("calendar_year"),
+                    field_name="kr_settings.external_turnovers.calendar_year",
+                ),
+                amount=_require_string(
+                    item.get("amount"),
+                    field_name="kr_settings.external_turnovers.amount",
+                ),
+            )
+            for item in (
+                _require_object(
+                    item,
+                    field_name="kr_settings.external_turnovers item",
+                )
+                for item in _require_list(
+                    data.get("external_turnovers", []),
+                    field_name="kr_settings.external_turnovers",
+                )
+            )
         ),
     )
 
@@ -868,6 +918,7 @@ def _client_from_dict(
 ) -> ClientTransferClient:
     control_value = data.get("control_accounts")
     vat_value = data.get("vat_accounts")
+    kr_settings_value = data.get("kr_settings")
 
     return ClientTransferClient(
         company_id=_parse_uuid(
@@ -916,6 +967,16 @@ def _client_from_dict(
             _require_object(
                 data.get("account_roles"),
                 field_name="client.account_roles",
+            )
+        ),
+        kr_settings=(
+            None
+            if kr_settings_value is None
+            else _kr_settings_from_dict(
+                _require_object(
+                    kr_settings_value,
+                    field_name="client.kr_settings",
+                )
             )
         ),
         taxonomy_mappings=tuple(

@@ -9,7 +9,6 @@ from sqlalchemy.engine import make_url
 
 from simpleob.core.config import ApplicationConfig
 
-
 TEST_DATABASE = "simpleob_migration_test"
 
 

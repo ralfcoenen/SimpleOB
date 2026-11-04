@@ -1,8 +1,8 @@
 """Tests für den portablen Mandantenimport."""
 
 from datetime import date, datetime, timezone
-from uuid import UUID
 from decimal import Decimal
+from uuid import UUID
 
 import pytest
 from sqlalchemy import create_engine
@@ -27,22 +27,22 @@ from simpleob.client_transfer.model import (
     ClientTransferBooking,
     ClientTransferBookingLine,
     ClientTransferBookingLineReference,
-    ClientTransferFixedAssetDepreciation,
-    ClientTransferEquityContribution,
-    ClientTransferTaxDepreciationAdjustment,
-    ClientTransferFixedAssetMovement,
     ClientTransferClient,
     ClientTransferControlAccounts,
+    ClientTransferEquityContribution,
     ClientTransferFiscalYear,
     ClientTransferFiscalYearReference,
     ClientTransferFixedAsset,
+    ClientTransferFixedAssetDepreciation,
+    ClientTransferFixedAssetMovement,
     ClientTransferFormat,
     ClientTransferMasterData,
-    ClientTransferShareholder,
-    ClientTransferTaxonomyMapping,
-    ClientTransferVatAccounts,
     ClientTransferProfitAppropriationAnnualData,
     ClientTransferProfitAppropriationPosting,
+    ClientTransferShareholder,
+    ClientTransferTaxDepreciationAdjustment,
+    ClientTransferTaxonomyMapping,
+    ClientTransferVatAccounts,
 )
 from simpleob.database.booking_repository import (
     BookingRepository,
@@ -54,20 +54,17 @@ from simpleob.database.company_repository import (
     CompanyRepository,
 )
 from simpleob.database.database import Base
-from simpleob.database.fixed_asset_depreciation_repository import (
-    FixedAssetDepreciationRepository,
-)
-from simpleob.database.tax_depreciation_adjustment_repository import (
-    TaxDepreciationAdjustmentRepository,
-)
 from simpleob.database.equity_contribution_repository import (
     EquityContributionRepository,
 )
-from simpleob.database.fixed_asset_repository import (
-    FixedAssetRepository,
+from simpleob.database.fixed_asset_depreciation_repository import (
+    FixedAssetDepreciationRepository,
 )
 from simpleob.database.fixed_asset_movement_repository import (
     FixedAssetMovementRepository,
+)
+from simpleob.database.fixed_asset_repository import (
+    FixedAssetRepository,
 )
 from simpleob.database.profit_appropriation_annual_data_repository import (
     ProfitAppropriationAnnualDataRepository,
@@ -78,12 +75,14 @@ from simpleob.database.profit_appropriation_posting_repository import (
 from simpleob.database.shareholder_repository import (
     ShareholderRepository,
 )
-from simpleob.domain.profit_appropriation_posting_type import (
-    ProfitAppropriationPostingType,
+from simpleob.database.tax_depreciation_adjustment_repository import (
+    TaxDepreciationAdjustmentRepository,
 )
+from simpleob.domain.booking_type import BookingType
 from simpleob.domain.company import Company
 from simpleob.domain.depreciation_kind import DepreciationKind
 from simpleob.domain.depreciation_source import DepreciationSource
+from simpleob.domain.entry_side import EntrySide
 from simpleob.domain.equity_contribution_reference import (
     EquityContributionReference,
 )
@@ -94,13 +93,12 @@ from simpleob.domain.fiscal_year_status import (
 from simpleob.domain.fixed_asset_movement_type import (
     FixedAssetMovementType,
 )
-from simpleob.domain.booking_type import BookingType
-from simpleob.domain.entry_side import EntrySide
 from simpleob.domain.fixed_asset_status import (
     FixedAssetStatus,
 )
-
-
+from simpleob.domain.profit_appropriation_posting_type import (
+    ProfitAppropriationPostingType,
+)
 
 COMPANY_ID = UUID(
     "12345678-1234-5678-1234-567812345678"

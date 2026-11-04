@@ -3,9 +3,9 @@
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy.orm import Session
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
+from sqlalchemy.orm import Session
 
 from simpleob.database.lock_error import DatabaseLockError
 from simpleob.database.models import (

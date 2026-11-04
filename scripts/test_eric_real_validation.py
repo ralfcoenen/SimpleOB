@@ -111,26 +111,26 @@ from simpleob.taxonomy.concept import TaxonomyPeriodType
 from simpleob.taxonomy.concept_set import TaxonomyConceptSet
 from simpleob.taxonomy.context import TaxonomyContext
 from simpleob.taxonomy.entry_point import TaxonomyEntryPoint
+from simpleob.taxonomy.fact import TaxonomyFact
+from simpleob.taxonomy.fiscal_requirement_reader import (
+    FiscalRequirement,
+    FiscalRequirementReader,
+)
+from simpleob.taxonomy.gaap_ci_mandatory_fact_completer import (
+    GaapCiMandatoryFactCompleter,
+)
 from simpleob.taxonomy.gcd_company_data_mapper import (
     GcdCompanyDataMapper,
 )
 from simpleob.taxonomy.gcd_fact_builder import GcdFactBuilder
+from simpleob.taxonomy.gcd_report_profile import GcdReportProfile
 from simpleob.taxonomy.gcd_shareholder import (
     GcdShareDivideKey,
     GcdShareholder,
     GcdShareholderLegalStatus,
 )
-from simpleob.taxonomy.gcd_report_profile import GcdReportProfile
 from simpleob.taxonomy.hgb_gaap_ci_mapping import (
     create_hgb_gaap_ci_mapping,
-)
-from simpleob.taxonomy.gaap_ci_mandatory_fact_completer import (
-    GaapCiMandatoryFactCompleter,
-)
-from simpleob.taxonomy.fact import TaxonomyFact
-from simpleob.taxonomy.fiscal_requirement_reader import (
-    FiscalRequirement,
-    FiscalRequirementReader,
 )
 from simpleob.taxonomy.mapper import TaxonomyMapper
 from simpleob.taxonomy.nil_fact import TaxonomyNilFact

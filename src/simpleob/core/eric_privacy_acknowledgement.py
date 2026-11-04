@@ -5,7 +5,6 @@ from __future__ import annotations
 import tomllib
 from pathlib import Path
 
-
 ERIC_PRIVACY_NOTICE_VERSION = "2021-07-01"
 
 ERIC_PRIVACY_ACKNOWLEDGEMENT_FILENAME = (

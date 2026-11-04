@@ -67,6 +67,7 @@ def _booking_window(*, enable_invoice_actions: bool = False) -> MainWindow:
         company=SimpleNamespace(company_id=uuid4())
     )
     window._workspace = SimpleNamespace(is_open=True)
+    window._kr_monitoring_service = None
     window._opening_balance_button = QPushButton()
     window._create_booking_tab()
     window.setCentralWidget(window._booking_tab)

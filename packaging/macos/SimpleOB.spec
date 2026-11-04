@@ -4,7 +4,11 @@ from importlib.metadata import version
 import os
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_data_files, copy_metadata
+from PyInstaller.utils.hooks import (
+    collect_data_files,
+    collect_submodules,
+    copy_metadata,
+)
 
 
 PROJECT_ROOT = Path(SPECPATH).resolve().parents[1]
@@ -58,6 +62,11 @@ arelle_datas = collect_data_files(
     "arelle",
     include_py_files=False,
 )
+
+postgresql_hiddenimports = [
+    "sqlalchemy.dialects.postgresql.psycopg",
+    *collect_submodules("psycopg"),
+]
 
 arelle_datas = [
     entry
@@ -164,6 +173,7 @@ a = Analysis(
     ],
     hiddenimports=[
         "logging.config",
+        *postgresql_hiddenimports,
     ],
     hookspath=[],
     hooksconfig={},

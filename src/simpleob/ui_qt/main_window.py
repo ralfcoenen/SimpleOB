@@ -82,6 +82,7 @@ from simpleob.services.credit_note_posting_service import (
     CreditNotePostingService,
 )
 from simpleob.services.fiscal_year_workspace import FiscalYearWorkspace
+from simpleob.services.kr_monitoring_service import KrMonitoringService
 from simpleob.services.open_item_credit_refund_reversal_service import (
     OpenItemCreditRefundReversalService,
 )
@@ -142,6 +143,7 @@ from simpleob.ui_qt.fixed_asset_disposal_link_dialog import (
 from simpleob.ui_qt.income_statement_frame import (
     IncomeStatementFrame,
 )
+from simpleob.ui_qt.kr_settings_dialog import KrSettingsDialog
 from simpleob.ui_qt.new_fixed_asset_dialog import NewFixedAssetDialog
 from simpleob.ui_qt.open_item_credit_refund_dialog import OpenItemCreditRefundDialog
 from simpleob.ui_qt.open_item_credit_refund_reversal_dialog import (
@@ -215,6 +217,7 @@ class MainWindow(QMainWindow):
         open_item_invoice_cancellation_service: OpenItemInvoiceCancellationService | None = None,
         open_item_credit_refund_service: OpenItemCreditRefundService | None = None,
         open_item_credit_refund_reversal_service: OpenItemCreditRefundReversalService | None = None,
+        kr_monitoring_service: KrMonitoringService | None = None,
     ) -> None:
         super().__init__()
 
@@ -264,6 +267,7 @@ class MainWindow(QMainWindow):
         self._open_item_invoice_cancellation_service = open_item_invoice_cancellation_service
         self._open_item_credit_refund_service = open_item_credit_refund_service
         self._open_item_credit_refund_reversal_service = open_item_credit_refund_reversal_service
+        self._kr_monitoring_service = kr_monitoring_service
         self._eric_certificate_path = (
             Path(eric_certificate_path).expanduser()
             if eric_certificate_path is not None
@@ -508,6 +512,10 @@ class MainWindow(QMainWindow):
         self._company_master_data_button.triggered.connect(
             self._open_company_master_data
         )
+        self._kr_settings_button = self._administration_menu.addAction(
+            "Kleinunternehmerregelung"
+        )
+        self._kr_settings_button.triggered.connect(self._open_kr_settings)
         self._shareholders_button = self._administration_menu.addAction(
             "Gesellschafter…"
         )
@@ -541,12 +549,17 @@ class MainWindow(QMainWindow):
     def _refresh_after_open_item_cancellation(self) -> None:
         """Aktualisiert Hauptbuchanzeigen nach einem OP-Rechnungsstorno."""
 
+        self._refresh_kr_monitoring()
         self._workspace.reload()
         self._refresh_accounts()
         self._refresh_journal()
         self._refresh_balance_sheet()
         self._refresh_closing()
         self._refresh_visible_open_item_view()
+
+    def _refresh_kr_monitoring(self) -> None:
+        """Aktualisiert die rein informative KR-Anzeige."""
+        self._vat_booking_frame.refresh_kr_summary()
 
     def _refresh_visible_open_item_view(self) -> None:
         """Aktualisiert nur die gerade sichtbare OP-Ansicht."""
@@ -2226,6 +2239,15 @@ class MainWindow(QMainWindow):
                 if self._credit_note_posting_service is not None
                 else None
             ),
+            kr_summary_provider=(
+                (
+                    lambda: self._kr_monitoring_service.get_summary(
+                        company_id=self._context.company.company_id
+                    )
+                )
+                if self._kr_monitoring_service is not None
+                else None
+            ),
         )
 
         self._booking_frame_layout.addWidget(
@@ -2288,6 +2310,7 @@ class MainWindow(QMainWindow):
             accounts=self._accounts,
         )
         if dialog.exec() == QDialog.DialogCode.Accepted:
+            self._refresh_kr_monitoring()
             self._workspace.reload()
             self._refresh_accounts()
             self._refresh_journal()
@@ -2340,6 +2363,7 @@ class MainWindow(QMainWindow):
 
     def _refresh_after_credit_refund(self) -> None:
         """Aktualisiert Hauptbuch und OP-Ansichten nach einer Rückerstattung."""
+        self._refresh_kr_monitoring()
         self._workspace.reload()
         self._refresh_accounts()
         self._refresh_journal()
@@ -2369,6 +2393,7 @@ class MainWindow(QMainWindow):
             fiscal_year=self._context.fiscal_year, service=service,
         )
         if dialog.exec() == QDialog.DialogCode.Accepted:
+            self._refresh_kr_monitoring()
             self._workspace.reload()
             self._refresh_accounts()
             self._refresh_journal()
@@ -2418,6 +2443,7 @@ class MainWindow(QMainWindow):
             ),
         )
 
+        self._refresh_kr_monitoring()
         self._refresh_accounts()
         self._refresh_journal()
         self._refresh_balance_sheet()
@@ -2516,6 +2542,7 @@ class MainWindow(QMainWindow):
             vat_accounts=self._vat_accounts,
             description=description,
         )
+        self._refresh_kr_monitoring()
         self._workspace.reload()
         self._refresh_accounts()
         self._refresh_journal()
@@ -2555,6 +2582,7 @@ class MainWindow(QMainWindow):
         self._refresh_journal()
         self._refresh_balance_sheet()
         self._refresh_visible_open_item_view()
+        self._refresh_kr_monitoring()
 
     def _post_credit_note(
         self,
@@ -2592,6 +2620,7 @@ class MainWindow(QMainWindow):
         if kind is CreditNoteKind.SUPPLIER:
             arguments["duplicate_reason"] = duplicate_reason
         post(**arguments)
+        self._refresh_kr_monitoring()
         self._workspace.reload()
         self._refresh_accounts()
         self._refresh_journal()
@@ -4361,6 +4390,7 @@ class MainWindow(QMainWindow):
             )
             return
 
+        self._refresh_kr_monitoring()
         self._refresh_journal()
         self._refresh_accounts()
         self._refresh_fixed_assets()
@@ -5489,6 +5519,36 @@ class MainWindow(QMainWindow):
             "Die Unternehmensstammdaten wurden gespeichert.",
         )
 
+    def _open_kr_settings(self) -> None:
+        """Bearbeitet Einstellungen der informativen KR-Anzeige."""
+        service = self._kr_monitoring_service
+        if service is None:
+            return
+        company_id = self._context.company.company_id
+        try:
+            settings = service.get_settings(company_id=company_id)
+        except ValueError as exc:
+            QMessageBox.critical(self, "Kleinunternehmerregelung", str(exc))
+            return
+        dialog = KrSettingsDialog(self, settings=settings)
+        dialog.exec()
+        if dialog.result is None:
+            return
+        try:
+            service.save_settings(
+                dialog.result,
+                expected_settings=settings,
+            )
+        except (ValueError, DatabaseLockError) as exc:
+            QMessageBox.critical(self, "Kleinunternehmerregelung", str(exc))
+            return
+        self._refresh_kr_monitoring()
+        QMessageBox.information(
+            self,
+            "Kleinunternehmerregelung",
+            "Die KR-Einstellungen wurden gespeichert.",
+        )
+
     def _reload_bookkeeping_data(
         self,
         _tab_index: int | None = None,
@@ -5712,6 +5772,7 @@ class MainWindow(QMainWindow):
 
         # Mandantenbezogene Verwaltungsfunktionen sperren.
         self._company_master_data_button.setEnabled(False)
+        self._kr_settings_button.setEnabled(False)
         self._shareholders_button.setEnabled(False)
         self._account_configuration_button.setEnabled(False)
         self._export_company_button.setEnabled(False)

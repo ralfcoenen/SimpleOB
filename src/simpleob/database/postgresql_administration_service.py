@@ -8,32 +8,31 @@ from pathlib import Path
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 
-
 from simpleob.core.config import ApplicationConfig
 from simpleob.database.migration_service import (
     DatabaseMigrationService,
     PostgreSQLSchemaInspection,
     PostgreSQLSchemaStatus,
 )
+from simpleob.database.postgresql_backup_service import (
+    PostgreSQLBackupService,
+)
+from simpleob.database.postgresql_maintenance_isolation import (
+    postgresql_maintenance_isolation,
+)
 from simpleob.database.postgresql_migration_lock import (
     postgresql_migration_lock,
-)
-from simpleob.database.postgresql_session_inspection import (
-    inspect_postgresql_sessions,
 )
 from simpleob.database.postgresql_migration_safety import (
     PostgreSQLMigrationAction,
     PostgreSQLMigrationApproval,
     validate_postgresql_migration,
 )
-from simpleob.database.postgresql_backup_service import (
-    PostgreSQLBackupService,
-)
 from simpleob.database.postgresql_restore_verification import (
     PostgreSQLRestoreVerificationService,
 )
-from simpleob.database.postgresql_maintenance_isolation import (
-    postgresql_maintenance_isolation,
+from simpleob.database.postgresql_session_inspection import (
+    inspect_postgresql_sessions,
 )
 
 

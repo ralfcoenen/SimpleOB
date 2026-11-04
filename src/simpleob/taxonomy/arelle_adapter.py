@@ -8,16 +8,16 @@ from arelle import XbrlConst
 from arelle.api.Session import Session
 from arelle.RuntimeOptions import RuntimeOptions
 
-from simpleob.taxonomy.concept import (
-    TaxonomyBalance,
-    TaxonomyConcept,
-    TaxonomyPeriodType,
-)
 from simpleob.taxonomy.calculation import (
     TaxonomyCalculationRelation,
 )
 from simpleob.taxonomy.calculation_set import (
     TaxonomyCalculationSet,
+)
+from simpleob.taxonomy.concept import (
+    TaxonomyBalance,
+    TaxonomyConcept,
+    TaxonomyPeriodType,
 )
 from simpleob.taxonomy.concept_set import TaxonomyConceptSet
 from simpleob.taxonomy.label import (

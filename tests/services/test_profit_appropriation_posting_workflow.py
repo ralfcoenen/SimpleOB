@@ -2,13 +2,9 @@
 
 from datetime import date
 from decimal import Decimal
+from unittest.mock import Mock
 from uuid import uuid4
 
-from unittest.mock import Mock
-
-from simpleob.domain.profit_appropriation_annual_data import (
-    ProfitAppropriationAnnualData,
-)
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -25,6 +21,9 @@ from simpleob.database.profit_appropriation_posting_repository import (
 )
 from simpleob.domain.company import Company
 from simpleob.domain.fiscal_year import FiscalYear
+from simpleob.domain.profit_appropriation_annual_data import (
+    ProfitAppropriationAnnualData,
+)
 from simpleob.domain.profit_appropriation_posting_proposal import (
     ProfitAppropriationPostingProposal,
 )

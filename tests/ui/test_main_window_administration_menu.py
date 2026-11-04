@@ -21,6 +21,7 @@ def _window(*, export_available: bool = True) -> tuple[MainWindow, QHBoxLayout]:
     QMainWindow.__init__(window)
     window._export_client_transfer = object() if export_available else None
     window._open_company_master_data = Mock()
+    window._open_kr_settings = Mock()
     window._open_shareholders = Mock()
     window._open_account_configuration = Mock()
     window._export_company = Mock()
@@ -31,7 +32,7 @@ def _window(*, export_available: bool = True) -> tuple[MainWindow, QHBoxLayout]:
     return window, layout
 
 
-def test_administration_actions_are_grouped_without_duplicates_or_kr_action():
+def test_administration_actions_include_kr_settings_without_duplicates():
     window, layout = _window()
 
     assert layout.count() == 1
@@ -44,6 +45,7 @@ def test_administration_actions_are_grouped_without_duplicates_or_kr_action():
     labels = [action.text() for action in actions]
     assert labels == [
         "Unternehmensstammdaten…",
+        "Kleinunternehmerregelung",
         "Gesellschafter…",
         "Kontenkonfiguration…",
         "Mandant exportieren…",
@@ -55,6 +57,7 @@ def test_administration_actions_are_grouped_without_duplicates_or_kr_action():
         action.trigger()
 
     window._open_company_master_data.assert_called_once()
+    window._open_kr_settings.assert_called_once()
     window._open_shareholders.assert_called_once()
     window._open_account_configuration.assert_called_once()
     window._export_company.assert_called_once()

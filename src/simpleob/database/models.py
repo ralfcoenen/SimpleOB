@@ -105,6 +105,23 @@ class Mandant(Base):
         nullable=True,
     )
 
+    taetigkeitsbeginn: Mapped[date | None] = mapped_column(
+        Date,
+        nullable=True,
+    )
+
+    kr_verzicht: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="0",
+    )
+
+    kr_verzicht_datum: Mapped[date | None] = mapped_column(
+        Date,
+        nullable=True,
+    )
+
     wirtschaftsjahre: Mapped[list["Wirtschaftsjahr"]] = relationship(
         back_populates="mandant",
         cascade="all, delete-orphan",
@@ -131,6 +148,39 @@ class Mandant(Base):
         back_populates="mandant",
         cascade="all, delete-orphan",
         uselist=False,
+    )
+
+
+class KrJahresumsatzErgaenzung(Base):
+    """Mandantenbezogene externe Umsatzergänzung für ein Kalenderjahr."""
+
+    __tablename__ = "kr_jahresumsatz_ergaenzungen"
+    __table_args__ = (
+        UniqueConstraint(
+            "mandant_id",
+            "kalenderjahr",
+            name="uq_kr_jahresumsatz_mandant_jahr",
+        ),
+        CheckConstraint(
+            "kalenderjahr >= 1 AND kalenderjahr <= 9999",
+            name="ck_kr_jahresumsatz_kalenderjahr",
+        ),
+        CheckConstraint(
+            "betrag >= 0",
+            name="ck_kr_jahresumsatz_betrag_nichtnegativ",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    mandant_id: Mapped[int] = mapped_column(
+        ForeignKey("mandanten.id"),
+        nullable=False,
+    )
+    kalenderjahr: Mapped[int] = mapped_column(Integer, nullable=False)
+    betrag: Mapped[Decimal] = mapped_column(
+        Numeric(18, 2),
+        nullable=False,
+        default=Decimal("0.00"),
     )
 
 class Konto(Base):

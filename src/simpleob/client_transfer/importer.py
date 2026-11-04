@@ -26,6 +26,15 @@ from simpleob.database.company_repository import (
 from simpleob.database.equity_contribution_repository import (
     EquityContributionRepository,
 )
+from simpleob.database.fixed_asset_depreciation_repository import (
+    FixedAssetDepreciationRepository,
+)
+from simpleob.database.fixed_asset_movement_repository import (
+    FixedAssetMovementRepository,
+)
+from simpleob.database.fixed_asset_repository import (
+    FixedAssetRepository,
+)
 from simpleob.database.profit_appropriation_annual_data_repository import (
     ProfitAppropriationAnnualDataRepository,
 )
@@ -34,15 +43,6 @@ from simpleob.database.profit_appropriation_posting_repository import (
 )
 from simpleob.database.shareholder_repository import (
     ShareholderRepository,
-)
-from simpleob.database.fixed_asset_repository import (
-    FixedAssetRepository,
-)
-from simpleob.database.fixed_asset_movement_repository import (
-    FixedAssetMovementRepository,
-)
-from simpleob.database.fixed_asset_depreciation_repository import (
-    FixedAssetDepreciationRepository,
 )
 from simpleob.database.tax_depreciation_adjustment_repository import (
     TaxDepreciationAdjustmentRepository,
@@ -67,17 +67,14 @@ from simpleob.domain.company_master_data import (
 )
 from simpleob.domain.depreciation_kind import DepreciationKind
 from simpleob.domain.depreciation_source import DepreciationSource
+from simpleob.domain.entry_side import EntrySide
 from simpleob.domain.equity_contribution_reference import (
     EquityContributionReference,
 )
-from simpleob.domain.fixed_asset_depreciation import (
-    FixedAssetDepreciation,
-)
-from simpleob.domain.entry_side import EntrySide
 from simpleob.domain.fiscal_year import FiscalYear
 from simpleob.domain.fixed_asset import FixedAsset
-from simpleob.domain.fixed_asset_status import (
-    FixedAssetStatus,
+from simpleob.domain.fixed_asset_depreciation import (
+    FixedAssetDepreciation,
 )
 from simpleob.domain.fixed_asset_movement import (
     FixedAssetMovement,
@@ -85,6 +82,10 @@ from simpleob.domain.fixed_asset_movement import (
 from simpleob.domain.fixed_asset_movement_type import (
     FixedAssetMovementType,
 )
+from simpleob.domain.fixed_asset_status import (
+    FixedAssetStatus,
+)
+from simpleob.domain.kr_settings import KrAnnualTurnoverAddition, KrSettings
 from simpleob.domain.profit_appropriation_annual_data import (
     ProfitAppropriationAnnualData,
 )
@@ -94,9 +95,10 @@ from simpleob.domain.profit_appropriation_posting import (
 from simpleob.domain.profit_appropriation_posting_type import (
     ProfitAppropriationPostingType,
 )
+from simpleob.domain.shareholder import Shareholder
 from simpleob.domain.template_account import TemplateAccount
 from simpleob.domain.vat_accounts import VatAccounts
-from simpleob.domain.shareholder import Shareholder
+
 
 class ClientTransferImporter:
     """Importiert einen portablen SimpleOB-Mandanten."""
@@ -208,6 +210,24 @@ class ClientTransferImporter:
                 ),
                 commit=False,
             )
+            if transfer.client.kr_settings is not None:
+                transferred_kr = transfer.client.kr_settings
+                self._company_repository.save_kr_settings(
+                    KrSettings(
+                        company_id=company_id,
+                        activity_start_date=transferred_kr.activity_start_date,
+                        waiver_declared=transferred_kr.waiver_declared,
+                        waiver_date=transferred_kr.waiver_date,
+                        external_turnovers=tuple(
+                            KrAnnualTurnoverAddition(
+                                calendar_year=item.calendar_year,
+                                amount=Decimal(item.amount),
+                            )
+                            for item in transferred_kr.external_turnovers
+                        ),
+                    ),
+                    commit=False,
+                )
 
             for transfer_account in (
                 transfer.client.accounts

@@ -13,7 +13,6 @@ from simpleob.database.postgresql_maintenance_isolation import (
     postgresql_maintenance_isolation,
 )
 
-
 TEST_DATABASE = "simpleob_migration_test"
 
 

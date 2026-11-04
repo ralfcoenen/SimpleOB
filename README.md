@@ -6,7 +6,7 @@ Das Projekt wird im Repository unter dem Entwicklungsnamen **OpenBilanz-UG** gef
 
 ## Aktueller Stand
 
-Aktuelle Version: **0.47.1**
+Aktuelle Version: **0.51.0**
 
 SimpleOB umfasst inzwischen insbesondere:
 

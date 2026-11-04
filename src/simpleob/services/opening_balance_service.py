@@ -5,9 +5,9 @@ from datetime import date
 from simpleob.domain.account_type import AccountType
 from simpleob.domain.booking import Booking
 from simpleob.domain.booking_line import BookingLine
+from simpleob.domain.booking_type import BookingType
 from simpleob.domain.entry_side import EntrySide
 from simpleob.domain.opening_balance import OpeningBalance
-from simpleob.domain.booking_type import BookingType
 
 
 class OpeningBalanceService:

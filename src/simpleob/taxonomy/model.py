@@ -2,11 +2,11 @@
 
 from dataclasses import dataclass, field
 
-from simpleob.taxonomy.concept import TaxonomyConcept
-from simpleob.taxonomy.concept_set import TaxonomyConceptSet
 from simpleob.taxonomy.calculation_set import (
     TaxonomyCalculationSet,
 )
+from simpleob.taxonomy.concept import TaxonomyConcept
+from simpleob.taxonomy.concept_set import TaxonomyConceptSet
 from simpleob.taxonomy.label import (
     TaxonomyLabel,
     TaxonomyLabelRole,

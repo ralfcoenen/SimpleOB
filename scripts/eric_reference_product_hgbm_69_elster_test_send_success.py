@@ -45,14 +45,18 @@ Der Test:
 
 from __future__ import annotations
 
+import getpass
+import os
+import xml.etree.ElementTree as ET
 from copy import deepcopy
 from dataclasses import replace
 from decimal import Decimal
 from io import StringIO
 from pathlib import Path
-import xml.etree.ElementTree as ET
-import getpass
-import os
+
+from simpleob.database.bvv_annual_data_repository import (
+    BvvAnnualDataRepository,
+)
 
 from simpleob.accounting.balance_sheet import BalanceSheet
 from simpleob.accounting.financial_statement_context import (
@@ -65,6 +69,7 @@ from simpleob.accounting.hgb_financial_statement_position_provider import (
 from simpleob.accounting.income_statement import IncomeStatement
 from simpleob.accounting.ledger import Ledger
 from simpleob.core.config import load_config
+from simpleob.core.context import ApplicationContext
 from simpleob.core.version import get_application_version
 from simpleob.database.booking_repository import BookingRepository
 from simpleob.database.chart_of_accounts_repository import (
@@ -81,6 +86,9 @@ from simpleob.database.fixed_asset_movement_repository import (
 from simpleob.database.fixed_asset_repository import FixedAssetRepository
 from simpleob.database.shareholder_repository import (
     ShareholderRepository,
+)
+from simpleob.database.tax_depreciation_adjustment_repository import (
+    TaxDepreciationAdjustmentRepository,
 )
 from simpleob.domain.account_type import AccountType
 from simpleob.domain.booking_type import BookingType
@@ -113,89 +121,34 @@ from simpleob.eric.bilanz_generation.taxonomy_6_9_values import (
 from simpleob.eric.bilanz_generation.taxonomy_6_9_xbrl_document_builder import (
     Taxonomy69XbrlDocumentBuilder,
 )
-
 from simpleob.eric.elster_bilanz_payload_service import (
     ElsterBilanzPayloadService,
 )
 from simpleob.eric.eric_create_th_adapter import (
     EricCreateThAdapter,
 )
-from simpleob.eric.eric_validate_adapter import (
-    EricValidateAdapter,
-    EricValidateError,
-)
 from simpleob.eric.eric_send_adapter import (
     EricSendAdapter,
     EricSendError,
 )
-from simpleob.services.closing_result import ClosingResult
-from simpleob.services.closing_service import ClosingService
-from simpleob.services.e_bilanz_account_detail_service import (
-    EBilanzAccountDetailService,
-)
-from simpleob.services.fixed_asset_schedule_service import (
-    FixedAssetScheduleService,
-)
-from simpleob.services.posting_service import PostingService
-from simpleob.taxonomy.account_balance_builder import (
-    AccountBalanceBuilder,
-)
-from simpleob.taxonomy.arelle_adapter import ArelleAdapter
-from simpleob.taxonomy.concept import TaxonomyPeriodType
-from simpleob.taxonomy.concept_set import TaxonomyConceptSet
-from simpleob.taxonomy.context import TaxonomyContext
-from simpleob.taxonomy.entry_point import TaxonomyEntryPoint
-from simpleob.taxonomy.gcd_company_data_mapper import (
-    GcdCompanyDataMapper,
-)
-from simpleob.taxonomy.gcd_fact_builder import GcdFactBuilder
-from simpleob.taxonomy.gcd_shareholder import (
-    GcdShareDivideKey,
-    GcdShareholder,
-    GcdShareholderLegalStatus,
-)
-from simpleob.taxonomy.gcd_report_profile import GcdReportProfile
-from simpleob.taxonomy.hgb_gaap_ci_mapping import (
-    create_hgb_gaap_ci_mapping,
-)
-from simpleob.taxonomy.gaap_ci_mandatory_fact_completer import (
-    GaapCiMandatoryFactCompleter,
-)
-from simpleob.taxonomy.fact import TaxonomyFact
-from simpleob.taxonomy.fixed_asset_schedule_builder import (
-    FixedAssetScheduleBuilder,
-)
-from simpleob.taxonomy.fiscal_requirement_reader import (
-    FiscalRequirement,
-    FiscalRequirementReader,
-)
-from simpleob.taxonomy.mapper import TaxonomyMapper
-from simpleob.taxonomy.nil_fact import TaxonomyNilFact
-from simpleob.taxonomy.resolver import TaxonomyResolver
-from simpleob.taxonomy.taxonomy import TaxonomyVersion
-from simpleob.taxonomy.unit import TaxonomyUnit
-from simpleob.accounting.financial_statement_context import (
-    create_standard_financial_statement_context,
-)
-from simpleob.accounting.hgb_financial_statement_position_provider import (
-    HgbFinancialStatementPositionProvider,
-)
-from simpleob.core.context import ApplicationContext
-from simpleob.database.bvv_annual_data_repository import (
-    BvvAnnualDataRepository,
-)
-from simpleob.database.tax_depreciation_adjustment_repository import (
-    TaxDepreciationAdjustmentRepository,
+from simpleob.eric.eric_validate_adapter import (
+    EricValidateAdapter,
+    EricValidateError,
 )
 from simpleob.services.closing_accounts import ClosingAccounts
 from simpleob.services.closing_consistency_service import (
     ClosingConsistencyService,
 )
+from simpleob.services.closing_result import ClosingResult
+from simpleob.services.closing_service import ClosingService
 from simpleob.services.depreciation_booking_service import (
     DepreciationBookingService,
 )
 from simpleob.services.depreciation_service import (
     DepreciationService,
+)
+from simpleob.services.e_bilanz_account_detail_service import (
+    EBilanzAccountDetailService,
 )
 from simpleob.services.e_bilanz_export_service import (
     EBilanzExportService,
@@ -213,16 +166,50 @@ from simpleob.services.fiscal_year_workspace import (
 from simpleob.services.fixed_asset_depreciation_workflow import (
     FixedAssetDepreciationWorkflow,
 )
+from simpleob.services.fixed_asset_schedule_service import (
+    FixedAssetScheduleService,
+)
 from simpleob.services.posting_service import PostingService
 from simpleob.services.reporting_service import ReportingService
 from simpleob.services.taxonomy_management_service import (
     TaxonomyManagementService,
 )
+from simpleob.taxonomy.account_balance_builder import (
+    AccountBalanceBuilder,
+)
 from simpleob.taxonomy.arelle_adapter import ArelleAdapter
+from simpleob.taxonomy.concept import TaxonomyPeriodType
+from simpleob.taxonomy.concept_set import TaxonomyConceptSet
+from simpleob.taxonomy.context import TaxonomyContext
+from simpleob.taxonomy.entry_point import TaxonomyEntryPoint
+from simpleob.taxonomy.fact import TaxonomyFact
+from simpleob.taxonomy.fiscal_requirement_reader import (
+    FiscalRequirement,
+    FiscalRequirementReader,
+)
+from simpleob.taxonomy.fixed_asset_schedule_builder import (
+    FixedAssetScheduleBuilder,
+)
+from simpleob.taxonomy.gaap_ci_mandatory_fact_completer import (
+    GaapCiMandatoryFactCompleter,
+)
 from simpleob.taxonomy.gcd_company_data_mapper import (
     GcdCompanyDataMapper,
 )
+from simpleob.taxonomy.gcd_fact_builder import GcdFactBuilder
+from simpleob.taxonomy.gcd_report_profile import GcdReportProfile
+from simpleob.taxonomy.gcd_shareholder import (
+    GcdShareDivideKey,
+    GcdShareholder,
+    GcdShareholderLegalStatus,
+)
+from simpleob.taxonomy.hgb_gaap_ci_mapping import (
+    create_hgb_gaap_ci_mapping,
+)
+from simpleob.taxonomy.mapper import TaxonomyMapper
+from simpleob.taxonomy.nil_fact import TaxonomyNilFact
 from simpleob.taxonomy.resolver import TaxonomyResolver
+from simpleob.taxonomy.taxonomy import TaxonomyVersion
 from simpleob.taxonomy.taxonomy_catalog import TaxonomyCatalog
 from simpleob.taxonomy.taxonomy_downloader import (
     TaxonomyDownloader,
@@ -230,6 +217,7 @@ from simpleob.taxonomy.taxonomy_downloader import (
 from simpleob.taxonomy.taxonomy_installation_service import (
     TaxonomyInstallationService,
 )
+from simpleob.taxonomy.unit import TaxonomyUnit
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -601,7 +589,9 @@ def _append_hgbm_transfer(
 ) -> None:
     """Erzeugt den kontrollierten UG-0002-HGBM-Testtuple."""
 
-    qname = lambda name: f"{{{gaap_namespace}}}{name}"
+    def qname(name: str) -> str:
+        return f"{{{gaap_namespace}}}{name}"
+
     transfer = ET.Element(qname("hbst.transfer"))
     kind = ET.SubElement(transfer, qname("hbst.transfer.kind"))
     kind_value = ET.SubElement(

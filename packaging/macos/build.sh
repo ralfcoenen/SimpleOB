@@ -30,6 +30,14 @@ do
     fi
 done
 
+if ! python -c 'import psycopg, psycopg_binary' >/dev/null 2>&1; then
+    echo >&2 \
+        "Fehler: Der PostgreSQL-Treiber fehlt in der aktiven Python-Umgebung."
+    echo >&2 \
+        "Bitte zuerst .venv/bin/python -m pip install -e '.[postgresql]' ausführen."
+    exit 1
+fi
+
 if [[ -z "${SIMPLEOB_ERIC_SDK_ROOT:-}" ]]; then
     echo >&2 \
         "Fehler: SIMPLEOB_ERIC_SDK_ROOT ist nicht gesetzt."

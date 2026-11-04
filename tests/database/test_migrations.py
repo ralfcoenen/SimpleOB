@@ -9,7 +9,7 @@ from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.exc import IntegrityError
 
 BASELINE_REVISION = "7392d6cc6892"
-HEAD_REVISION = "c4e27a91b6d0"
+HEAD_REVISION = "b7d41a8f2c60"
 
 
 def _alembic_config(

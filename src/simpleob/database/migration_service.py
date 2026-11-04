@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import sqlite3
 import sys
-from pathlib import Path
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 
 from alembic import command
 from alembic.config import Config

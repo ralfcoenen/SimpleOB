@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from contextlib import contextmanager
 from collections.abc import Iterator
+from contextlib import contextmanager
 
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
-
 
 # Fester, SimpleOB-spezifischer Advisory-Lock-Schlüssel.
 # Innerhalb einer PostgreSQL-Datenbank müssen alle

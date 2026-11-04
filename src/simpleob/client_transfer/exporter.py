@@ -22,6 +22,8 @@ from simpleob.client_transfer.model import (
     ClientTransferFixedAssetDepreciation,
     ClientTransferFixedAssetMovement,
     ClientTransferFormat,
+    ClientTransferKrAnnualTurnover,
+    ClientTransferKrSettings,
     ClientTransferMasterData,
     ClientTransferProfitAppropriationAnnualData,
     ClientTransferProfitAppropriationPosting,
@@ -67,6 +69,7 @@ from simpleob.database.shareholder_repository import (
 from simpleob.database.tax_depreciation_adjustment_repository import (
     TaxDepreciationAdjustmentRepository,
 )
+from simpleob.domain.kr_settings import KrSettings
 
 
 def _amount(value: Decimal) -> str:
@@ -148,6 +151,10 @@ class ClientTransferExporter:
             raise ValueError(
                 "Das Unternehmen ist nicht vorhanden."
             )
+
+        kr_settings = self._company_repository.get_kr_settings(company_id)
+        if kr_settings is None:
+            kr_settings = KrSettings(company_id=company_id)
 
         loaded_chart = (
             self._chart_of_accounts_repository
@@ -396,6 +403,18 @@ class ClientTransferExporter:
                         master_data.federal_state
                     ),
                     business=master_data.business,
+                ),
+                kr_settings=ClientTransferKrSettings(
+                    activity_start_date=kr_settings.activity_start_date,
+                    waiver_declared=kr_settings.waiver_declared,
+                    waiver_date=kr_settings.waiver_date,
+                    external_turnovers=tuple(
+                        ClientTransferKrAnnualTurnover(
+                            calendar_year=item.calendar_year,
+                            amount=_amount(item.amount),
+                        )
+                        for item in kr_settings.external_turnovers
+                    ),
                 ),
                 accounts=transfer_accounts,
                 control_accounts=(

@@ -8,7 +8,6 @@ import sys
 
 import psycopg
 
-
 DATABASE_NAME = "simpleob_migration_test"
 
 

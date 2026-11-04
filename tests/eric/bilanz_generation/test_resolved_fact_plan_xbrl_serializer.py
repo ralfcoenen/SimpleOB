@@ -3,8 +3,6 @@
 from datetime import date
 from decimal import Decimal
 
-import pytest
-
 from simpleob.eric.bilanz_generation.fact_plan import (
     FactPlanNode,
     FactPlanState,

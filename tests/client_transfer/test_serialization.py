@@ -23,6 +23,8 @@ from simpleob.client_transfer.model import (
     ClientTransferFixedAssetDepreciation,
     ClientTransferFixedAssetMovement,
     ClientTransferFormat,
+    ClientTransferKrAnnualTurnover,
+    ClientTransferKrSettings,
     ClientTransferMasterData,
     ClientTransferProfitAppropriationAnnualData,
     ClientTransferProfitAppropriationPosting,
@@ -36,7 +38,6 @@ from simpleob.client_transfer.serialization import (
     client_transfer_to_dict,
     client_transfer_to_json,
 )
-
 
 COMPANY_ID = UUID(
     "12345678-1234-5678-1234-567812345678"
@@ -83,6 +84,15 @@ def _build_transfer() -> ClientTransfer:
                 legal_form="UG (haftungsbeschränkt)",
                 tax_number="123/456/78901",
                 city="Düsseldorf",
+            ),
+            kr_settings=ClientTransferKrSettings(
+                activity_start_date=date(2020, 5, 1),
+                waiver_declared=True,
+                waiver_date=date(2025, 12, 31),
+                external_turnovers=(
+                    ClientTransferKrAnnualTurnover(2024, "123.45"),
+                    ClientTransferKrAnnualTurnover(2025, "200.00"),
+                ),
             ),
             accounts=(
                 ClientTransferAccount(
@@ -133,6 +143,28 @@ def test_transfer_json_roundtrip() -> None:
     restored = client_transfer_from_json(text)
 
     assert restored == transfer
+
+
+def test_legacy_transfer_without_kr_settings_remains_readable() -> None:
+    transfer = _build_transfer()
+    data = client_transfer_to_dict(transfer)
+    data["client"].pop("kr_settings")
+
+    restored = client_transfer_from_json(json.dumps(data))
+
+    assert restored.client.kr_settings is None
+
+
+def test_kr_settings_are_serialized_with_calendar_years() -> None:
+    data = client_transfer_to_dict(_build_transfer())
+    kr_settings = data["client"]["kr_settings"]
+
+    assert kr_settings["activity_start_date"] == "2020-05-01"
+    assert kr_settings["waiver_date"] == "2025-12-31"
+    assert kr_settings["external_turnovers"] == [
+        {"calendar_year": 2024, "amount": "123.45"},
+        {"calendar_year": 2025, "amount": "200.00"},
+    ]
 
 
 def test_transfer_json_uses_portable_scalar_values() -> None:

@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "simpleob"
-version = "0.50.1"
+version = "0.51.0"
 description = "Lokale Buchhaltungs- und E-Bilanz-Software"
 requires-python = ">=3.12,<3.13"
 

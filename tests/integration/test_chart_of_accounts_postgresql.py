@@ -14,8 +14,8 @@ from simpleob.database.chart_of_accounts_repository import (
 from simpleob.database.company_repository import CompanyRepository
 from simpleob.database.lock_error import DatabaseLockError
 from simpleob.database.models import (
-    Konto,
     KontenTaxonomieZuordnung,
+    Konto,
     Mandant,
 )
 from simpleob.domain.company import Company

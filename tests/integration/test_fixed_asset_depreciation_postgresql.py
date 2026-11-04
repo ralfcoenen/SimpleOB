@@ -2,8 +2,8 @@
 """PostgreSQL-Konkurrenztest für die Abschreibungsbestätigung."""
 
 import os
-from datetime import date
 from dataclasses import replace
+from datetime import date
 from decimal import Decimal
 from uuid import uuid4
 
