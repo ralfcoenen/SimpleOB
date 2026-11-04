@@ -133,6 +133,13 @@ fi
 RELEASE_TAG="v${PROJECT_VERSION}"
 RELEASE_TITLE="SimpleOB ${RELEASE_TAG}"
 RELEASE_ARCHIVE="${PROJECT_ROOT}/dist/release/SimpleOB-${PROJECT_VERSION}-macOS.zip"
+VERSION_NOTES_FILE="${PROJECT_ROOT}/packaging/macos/release-notes/${PROJECT_VERSION}.md"
+
+if [[ ! -s "${VERSION_NOTES_FILE}" ]]; then
+    echo >&2 "Fehler: Versionsspezifische Release Notes fehlen oder sind leer:"
+    echo >&2 "  ${VERSION_NOTES_FILE}"
+    exit 1
+fi
 
 #
 # Release-Artefakt
@@ -297,6 +304,11 @@ cat > "${RELEASE_NOTES_FILE}" <<EOF_NOTES
 ## SimpleOB ${RELEASE_TAG}
 
 Diese Version stellt das aktuelle macOS-Auslieferungspaket von SimpleOB bereit.
+EOF_NOTES
+
+cat "${VERSION_NOTES_FILE}" >> "${RELEASE_NOTES_FILE}"
+
+cat >> "${RELEASE_NOTES_FILE}" <<EOF_NOTES
 
 ### Inhalt des Auslieferungspakets
 
