@@ -564,7 +564,7 @@ class CompanyRepository:
         )
 
     def get_kr_settings(self, company_id: UUID) -> KrSettings | None:
-        """Lädt die KR-Einstellungen einschließlich jahresgebundener Beträge."""
+        """Lädt Einstellungen zur Kleinunternehmerregelung einschließlich Jahresbeträgen."""
         model = (
             self._session.query(Mandant)
             .filter(Mandant.company_id == str(company_id))
@@ -599,13 +599,15 @@ class CompanyRepository:
         expected_settings: KrSettings | None = None,
         commit: bool = True,
     ) -> None:
-        """Speichert KR-Einstellungen atomar für genau einen Mandanten."""
+        """Speichert Einstellungen zur Kleinunternehmerregelung atomar pro Mandant."""
         if not isinstance(settings, KrSettings):
             raise TypeError("settings must be KrSettings")
         if expected_settings is not None and (
             expected_settings.company_id != settings.company_id
         ):
-            raise ValueError("Die erwarteten KR-Einstellungen gehören zu einem anderen Mandanten.")
+            raise ValueError(
+                "Die erwarteten Einstellungen zur Kleinunternehmerregelung gehören zu einem anderen Mandanten."
+            )
         query = self._session.query(Mandant).filter(
             Mandant.company_id == str(settings.company_id)
         )
@@ -622,7 +624,7 @@ class CompanyRepository:
                 self._session.rollback()
                 if getattr(exc.orig, "sqlstate", None) == "55P03":
                     raise DatabaseLockError(
-                        "KR-Einstellungen momentan gesperrt. Bitte versuchen Sie es später erneut."
+                        "Einstellungen zur Kleinunternehmerregelung momentan gesperrt. Bitte versuchen Sie es später erneut."
                     ) from exc
                 raise
         else:
@@ -634,7 +636,7 @@ class CompanyRepository:
             if current != expected_settings:
                 self._session.rollback()
                 raise ValueError(
-                    "Die KR-Einstellungen wurden zwischenzeitlich geändert. "
+                    "Die Einstellungen zur Kleinunternehmerregelung wurden zwischenzeitlich geändert. "
                     "Bitte öffnen Sie den Dialog erneut."
                 )
 

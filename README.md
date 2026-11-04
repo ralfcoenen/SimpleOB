@@ -1,12 +1,12 @@
 # SimpleOB
 
-**SimpleOB** ist eine lokale Buchhaltungs- und E-Bilanz-Anwendung für kleine Kapitalgesellschaften.
+**SimpleOB** ist eine Desktop-Anwendung für Buchführung und E-Bilanz kleiner Kapitalgesellschaften. Sie kann ihre Daten in einer lokalen SQLite-Datenbank oder auf einem PostgreSQL-Server speichern.
 
 Das Projekt wird im Repository unter dem Entwicklungsnamen **OpenBilanz-UG** geführt. Der Name der ausgelieferten Anwendung ist **SimpleOB**.
 
 ## Aktueller Stand
 
-Aktuelle Version: **0.51.0**
+Aktuelle Version: **0.51.1**
 
 SimpleOB umfasst inzwischen insbesondere:
 
@@ -17,13 +17,17 @@ SimpleOB umfasst inzwischen insbesondere:
 - Bilanz nach § 266 HGB
 - Gewinn- und Verlustrechnung nach § 275 HGB
 - Anlagenbuchhaltung
+- Erfassung von Eingangs- und Ausgangsrechnungen sowie Gutschriften
+- Offene-Posten-Verwaltung mit Zahlungen, Verrechnungen, Rückerstattungen und Abstimmung
 - grundlegenden Workflow für Eröffnungsbilanzen
 - Umsatzsteuer- und Steuerkontenkonfiguration
 - E-Bilanz auf Basis der Taxonomie 6.9
 - XBRL-Erzeugung und -Validierung
 - ELSTER-/ERiC-Übermittlung
 - Testübermittlung mit ELSTER-Testzertifikat
-- lokale SQLite-Datenhaltung
+- informative Umsatzüberwachung zur Kleinunternehmerregelung nach § 19 UStG
+- Mandantensicherung und -übertragung im Format `.simpleob`
+- SQLite- und PostgreSQL-Datenhaltung
 - Datenbankmigrationen mit Alembic
 - PDF-Auswertungen
 - PySide6-Benutzeroberfläche
@@ -60,7 +64,8 @@ SimpleOB basiert derzeit auf:
 - PySide6
 - SQLAlchemy
 - Alembic
-- SQLite
+- SQLite (Standard)
+- PostgreSQL (optionale Python-Abhängigkeit `postgresql`)
 - Arelle
 - ERiC
 - ReportLab
@@ -81,11 +86,19 @@ python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 ```
 
+Für eine Entwicklungsinstallation mit PostgreSQL-Treiber verwenden Sie stattdessen:
+
+```bash
+python -m pip install -e ".[dev,postgresql]"
+```
+
 Die Anwendung kann anschließend aus der Entwicklungsumgebung gestartet werden:
 
 ```bash
-openbilanz
+simpleob
 ```
+
+SQLite ist ohne zusätzlichen Datenbankserver nutzbar. PostgreSQL erfordert einen eingerichteten und erreichbaren PostgreSQL-Server; für eine Entwicklungsinstallation ist zusätzlich die optionale Abhängigkeit `postgresql` erforderlich. Das macOS-Auslieferungspaket enthält den PostgreSQL-Treiber.
 
 Die Tests werden mit `pytest` ausgeführt:
 
@@ -96,6 +109,8 @@ pytest
 ## macOS-Auslieferung
 
 Für macOS wird SimpleOB mit PyInstaller als eigenständige Anwendung gebaut.
+
+Das veröffentlichte macOS-Paket wird derzeit ohne Apple-Developer-ID-Signatur und ohne Notarisierung ausgeliefert. macOS kann deshalb beim ersten Start eine Gatekeeper-Warnung anzeigen oder das Öffnen zunächst blockieren. Hinweise zur Freigabe stehen im Benutzerhandbuch. Die Anwendung sollte nur aus einer vertrauenswürdigen Bezugsquelle installiert werden.
 
 Die Release-Werkzeuge befinden sich unter `packaging/macos/`.
 
@@ -128,13 +143,15 @@ scripts/build_user_manual.sh
 
 Das Benutzerhandbuch enthält insbesondere Hinweise zu Installation und erstem Start unter macOS, Mandanten und Geschäftsjahren, Buchführung und Jahresabschluss, E-Bilanz, ELSTER-Zertifikat und ELSTER-Datenlieferant, Test- und Produktivübermittlung sowie Datenbankaktualisierungen.
 
-## Datenhaltung und Aktualisierungen
+Es beschreibt außerdem offene Posten, Zahlungen, Rückerstattungen, Mandantensicherungen und die informative Umsatzüberwachung zur Kleinunternehmerregelung samt ihren fachlichen Grenzen.
 
-SimpleOB speichert seine produktiven Daten lokal.
+## Datenhaltung, Sicherung und Aktualisierungen
 
-Die Datenbankstruktur wird mit Alembic versioniert. Bei notwendigen Schemaaktualisierungen führt SimpleOB die vorgesehenen Migrationen beim Start aus.
+SimpleOB verwendet standardmäßig SQLite. Die Datenbank und Anwendungskonfiguration liegen lokal im benutzerspezifischen SimpleOB-Anwendungsdatenverzeichnis. Optional kann eine vorhandene, erreichbare PostgreSQL-Datenbank verwendet werden; deren Buchhaltungsdaten liegen auf dem Datenbankserver.
 
-Vor einer tatsächlichen Migration einer bestehenden SQLite-Datenbank wird automatisch eine Sicherungskopie angelegt.
+Bei SQLite führt SimpleOB erforderliche Datenbankmigrationen beim Start aus und legt vor einer notwendigen Migration automatisch eine Sicherung der bestehenden Datenbank an. Bei PostgreSQL prüft SimpleOB beim Start den Schema-Stand, migriert eine vorhandene Datenbank aber nicht automatisch. Eine notwendige PostgreSQL-Aktualisierung muss administrativ geplant und vorab gesichert werden.
+
+Eine `.simpleob`-Datei exportiert unterstützte Mandantendaten einschließlich der Geschäftsjahre und Einstellungen zur Kleinunternehmerregelung. Sie enthält derzeit weder Geschäftspartner noch separate OP- und Zahlungszuordnungsdaten und ist daher für Mandanten mit OP-Nutzung keine vollständige Sicherung oder Übertragung. Sie ersetzt auch keine vollständige Datenbanksicherung: SQLite muss lokal gesichert werden, PostgreSQL direkt auf dem Server. Anwendungsweite ELSTER-Einstellungen und Zertifikate werden nicht mit dem Mandanten exportiert. Umfang und Einschränkungen beschreibt das Benutzerhandbuch.
 
 ## E-Bilanz und ELSTER
 
@@ -155,7 +172,7 @@ Bei der Entwicklung stehen insbesondere im Vordergrund:
 - mandantenspezifische Konfiguration statt fest codierter Konten
 - kontrollierte Datenbankmigrationen
 - reproduzierbare Release-Prozesse
-- lokale Datenhaltung
+- SQLite als Standard sowie optional PostgreSQL
 - möglichst geringe unnötige Komplexität
 
 E-Bilanz- und Taxonomiefunktionalität wird gezielt auf den für die technisch valide und tatsächlich übermittelbare E-Bilanz erforderlichen Umfang begrenzt.

@@ -188,7 +188,9 @@ class ClientDeletionRepository:
                 statements = (
                     select(table).where(fk.parent.in_(batch))
                     for fk in parents
-                    for batch in _id_batches(ids[fk.column.table.name])
+                    for batch in _id_batches(
+                        row[fk.column.name] for row in captured[fk.column.table.name]
+                    )
                 )
             # Mehrfach verbundene Sätze können über mehrere Elternpfade erscheinen.
             by_id = {}
@@ -205,12 +207,20 @@ class ClientDeletionRepository:
             for row in captured[table.name]:
                 for fk in table.foreign_keys:
                     value = row[fk.parent.name]
-                    if value is not None and value not in ids[fk.column.table.name]:
+                    referenced_values = {
+                        target[fk.column.name]
+                        for target in captured[fk.column.table.name]
+                    }
+                    if value is not None and value not in referenced_values:
                         raise ValueError(
                             f"Fremde oder beschädigte Beziehung in {table.name}."
                         )
             for fk in table.foreign_keys:
-                for batch in _id_batches(ids[fk.column.table.name]):
+                referenced_values = {
+                    target[fk.column.name]
+                    for target in captured[fk.column.table.name]
+                }
+                for batch in _id_batches(referenced_values):
                     referenced = self.connection.execute(
                         select(table.c.id).where(fk.parent.in_(batch))
                     ).scalars()
@@ -325,11 +335,17 @@ class ClientDeletionRepository:
 
     def check_deleted(self, captured: CapturedClient) -> None:
         for table in self.tables:
-            checks = [(table.c.id, table.name)]
+            checks = [(table.c.id, captured[table.name], "id")]
             for fk in table.foreign_keys:
-                checks.append((fk.parent, fk.column.table.name))
-            for column, parent in checks:
-                for batch in _id_batches(row["id"] for row in captured[parent]):
+                checks.append(
+                    (
+                        fk.parent,
+                        captured[fk.column.table.name],
+                        fk.column.name,
+                    )
+                )
+            for column, target_rows, target_column in checks:
+                for batch in _id_batches(row[target_column] for row in target_rows):
                     if self.connection.execute(
                         select(table.c.id).where(column.in_(batch)).limit(1)
                     ).first():

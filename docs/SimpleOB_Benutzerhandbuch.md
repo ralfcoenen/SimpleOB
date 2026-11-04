@@ -1,8 +1,10 @@
 # SimpleOB – Benutzerhandbuch
 
+**Anwenderhandbuch für SimpleOB 0.51.1**
+
 ## 1. Über SimpleOB
 
-SimpleOB ist eine lokale Buchhaltungs- und E-Bilanz-Anwendung für kleine
+SimpleOB ist eine Desktop-Anwendung für Buchführung und E-Bilanz kleiner
 Kapitalgesellschaften, insbesondere für kleine Unternehmergesellschaften
 (haftungsbeschränkt).
 
@@ -15,15 +17,19 @@ Zu den Funktionen gehören insbesondere:
 - Verwaltung von Mandanten und Geschäftsjahren,
 - Verwaltung eines mandantenspezifischen Kontenrahmens,
 - Erfassung von Buchungen,
+- Erfassung von Rechnungen, Gutschriften und offenen Posten,
+- Zuordnung von Zahlungen, Verrechnung von Guthaben und Erfassung von Rückerstattungen,
 - Anlagenbuchhaltung,
 - Erstellung von Bilanz und Gewinn- und Verlustrechnung,
 - Unterstützung des Jahresabschlusses,
 - Erstellung der E-Bilanz,
 - Prüfung der E-Bilanz,
-- Testübermittlung und produktive Übermittlung der E-Bilanz über ELSTER.
+- Testübermittlung und produktive Übermittlung der E-Bilanz über ELSTER,
+- informative Umsatzüberwachung zur Kleinunternehmerregelung nach § 19 UStG.
 
-SimpleOB ist eine Desktop-Anwendung. Die Buchhaltungsdaten werden lokal
-gespeichert.
+SimpleOB ist eine Desktop-Anwendung. Die Buchhaltungsdaten liegen je nach
+Konfiguration entweder in einer lokalen SQLite-Datenbank oder auf einem
+PostgreSQL-Server.
 
 ### 1.1 Eigenverantwortliche Verwendung
 
@@ -33,6 +39,26 @@ E-Bilanz. Die Anwendung ersetzt keine steuerliche oder rechtliche Beratung.
 Der Anwender bleibt für die sachliche Richtigkeit und Vollständigkeit der
 erfassten Daten sowie für die Prüfung der zu übermittelnden E-Bilanz
 verantwortlich.
+
+### 1.2 Oberfläche und Navigation
+
+Im Startfenster **„SimpleOB – Buchhaltung öffnen“** wählen Sie ein Unternehmen
+und ein Geschäftsjahr. Dort können Sie außerdem eine neue Buchhaltung oder ein
+neues Geschäftsjahr anlegen, eine `.simpleob`-Mandantensicherung importieren,
+die Datenbank wechseln oder einen Mandanten vollständig löschen.
+
+Nach dem Öffnen stehen im Hauptfenster die Register **Konten**, **Journal**,
+**Buchen**, **Anlagen**, **Bilanz**, **GuV**, **Auswertungen**,
+**OP-Übersicht**, **OP-Abstimmung**, **Jahresabschluss** und **E-Bilanz** zur
+Verfügung. Die OP-Register werden angezeigt, wenn die zugehörigen Dienste
+verfügbar sind.
+
+Über **Verwaltung** erreichen Sie die Unternehmensstammdaten, die Einstellungen
+zur Kleinunternehmerregelung, die Gesellschafterverwaltung, die
+Kontenkonfiguration und den Mandantenexport. **Einstellungen** enthält die
+ELSTER-Zertifikats- und Datenlieferantenangaben. Unter **Hilfe** finden Sie
+Datenschutz- und ERiC-Hinweise. Die Schaltfläche **Buchhaltung wechseln** führt
+zur Mandanten- und Geschäftsjahrauswahl zurück.
 
 
 ## 2. Installation unter macOS
@@ -54,9 +80,10 @@ Für die gewöhnliche Einzelplatznutzung ist SQLite die einfachere Variante.
 
 ### 2.2 SimpleOB beim ersten Start unter macOS freigeben
 
-SimpleOB wird nicht über den Mac App Store vertrieben.
-
-Abhängig von der Signierung und Notarisierung der ausgelieferten Anwendung kann macOS beim ersten Start eine Sicherheitsprüfung durchführen oder das unmittelbare Öffnen verhindern.
+SimpleOB wird nicht über den Mac App Store vertrieben. Das aktuelle
+macOS-Auslieferungspaket wird ohne Apple-Developer-ID-Signatur und ohne
+Notarisierung bereitgestellt. macOS kann daher beim ersten Start eine
+Gatekeeper-Warnung anzeigen oder das Öffnen blockieren.
 
 SimpleOB sollte ausschließlich aus einer vertrauenswürdigen Bezugsquelle installiert werden.
 
@@ -497,10 +524,36 @@ Die Einzelheiten dazu werden im folgenden Kapitel beschrieben.
 
 ### 6.6 Mandanten importieren und exportieren
 
-SimpleOB unterstützt den Austausch vollständiger Mandanten über
-portable `.simpleob`-Dateien.
+SimpleOB unterstützt den Export und Import der im `.simpleob`-Format
+abgebildeten Mandantendaten. Bei Mandanten mit OP-Verwaltung ist dieses Format
+in Version 0.51.1 keine vollständige Sicherung oder Übertragung; siehe
+Kapitel 14.2.
 
-Import und Export werden in Kapitel 14 **„Datenaustausch“** beschrieben.
+Den Export starten Sie im geöffneten Mandanten über **Verwaltung → Mandant
+exportieren …**. Den Import finden Sie im Startfenster unter **Mandant
+importieren …**. Die Einzelheiten stehen in Kapitel 14 **„Datenaustausch und
+Mandantensicherung“**.
+
+### 6.7 Mandanten vollständig löschen
+
+Im Startfenster kann der ausgewählte Mandant über **Mandant vollständig löschen
+…** entfernt werden. Dieser Vorgang löscht unwiderruflich den Mandanten, alle
+seine Geschäftsjahre und die zugehörigen Daten aus der aktuell verwendeten
+Datenbank. Er steht für SQLite und PostgreSQL zur Verfügung.
+
+Vor der Löschung fordert SimpleOB Sie auf, einen Ordner für eine
+Mandantensicherung auszuwählen. Die Sicherung wird exportiert und auf
+Vollständigkeit geprüft, bevor die Löschung beginnen kann. Im anschließenden
+Bestätigungsdialog sehen Sie Mandantenname, Mandanten-ID und Sicherungspfad.
+Zur Bestätigung müssen Sie den vollständigen Mandantennamen exakt eingeben.
+Bei Abbruch, falscher Eingabe oder fehlgeschlagener oder unvollständiger
+Sicherung wird der Mandant nicht gelöscht. In Version 0.51.1 überträgt
+`.simpleob` keine Geschäftspartner und keine separaten OP-Nebenbuchdaten.
+Wenn solche Daten vorhanden sind, schlägt die Vollständigkeitsprüfung fehl und
+SimpleOB bricht die Löschung ab. Die Einschränkung des Formats ist in Kapitel
+14.2 beschrieben. Bewahren Sie eine erfolgreiche
+`.simpleob`-Datei an einem sicheren Ort auf; sie kann die darin enthaltenen
+unterstützten Daten wiederherstellen.
 
 ## 7. Geschäftsjahre
 
@@ -1076,6 +1129,149 @@ möglich.“**
 
 Der Abschluss eines Geschäftsjahres wird in Kapitel 11
 **„Jahresabschluss“** beschrieben.
+
+### 9.14 Offene Posten und Rechnungen
+
+Ausgangs- und Eingangsrechnungen werden in der Buchungsart
+**„Rechnung mit Umsatzsteuer“** erfasst. Geben Sie Geschäftspartner,
+Rechnungsnummer, Beleg- und Fälligkeitsdatum sowie die Rechnungspositionen an.
+Die Rechnung wird gebucht und als Forderungs- beziehungsweise
+Verbindlichkeits-OP geführt. Eine Kundengutschrift oder Lieferantengutschrift
+erzeugt entsprechend einen Guthaben-OP.
+
+Die Register **OP-Übersicht** und **OP-Abstimmung** ergänzen die Buchungsmaske.
+In der OP-Übersicht können Sie Kunden oder Lieferanten sowie offene,
+ausgeglichene oder alle Posten filtern. **Einzelposten** zeigt einzelne
+Rechnungen und Gutschriften; **Summen** fasst die Werte je Geschäftspartner
+und OP-Art zusammen. Über **Details** sehen Sie die Vorgänge eines Postens.
+Die Übersicht zeigt die aktuelle OP-Situation, keine historische
+Stichtagsauswertung.
+
+### 9.15 Zahlungen und Teilzahlungen zuordnen
+
+Im Register **Buchen** befindet sich oberhalb der Buchungserfassung die Gruppe
+**OP-Verwaltung**. Wählen Sie **Zahlung auf Rechnung erfassen …**, um eine
+Kunden- oder Lieferantenzahlung zu erfassen. Wählen Sie Zahlungsrichtung,
+Geschäftspartner und Bank- oder Kassenkonto. Erfassen Sie sowohl das
+tatsächliche Zahlungsdatum als auch das Buchungsdatum.
+
+Tragen Sie den Gesamtzahlungsbetrag ein und verteilen Sie ihn auf eine oder
+mehrere Rechnungen desselben Geschäftspartners und derselben Zahlungsrichtung.
+Die Zuordnung muss in Summe genau dem Zahlungsbetrag entsprechen.
+Teilzahlungen sind möglich: Der einer Rechnung zugewiesene Betrag kann kleiner
+als ihr offener Betrag sein. Weitere Zahlungen können später zugeordnet werden.
+Eine Zahlung auf mehrere Rechnungen wird anhand der einzelnen Zuordnungsbeträge
+aufgeteilt.
+
+Eine direkt über Bank oder Kasse erfasste Buchung erzeugt für sich allein keine
+Rechnungs-OP-Zahlungszuordnung. Für die nachfolgend beschriebene Auswertung zur
+Kleinunternehmerregelung muss eine Ausgangsrechnung deshalb als OP erfasst und
+die Zahlung über diesen Dialog zugeordnet werden.
+
+### 9.16 Guthaben verrechnen oder erstatten
+
+Mit **Guthaben mit Rechnung verrechnen …** können Sie ein Kunden- oder
+Lieferantenguthaben mit einer offenen Rechnung desselben Geschäftspartners
+verrechnen. Die Verrechnung erzeugt eine Umbuchung zwischen den OP-Konten,
+aber keine Bank- oder Kassenbewegung.
+
+Mit **Guthaben erstatten …** erfassen Sie eine tatsächliche Aus- oder
+Rückzahlung aus einem Guthaben, zum Beispiel aus einer Gutschrift oder einem
+Rechnungsstorno. Ein Rechnungsstorno selbst ist noch keine Auszahlung; eine
+tatsächliche Rückzahlung muss separat erfasst werden. Geben Sie den
+Erstattungsbetrag, das tatsächliche Zahlungs- beziehungsweise Erstattungsdatum
+und das Buchungsdatum an. Teilrückerstattungen sind bis zur Höhe des
+verfügbaren Guthabens möglich. Die Funktion
+**Guthabenrückerstattung zurücknehmen …** erfasst die Rücknahme einer bereits
+verbuchten Rückerstattung.
+
+### 9.17 Zahlungszuordnung korrigieren
+
+Mit **Zahlungszuordnung korrigieren …** können Sie eine bestehende Zuordnung
+ganz oder teilweise auf eine andere Rechnung desselben Geschäftspartners und
+derselben Zahlungsrichtung übertragen. Dazu sind ein Korrekturdatum, ein
+Buchungsdatum und eine Begründung erforderlich. Die ursprüngliche Bank- oder
+Kassenzahlung bleibt bestehen; die Korrektur selbst ist keine neue
+Geldbewegung.
+
+### 9.18 Rechnungen und Buchungen stornieren
+
+Eine stornierbare Rechnung kann in der **OP-Übersicht** über
+**Rechnung vollständig stornieren** aufgehoben werden. SimpleOB zeigt vorab
+eine Vorschau und verlangt ein Stornobuchungsdatum sowie einen Stornogrund.
+Ein Rechnungsstorno erzeugt die Gegenbuchung und einen zugehörigen
+Guthaben-OP; es löscht die ursprüngliche Rechnung nicht. Die Stornierbarkeit
+wird anhand des Postens und seiner Vorgänge geprüft.
+
+Im Register **Journal** steht außerdem **Buchung stornieren** für Buchungen zur
+Verfügung, die nach den Prüfregeln der Anwendung storniert werden können.
+Dabei wird eine Gegenbuchung erzeugt. Eine Buchung wird nicht aus dem Journal
+entfernt.
+
+### 9.19 OP-Abstimmung
+
+Im Register **OP-Abstimmung** vergleichen Sie zum gewählten Stichtag die Salden
+der OP-Sammelkonten im Hauptbuch mit den Salden der OP-Nebenbuchführung.
+Abweichungen, nicht zugeordnete Hauptbuchbewegungen und zeitlich ungeklärte
+historische Zahlungszuordnungskorrekturen werden zur Prüfung angezeigt. Die
+Abstimmung weist auf Klärungsbedarf hin; sie bucht keine Korrekturen
+automatisch.
+
+### 9.20 Umsatzüberwachung zur Kleinunternehmerregelung nach § 19 UStG
+
+Im Bereich **Buchen** zeigt die Gruppe **Umsatzüberwachung – vereinnahmte
+Kundenzahlungen** für das
+Vorjahr und das laufende Kalenderjahr Kundenzahlungen, Kundenrückerstattungen,
+externe Umsatzergänzungen, den Saldo einschließlich Ergänzung und – sofern
+bestimmbar – die angezeigte Umsatzgrenze. Die Kalenderjahre richten sich nach dem
+aktuellen Datum, nicht nach dem geöffneten Geschäftsjahr.
+
+Die OP-Auswertung berücksichtigt Kundenzahlungen anhand ihres tatsächlichen
+Zahlungsdatums und nur in Höhe des den Ausgangsrechnungen zugeordneten
+Betrags. Teilzahlungen und Zuordnungen einer Zahlung zu mehreren Rechnungen
+werden entsprechend ihrer Anteile berücksichtigt. Korrigierte Zuordnungen
+wirken entsprechend der anschließend gültigen OP-Zuordnung. Journalstornierte
+Zahlungen werden nicht als wirksame Zahlung gezählt.
+
+Tatsächlich ausgezahlte, in der OP-Verwaltung erfasste Rückerstattungen aus
+Kundengutschriften und Ausgangsrechnungsstornos werden im Kalenderjahr des
+Erstattungsdatums abgezogen. Eine Gutschrift oder Verrechnung ohne Auszahlung
+ist für sich allein keine Rückerstattung. Zurückgenommene Rückerstattungen
+werden nicht als Auszahlung berücksichtigt.
+
+Im Dialog **Verwaltung → Kleinunternehmerregelung** können Sie den Beginn der
+unternehmerischen Tätigkeit, externe Jahresumsätze für konkrete Kalenderjahre
+sowie einen dokumentierten Verzicht erfassen. Jahresbeträge bleiben ihrem
+Kalenderjahr zugeordnet. Externe Beträge werden zusätzlich zu den OP-Werten
+angezeigt und nicht in die OP-Summen übernommen. Fehlt der Tätigkeitsbeginn,
+leitet SimpleOB kein Gründungsjahr aus dem ersten Geschäftsjahr ab und kann
+die passende Grenze nicht bestimmen. Im Gründungsjahr wird 25.000 € angezeigt;
+für Folgejahre werden 25.000 € für das Vorjahr und 100.000 € für das laufende
+Jahr angezeigt.
+
+Bei dokumentiertem Verzicht wird der Informationsbereich zur
+Kleinunternehmerregelung ausgeblendet. Das
+Verzichtsdatum dokumentiert die eingegebene Angabe; SimpleOB übermittelt damit
+keine Erklärung und prüft nicht automatisch die steuerliche Wirksamkeit oder
+Fristen.
+
+Beim Verlassen eines Betragsfeldes einer Ausgangsrechnung kann eine Warnung
+erscheinen, wenn die Grenze bei angenommener vollständiger Vereinnahmung im
+laufenden Kalenderjahr voraussichtlich überschritten würde. Die Prognose setzt
+den eingegebenen Bruttobetrag einmal an; die Umsatzsteuer wird nicht nochmals
+hinzugerechnet. Die Warnung blockiert die Buchung nicht und ändert den
+Steuersatz nicht automatisch.
+
+Die Umsatzüberwachung ist eine informative Auswertung und keine vollständige
+steuerrechtliche Prüfung. Sie erfasst ausschließlich OP-zugeordnete
+Kundenzahlungen sowie eindeutig zuordenbare Rückerstattungen. Direktverkäufe
+über Bank oder Kasse ohne Rechnungs-OP, Anzahlungen ohne Rechnung und nicht
+eindeutig erkennbare Entgeltminderungen sind nicht vollständig enthalten.
+Erkannte direkte Erlösbuchungen können einen Hinweis auslösen, werden aber
+nicht zur überwachten Umsatzsumme addiert. Ausgangsrechnungen müssen für diese
+Auswertung grundsätzlich auf Ziel erfasst werden. Die Anzeige nimmt keine automatische
+Aktivierung oder Deaktivierung der Kleinunternehmerregelung und keine andere
+automatische Änderung der steuerlichen Behandlung vor.
 
 ## 10. Anlagenbuchhaltung
 
@@ -2478,8 +2674,8 @@ E-Bilanz-Daten fachlich zu prüfen.
 
 ## 14. Datenaustausch und Mandantensicherung
 
-SimpleOB kann einen vollständigen Mandanten in eine portable Datei
-exportieren und später wieder importieren.
+SimpleOB kann die im `.simpleob`-Transferformat unterstützten Daten eines
+Mandanten in eine portable Datei exportieren und später wieder importieren.
 
 Hierfür verwendet SimpleOB Dateien mit der Endung
 
@@ -2510,7 +2706,7 @@ Nach erfolgreichem Export bestätigt SimpleOB die Erstellung der Datei.
 
 ### 14.2 Umfang einer Mandantensicherung
 
-Eine `.simpleob`-Datei enthält den vollständigen von SimpleOB
+Eine `.simpleob`-Datei enthält den von SimpleOB im Transferformat
 unterstützten Datenbestand des exportierten Mandanten.
 
 Dazu gehören insbesondere:
@@ -2521,6 +2717,7 @@ Dazu gehören insbesondere:
 - Umsatzsteuerkonten,
 - Kontenrollen,
 - mandantenspezifische E-Bilanz-Zuordnungen,
+- Einstellungen zur Kleinunternehmerregelung mit Tätigkeitsbeginn, Verzichtsangabe und kalenderjahrbezogenen externen Umsatzergänzungen,
 - Gesellschafterdaten,
 - sämtliche in SimpleOB verwalteten Geschäftsjahre,
 - Buchungen und Buchungszeilen,
@@ -2532,6 +2729,17 @@ Dazu gehören insbesondere:
 - Daten zur Ergebnisverwendung,
 - Buchungen zur Ergebnisverwendung und
 - erfasste Einlagen.
+
+**Einschränkung in Version 0.51.1:** Das `.simpleob`-Format enthält derzeit
+nicht die Geschäftspartner und separaten OP-Nebenbuchdaten wie Rechnungs-OPs, Zahlungen,
+Zahlungszuordnungen, Verrechnungen, Rückerstattungen und deren Korrekturen.
+Die zugehörigen Hauptbuchungen können im Export enthalten sein, bilden diese
+OP-Vorgänge aber nicht vollständig ab. Deshalb ist `.simpleob` für einen
+Mandanten mit genutzter OP-Verwaltung keine vollständige Sicherung oder
+Übertragung. Insbesondere kann die OP-basierte Umsatzüberwachung nach einem
+Import die bisherige Zahlungshistorie nicht wiederherstellen. Sichern Sie in
+diesem Fall zusätzlich die vollständige Datenbank und verwenden Sie für eine
+Übertragung der OP-Daten kein `.simpleob`-Archiv allein.
 
 Der Export beschränkt sich damit nicht auf das gerade ausgewählte
 Geschäftsjahr.
@@ -2545,6 +2753,10 @@ Die `.simpleob`-Datei enthält mandantenbezogene Daten.
 
 Anwendungsweite Einstellungen gehören dagegen nicht zum
 Mandantentransfer.
+
+Die mandantenbezogenen Einstellungen zur Kleinunternehmerregelung sind
+Bestandteil des Exports. Dazu gehören Tätigkeitsbeginn, dokumentierter
+Verzicht samt Datum und externe Umsatzergänzungen mit ihrem Kalenderjahr.
 
 Insbesondere werden die in Kapitel 5 beschriebenen
 ELSTER-Einstellungen nicht als Bestandteil des Mandanten exportiert.
@@ -2595,8 +2807,8 @@ Nach Auswahl einer `.simpleob`-Datei liest und prüft SimpleOB zunächst
 deren Inhalt.
 
 Ist die Datei gültig und kann der Mandant importiert werden, werden
-die enthaltenen Mandantendaten in die lokale SimpleOB-Datenbank
-übernommen.
+die enthaltenen unterstützten Mandantendaten in die aktuell konfigurierte
+SimpleOB-Datenbank übernommen, also in SQLite oder PostgreSQL.
 
 Nach erfolgreichem Import erscheint der importierte Mandant in der
 Mandantenauswahl und wird dort ausgewählt.
@@ -2657,9 +2869,11 @@ der Datenbank verbleibt.
 
 ### 14.9 `.simpleob` als Mandantensicherung
 
-Die Exportfunktion eignet sich dazu, einen Mandanten einschließlich
-seiner in SimpleOB gespeicherten Geschäftsjahre und Buchhaltungsdaten
-in einer einzelnen Datei zu sichern.
+Die Exportfunktion sichert die im `.simpleob`-Format unterstützten Daten eines
+Mandanten einschließlich seiner Geschäftsjahre in einer einzelnen Datei.
+Bei Nutzung der OP-Verwaltung ist sie keine vollständige Sicherung; beachten
+Sie dazu die Einschränkung in Kapitel 14.2 und sichern Sie zusätzlich die
+gesamte Datenbank.
 
 Eine solche Sicherung sollte insbesondere erstellt werden
 
@@ -2679,8 +2893,8 @@ Sicherungsmedium.
 
 ### 14.10 Unterschied zur Sicherung der gesamten SimpleOB-Datenbank
 
-Eine `.simpleob`-Datei sichert einen einzelnen Mandanten in einem
-portablen SimpleOB-Format.
+Eine `.simpleob`-Datei sichert die in Kapitel 14.2 beschriebenen unterstützten
+Daten eines Mandanten in einem portablen SimpleOB-Format.
 
 Davon zu unterscheiden ist die Sicherung der vollständigen SimpleOB-Datenbank.
 
@@ -2694,10 +2908,10 @@ Bei Verwendung von **PostgreSQL** liegen die Buchhaltungsdaten dagegen auf dem P
 
 Die Sicherungsarten haben unterschiedliche Zwecke:
 
-- **`.simpleob`-Mandantensicherung:** Portabler Export eines einzelnen Mandanten einschließlich seiner Geschäftsjahre und Buchhaltungsdaten.
+- **`.simpleob`-Mandantensicherung:** Portabler Export der in Kapitel 14.2 beschriebenen Mandantendaten einschließlich der Geschäftsjahre.
 - **SQLite-Datenbanksicherung:** Sicherung des gesamten lokalen Buchhaltungsdatenbestands.
 - **PostgreSQL-Datenbanksicherung:** Sicherung des Datenbestands auf dem PostgreSQL-Server.
-- **Sicherung der lokalen Anwendungsdaten:** Sicherung der lokalen Konfiguration und gegebenenfalls weiterer Anwendungsdateien.x
+- **Sicherung der lokalen Anwendungsdaten:** Sicherung der lokalen Konfiguration und gegebenenfalls weiterer Anwendungsdateien.
 
 
 Für eine belastbare Datensicherungsstrategie empfiehlt es sich, nicht
@@ -2707,6 +2921,12 @@ ausschließlich auf eine einzige Sicherungsart zu vertrauen.
 
 Für die Übertragung eines Mandanten auf einen anderen Rechner kann
 folgender Ablauf verwendet werden:
+
+Dieser Ablauf eignet sich in Version 0.51.1 nicht zur vollständigen
+Übertragung von Geschäftspartner- oder OP-Daten. Wenn die OP-Verwaltung
+verwendet wurde, verwenden Sie `.simpleob` nicht als einzige
+Übertragungsmethode; die dazugehörige Einschränkung ist in Kapitel 14.2
+beschrieben.
 
 1. Den gewünschten Mandanten auf dem bisherigen Rechner öffnen.
 2. Den Mandanten als `.simpleob`-Datei exportieren.
@@ -3076,17 +3296,19 @@ Der Schutz dieser Daten sowie ein verantwortungsvoller Umgang mit
 Sicherungen, Exportdateien und ELSTER-Zugangsdaten sind deshalb
 wesentliche Bestandteile der Nutzung von SimpleOB.
 
-### 16.1 Lokale Speicherung der SimpleOB-Daten
+### 16.1 Speicherung der SimpleOB-Daten
 
-Die mit SimpleOB erfassten Buchhaltungs- und Unternehmensdaten werden
-in der lokalen SimpleOB-Datenbank gespeichert.
+Die mit SimpleOB erfassten Buchhaltungs- und Unternehmensdaten werden je
+nach Konfiguration in SQLite oder PostgreSQL gespeichert. Bei SQLite
+befindet sich die Buchhaltungsdatenbank lokal. Bei PostgreSQL liegen die
+Buchhaltungsdaten auf dem PostgreSQL-Server.
 
 Unter macOS befinden sich die Anwendungsdaten standardmäßig unter:
 
 `~/Library/Application Support/SimpleOB/`
 
-Zu diesen Daten gehören insbesondere die lokale Datenbank und die
-Anwendungskonfiguration.
+Zu den lokalen Anwendungsdaten gehören insbesondere die
+Anwendungskonfiguration und bei SQLite auch die lokale Buchhaltungsdatenbank.
 
 Die lokale Speicherung bedeutet nicht, dass SimpleOB niemals Daten an
 externe Stellen überträgt. Eine ausdrücklich vom Benutzer ausgelöste

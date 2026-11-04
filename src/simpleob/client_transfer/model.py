@@ -218,11 +218,15 @@ class ClientTransferKrAnnualTurnover:
         try:
             amount = Decimal(amount_text)
         except InvalidOperation as exc:
-            raise ValueError("KR external turnover amount must be decimal text") from exc
+            raise ValueError(
+                "Externe Umsatzergänzung muss als Dezimalbetrag angegeben werden."
+            ) from exc
         if not amount.is_finite() or amount < Decimal("0.00"):
-            raise ValueError("KR external turnover amount must be non-negative")
+            raise ValueError("Externe Umsatzergänzung darf nicht negativ sein.")
         if amount != amount.quantize(Decimal("0.01")):
-            raise ValueError("KR external turnover amount must use cents")
+            raise ValueError(
+                "Externe Umsatzergänzung darf höchstens zwei Nachkommastellen haben."
+            )
         object.__setattr__(self, "amount", format(amount, ".2f"))
 
 
@@ -250,10 +254,14 @@ class ClientTransferKrSettings:
             isinstance(item, ClientTransferKrAnnualTurnover)
             for item in self.external_turnovers
         ):
-            raise TypeError("external_turnovers must contain KR annual turnover values")
+            raise TypeError(
+                "Jahresbezogene Umsatzergänzungen müssen gültige Beträge enthalten."
+            )
         years = [item.calendar_year for item in self.external_turnovers]
         if len(years) != len(set(years)):
-            raise ValueError("KR annual turnover years must be unique")
+            raise ValueError(
+                "Für jedes Kalenderjahr darf nur eine Umsatzergänzung vorliegen."
+            )
 
 
 @dataclass(frozen=True, slots=True)

@@ -71,8 +71,8 @@ def test_warns_when_forecast_exceeds_limit_and_not_when_equal_or_below(
         amount_entry.editingFinished.emit()
         assert len(calls) == 1
         _parent, title, message, button = calls[0]
-        assert title == "KR-Grenze voraussichtlich überschritten"
-        assert "Bisheriger KR-Umsatz: 99.950,00 €" in message
+        assert title == "Umsatzgrenze voraussichtlich überschritten"
+        assert "Bisheriger Umsatz: 99.950,00 €" in message
         assert "Neue Ausgangsrechnung: 100,00 €" in message
         assert "Prognostizierter Umsatz: 100.050,00 €" in message
         assert "Maßgebliche Grenze: 100.000,00 €" in message

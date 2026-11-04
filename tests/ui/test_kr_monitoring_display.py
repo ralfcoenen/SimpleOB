@@ -115,7 +115,9 @@ def test_kr_query_failure_does_not_prevent_booking_frame_creation():
         kr_summary_provider=unavailable_summary,
     )
     try:
-        assert frame._kr_error_label.text() == "KR-Auswertung derzeit nicht verfügbar."
+        assert frame._kr_error_label.text() == (
+            "Die Umsatzüberwachung ist derzeit nicht verfügbar."
+        )
         assert not frame._kr_error_label.isHidden()
         assert frame._invoice_type_box.isEnabled()
     finally:

@@ -40,12 +40,12 @@ class KrSettingsDialog(QDialog):
         self.setMinimumWidth(480)
 
         layout = QVBoxLayout(self)
-        layout.addWidget(
-            QLabel(
-                "Diese Angaben steuern nur die informative KR-Anzeige. "
-                "Sie ändern keine steuerliche Behandlung."
-            )
+        info_label = QLabel(
+            "Diese Angaben steuern nur die informative Umsatzüberwachung "
+            "zur Kleinunternehmerregelung. Sie ändern keine steuerliche Behandlung."
         )
+        info_label.setWordWrap(True)
+        layout.addWidget(info_label)
         form = QFormLayout()
         layout.addLayout(form)
 
@@ -139,7 +139,11 @@ class KrSettingsDialog(QDialog):
                 ),
             )
         except (TypeError, ValueError) as exc:
-            QMessageBox.critical(self, "Ungültige KR-Einstellungen", str(exc))
+            QMessageBox.critical(
+                self,
+                "Ungültige Einstellungen zur Kleinunternehmerregelung",
+                str(exc),
+            )
             return
 
         self.result = settings

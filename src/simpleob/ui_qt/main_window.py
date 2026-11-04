@@ -5546,7 +5546,7 @@ class MainWindow(QMainWindow):
         QMessageBox.information(
             self,
             "Kleinunternehmerregelung",
-            "Die KR-Einstellungen wurden gespeichert.",
+            "Die Einstellungen zur Kleinunternehmerregelung wurden gespeichert.",
         )
 
     def _reload_bookkeeping_data(

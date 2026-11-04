@@ -21,7 +21,9 @@ class KrAnnualTurnoverAddition:
         ):
             raise ValueError("Das Kalenderjahr ist ungültig.")
         if isinstance(self.amount, (bool, float)):
-            raise TypeError("KR-Umsatzergänzungen müssen Decimal-Beträge sein.")
+            raise TypeError(
+                "Umsatzergänzungen zur Kleinunternehmerregelung müssen Decimal-Beträge sein."
+            )
         try:
             raw_amount = Decimal(str(self.amount))
         except InvalidOperation as exc:

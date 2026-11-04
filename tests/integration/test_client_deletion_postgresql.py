@@ -123,7 +123,7 @@ def test_postgresql_blocks_writers_on_every_table_until_commit(
     monkeypatch.setattr(ClientDeletionRepository, "check_deleted", postcheck)
     path = tmp_path / "postgres.simpleob"
     _delete(postgres_client, path)
-    assert len(observations) == 32
+    assert len(observations) == 2 * len(Base.metadata.sorted_tables)
     assert read_client_transfer_archive(path).client == transfer.client
     with engine.connect() as connection:
         assert not any(

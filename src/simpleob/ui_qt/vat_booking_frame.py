@@ -346,7 +346,7 @@ class VatBookingFrame(QWidget):
         self.refresh_kr_summary()
 
     def _create_kr_summary(self, parent_layout: QVBoxLayout) -> None:
-        box = QGroupBox("KR – Vereinnahmte Kundenzahlungen")
+        box = QGroupBox("Umsatzüberwachung – vereinnahmte Kundenzahlungen")
         grid = QGridLayout(box)
         grid.setContentsMargins(8, 6, 8, 6)
         grid.setHorizontalSpacing(12)
@@ -363,7 +363,7 @@ class VatBookingFrame(QWidget):
                 ("refunds", "Kundenrückerstattungen"),
                 ("external", "Externe Umsatzergänzung"),
                 ("balance", "Saldo inkl. Ergänzung"),
-                ("limit", "KR-Grenze"),
+                ("limit", "Umsatzgrenze"),
             ),
             start=1,
         ):
@@ -377,19 +377,21 @@ class VatBookingFrame(QWidget):
             self._kr_value_labels[key] = (previous, current)
 
         self._kr_direct_revenue_warning = QLabel(
-            "Direkte Erlösbuchungen vorhanden. Die KR-Auswertung kann unvollständig sein."
+            "Direkte Erlösbuchungen vorhanden. Die Umsatzüberwachung kann unvollständig sein."
         )
         self._kr_direct_revenue_warning.setWordWrap(True)
         self._kr_direct_revenue_warning.setStyleSheet("font-weight: bold;")
         self._kr_direct_revenue_warning.hide()
         grid.addWidget(self._kr_direct_revenue_warning, 6, 0, 1, 3)
         self._kr_activity_start_warning = QLabel(
-            "Beginn der Tätigkeit fehlt. Das Gründungsjahr und die passende KR-Grenze sind nicht bestimmbar."
+            "Beginn der Tätigkeit fehlt. Das Gründungsjahr und die passende Umsatzgrenze sind nicht bestimmbar."
         )
         self._kr_activity_start_warning.setWordWrap(True)
         self._kr_activity_start_warning.hide()
         grid.addWidget(self._kr_activity_start_warning, 7, 0, 1, 3)
-        self._kr_error_label = QLabel("KR-Auswertung derzeit nicht verfügbar.")
+        self._kr_error_label = QLabel(
+            "Die Umsatzüberwachung ist derzeit nicht verfügbar."
+        )
         self._kr_error_label.setWordWrap(True)
         self._kr_error_label.hide()
         grid.addWidget(self._kr_error_label, 8, 0, 1, 3)
@@ -1173,7 +1175,7 @@ class VatBookingFrame(QWidget):
             "Bei vollständiger Vereinnahmung dieser Ausgangsrechnung im "
             "laufenden Kalenderjahr würde die Grenze der "
             "Kleinunternehmerregelung überschritten.\n\n"
-            f"Bisheriger KR-Umsatz: {format_german_amount(current_balance)} €\n"
+            f"Bisheriger Umsatz: {format_german_amount(current_balance)} €\n"
             f"Neue Ausgangsrechnung: {format_german_amount(invoice_amount)} €\n"
             "Prognostizierter Umsatz: "
             f"{format_german_amount(projected_turnover)} €\n"
@@ -1184,7 +1186,7 @@ class VatBookingFrame(QWidget):
         )
         QMessageBox.warning(
             self,
-            "KR-Grenze voraussichtlich überschritten",
+            "Umsatzgrenze voraussichtlich überschritten",
             message,
             QMessageBox.StandardButton.Ok,
         )
