@@ -40,6 +40,8 @@ account_number;name;account_type;statement_type;debit_position_code;credit_posit
 8020;Jahresüberschuss;EQUITY;BALANCE_SHEET;;HGB.266.PASSIVA.A.V
 8021;Jahresfehlbetrag;EQUITY;BALANCE_SHEET;HGB.266.PASSIVA.A.V;
 8400;Umsatzerlöse 19 %;REVENUE;INCOME_STATEMENT;;HGB.275.GKV.1
+8407;Umsatzerlöse 7 %;REVENUE;INCOME_STATEMENT;;HGB.275.GKV.1
+8410;Umsatzerlöse 0 %;REVENUE;INCOME_STATEMENT;;HGB.275.GKV.1
 8500;Erträge aus Abgängen des Anlagevermögens;REVENUE;INCOME_STATEMENT;;HGB.275.GKV.4
 8590;Sonstige betriebliche Erträge;REVENUE;INCOME_STATEMENT;;HGB.275.GKV.4
 9000;Eröffnungsbilanzkonto;EQUITY;;;

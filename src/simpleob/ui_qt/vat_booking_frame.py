@@ -6,6 +6,7 @@ from decimal import Decimal, InvalidOperation
 from uuid import UUID
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QResizeEvent
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -17,6 +18,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMessageBox,
     QPushButton,
+    QSplitter,
     QVBoxLayout,
     QWidget,
 )
@@ -46,6 +48,31 @@ _CUSTOMER_CREDIT_NOTE = "Kundengutschrift"
 _SUPPLIER_CREDIT_NOTE = "Lieferantengutschrift"
 
 _TAX_RATES = ("0 %", "7 %", "19 %")
+_BOOKING_COLUMNS_BREAKPOINT = 1050
+
+
+class ResponsiveBookingSplitter(QSplitter):
+    """Zeigt Buchung und Umsatzüberwachung passend zur Fensterbreite an."""
+
+    def __init__(self) -> None:
+        super().__init__(Qt.Orientation.Horizontal)
+        self.setChildrenCollapsible(False)
+        self.setStretchFactor(0, 3)
+        self.setStretchFactor(1, 2)
+
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        orientation = (
+            Qt.Orientation.Vertical
+            if self.width() < _BOOKING_COLUMNS_BREAKPOINT
+            else Qt.Orientation.Horizontal
+        )
+        changed = self.orientation() != orientation
+        if changed:
+            self.setOrientation(orientation)
+        super().resizeEvent(event)
+        if changed and orientation == Qt.Orientation.Horizontal:
+            width = max(1, self.width())
+            self.setSizes([round(width * 0.6), round(width * 0.4)])
 
 
 class VatBookingFrame(QWidget):
@@ -315,7 +342,7 @@ class VatBookingFrame(QWidget):
             self._status_label
         )
 
-        self._create_kr_summary(layout)
+        self._create_kr_summary()
 
         self._invoice_type_box.currentTextChanged.connect(
             self._on_form_changed
@@ -345,7 +372,7 @@ class VatBookingFrame(QWidget):
         self._update_invoice_fields()
         self.refresh_kr_summary()
 
-    def _create_kr_summary(self, parent_layout: QVBoxLayout) -> None:
+    def _create_kr_summary(self) -> None:
         box = QGroupBox("Umsatzüberwachung – vereinnahmte Kundenzahlungen")
         grid = QGridLayout(box)
         grid.setContentsMargins(8, 6, 8, 6)
@@ -405,7 +432,11 @@ class VatBookingFrame(QWidget):
         self._kr_scope_note.setWordWrap(True)
         grid.addWidget(self._kr_scope_note, 9, 0, 1, 3)
         self._kr_summary_box = box
-        parent_layout.addWidget(box)
+
+    @property
+    def kr_summary_widget(self) -> QGroupBox:
+        """Gibt das bestehende Umsatzüberwachungs-Widget für das Layout frei."""
+        return self._kr_summary_box
 
     def refresh_kr_summary(self) -> None:
         """Aktualisiert die informative kalenderjährliche KR-Ansicht."""

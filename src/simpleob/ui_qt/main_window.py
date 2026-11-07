@@ -165,7 +165,10 @@ from simpleob.ui_qt.shareholder_dialog import ShareholdersDialog
 from simpleob.ui_qt.tax_depreciation_adjustment_dialog import (
     TaxDepreciationAdjustmentDialog,
 )
-from simpleob.ui_qt.vat_booking_frame import VatBookingFrame
+from simpleob.ui_qt.vat_booking_frame import (
+    ResponsiveBookingSplitter,
+    VatBookingFrame,
+)
 
 ZERO = Decimal("0.00")
 
@@ -2150,8 +2153,6 @@ class MainWindow(QMainWindow):
         )
         mode_layout.addStretch()
 
-        booking_layout.addLayout(mode_layout)
-
         technical_account_numbers = {
             self._opening_balance_account_number,
             self._closing_accounts.income_summary_account,
@@ -2257,9 +2258,18 @@ class MainWindow(QMainWindow):
             self._vat_booking_frame
         )
 
-        booking_layout.addWidget(
-            self._booking_frame_container
+        booking_left_column = QWidget()
+        booking_left_layout = QVBoxLayout(booking_left_column)
+        booking_left_layout.setContentsMargins(0, 0, 0, 0)
+        booking_left_layout.addLayout(mode_layout)
+        booking_left_layout.addWidget(self._booking_frame_container)
+
+        self._booking_columns_splitter = ResponsiveBookingSplitter()
+        self._booking_columns_splitter.addWidget(booking_left_column)
+        self._booking_columns_splitter.addWidget(
+            self._vat_booking_frame.kr_summary_widget
         )
+        booking_layout.addWidget(self._booking_columns_splitter)
         layout.addWidget(booking_group)
         layout.addStretch()
 

@@ -1,3 +1,5 @@
+from datetime import date
+from decimal import Decimal
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -13,8 +15,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from simpleob.domain.kr_monitoring import KrCalendarYearTotals, KrMonitoringSummary
 from simpleob.domain.vat_accounts import VatAccounts
 from simpleob.ui_qt.main_window import MainWindow
+from simpleob.ui_qt.vat_booking_frame import ResponsiveBookingSplitter
 
 
 def _assert_label_close_to_field(frame: QWidget, field: QWidget) -> None:
@@ -108,6 +112,7 @@ def test_booking_tab_groups_op_actions_and_fits_reduced_width():
     app.processEvents()
     op_group = groups["OP-Verwaltung"]
     assert op_group.isVisible()
+    assert op_group.width() > window._booking_columns_splitter.width()
     assert all(button.width() >= button.sizeHint().width() for button in action_buttons)
     assert all(button.width() < op_group.width() for button in action_buttons)
 
@@ -141,6 +146,29 @@ def test_invoice_booking_layout_switches_related_fields_without_clipping():
     window._booking_mode_box.setCurrentText("Rechnung mit Umsatzsteuer")
     app.processEvents()
     frame = window._vat_booking_frame
+    summary = KrMonitoringSummary(
+        previous_year=KrCalendarYearTotals(
+            calendar_year=2025,
+            customer_payments=Decimal("25000.00"),
+            customer_refunds=Decimal("0.00"),
+            has_direct_revenue_bookings=False,
+            external_turnover=Decimal("0.00"),
+            limit=Decimal("25000.00"),
+        ),
+        current_year=KrCalendarYearTotals(
+            calendar_year=2026,
+            customer_payments=Decimal("0.00"),
+            customer_refunds=Decimal("0.00"),
+            has_direct_revenue_bookings=False,
+            external_turnover=Decimal("0.00"),
+            limit=Decimal("100000.00"),
+        ),
+        activity_start_date=date(2020, 1, 1),
+    )
+    frame._kr_summary_provider = lambda: summary
+    frame.refresh_kr_summary()
+    splitter = window._booking_columns_splitter
+    assert isinstance(splitter, ResponsiveBookingSplitter)
     scroll_area = window.findChild(QScrollArea)
     assert frame.isVisible()
     assert not window._booking_frame.isVisible()
@@ -152,6 +180,10 @@ def test_invoice_booking_layout_switches_related_fields_without_clipping():
     assert not frame._original_invoice_number_entry.isVisible()
     window.resize(1600, 700)
     app.processEvents()
+    assert splitter.orientation().name == "Horizontal"
+    left_width, right_width = splitter.sizes()
+    assert 0.55 <= left_width / (left_width + right_width) <= 0.65
+    assert frame.kr_summary_widget.isVisible()
     _assert_label_close_to_field(frame, frame._invoice_type_box)
     _assert_label_close_to_field(frame, frame._booking_date_entry)
     _assert_label_close_to_field(frame, frame._voucher_no_entry)
@@ -188,6 +220,26 @@ def test_invoice_booking_layout_switches_related_fields_without_clipping():
     app.processEvents()
     assert frame._partner_label.text() == "Lieferant"
     assert frame._original_invoice_number_entry.isVisible()
+
+    window.resize(800, 700)
+    app.processEvents()
+    assert splitter.orientation().name == "Vertical"
+    assert scroll_area.horizontalScrollBar().maximum() == 0
+    assert frame.kr_summary_widget.isVisible()
+    frame._invoice_type_box.setCurrentText("Ausgangsrechnung")
+    app.processEvents()
+    assert frame._on_account.isVisible()
+    for widget in (
+        window._booking_mode_box,
+        frame._invoice_type_box,
+        frame._booking_date_entry,
+        frame._voucher_no_entry,
+        frame._booking_button,
+        frame.kr_summary_widget,
+    ):
+        right = widget.mapTo(scroll_area.viewport(), QPoint()).x() + widget.width()
+        assert right <= scroll_area.viewport().width()
+    assert scroll_area.horizontalScrollBar().maximum() == 0
 
     window._booking_mode_box.setCurrentText("Einfache Buchung")
     app.processEvents()
