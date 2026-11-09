@@ -17,6 +17,9 @@ from PySide6.QtWidgets import (
 )
 from sqlalchemy.engine import make_url
 
+from simpleob.accounting.financial_statement_position import (
+    FinancialStatementPosition,
+)
 from simpleob.client_transfer.archive import (
     read_client_transfer_archive,
 )
@@ -24,12 +27,16 @@ from simpleob.client_transfer.filename import client_backup_filename
 from simpleob.client_transfer.model import ClientTransfer
 from simpleob.core.config import (
     ApplicationConfig,
+    desktop_application_data_dir,
     save_database_configuration,
 )
 from simpleob.core.context import ApplicationContext
 from simpleob.database.company_repository import CompanyRepository
 from simpleob.domain.company import Company
 from simpleob.domain.fiscal_year import FiscalYear
+from simpleob.importers.chart_of_accounts_template_bundle_importer import (
+    ChartOfAccountsTemplateBundle,
+)
 from simpleob.services.client_deletion_service import ClientDeletionCommitUnknown
 from simpleob.ui_qt.database_configuration_dialog import (
     DatabaseConfigurationDialog,
@@ -52,6 +59,13 @@ class StartDialog(QDialog):
             Callable[[ClientTransfer], None] | None
         ) = None,
         delete_client: Callable[[Company, Path], Path] | None = None,
+        taxonomy_choices_provider: (
+            Callable[
+                [FiscalYear, FinancialStatementPosition],
+                tuple[tuple[str, str], ...],
+            ]
+            | None
+        ) = None,
     ) -> None:
         super().__init__()
 
@@ -60,8 +74,11 @@ class StartDialog(QDialog):
         self._repository = repository
         self._import_client_transfer = import_client_transfer
         self._delete_client = delete_client
+        self._taxonomy_choices_provider = taxonomy_choices_provider
 
         self.result: ApplicationContext | None = None
+        self.chart_bundle: ChartOfAccountsTemplateBundle | None = None
+        self.uses_standard_chart = False
         self.opening_transfer_request: (
             tuple[FiscalYear, FiscalYear] | None
         ) = None
@@ -455,6 +472,11 @@ class StartDialog(QDialog):
         dialog = NewCompanyDialog(
             self,
             repository=self._repository,
+            template_directory=(
+                desktop_application_data_dir()
+                / "chart_of_accounts_templates"
+            ),
+            taxonomy_choices_provider=self._taxonomy_choices_provider,
         )
 
         if dialog.exec() != QDialog.DialogCode.Accepted:
@@ -464,6 +486,8 @@ class StartDialog(QDialog):
             return
 
         self.result = dialog.result
+        self.chart_bundle = dialog.chart_bundle
+        self.uses_standard_chart = dialog.uses_standard_chart
         self.accept()
 
     def _create_new_fiscal_year(self) -> None:

@@ -36,6 +36,27 @@ ERIC_WRAPPER_DIR = (
     / "ericapi"
 )
 
+CHART_TEMPLATE_DIR = SRC_ROOT / "simpleob/resources/chart_of_accounts"
+TAXONOMY_MAPPING_DIR = (
+    SRC_ROOT / "simpleob/resources/e_bilanz/account_mappings"
+)
+chart_template_datas = [
+    (str(path), "simpleob/resources/chart_of_accounts")
+    for path in sorted(CHART_TEMPLATE_DIR.iterdir())
+    if path.is_file()
+]
+taxonomy_mapping_datas = [
+    (
+        str(path),
+        str(
+            Path("simpleob/resources/e_bilanz/account_mappings")
+            / path.parent.relative_to(TAXONOMY_MAPPING_DIR)
+        ),
+    )
+    for path in sorted(TAXONOMY_MAPPING_DIR.rglob("*"))
+    if path.is_file()
+]
+
 required_eric_paths = (
     ERIC_LIB_DIR,
     ERIC_PLUGIN_DIR,
@@ -106,22 +127,8 @@ a = Analysis(
     pathex=[str(SRC_ROOT)],
     binaries=eric_binaries,
     datas=[
-        (
-            str(
-                SRC_ROOT
-                / "simpleob/resources/chart_of_accounts/"
-                "openbilanz_standard.csv"
-            ),
-            "simpleob/resources/chart_of_accounts",
-        ),
-        (
-            str(
-                SRC_ROOT
-                / "simpleob/resources/e_bilanz/account_mappings/6.9/"
-                "openbilanz_standard.csv"
-            ),
-            "simpleob/resources/e_bilanz/account_mappings/6.9",
-        ),
+        *chart_template_datas,
+        *taxonomy_mapping_datas,
         (
             str(
                 SRC_ROOT

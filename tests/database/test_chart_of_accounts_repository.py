@@ -375,6 +375,7 @@ def test_saves_and_validates_control_accounts() -> None:
         repository.save_control_accounts(
             company_id=company.company_id,
             control_accounts=control_accounts,
+            vat_accounts=vat_accounts,
         )
 
         repository.save_vat_accounts(

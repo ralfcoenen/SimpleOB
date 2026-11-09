@@ -42,6 +42,13 @@ include = [
     "simpleob*"
 ]
 
+[tool.setuptools.package-data]
+simpleob = [
+    "resources/**/*.csv",
+    "resources/**/*.json",
+    "resources/**/*.txt",
+]
+
 
 [tool.pytest.ini_options]
 testpaths = [

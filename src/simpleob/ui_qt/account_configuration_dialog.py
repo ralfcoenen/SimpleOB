@@ -36,9 +36,10 @@ class AccountConfigurationDialog(QDialog):
         parent,
         *,
         accounts: tuple[Account, ...],
-        control_accounts: AccountingControlAccounts,
-        vat_accounts: VatAccounts,
-        account_roles: AccountingAccountRoles,
+        control_accounts: AccountingControlAccounts | None,
+        vat_accounts: VatAccounts | None,
+        account_roles: AccountingAccountRoles | None,
+        for_new_company: bool = False,
     ) -> None:
         super().__init__(parent)
 
@@ -55,7 +56,12 @@ class AccountConfigurationDialog(QDialog):
 
         self._control_accounts = control_accounts
         self._vat_accounts = vat_accounts
-        self._account_roles = account_roles
+        self._for_new_company = for_new_company
+        self._account_roles = account_roles or AccountingAccountRoles(
+            cash_accounts=frozenset(),
+            bank_accounts=frozenset(),
+            general_rate_sales_accounts=frozenset(),
+        )
         self._role_definitions = (
             ("Kasse", "cash_accounts"),
             ("Bank", "bank_accounts"),
@@ -66,7 +72,7 @@ class AccountConfigurationDialog(QDialog):
             ("Lieferantenguthaben", "supplier_credit_balances"),
         )
         self._role_assignments = {
-            field_name: set(getattr(account_roles, field_name))
+            field_name: set(getattr(self._account_roles, field_name))
             for _label, field_name in self._role_definitions
         }
         self._current_role_key: str | None = None
@@ -102,7 +108,9 @@ class AccountConfigurationDialog(QDialog):
 
         layout.addWidget(
             QLabel(
-                "Die Einstellungen gelten für den aktuell "
+                "Die Einstellungen gelten für den neuen Kontenrahmen."
+                if self._for_new_company
+                else "Die Einstellungen gelten für den aktuell "
                 "geöffneten Mandanten."
             )
         )
@@ -416,6 +424,7 @@ class AccountConfigurationDialog(QDialog):
         """Erzeugt eine schreibgeschützte Kontenauswahl."""
 
         combo_box = QComboBox()
+        combo_box.addItem("Bitte auswählen …", None)
 
         for account in self._accounts:
             combo_box.addItem(
@@ -464,84 +473,56 @@ class AccountConfigurationDialog(QDialog):
     def _load_values(self) -> None:
         """Übernimmt die vorhandene Kontenkonfiguration."""
 
-        self._select_account(
-            self._opening_balance_box,
-            self._control_accounts.opening_balance_account,
-        )
-        self._select_account(
-            self._income_summary_box,
-            self._control_accounts.income_summary_account,
-        )
-        self._select_account(
-            self._profit_box,
-            self._control_accounts.profit_account,
-        )
-        self._select_account(
-            self._loss_box,
-            self._control_accounts.loss_account,
-        )
-        self._select_account(
-            self._profit_loss_carryforward_box,
-            (
-                self._control_accounts
-                .profit_loss_carryforward_account
-            ),
-        )
-        self._select_account(
-            self._statutory_reserve_box,
-            self._control_accounts.statutory_reserve_account,
-        )
-        self._select_account(
-            self._other_revenue_reserves_box,
-            (
-                self._control_accounts
-                .other_revenue_reserves_account
-            ),
-        )
-        self._select_account(
-            self._distribution_liability_box,
-            (
-                self._control_accounts
-                .distribution_liability_account
-            ),
-        )
-        self._select_account(
-            self._depreciation_expense_box,
-            (
-                self._control_accounts
-                .depreciation_expense_account
-            ),
-        )
-        self._select_account(
-            self._fixed_asset_disposal_gain_box,
-            (
-                self._control_accounts
-                .fixed_asset_disposal_gain_account
-            ),
-        )
-        self._select_account(
-            self._fixed_asset_disposal_loss_box,
-            (
-                self._control_accounts
-                .fixed_asset_disposal_loss_account
-            ),
-        )
-        self._select_account(
-            self._input_tax_7_box,
-            self._vat_accounts.input_tax_7,
-        )
-        self._select_account(
-            self._input_tax_19_box,
-            self._vat_accounts.input_tax_19,
-        )
-        self._select_account(
-            self._output_tax_7_box,
-            self._vat_accounts.output_tax_7,
-        )
-        self._select_account(
-            self._output_tax_19_box,
-            self._vat_accounts.output_tax_19,
-        )
+        if self._control_accounts is not None:
+            self._select_account(
+                self._opening_balance_box,
+                self._control_accounts.opening_balance_account,
+            )
+            self._select_account(
+                self._income_summary_box,
+                self._control_accounts.income_summary_account,
+            )
+            self._select_account(
+                self._profit_box,
+                self._control_accounts.profit_account,
+            )
+            self._select_account(
+                self._loss_box,
+                self._control_accounts.loss_account,
+            )
+            self._select_account(
+                self._profit_loss_carryforward_box,
+                self._control_accounts.profit_loss_carryforward_account,
+            )
+            self._select_account(
+                self._statutory_reserve_box,
+                self._control_accounts.statutory_reserve_account,
+            )
+            self._select_account(
+                self._other_revenue_reserves_box,
+                self._control_accounts.other_revenue_reserves_account,
+            )
+            self._select_account(
+                self._distribution_liability_box,
+                self._control_accounts.distribution_liability_account,
+            )
+            self._select_account(
+                self._depreciation_expense_box,
+                self._control_accounts.depreciation_expense_account,
+            )
+            self._select_account(
+                self._fixed_asset_disposal_gain_box,
+                self._control_accounts.fixed_asset_disposal_gain_account,
+            )
+            self._select_account(
+                self._fixed_asset_disposal_loss_box,
+                self._control_accounts.fixed_asset_disposal_loss_account,
+            )
+        if self._vat_accounts is not None:
+            self._select_account(self._input_tax_7_box, self._vat_accounts.input_tax_7)
+            self._select_account(self._input_tax_19_box, self._vat_accounts.input_tax_19)
+            self._select_account(self._output_tax_7_box, self._vat_accounts.output_tax_7)
+            self._select_account(self._output_tax_19_box, self._vat_accounts.output_tax_19)
 
     @staticmethod
     def _select_account(

@@ -1,7 +1,9 @@
 """Tests für die Initialisierung mandantenspezifischer Kontenrahmen."""
 
+from datetime import date
 from uuid import uuid4
 
+import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -19,11 +21,16 @@ from simpleob.domain.account_type import AccountType
 from simpleob.domain.accounting_account_roles import (
     AccountingAccountRoles,
 )
+from simpleob.domain.accounting_control_accounts import (
+    AccountingControlAccounts,
+)
 from simpleob.domain.chart_of_accounts_template import (
     ChartOfAccountsTemplate,
 )
 from simpleob.domain.company import Company
+from simpleob.domain.fiscal_year import FiscalYear
 from simpleob.domain.template_account import TemplateAccount
+from simpleob.domain.vat_accounts import VatAccounts
 from simpleob.hgb.balance_sheet_structure import (
     create_hgb_balance_sheet_structure,
 )
@@ -228,6 +235,7 @@ def test_initializes_chart_of_accounts_for_company() -> None:
             standard_account_taxonomy_concepts=(
                 _standard_account_taxonomy_concepts()
             ),
+            use_standard_defaults=True,
         )
 
         session.commit()
@@ -286,6 +294,40 @@ def test_initializes_chart_of_accounts_for_company() -> None:
     }
 
 
+def test_individual_chart_requires_explicit_system_and_vat_accounts() -> None:
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine)
+    company = Company(company_id=uuid4(), name="Individuelle UG")
+
+    with Session() as session:
+        company_repository = CompanyRepository(session)
+        repository = ChartOfAccountsRepository(session)
+        company_repository.add(company, commit=False)
+        service = ChartOfAccountsInitializationService(
+            repository=repository,
+            position_provider=_position_provider(),
+        )
+
+        with pytest.raises(ValueError, match="ausdrücklich zugeordnet"):
+            service.initialize(
+                company=company,
+                standard_chart_of_accounts=ChartOfAccountsTemplate(
+                    name="Fremder Rahmen",
+                    accounts=(
+                        TemplateAccount(
+                            "7000", "Aktivkonto", AccountType.ASSET
+                        ),
+                    ),
+                ),
+            )
+        session.rollback()
+        assert repository.load_for_company(
+            company_id=company.company_id,
+            position_provider=_position_provider(),
+        ) is None
+
+
 def test_does_not_replace_existing_chart_of_accounts() -> None:
     """Ein vorhandener Mandantenkontenrahmen wird nicht überschrieben."""
 
@@ -330,6 +372,7 @@ def test_does_not_replace_existing_chart_of_accounts() -> None:
             standard_account_taxonomy_concepts=(
                 _standard_account_taxonomy_concepts()
             ),
+            use_standard_defaults=True,
         )
 
         session.commit()
@@ -356,6 +399,7 @@ def test_does_not_replace_existing_chart_of_accounts() -> None:
             standard_account_taxonomy_concepts=(
                 _standard_account_taxonomy_concepts()
             ),
+            use_standard_defaults=True,
         )
 
         loaded = repository.load_for_company(
@@ -398,3 +442,137 @@ def test_does_not_replace_existing_chart_of_accounts() -> None:
                 "8990",
                 "9000",
             }
+
+
+def test_initializes_alternative_chart_with_explicit_configuration() -> None:
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine)
+    company = Company(company_id=uuid4(), name="Alternative UG")
+    chart = ChartOfAccountsTemplate(
+        name="Custom",
+        accounts=(
+            TemplateAccount("7000", "Eigenkapital", AccountType.EQUITY),
+            TemplateAccount("7001", "Verbindlichkeit", AccountType.LIABILITY),
+            TemplateAccount("7002", "Aufwand", AccountType.EXPENSE),
+            TemplateAccount("7003", "Ertrag", AccountType.REVENUE),
+            TemplateAccount("7004", "Aktivkonto", AccountType.ASSET),
+        ),
+    )
+    controls = AccountingControlAccounts(
+        opening_balance_account="7000",
+        income_summary_account="7000",
+        profit_account="7000",
+        loss_account="7000",
+        profit_loss_carryforward_account="7000",
+        statutory_reserve_account="7000",
+        other_revenue_reserves_account="7000",
+        distribution_liability_account="7001",
+        depreciation_expense_account="7002",
+        fixed_asset_disposal_gain_account="7003",
+        fixed_asset_disposal_loss_account="7002",
+    )
+    vat = VatAccounts("7004", "7004", "7001", "7001")
+    roles = AccountingAccountRoles(
+        cash_accounts=frozenset(),
+        bank_accounts=frozenset(),
+        general_rate_sales_accounts=frozenset(),
+    )
+
+    with Session() as session:
+        company_repository = CompanyRepository(session)
+        repository = ChartOfAccountsRepository(session)
+        company_repository.add(company, commit=False)
+        company_repository.add_fiscal_year(
+            company.company_id,
+            FiscalYear(date(2026, 1, 1), date(2026, 12, 31)),
+            commit=False,
+        )
+        service = ChartOfAccountsInitializationService(
+            repository=repository,
+            position_provider=_position_provider(),
+        )
+        assert service.initialize(
+            company=company,
+            standard_chart_of_accounts=chart,
+            control_accounts=controls,
+            vat_accounts=vat,
+            account_roles=roles,
+            standard_account_taxonomy_concepts={},
+        )
+        session.commit()
+        loaded = repository.load_for_company(
+            company_id=company.company_id,
+            position_provider=_position_provider(),
+        )
+
+    assert loaded is not None
+    loaded_chart, _accounts = loaded
+    assert tuple(account.account_number for account in loaded_chart.accounts) == (
+        "7000", "7001", "7002", "7003", "7004",
+    )
+
+
+def test_failed_new_chart_initialization_rolls_back_company_and_fiscal_year() -> None:
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine)
+    company = Company(company_id=uuid4(), name="Rollback UG")
+    chart = ChartOfAccountsTemplate(
+        name="Incomplete",
+        accounts=(
+            TemplateAccount(
+                account_number="7000",
+                name="Customkonto",
+                account_type=AccountType.ASSET,
+            ),
+        ),
+    )
+    controls = AccountingControlAccounts(
+        opening_balance_account="9999",
+        income_summary_account="9999",
+        profit_account="9999",
+        loss_account="9999",
+        profit_loss_carryforward_account="9999",
+        statutory_reserve_account="9999",
+        other_revenue_reserves_account="9999",
+        distribution_liability_account="9999",
+        depreciation_expense_account="9999",
+        fixed_asset_disposal_gain_account="9999",
+        fixed_asset_disposal_loss_account="9999",
+    )
+    vat = VatAccounts("7000", "7000", "7000", "7000")
+    roles = AccountingAccountRoles(
+        cash_accounts=frozenset(),
+        bank_accounts=frozenset(),
+        general_rate_sales_accounts=frozenset(),
+    )
+
+    with Session() as session:
+        company_repository = CompanyRepository(session)
+        repository = ChartOfAccountsRepository(session)
+        company_repository.add(company, commit=False)
+        company_repository.add_fiscal_year(
+            company.company_id,
+            FiscalYear(date(2026, 1, 1), date(2026, 12, 31)),
+            commit=False,
+        )
+        service = ChartOfAccountsInitializationService(
+            repository=repository,
+            position_provider=_position_provider(),
+        )
+        with pytest.raises(ValueError, match="Technische Konten"):
+            service.initialize(
+                company=company,
+                standard_chart_of_accounts=chart,
+                control_accounts=controls,
+                vat_accounts=vat,
+                account_roles=roles,
+                standard_account_taxonomy_concepts={},
+            )
+        session.rollback()
+        assert company_repository.get(company.company_id) is None
+        assert repository.load_for_company(
+            company_id=company.company_id,
+            position_provider=_position_provider(),
+        ) is None

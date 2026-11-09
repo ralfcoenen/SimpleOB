@@ -302,6 +302,7 @@ def postgres_profit_appropriation_data():
                 company=company,
                 standard_chart_of_accounts=standard_context.chart_of_accounts,
                 standard_account_taxonomy_concepts=mapping,
+                use_standard_defaults=True,
             )
             assert initialized is True
             session.commit()

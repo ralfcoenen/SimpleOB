@@ -1,5 +1,6 @@
 """PySide6-Dialog zum Anlegen und Bearbeiten eines Kontos."""
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from PySide6.QtWidgets import (
@@ -30,7 +31,10 @@ class AccountEditorResult:
     """Ergebnis des Konteneditors."""
 
     account: Account
-    mapping_rule: AccountMappingRule
+    mapping_rule: AccountMappingRule | None
+    hgb_mapping_required: bool = True
+    taxonomy_concept_name: str | None = None
+    taxonomy_mapping_changed: bool = False
 
 
 class AccountEditorDialog(QDialog):
@@ -53,6 +57,16 @@ class AccountEditorDialog(QDialog):
         income_statement: FinancialStatementPosition,
         account: Account | None = None,
         mapping_rule: AccountMappingRule | None = None,
+        template_mode: bool = False,
+        hgb_mapping_required: bool = True,
+        taxonomy_concept_name: str | None = None,
+        taxonomy_choices_provider: (
+            Callable[
+                [FinancialStatementPosition],
+                tuple[tuple[str, str], ...],
+            ]
+            | None
+        ) = None,
     ) -> None:
         super().__init__(parent)
 
@@ -61,6 +75,13 @@ class AccountEditorDialog(QDialog):
         self._income_statement = income_statement
         self._account = account
         self._mapping_rule = mapping_rule
+        self._template_mode = template_mode
+        self._hgb_mapping_required = hgb_mapping_required
+        self._original_taxonomy_concept_name = taxonomy_concept_name
+        self._taxonomy_choices_provider = taxonomy_choices_provider
+        self._updating_taxonomy_choices = False
+        self._taxonomy_selection_touched = False
+        self._taxonomy_choice_error: str | None = None
         self._is_edit_mode = account is not None
 
         self.result: AccountEditorResult | None = None
@@ -80,7 +101,7 @@ class AccountEditorDialog(QDialog):
             if self._is_edit_mode
             else "SimpleOB – Neues Konto"
         )
-        self.setFixedSize(850, 430)
+        self.setFixedSize(850, 560 if template_mode else 430)
 
         self._create_ui()
         self._update_mapping_choices()
@@ -90,6 +111,8 @@ class AccountEditorDialog(QDialog):
             self._name_entry.setFocus()
         else:
             self._account_number_entry.setFocus()
+        if self._template_mode:
+            self._update_taxonomy_choices()
 
     def _create_ui(self) -> None:
         """Erzeugt die Benutzeroberfläche."""
@@ -114,7 +137,7 @@ class AccountEditorDialog(QDialog):
 
         self._account_number_entry = QLineEdit()
         if self._is_edit_mode:
-            self._account_number_entry.setEnabled(False)
+            self._account_number_entry.setEnabled(self._template_mode)
         form.addRow(
             "Kontonummer",
             self._account_number_entry,
@@ -161,14 +184,65 @@ class AccountEditorDialog(QDialog):
             self._credit_position_box,
         )
 
+        self._taxonomy_position_box: QComboBox | None = None
+        self._taxonomy_status_label: QLabel | None = None
+        if self._template_mode:
+            self._taxonomy_position_box = QComboBox()
+            self._taxonomy_position_box.addItem(
+                "Keine explizite Zuordnung",
+                None,
+            )
+            self._taxonomy_position_box.currentIndexChanged.connect(
+                self._on_taxonomy_selection_changed
+            )
+            form.addRow(
+                "E-Bilanz-Taxonomiezuordnung",
+                self._taxonomy_position_box,
+            )
+            self._taxonomy_status_label = QLabel()
+            self._taxonomy_status_label.setWordWrap(True)
+            form.addRow("", self._taxonomy_status_label)
+
+        self._debit_position_box.currentTextChanged.connect(
+            self._on_hgb_position_changed
+        )
+        self._credit_position_box.currentTextChanged.connect(
+            self._on_hgb_position_changed
+        )
+
+        self._hgb_mapping_required_box: QCheckBox | None = None
+        self._hgb_exception_hint: QLabel | None = None
+        if self._template_mode:
+            self._hgb_mapping_required_box = QCheckBox(
+                "HGB-Zuordnung erforderlich"
+            )
+            self._hgb_mapping_required_box.setChecked(
+                self._hgb_mapping_required
+            )
+            self._hgb_mapping_required_box.toggled.connect(
+                self._on_hgb_mapping_requirement_changed
+            )
+            form.addRow("", self._hgb_mapping_required_box)
+            self._hgb_exception_hint = QLabel(
+                "Diese Ausnahme ist nur für Konten vorgesehen, die keine "
+                "eigene Bilanz- oder GuV-Position benötigen, etwa ein "
+                "Eröffnungsbilanzkonto oder GuV-Sammelkonto."
+            )
+            self._hgb_exception_hint.setWordWrap(True)
+            self._hgb_exception_hint.setVisible(
+                not self._hgb_mapping_required
+            )
+            form.addRow("", self._hgb_exception_hint)
+
         self._is_active_box = QCheckBox(
             "Konto ist aktiv"
         )
         self._is_active_box.setChecked(True)
-        form.addRow(
-            "",
-            self._is_active_box,
-        )
+        if not self._template_mode:
+            form.addRow(
+                "",
+                self._is_active_box,
+            )
 
         layout.addLayout(form)
 
@@ -209,6 +283,121 @@ class AccountEditorDialog(QDialog):
         """Aktualisiert die möglichen HGB-Zuordnungen."""
 
         self._update_mapping_choices()
+
+    def _on_hgb_position_changed(self, _text: str) -> None:
+        if self._template_mode:
+            self._update_taxonomy_choices()
+
+    def _on_taxonomy_selection_changed(self, _index: int) -> None:
+        if not self._updating_taxonomy_choices:
+            self._taxonomy_selection_touched = True
+            self._taxonomy_choice_error = None
+            if self._taxonomy_status_label is not None:
+                self._taxonomy_status_label.clear()
+
+    def _selected_hgb_position(
+        self,
+    ) -> FinancialStatementPosition | None:
+        debit_position = self._debit_positions.get(
+            self._debit_position_box.currentText()
+        )
+        credit_position = self._credit_positions.get(
+            self._credit_position_box.currentText()
+        )
+        if debit_position is None:
+            return credit_position
+        if credit_position is None or debit_position == credit_position:
+            return debit_position
+        raise ValueError(
+            "Für die Taxonomieauswahl müssen Soll- und Haben-HGB-Zuordnung "
+            "übereinstimmen oder eine Seite muss leer sein."
+        )
+
+    def _update_taxonomy_choices(self) -> None:
+        """Zeigt ausschließlich explizit zulässige Taxonomiepositionen an."""
+
+        combo = self._taxonomy_position_box
+        if combo is None:
+            return
+
+        selected = combo.currentData()
+        if self._taxonomy_selection_touched:
+            if isinstance(selected, tuple) and selected[:1] == ("unavailable",):
+                selected_concept = selected[1]
+            elif isinstance(selected, str):
+                selected_concept = selected
+            else:
+                selected_concept = None
+        else:
+            selected_concept = self._original_taxonomy_concept_name
+
+        choices: tuple[tuple[str, str], ...] = ()
+        self._taxonomy_choice_error = None
+        if self._taxonomy_choices_provider is None:
+            if self._original_taxonomy_concept_name is not None:
+                self._taxonomy_choice_error = (
+                    "Die vorhandene Zuordnung kann in diesem Dialog nicht "
+                    "gegen Taxonomie 6.9 geprüft werden."
+                )
+        else:
+            try:
+                position = self._selected_hgb_position()
+                if position is None:
+                    raise ValueError(
+                        "Für dieses Konto ist keine eindeutige HGB-Zuordnung "
+                        "ausgewählt."
+                    )
+                choices = self._taxonomy_choices_provider(position)
+            except (OSError, ValueError) as exc:
+                self._taxonomy_choice_error = str(exc)
+
+        self._updating_taxonomy_choices = True
+        combo.blockSignals(True)
+        try:
+            combo.clear()
+            combo.addItem("Keine explizite Zuordnung", None)
+            concept_names = {concept for concept, _label in choices}
+            if (
+                selected_concept is not None
+                and selected_concept not in concept_names
+            ):
+                combo.addItem(
+                    f"Bisherige Zuordnung nicht passend: {selected_concept}",
+                    ("unavailable", selected_concept),
+                )
+                self._taxonomy_choice_error = (
+                    "Die bisherige Zuordnung passt nicht zur aktuellen "
+                    "HGB-Zuordnung. Wählen Sie eine zulässige Position oder "
+                    "ausdrücklich „Keine explizite Zuordnung“."
+                )
+            for concept_name, label in choices:
+                combo.addItem(label, concept_name)
+
+            if selected_concept is not None:
+                for index in range(combo.count()):
+                    if combo.itemData(index) == selected_concept or (
+                        combo.itemData(index)
+                        == ("unavailable", selected_concept)
+                    ):
+                        combo.setCurrentIndex(index)
+                        break
+            else:
+                combo.setCurrentIndex(0)
+        finally:
+            combo.blockSignals(False)
+            self._updating_taxonomy_choices = False
+
+        if self._taxonomy_status_label is not None:
+            self._taxonomy_status_label.setText(
+                self._taxonomy_choice_error or ""
+            )
+
+    def _on_hgb_mapping_requirement_changed(
+        self,
+        required: bool,
+    ) -> None:
+        if self._hgb_exception_hint is not None:
+            self._hgb_exception_hint.setVisible(not required)
 
     def _update_mapping_choices(self) -> None:
         """Stellt passende HGB-Positionen zum Kontotyp bereit."""
@@ -378,17 +567,48 @@ class AccountEditorDialog(QDialog):
                 )
             )
 
-            self._validate_mapping(
-                account_type=account_type,
-                debit_position=debit_position,
-                credit_position=credit_position,
+            hgb_mapping_required = (
+                self._hgb_mapping_required_box.isChecked()
+                if self._hgb_mapping_required_box is not None
+                else True
             )
+            if hgb_mapping_required:
+                self._validate_mapping(
+                    account_type=account_type,
+                    debit_position=debit_position,
+                    credit_position=credit_position,
+                )
 
-            mapping_rule = AccountMappingRule(
-                account_number=account.number,
-                debit_position=debit_position,
-                credit_position=credit_position,
-            )
+            mapping_rule = None
+            if debit_position is not None or credit_position is not None:
+                mapping_rule = AccountMappingRule(
+                    account_number=account.number,
+                    debit_position=debit_position,
+                    credit_position=credit_position,
+                )
+
+            taxonomy_concept_name = None
+            taxonomy_mapping_changed = False
+            if self._taxonomy_position_box is not None:
+                selected_taxonomy = self._taxonomy_position_box.currentData()
+                if (
+                    isinstance(selected_taxonomy, tuple)
+                    and selected_taxonomy[:1] == ("unavailable",)
+                ):
+                    raise ValueError(
+                        "Die bisherige E-Bilanz-Taxonomiezuordnung passt nicht "
+                        "zur aktuellen HGB-Zuordnung. Wählen Sie eine gültige "
+                        "Position oder ausdrücklich „Keine explizite Zuordnung“."
+                    )
+                taxonomy_concept_name = (
+                    selected_taxonomy
+                    if isinstance(selected_taxonomy, str)
+                    else None
+                )
+                taxonomy_mapping_changed = (
+                    taxonomy_concept_name
+                    != self._original_taxonomy_concept_name
+                )
 
         except (TypeError, ValueError) as exc:
             QMessageBox.critical(
@@ -405,6 +625,9 @@ class AccountEditorDialog(QDialog):
         self.result = AccountEditorResult(
             account=account,
             mapping_rule=mapping_rule,
+            hgb_mapping_required=hgb_mapping_required,
+            taxonomy_concept_name=taxonomy_concept_name,
+            taxonomy_mapping_changed=taxonomy_mapping_changed,
         )
 
         self.accept()

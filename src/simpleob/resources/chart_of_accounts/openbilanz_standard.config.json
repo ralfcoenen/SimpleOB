@@ -1,0 +1,33 @@
+{
+  "format_version": 1,
+  "system_accounts": {
+    "opening_balance_account": "9000",
+    "income_summary_account": "8990",
+    "profit_account": "8020",
+    "loss_account": "8021",
+    "profit_loss_carryforward_account": "2970",
+    "statutory_reserve_account": "0846",
+    "other_revenue_reserves_account": "0855",
+    "distribution_liability_account": "0755",
+    "depreciation_expense_account": "4830",
+    "fixed_asset_disposal_gain_account": "8500",
+    "fixed_asset_disposal_loss_account": "4900"
+  },
+  "vat_accounts": {
+    "input_tax_7": "1571",
+    "input_tax_19": "1576",
+    "output_tax_7": "1771",
+    "output_tax_19": "1776"
+  },
+  "account_roles": {
+    "cash_accounts": ["1000"],
+    "bank_accounts": ["1200"],
+    "general_rate_sales_accounts": ["8400"],
+    "customer_receivables": ["1400"],
+    "supplier_payables": ["1600"],
+    "customer_credit_balances": ["1610"],
+    "supplier_credit_balances": ["1410"]
+  },
+  "taxonomy_version": "6.9",
+  "taxonomy_mapping_file": "../e_bilanz/account_mappings/6.9/openbilanz_standard.csv"
+}

@@ -199,6 +199,37 @@ from simpleob.ui_qt.postgresql_password_dialog import (
 from simpleob.ui_qt.start_dialog import StartDialog
 
 
+def _stage_new_company_chart_initialization(
+    *,
+    company_repository,
+    chart_of_accounts_initialization_service,
+    dialog: StartDialog,
+) -> None:
+    """Stellt Mandant und Kontenrahmen in der laufenden Transaktion bereit."""
+
+    bundle = dialog.chart_bundle
+    if bundle is None or dialog.result is None:
+        return
+
+    company = dialog.result.company
+    company_repository.add(company, commit=False)
+    company_repository.add_fiscal_year(
+        company.company_id,
+        dialog.result.fiscal_year,
+        commit=False,
+    )
+    chart_of_accounts_initialization_service.initialize(
+        company=company,
+        standard_chart_of_accounts=bundle.chart,
+        standard_account_taxonomy_concepts=bundle.taxonomy_mappings or {},
+        control_accounts=bundle.control_accounts,
+        vat_accounts=bundle.vat_accounts,
+        account_roles=bundle.account_roles,
+        taxonomy_version=bundle.taxonomy_version or "6.9",
+        use_standard_defaults=dialog.uses_standard_chart,
+    )
+
+
 def _load_application_config():
     """Lädt die Konfiguration passend zur Ausführungsumgebung."""
 
@@ -500,6 +531,21 @@ def main() -> None:
     )
 
     arelle_adapter = ArelleAdapter()
+    template_taxonomy_service = EBilanzService(
+        resolver=resolver,
+        adapter=arelle_adapter,
+        company_data_mapper=GcdCompanyDataMapper(),
+        assets=standard_financial_statement_context.assets,
+        liabilities=standard_financial_statement_context.liabilities,
+        income_statement=standard_financial_statement_context.income_statement,
+    )
+
+    def template_taxonomy_choices(fiscal_year, position):
+        return template_taxonomy_service.account_taxonomy_choices(
+            fiscal_year=fiscal_year,
+            position=position,
+        )
+
     session = database.create_session()
 
     try:
@@ -759,6 +805,7 @@ def main() -> None:
                     import_client_transfer
                 ),
                 delete_client=delete_client,
+                taxonomy_choices_provider=template_taxonomy_choices,
             )
 
             if dialog.exec() != QDialog.DialogCode.Accepted:
@@ -779,21 +826,43 @@ def main() -> None:
                 dialog.opening_transfer_request
             )
 
-            initialized = (
-                chart_of_accounts_initialization_service.initialize(
-                    company=context.company,
-                    standard_chart_of_accounts=(
-                        standard_financial_statement_context
-                        .chart_of_accounts
-                    ),
-                    standard_account_taxonomy_concepts=(
-                        standard_account_taxonomy_concepts
-                    ),
+            if dialog.chart_bundle is not None:
+                try:
+                    _stage_new_company_chart_initialization(
+                        company_repository=company_repository,
+                        chart_of_accounts_initialization_service=(
+                            chart_of_accounts_initialization_service
+                        ),
+                        dialog=dialog,
+                    )
+                    session.commit()
+                except Exception as exc:
+                    session.rollback()
+                    QMessageBox.critical(
+                        dialog,
+                        "Buchhaltung kann nicht angelegt werden",
+                        "Die Buchhaltung und ihr Kontenrahmen wurden nicht "
+                        "gespeichert.\n\n"
+                        f"{exc}",
+                    )
+                    continue
+            else:
+                initialized = (
+                    chart_of_accounts_initialization_service.initialize(
+                        company=context.company,
+                        standard_chart_of_accounts=(
+                            standard_financial_statement_context
+                            .chart_of_accounts
+                        ),
+                        standard_account_taxonomy_concepts=(
+                            standard_account_taxonomy_concepts
+                        ),
+                        use_standard_defaults=True,
+                    )
                 )
-            )
 
-            if initialized:
-                session.commit()
+                if initialized:
+                    session.commit()
 
             loaded_chart_of_accounts = (
                 chart_of_accounts_repository.load_for_company(

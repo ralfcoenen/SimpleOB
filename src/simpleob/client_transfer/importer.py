@@ -411,6 +411,16 @@ class ClientTransferImporter:
     ) -> None:
         client = transfer.client
         company_id = client.company_id
+        vat_accounts = None
+
+        if client.vat_accounts is not None:
+            data = client.vat_accounts
+            vat_accounts = VatAccounts(
+                input_tax_7=data.input_tax_7,
+                input_tax_19=data.input_tax_19,
+                output_tax_7=data.output_tax_7,
+                output_tax_19=data.output_tax_19,
+            )
 
         if client.control_accounts is not None:
             data = client.control_accounts
@@ -448,20 +458,14 @@ class ClientTransferImporter:
                         data.fixed_asset_disposal_loss_account
                     ),
                 ),
+                vat_accounts=vat_accounts,
                 commit=False,
             )
 
-        if client.vat_accounts is not None:
-            data = client.vat_accounts
-
+        if vat_accounts is not None:
             self._chart_of_accounts_repository.save_vat_accounts(
                 company_id=company_id,
-                vat_accounts=VatAccounts(
-                    input_tax_7=data.input_tax_7,
-                    input_tax_19=data.input_tax_19,
-                    output_tax_7=data.output_tax_7,
-                    output_tax_19=data.output_tax_19,
-                ),
+                vat_accounts=vat_accounts,
                 commit=False,
             )
 

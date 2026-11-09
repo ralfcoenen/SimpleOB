@@ -499,6 +499,7 @@ class ChartOfAccountsRepository:
         *,
         company_id: UUID,
         control_accounts: AccountingControlAccounts,
+        vat_accounts: VatAccounts | None = None,
         commit: bool = True,
     ) -> None:
         """Speichert die technischen Konten eines Mandanten."""
@@ -556,6 +557,71 @@ class ChartOfAccountsRepository:
                 f"{missing}"
             )
 
+        if vat_accounts is not None:
+            missing_vat_accounts = vat_accounts.account_numbers - account_numbers
+            if missing_vat_accounts:
+                raise ValueError(
+                    "Umsatzsteuerkonten sind im Kontenrahmen nicht vorhanden: "
+                    + ", ".join(sorted(missing_vat_accounts))
+                )
+
+        account_types = dict(
+            self._session.query(
+                Konto.account_number,
+                Konto.account_type,
+            )
+            .filter(Konto.mandant_id == company_model.id)
+            .all()
+        )
+        expected_control_types = (
+            (control_accounts.opening_balance_account, AccountType.EQUITY, "Eröffnungsbilanzkonto"),
+            (control_accounts.income_summary_account, AccountType.EQUITY, "GuV-Sammelkonto"),
+            (control_accounts.profit_account, AccountType.EQUITY, "Jahresüberschusskonto"),
+            (control_accounts.loss_account, AccountType.EQUITY, "Jahresfehlbetragskonto"),
+            (control_accounts.profit_loss_carryforward_account, AccountType.EQUITY, "Gewinn-/Verlustvortragskonto"),
+            (control_accounts.statutory_reserve_account, AccountType.EQUITY, "gesetzliches Rücklagenkonto"),
+            (control_accounts.other_revenue_reserves_account, AccountType.EQUITY, "Gewinnrücklagenkonto"),
+            (control_accounts.distribution_liability_account, AccountType.LIABILITY, "Ausschüttungsverbindlichkeit"),
+            (control_accounts.depreciation_expense_account, AccountType.EXPENSE, "Abschreibungskonto"),
+            (control_accounts.fixed_asset_disposal_gain_account, AccountType.REVENUE, "Anlagenabgangsertragskonto"),
+            (control_accounts.fixed_asset_disposal_loss_account, AccountType.EXPENSE, "Anlagenabgangsverlustkonto"),
+        )
+        for account_number, expected_type, label in expected_control_types:
+            if account_types.get(account_number) != expected_type.name:
+                raise ValueError(
+                    f"{label} {account_number} muss den Kontotyp "
+                    f"{expected_type.name} haben."
+                )
+        if vat_accounts is not None:
+            wrong_vat_types = (
+                [
+                    number
+                    for number in (
+                        vat_accounts.input_tax_7,
+                        vat_accounts.input_tax_19,
+                    )
+                    if account_types.get(number) != AccountType.ASSET.name
+                ],
+                [
+                    number
+                    for number in (
+                        vat_accounts.output_tax_7,
+                        vat_accounts.output_tax_19,
+                    )
+                    if account_types.get(number) != AccountType.LIABILITY.name
+                ],
+            )
+            if wrong_vat_types[0]:
+                raise ValueError(
+                    "Vorsteuerkonten müssen Aktivkonten sein: "
+                    + ", ".join(sorted(set(wrong_vat_types[0])))
+                )
+            if wrong_vat_types[1]:
+                raise ValueError(
+                    "Umsatzsteuerkonten müssen Passivkonten sein: "
+                    + ", ".join(sorted(set(wrong_vat_types[1])))
+                )
+
         model = (
             self._session.query(
                 KontenrahmenKonfiguration
@@ -568,6 +634,11 @@ class ChartOfAccountsRepository:
         )
 
         if model is None:
+            if vat_accounts is None:
+                raise ValueError(
+                    "Zum erstmaligen Speichern technischer Konten müssen "
+                    "auch Umsatz- und Vorsteuerkonten angegeben werden."
+                )
             model = KontenrahmenKonfiguration(
                 mandant_id=company_model.id,
                 opening_balance_account=(
@@ -609,10 +680,10 @@ class ChartOfAccountsRepository:
                     control_accounts
                     .fixed_asset_disposal_loss_account
                 ),
-                input_tax_7="1571",
-                input_tax_19="1576",
-                output_tax_7="1771",
-                output_tax_19="1776",
+                input_tax_7=vat_accounts.input_tax_7,
+                input_tax_19=vat_accounts.input_tax_19,
+                output_tax_7=vat_accounts.output_tax_7,
+                output_tax_19=vat_accounts.output_tax_19,
             )
 
             self._session.add(model)
@@ -716,6 +787,35 @@ class ChartOfAccountsRepository:
                 "Umsatzsteuerkonten sind im "
                 "Kontenrahmen nicht vorhanden: "
                 f"{missing}"
+            )
+
+        account_types = dict(
+            self._session.query(
+                Konto.account_number,
+                Konto.account_type,
+            )
+            .filter(Konto.mandant_id == company_model.id)
+            .all()
+        )
+        unsuitable_input_accounts = sorted(
+            number
+            for number in (vat_accounts.input_tax_7, vat_accounts.input_tax_19)
+            if account_types.get(number) != AccountType.ASSET.name
+        )
+        if unsuitable_input_accounts:
+            raise ValueError(
+                "Vorsteuerkonten müssen Aktivkonten sein: "
+                + ", ".join(unsuitable_input_accounts)
+            )
+        unsuitable_output_accounts = sorted(
+            number
+            for number in (vat_accounts.output_tax_7, vat_accounts.output_tax_19)
+            if account_types.get(number) != AccountType.LIABILITY.name
+        )
+        if unsuitable_output_accounts:
+            raise ValueError(
+                "Umsatzsteuerkonten müssen Passivkonten sein: "
+                + ", ".join(unsuitable_output_accounts)
             )
 
         model = (
@@ -1244,6 +1344,39 @@ class ChartOfAccountsRepository:
                 f"{missing}"
             )
 
+        role_account_types = dict(
+            self._session.query(
+                Konto.account_number,
+                Konto.account_type,
+            )
+            .filter(Konto.mandant_id == company_model.id)
+            .all()
+        )
+        for account_set, expected_type, message in (
+            (
+                account_roles.cash_accounts,
+                AccountType.ASSET,
+                "Kassenkonten müssen Aktivkonten sein",
+            ),
+            (
+                account_roles.bank_accounts,
+                AccountType.ASSET,
+                "Bankkonten müssen Aktivkonten sein",
+            ),
+            (
+                account_roles.general_rate_sales_accounts,
+                AccountType.REVENUE,
+                "Umsatzerlöskonten müssen Ertragskonten sein",
+            ),
+        ):
+            unsuitable = sorted(
+                number
+                for number in account_set
+                if role_account_types.get(number) != expected_type.name
+            )
+            if unsuitable:
+                raise ValueError(message + ": " + ", ".join(unsuitable))
+
         unsuitable_receivable_accounts = {
             account_number
             for account_number in account_roles.customer_receivables
@@ -1404,6 +1537,7 @@ class ChartOfAccountsRepository:
             self.save_control_accounts(
                 company_id=company_id,
                 control_accounts=control_accounts,
+                vat_accounts=vat_accounts,
                 commit=False,
             )
             self.save_vat_accounts(

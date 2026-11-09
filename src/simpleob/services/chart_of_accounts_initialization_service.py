@@ -37,7 +37,12 @@ class ChartOfAccountsInitializationService:
         *,
         company: Company,
         standard_chart_of_accounts: ChartOfAccountsTemplate,
-        standard_account_taxonomy_concepts: dict[str, str],
+        standard_account_taxonomy_concepts: dict[str, str] | None = None,
+        control_accounts: AccountingControlAccounts | None = None,
+        vat_accounts: VatAccounts | None = None,
+        account_roles: AccountingAccountRoles | None = None,
+        taxonomy_version: str = "6.9",
+        use_standard_defaults: bool = False,
     ) -> bool:
         """Initialisiert einen noch nicht vorhandenen Mandantenkontenrahmen.
 
@@ -61,36 +66,54 @@ class ChartOfAccountsInitializationService:
             in standard_chart_of_accounts.accounts
         )
 
-        control_accounts = AccountingControlAccounts(
-            opening_balance_account="9000",
-            income_summary_account="8990",
-            profit_account="8020",
-            loss_account="8021",
-            profit_loss_carryforward_account="2970",
-            statutory_reserve_account="0846",
-            other_revenue_reserves_account="0855",
-            distribution_liability_account="0755",
-            depreciation_expense_account="4830",
-            fixed_asset_disposal_gain_account="8500",
-            fixed_asset_disposal_loss_account="4900",
-        )
+        if use_standard_defaults:
+            if control_accounts is None:
+                control_accounts = AccountingControlAccounts(
+                    opening_balance_account="9000",
+                    income_summary_account="8990",
+                    profit_account="8020",
+                    loss_account="8021",
+                    profit_loss_carryforward_account="2970",
+                    statutory_reserve_account="0846",
+                    other_revenue_reserves_account="0855",
+                    distribution_liability_account="0755",
+                    depreciation_expense_account="4830",
+                    fixed_asset_disposal_gain_account="8500",
+                    fixed_asset_disposal_loss_account="4900",
+                )
+            if vat_accounts is None:
+                vat_accounts = VatAccounts(
+                    input_tax_7="1571",
+                    input_tax_19="1576",
+                    output_tax_7="1771",
+                    output_tax_19="1776",
+                )
+            if account_roles is None:
+                account_roles = AccountingAccountRoles(
+                    cash_accounts=frozenset(("1000",)),
+                    bank_accounts=frozenset(("1200",)),
+                    general_rate_sales_accounts=frozenset(("8400",)),
+                    customer_receivables=frozenset(("1400",)),
+                    supplier_payables=frozenset(("1600",)),
+                    customer_credit_balances=frozenset(("1610",)),
+                    supplier_credit_balances=frozenset(("1410",)),
+                )
 
-        vat_accounts = VatAccounts(
-            input_tax_7="1571",
-            input_tax_19="1576",
-            output_tax_7="1771",
-            output_tax_19="1776",
-        )
+        if control_accounts is None or vat_accounts is None:
+            raise ValueError(
+                "Für diesen Kontenrahmen müssen die technischen Konten "
+                "sowie Umsatz- und Vorsteuerkonten ausdrücklich zugeordnet werden."
+            )
 
-        account_roles = AccountingAccountRoles(
-            cash_accounts=frozenset(("1000",)),
-            bank_accounts=frozenset(("1200",)),
-            general_rate_sales_accounts=frozenset(("8400",)),
-            customer_receivables=frozenset(("1400",)),
-            supplier_payables=frozenset(("1600",)),
-            customer_credit_balances=frozenset(("1610",)),
-            supplier_credit_balances=frozenset(("1410",)),
-        )
+        if account_roles is None:
+            account_roles = AccountingAccountRoles(
+                cash_accounts=frozenset(),
+                bank_accounts=frozenset(),
+                general_rate_sales_accounts=frozenset(),
+            )
+
+        if standard_account_taxonomy_concepts is None:
+            standard_account_taxonomy_concepts = {}
 
         self._repository.save_for_company(
             company_id=company.company_id,
@@ -102,6 +125,7 @@ class ChartOfAccountsInitializationService:
         self._repository.save_control_accounts(
             company_id=company.company_id,
             control_accounts=control_accounts,
+            vat_accounts=vat_accounts,
             commit=False,
         )
 
@@ -119,7 +143,7 @@ class ChartOfAccountsInitializationService:
 
         self._repository.save_account_taxonomy_concepts(
             company_id=company.company_id,
-            taxonomy_version="6.9",
+            taxonomy_version=taxonomy_version,
             account_taxonomy_concepts=(
                 standard_account_taxonomy_concepts
             ),

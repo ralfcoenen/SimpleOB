@@ -3,7 +3,7 @@ from decimal import Decimal
 from types import SimpleNamespace
 from uuid import uuid4
 
-from PySide6.QtWidgets import QApplication, QDialog, QMainWindow
+from PySide6.QtWidgets import QApplication, QDialog, QMainWindow, QMessageBox
 
 from simpleob.date_input import GermanDateEdit
 from simpleob.domain.company import Company
@@ -111,7 +111,150 @@ def test_accounting_and_fixed_asset_forms_use_central_date_fields():
         disposal_dialog,
     ):
         widget.close()
+
+
+def test_new_company_dialog_defaults_to_standard_and_accepts_custom_csv(
+    monkeypatch,
+    tmp_path,
+):
+    app = _app()
+    dialog = NewCompanyDialog(None, repository=object())
+
+    assert dialog._chart_box.currentText() == "SimpleOB-Standard"
+    assert dialog._selected_chart_path().name == "openbilanz_standard.csv"
+
+    custom_csv = tmp_path / "eigener_kontenrahmen.csv"
+    custom_csv.write_text(
+        "account_number;name;account_type\n7000;Bank;ASSET\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "simpleob.ui_qt.new_company_dialog.QFileDialog.getOpenFileName",
+        lambda *_args, **_kwargs: (str(custom_csv), "CSV"),
+    )
+    dialog._select_custom_chart()
+
+    assert dialog._selected_chart_path() == custom_csv
+    assert dialog._custom_chart_label.text() == str(custom_csv)
+    dialog.close()
     app.processEvents()
+
+
+def test_individual_chart_requires_warning_confirmation(
+    monkeypatch,
+    tmp_path,
+):
+    _app()
+    dialog = NewCompanyDialog(None, repository=object())
+    custom_csv = tmp_path / "individuell.csv"
+    custom_csv.write_text(
+        "account_number;name;account_type\n7000;Kasse;ASSET\n",
+        encoding="utf-8",
+    )
+    dialog._custom_chart_path = custom_csv
+    dialog._company_name_entry.setText("Test UG")
+    warning_calls = []
+
+    def decline_warning(*args):
+        warning_calls.append(args)
+        return QMessageBox.StandardButton.No
+
+    monkeypatch.setattr(
+        "simpleob.ui_qt.new_company_dialog.QMessageBox.warning",
+        decline_warning,
+    )
+    dialog._create_company()
+
+    assert len(warning_calls) == 1
+    assert "Systemkonten" in warning_calls[0][2]
+    assert "Taxonomiezuweisungen" in warning_calls[0][2]
+    assert dialog.result is None
+    assert dialog.chart_bundle is None
+    dialog.close()
+
+
+def test_individual_chart_with_sidecar_still_opens_configuration_dialog(
+    monkeypatch,
+    tmp_path,
+):
+    _app()
+    dialog = NewCompanyDialog(None, repository=object())
+    custom_csv = tmp_path / "prepared.csv"
+    custom_csv.write_text(
+        "account_number;name;account_type\n7000;Konto;ASSET\n",
+        encoding="utf-8",
+    )
+    dialog._custom_chart_path = custom_csv
+    dialog._company_name_entry.setText("Test UG")
+    prepared_bundle = dialog._chart_importer.load(
+        dialog._chart_directory / "openbilanz_standard.csv"
+    )
+    monkeypatch.setattr(
+        dialog._chart_importer,
+        "load",
+        lambda _path: prepared_bundle,
+    )
+    monkeypatch.setattr(
+        "simpleob.ui_qt.new_company_dialog.QMessageBox.warning",
+        lambda *_args: QMessageBox.StandardButton.Yes,
+    )
+    dialog_calls = []
+
+    class AcceptedConfigurationDialog:
+        def __init__(self, _parent, **kwargs):
+            dialog_calls.append(kwargs)
+            self.result = (
+                kwargs["control_accounts"],
+                kwargs["vat_accounts"],
+                kwargs["account_roles"],
+            )
+
+        def exec(self):
+            return QDialog.DialogCode.Accepted
+
+    monkeypatch.setattr(
+        "simpleob.ui_qt.new_company_dialog.AccountConfigurationDialog",
+        AcceptedConfigurationDialog,
+    )
+    dialog._create_company()
+
+    assert len(dialog_calls) == 1
+    assert dialog_calls[0]["for_new_company"] is True
+    assert dialog.chart_bundle is not None
+    assert dialog.result is not None
+    dialog.close()
+
+
+def test_only_exact_standard_chart_path_is_treated_as_standard(tmp_path):
+    _app()
+    dialog = NewCompanyDialog(None, repository=object())
+    assert dialog._is_standard_chart(
+        dialog._chart_directory / "openbilanz_standard.csv"
+    )
+
+    custom_named_standard = tmp_path / "openbilanz_standard.csv"
+    custom_named_standard.write_text("", encoding="utf-8")
+    assert not dialog._is_standard_chart(custom_named_standard)
+    dialog.close()
+
+
+def test_standard_chart_creation_does_not_show_individual_warning(monkeypatch):
+    _app()
+    dialog = NewCompanyDialog(None, repository=object())
+    dialog._company_name_entry.setText("Standard UG")
+
+    def unexpected_warning(*_args):
+        raise AssertionError("Der Standardkontenrahmen darf nicht warnen.")
+
+    monkeypatch.setattr(
+        "simpleob.ui_qt.new_company_dialog.QMessageBox.warning",
+        unexpected_warning,
+    )
+    dialog._create_company()
+
+    assert dialog.result is not None
+    assert dialog.uses_standard_chart
+    dialog.close()
 
 
 def test_main_window_date_prompt_uses_central_field(monkeypatch):
