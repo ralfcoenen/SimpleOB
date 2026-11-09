@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import os
+import subprocess
 from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
 from sqlalchemy.engine import make_url
 
+from simpleob.database.connection_credentials import PostgreSQLCredentials
 from simpleob.database.postgresql_backup_service import (
     PostgreSQLBackupService,
 )
@@ -85,3 +87,85 @@ def test_backup_creates_valid_archive(
     assert result.database_name == "simpleob_migration_test"
     assert result.backup_size > 0
     assert backup.is_file()
+
+
+def test_backup_uses_and_removes_explicit_temporary_passfile(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    config = Mock()
+    config.database_url = (
+        "postgresql+psycopg://testuser@localhost:5432/"
+        "simpleob_migration_test"
+    )
+    service = PostgreSQLBackupService(
+        application_config=config,
+        credentials=PostgreSQLCredentials("one-time-secret"),
+    )
+    backup = tmp_path / "backup.dump"
+    calls: list[tuple[list[str], dict[str, str], Path]] = []
+
+    monkeypatch.setenv("PGPASSWORD", "ambient-secret")
+    monkeypatch.setenv("PGPASSFILE", "/tmp/ambient-passfile")
+    monkeypatch.setenv("PGSERVICE", "ambient-service")
+
+    def fake_run(command, *, env, **_kwargs):
+        passfile = Path(env["PGPASSFILE"])
+        assert passfile.is_file()
+        calls.append((command, env, passfile))
+        if command[0] == "pg_dump":
+            backup.write_bytes(b"archive")
+        return Mock()
+
+    monkeypatch.setattr(
+        "simpleob.database.postgresql_backup_service.subprocess.run",
+        fake_run,
+    )
+
+    result = service.create_backup(backup_path=backup)
+
+    assert result.backup_size == len(b"archive")
+    assert len(calls) == 2
+    assert calls[0][2] == calls[1][2]
+    assert calls[0][1]["PGPASSFILE"] != "/tmp/ambient-passfile"
+    assert "PGPASSWORD" not in calls[0][1]
+    assert "PGSERVICE" not in calls[0][1]
+    assert not calls[0][2].exists()
+
+
+def test_backup_removes_passfile_and_hides_subprocess_error(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    config = Mock()
+    config.database_url = (
+        "postgresql+psycopg://testuser@localhost:5432/"
+        "simpleob_migration_test"
+    )
+    service = PostgreSQLBackupService(
+        application_config=config,
+        credentials=PostgreSQLCredentials("one-time-secret"),
+    )
+    backup = tmp_path / "failed.dump"
+    paths: list[Path] = []
+
+    def failing_run(_command, *, env, **_kwargs):
+        paths.append(Path(env["PGPASSFILE"]))
+        raise subprocess.CalledProcessError(
+            1,
+            "pg_dump",
+            stderr="diagnostic containing one-time-secret",
+        )
+
+    monkeypatch.setattr(
+        "simpleob.database.postgresql_backup_service.subprocess.run",
+        failing_run,
+    )
+
+    with pytest.raises(RuntimeError) as error:
+        service.create_backup(backup_path=backup)
+
+    assert "one-time-secret" not in str(error.value)
+    assert error.value.__cause__ is None
+    assert paths and not paths[0].exists()
+    assert not backup.exists()

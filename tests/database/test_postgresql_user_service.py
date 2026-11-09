@@ -24,8 +24,11 @@ def config(tmp_path):
 def arguments(config):
     return dict(
         application_config=config,
+        admin_username="admin_user",
         admin_credentials=PostgreSQLCredentials("admin-secret"),
         application_credentials=PostgreSQLCredentials("user-secret"),
+        migration_username="migration_user",
+        migration_credentials=PostgreSQLCredentials("migration-secret"),
         confirmed=True,
     )
 
@@ -93,6 +96,24 @@ def test_password_is_encrypted_before_role_sql():
     ]
     assert "clear-secret" not in str(statement)
     assert "SCRAM-SHA-256" in str(statement)
+    assert "NOCREATEDB" in str(statement)
+
+    temporary_connection = MagicMock()
+    temporary_connection.connection.driver_connection.pgconn.encrypt_password.return_value = (
+        b"SCRAM-SHA-256$verifier"
+    )
+    PostgreSQLUserService._create_role(
+        temporary_connection,
+        "migration_user",
+        PostgreSQLCredentials("migration-secret"),
+        createdb=True,
+    )
+    temporary_statement = (
+        temporary_connection.connection.driver_connection.cursor.return_value
+        .__enter__.return_value.execute.call_args.args[0]
+    )
+    assert "CREATEDB" in str(temporary_statement)
+    assert "NOCREATEDB" not in str(temporary_statement)
 
 
 def test_existing_database_does_not_call_initializer(config):
@@ -142,7 +163,10 @@ def test_existing_access_grants_are_transactional_and_keep_owners(config):
             Base.metadata.tables
         ) + ["alembic_version"]
         service._grant_existing_access(
-            config, PostgreSQLCredentials("admin"), PostgreSQLCredentials("user")
+            config,
+            "admin_user",
+            PostgreSQLCredentials("admin"),
+            PostgreSQLCredentials("user"),
         )
         create_role.assert_called_once()
     statements = [call.args[0] for call in connection.exec_driver_sql.call_args_list]
@@ -173,7 +197,10 @@ def test_unknown_tables_prevent_role_and_grant_creation(config):
         inspector.return_value.get_table_names.return_value = ["unrelated_table"]
         with pytest.raises(ValueError, match="ausschließlich"):
             service._grant_existing_access(
-                config, PostgreSQLCredentials("admin"), PostgreSQLCredentials("user")
+                config,
+                "admin_user",
+                PostgreSQLCredentials("admin"),
+                PostgreSQLCredentials("user"),
             )
         create_role.assert_not_called()
 
@@ -189,20 +216,23 @@ def test_new_database_uses_existing_initializer(config):
             return_value=engine,
         ),
         patch("simpleob.database.postgresql_user_service.postgresql_migration_lock"),
-        patch.object(service, "_create_role"),
+        patch.object(service, "_create_role") as create_role,
         patch.object(service, "_verify_access"),
         patch(
             "simpleob.database.postgresql_user_service.PostgreSQLInitializationService"
         ) as initializer,
     ):
         service.create_user(**arguments(config), new_database=True)
+        assert [call.args[1] for call in create_role.call_args_list] == [
+            "new_user",
+            "migration_user",
+        ]
+        assert create_role.call_args_list[1].kwargs["createdb"] is True
         initializer.return_value.initialize_database.assert_called_once()
-        assert (
-            initializer.return_value.initialize_database.call_args.kwargs[
-                "admin_username"
-            ]
-            == "postgres"
-        )
+        call = initializer.return_value.initialize_database.call_args.kwargs
+        assert call["admin_username"] == "admin_user"
+        assert call["migration_username"] == "migration_user"
+        assert call["application_config"].database_url == config.database_url
 
 
 def test_partial_failure_is_reported_without_password(config):

@@ -29,7 +29,11 @@ def test_success_uses_separate_service(config, new_database):
     dialog._username.setText("new_user")
     dialog._password.setText("secret")
     dialog._repeat.setText("secret")
+    dialog._admin_username.setText("test_admin")
     dialog._admin_password.setText("admin")
+    if new_database:
+        dialog._migration_password.setText("migration-secret")
+        dialog._migration_repeat.setText("migration-secret")
     with (
         patch(
             "simpleob.ui_qt.postgresql_user_dialog.QMessageBox.question",
@@ -46,6 +50,10 @@ def test_success_uses_separate_service(config, new_database):
             == "postgresql+psycopg://new_user@localhost:5432/books"
         )
         assert call["application_credentials"].password == "secret"
+        assert call["admin_username"] == "test_admin"
+        if new_database:
+            assert call["migration_username"] == "simpleob_migrator"
+            assert call["migration_credentials"].password == "migration-secret"
     assert dialog.result() == QDialog.DialogCode.Accepted
     assert not dialog._admin_password.text()
     assert not dialog._password.text()
@@ -65,6 +73,8 @@ def test_password_mismatch_does_not_call_service(config):
 
 def test_cancel_confirmation_does_not_call_service(config):
     dialog = PostgreSQLUserDialog(config=config, new_database=False)
+    dialog._admin_username.setText("test_admin")
+    dialog._admin_password.setText("admin")
     dialog._password.setText("secret")
     dialog._repeat.setText("secret")
     with (

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -10,8 +9,14 @@ from uuid import uuid4
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
+from sqlalchemy.exc import DBAPIError
 
 from simpleob.core.config import ApplicationConfig
+from simpleob.database.connection_credentials import (
+    PostgreSQLCredentials,
+    database_connect_args,
+    postgresql_tool_environment,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,18 +35,21 @@ class PostgreSQLRestoreVerificationService:
         self,
         *,
         application_config: ApplicationConfig,
+        credentials: PostgreSQLCredentials | None = None,
     ) -> None:
         self._application_config = application_config
+        self._credentials = credentials
 
     def verify_backup(
         self,
         *,
         backup_path: Path,
+        confirmed_source_database: str,
     ) -> PostgreSQLRestoreVerificationResult:
         """Stellt ein Backup testweise wieder her.
 
-        Ausschließlich die Datenbank simpleob_migration_test
-        wird als Quelle unterstützt.
+        Die Quelle muss ausdrücklich benannt und mit der konfigurierten
+        Datenbank identisch sein. Systemdatenbanken sind ausgeschlossen.
 
         Die temporäre Datenbank wird nur gelöscht, wenn sie
         von diesem Aufruf erfolgreich angelegt wurde.
@@ -58,10 +66,14 @@ class PostgreSQLRestoreVerificationService:
 
         source_database = database_url.database
 
-        if source_database != "simpleob_migration_test":
+        if (
+            not confirmed_source_database
+            or source_database != confirmed_source_database
+            or source_database in {"postgres", "template0", "template1"}
+        ):
             raise ValueError(
-                "Wiederherstellungsproben sind derzeit nur "
-                "für simpleob_migration_test freigegeben."
+                "Die Wiederherstellungsprobe benötigt die ausdrücklich "
+                "bestätigte Quelldatenbank."
             )
 
         if database_url.password is not None:
@@ -94,6 +106,10 @@ class PostgreSQLRestoreVerificationService:
         admin_engine = create_engine(
             admin_url,
             isolation_level="AUTOCOMMIT",
+            connect_args=database_connect_args(
+                admin_url,
+                self._credentials,
+            ),
         )
 
         created = False
@@ -134,22 +150,30 @@ class PostgreSQLRestoreVerificationService:
 
             restore_command.append(str(backup_path))
 
-            environment = os.environ.copy()
-            environment.pop("PGPASSWORD", None)
-
-            subprocess.run(
-                restore_command,
-                check=True,
-                capture_output=True,
-                text=True,
-                env=environment,
-            )
+            with postgresql_tool_environment(
+                database_url,
+                self._credentials,
+                database_pattern="*",
+            ) as environment:
+                subprocess.run(
+                    restore_command,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    env=environment,
+                )
 
             restored_url = database_url.set(
                 database=temporary_database
             )
 
-            restored_engine = create_engine(restored_url)
+            restored_engine = create_engine(
+                restored_url,
+                connect_args=database_connect_args(
+                    restored_url,
+                    self._credentials,
+                ),
+            )
 
             try:
                 with restored_engine.connect() as connection:
@@ -178,14 +202,11 @@ class PostgreSQLRestoreVerificationService:
                 restored_table_count=int(table_count),
             )
 
-        except (
-            OSError,
-            subprocess.CalledProcessError,
-        ) as exc:
+        except (OSError, subprocess.CalledProcessError, DBAPIError):
             raise RuntimeError(
                 "Die PostgreSQL-Wiederherstellungsprobe "
                 "ist fehlgeschlagen."
-            ) from exc
+            ) from None
 
         finally:
             try:

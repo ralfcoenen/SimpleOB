@@ -24,6 +24,9 @@ from simpleob.database.connection_credentials import (
 
 LEGACY_SCHEMA_REVISION = "f65c37865e28"
 
+# Capability token shared only with the administrative upgrade coordinator.
+_ADMIN_POSTGRESQL_UPGRADE_AUTHORIZATION = object()
+
 LEGACY_SCHEMA = {
     "anlageabschreibungen": {
         "id": (False, True),
@@ -480,23 +483,35 @@ class DatabaseMigrationService:
         self,
         connection: Connection,
     ) -> None:
-        """Führt Alembic über eine bestehende PostgreSQL-Verbindung aus.
+        """Blockiert direkte PostgreSQL-Upgrades außerhalb des Adminpfads."""
+        raise RuntimeError(
+            "PostgreSQL-Upgrades dürfen ausschließlich über "
+            "PostgreSQLAdministrationService ausgeführt werden."
+        )
 
-        Die Methode öffnet keine eigene Datenbankverbindung.
-        Sie darf ausschließlich vom administrativen
-        Migrationsablauf aufgerufen werden.
-        """
+    def _upgrade_postgresql_on_connection(
+        self,
+        connection: Connection,
+        *,
+        target_database: str,
+        authorization: object,
+    ) -> None:
+        """Internes Upgrade, nur für den geschützten Administrationspfad."""
+        if authorization is not _ADMIN_POSTGRESQL_UPGRADE_AUTHORIZATION:
+            raise PermissionError("Administratives Upgrade nicht freigegeben.")
         database_url = make_url(
             self._application_config.database_url
         )
 
         if (
             database_url.get_backend_name() != "postgresql"
-            or database_url.database != "simpleob_migration_test"
+            or not target_database
+            or database_url.database != target_database
+            or target_database in {"postgres", "template0", "template1"}
         ):
             raise ValueError(
-                "Die PostgreSQL-Migration ist ausschließlich "
-                "für 'simpleob_migration_test' zugelassen."
+                "Die ausdrücklich bestätigte Ziel-Datenbank stimmt nicht "
+                "mit der PostgreSQL-Migrationsverbindung überein."
             )
 
         if connection.closed or connection.dialect.name != "postgresql":
@@ -504,7 +519,7 @@ class DatabaseMigrationService:
                 "Eine offene PostgreSQL-Verbindung ist erforderlich."
             )
 
-        if connection.engine.url.database != "simpleob_migration_test":
+        if connection.engine.url.database != target_database:
             raise ValueError(
                 "Die Migrationsverbindung verweist auf "
                 "eine unerwartete Datenbank."
@@ -514,10 +529,10 @@ class DatabaseMigrationService:
             "SELECT current_database()"
         ).scalar_one()
 
-        if actual_database != "simpleob_migration_test":
+        if actual_database != target_database:
             raise ValueError(
-                "Die tatsächliche Migrationsverbindung verweist "
-                "nicht auf 'simpleob_migration_test'."
+                "Die tatsächliche Migrationsverbindung verweist nicht "
+                "auf die bestätigte Ziel-Datenbank."
             )
 
         alembic_config = self._create_alembic_config()

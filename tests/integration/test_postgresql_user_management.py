@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import URL
+from sqlalchemy.exc import ProgrammingError
 
 from simpleob.core.config import ApplicationConfig
 from simpleob.database.connection_credentials import PostgreSQLCredentials
@@ -72,6 +73,17 @@ def test_user_management_on_isolated_cluster(tmp_path):
             port=port,
             database="books",
         )
+        bootstrap_engine = create_engine(
+            url.set(username="postgres", database="postgres"),
+            connect_args={"password": "temporary-admin-secret"},
+            hide_parameters=True,
+        )
+        engines.append(bootstrap_engine)
+        with bootstrap_engine.begin() as connection:
+            connection.exec_driver_sql(
+                "CREATE ROLE simpleob_dbadmin LOGIN CREATEDB CREATEROLE "
+                "PASSWORD 'temporary-limited-admin-secret'"
+            )
         config = ApplicationConfig(
             data_dir=tmp_path,
             database_file=tmp_path / "unused.db",
@@ -80,34 +92,65 @@ def test_user_management_on_isolated_cluster(tmp_path):
             database_url_override=str(url),
         )
         service = PostgreSQLUserService()
-        admin = PostgreSQLCredentials("temporary-admin-secret")
+        postgres_admin = PostgreSQLCredentials("temporary-admin-secret")
+        admin = PostgreSQLCredentials("temporary-limited-admin-secret")
         service.create_user(
             application_config=config,
+            admin_username="simpleob_dbadmin",
             admin_credentials=admin,
             application_credentials=PostgreSQLCredentials("secret-one"),
+            migration_username="migrator_one",
+            migration_credentials=PostgreSQLCredentials("migration-secret"),
             new_database=True,
             confirmed=True,
         )
+        migration_engine = create_engine(
+            url.set(username="migrator_one"),
+            connect_args={"password": "migration-secret"},
+        )
+        operating_engine = create_engine(url, connect_args={"password": "secret-one"})
+        engines.extend([migration_engine, operating_engine])
         second = replace(
             config, database_url_override=str(url.set(username="user_two"))
         )
         service.create_user(
             application_config=second,
-            admin_credentials=admin,
+            admin_username="postgres",
+            admin_credentials=postgres_admin,
             application_credentials=PostgreSQLCredentials("secret-two"),
             new_database=False,
             confirmed=True,
         )
+        # The first initialization's defaults must grant access to future
+        # objects created by the migration owner to the operating role.
+        with migration_engine.begin() as connection:
+            connection.exec_driver_sql(
+                "CREATE TABLE public.default_privilege_probe "
+                "(id serial PRIMARY KEY, value text)"
+            )
+        with operating_engine.begin() as connection:
+            connection.exec_driver_sql(
+                "INSERT INTO public.default_privilege_probe (value) "
+                "VALUES ('runtime access')"
+            )
+            assert (
+                connection.exec_driver_sql(
+                    "SELECT value FROM public.default_privilege_probe"
+                ).scalar_one()
+                == "runtime access"
+            )
         with pytest.raises(ValueError, match="Benutzer.*existiert"):
             service.create_user(
                 application_config=second,
-                admin_credentials=admin,
+                admin_username="postgres",
+                admin_credentials=postgres_admin,
                 application_credentials=PostgreSQLCredentials("replacement"),
                 new_database=False,
                 confirmed=True,
             )
         admin_engine = create_engine(
-            url.set(username="postgres"), connect_args={"password": admin.password}
+            url.set(username="postgres"),
+            connect_args={"password": postgres_admin.password},
         )
         engines.append(admin_engine)
         with admin_engine.connect() as conn:
@@ -117,8 +160,62 @@ def test_user_management_on_isolated_cluster(tmp_path):
                         "SELECT pg_get_userbyid(datdba) FROM pg_database WHERE datname='books'"
                     )
                 ).scalar_one()
-                == "owner_one"
+                == "migrator_one"
             )
+            assert not conn.execute(
+                text(
+                    "SELECT pg_has_role('simpleob_dbadmin','migrator_one','SET') "
+                    "OR pg_has_role('simpleob_dbadmin','migrator_one','USAGE')"
+                )
+            ).scalar_one()
+            assert (
+                conn.execute(
+                    text(
+                        "SELECT COUNT(DISTINCT pg_get_userbyid(relowner)) "
+                        "FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace "
+                        "WHERE n.nspname='public' AND c.relkind IN ('r','p','S')"
+                    )
+                ).scalar_one()
+                == 1
+            )
+            assert (
+                conn.execute(
+                    text(
+                        "SELECT DISTINCT pg_get_userbyid(relowner) "
+                        "FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace "
+                        "WHERE n.nspname='public' AND c.relkind IN ('r','p','S')"
+                    )
+                ).scalar_one()
+                == "migrator_one"
+            )
+            assert all(
+                not any(row)
+                for row in conn.execute(
+                    text(
+                        "SELECT rolcreatedb, rolcreaterole, rolsuper "
+                        "FROM pg_roles WHERE rolname IN ('owner_one','migrator_one')"
+                    )
+                ).all()
+            )
+            assert not conn.execute(
+                text("SELECT pg_has_role('owner_one','migrator_one','MEMBER')")
+            ).scalar_one()
+            assert not conn.execute(
+                text(
+                    "SELECT has_database_privilege('owner_one','books','CREATE') "
+                    "OR has_database_privilege('owner_one','books','TEMPORARY') "
+                    "OR has_schema_privilege('owner_one','public','CREATE')"
+                )
+            ).scalar_one()
+            assert conn.execute(
+                text(
+                    "SELECT has_table_privilege('owner_one','public.alembic_version','SELECT') "
+                    "AND has_sequence_privilege('owner_one', "
+                    "(SELECT quote_ident(n.nspname)||'.'||quote_ident(c.relname) "
+                    "FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace "
+                    "WHERE c.relkind='S' AND n.nspname='public' LIMIT 1), 'USAGE')"
+                )
+            ).scalar_one()
             assert not any(
                 conn.execute(
                     text(
@@ -136,7 +233,15 @@ def test_user_management_on_isolated_cluster(tmp_path):
             url.set(username="user_two"), connect_args={"password": "secret-two"}
         )
         engines.extend([owner_engine, user_engine])
-        with owner_engine.begin() as conn:
+        with owner_engine.connect() as conn:
+            with pytest.raises(
+                ProgrammingError, match="permission denied for schema public"
+            ):
+                conn.exec_driver_sql(
+                    "CREATE TABLE public.runtime_must_not_create (id integer)"
+                )
+            conn.rollback()
+        with migration_engine.begin() as conn:
             conn.exec_driver_sql(
                 "CREATE TABLE public.rights_probe (id serial PRIMARY KEY, value text)"
             )

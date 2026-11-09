@@ -54,6 +54,7 @@ from simpleob.database.fixed_asset_repository import FixedAssetRepository
 from simpleob.database.kr_monitoring_repository import KrMonitoringRepository
 from simpleob.database.migration_service import (
     DatabaseMigrationService,
+    PostgreSQLSchemaStatus,
 )
 from simpleob.database.open_item_credit_refund_repository import (
     OpenItemCreditRefundRepository,
@@ -328,6 +329,14 @@ def _is_postgresql_authentication_error(
 
     return False
 
+class _DatabaseStartupCancelled(Exception):
+    pass
+
+
+class _DatabaseConnectionChangeRequested(Exception):
+    pass
+
+
 def _prepare_database_connection(
     config: ApplicationConfig,
 ) -> tuple[
@@ -354,7 +363,26 @@ def _prepare_database_connection(
         )
 
         if is_postgresql(candidate):
-            migration_service.check_ready_for_start()
+            try:
+                migration_service.check_ready_for_start()
+            except Exception as exc:
+                if _is_postgresql_authentication_error(exc):
+                    raise
+                inspection = migration_service.inspect_postgresql_schema()
+                if inspection.status == PostgreSQLSchemaStatus.CURRENT:
+                    raise
+                from simpleob.ui_qt.postgresql_startup_upgrade import (
+                    offer_postgresql_upgrade,
+                )
+
+                action = offer_postgresql_upgrade(candidate, credentials, inspection)
+                if action == "cancel":
+                    raise _DatabaseStartupCancelled from None
+                if action != "ready":
+                    raise _DatabaseConnectionChangeRequested from None
+                # Neue Betriebsverbindung; keine Startfreigabe allein aufgrund
+                # eines erfolgreichen administrativen Rückgabewerts.
+                migration_service.check_ready_for_start()
         else:
             migration_service.upgrade_to_head()
 
@@ -363,11 +391,19 @@ def _prepare_database_connection(
     if is_postgresql(config) and credentials is None:
         return None
 
+    original_config = config
+    pending_configuration = False
     while True:
         try:
             check_database(config, credentials)
+            if pending_configuration:
+                save_database_configuration(original_config, config.database_url_override)
             return config, credentials
 
+        except _DatabaseStartupCancelled:
+            return None
+        except _DatabaseConnectionChangeRequested:
+            error_message = None
         except Exception as exc:
             if (
                 is_postgresql(config)
@@ -395,19 +431,18 @@ def _prepare_database_connection(
 
             error_message = str(exc)
 
-        result = QMessageBox.question(
-            None,
-            "SimpleOB – Datenbankverbindung",
-            "Die Datenbank konnte nicht geöffnet werden:\n\n"
-            f"{error_message}\n\n"
-            "Möchten Sie die Datenbankverbindung ändern?",
-            QMessageBox.StandardButton.Yes
-            | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.Yes,
-        )
-
-        if result != QMessageBox.StandardButton.Yes:
-            return None
+        if error_message is not None:
+            result = QMessageBox.question(
+                None,
+                "SimpleOB – Datenbankverbindung",
+                "Die Datenbank konnte nicht geöffnet werden:\n\n"
+                f"{error_message}\n\n"
+                "Möchten Sie die Datenbankverbindung ändern?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes,
+            )
+            if result != QMessageBox.StandardButton.Yes:
+                return None
 
         dialog = DatabaseConfigurationDialog(
             config=config,
@@ -426,18 +461,10 @@ def _prepare_database_connection(
         if is_postgresql(candidate) and candidate_credentials is None:
             return None
 
-        try:
-            check_database(candidate, candidate_credentials)
+        config = candidate
+        credentials = candidate_credentials
+        pending_configuration = True
 
-            save_database_configuration(
-                config,
-                dialog.selected_database_url,
-            )
-
-            return candidate, candidate_credentials
-
-        except Exception as exc:
-            error_message = str(exc)
 
 def main() -> None:
     """Startet die PySide6-Oberfläche von SimpleOB."""

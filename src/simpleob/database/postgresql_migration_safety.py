@@ -25,6 +25,7 @@ class PostgreSQLMigrationApproval:
     initialize_confirmed: bool = False
     migration_confirmed: bool = False
     maintenance_confirmed: bool = False
+    confirmed_database_name: str | None = None
     backup_path: Path | None = None
 
 

@@ -27,8 +27,11 @@ class PostgreSQLUserService:
         self,
         *,
         application_config: ApplicationConfig,
+        admin_username: str,
         admin_credentials: PostgreSQLCredentials,
         application_credentials: PostgreSQLCredentials,
+        migration_username: str | None = None,
+        migration_credentials: PostgreSQLCredentials | None = None,
         new_database: bool,
         confirmed: bool,
     ) -> None:
@@ -63,7 +66,39 @@ class PostgreSQLUserService:
         ):
             raise ValueError("Ein nicht leeres, gültiges Benutzerpasswort ist nötig.")
 
-        admin_url = url.set(username="postgres", database="postgres")
+        admin_username = (
+            admin_username.strip() if isinstance(admin_username, str) else ""
+        )
+        if not admin_username or "\x00" in admin_username:
+            raise ValueError(
+                "Eine administrative PostgreSQL-Rolle muss angegeben werden."
+            )
+        if new_database:
+            migration_username = (
+                migration_username.strip()
+                if isinstance(migration_username, str)
+                else ""
+            )
+            if (
+                not migration_username
+                or migration_username in {url.username, admin_username}
+                or migration_username.startswith("pg_")
+            ):
+                raise ValueError(
+                    "Betriebs-, Migrations- und Administrationsrolle müssen verschieden sein."
+                )
+            if (
+                len(migration_username.encode()) > 63
+                or "\x00" in migration_username
+                or not isinstance(migration_credentials, PostgreSQLCredentials)
+                or not migration_credentials.password
+                or "\x00" in migration_credentials.password
+            ):
+                raise ValueError(
+                    "Eine gültige Migrationsrolle mit nicht leerem Passwort ist erforderlich."
+                )
+
+        admin_url = url.set(username=admin_username, database="postgres")
         engine = create_engine(
             admin_url,
             isolation_level="AUTOCOMMIT",
@@ -72,6 +107,7 @@ class PostgreSQLUserService:
         )
         created = False
         role_may_exist = False
+        temporary_createdb = False
         phase = "Verbindung zur administrativen PostgreSQL-Datenbank"
         try:
             with engine.connect() as connection:
@@ -101,17 +137,52 @@ class PostgreSQLUserService:
                             "Die vorhandene Datenbank wurde nicht gefunden."
                         )
                     if new_database:
-                        phase = "Anlegen der Anwendungsrolle"
+                        if (
+                            connection.execute(
+                                text("SELECT 1 FROM pg_roles WHERE rolname = :name"),
+                                {"name": migration_username},
+                            ).scalar_one_or_none()
+                            is not None
+                        ):
+                            raise ValueError(
+                                "Die Migrationsrolle existiert bereits; sie wird nicht verändert."
+                            )
+                        phase = "Anlegen der Betriebs- und Migrationsrolle"
+                        admin_flags = connection.execute(
+                            text(
+                                "SELECT rolsuper, rolcreaterole "
+                                "FROM pg_roles WHERE rolname = :name"
+                            ),
+                            {"name": admin_username},
+                        ).one_or_none()
+                        if admin_flags is None or (
+                            not admin_flags.rolsuper and not admin_flags.rolcreaterole
+                        ):
+                            raise ValueError(
+                                "Zum Erstellen der Rollen und zum Entfernen des "
+                                "vorübergehenden CREATEDB-Rechts benötigt die "
+                                "Administration CREATEROLE oder SUPERUSER."
+                            )
                         # CREATE ROLE läuft auf dieser Verbindung im AUTOCOMMIT-Modus.
                         # Bei einem Verbindungsfehler kann die Rolle bereits existieren.
                         role_may_exist = True
                         self._create_role(
                             connection, url.username, application_credentials
                         )
+                        # Bereits vor dem DDL markieren, damit auch ein
+                        # Verbindungsabbruch nach CREATE ROLE bereinigt wird.
+                        temporary_createdb = True
+                        self._create_role(
+                            connection,
+                            migration_username,
+                            migration_credentials,
+                            createdb=True,
+                        )
                     else:
                         phase = "Prüfen und Erteilen der Rechte für die vorhandene Datenbank"
                         self._grant_existing_access(
                             application_config,
+                            admin_username,
                             admin_credentials,
                             application_credentials,
                         )
@@ -123,8 +194,10 @@ class PostgreSQLUserService:
                 phase = "Initialisieren der neuen Datenbank"
                 PostgreSQLInitializationService().initialize_database(
                     application_config=application_config,
-                    admin_username="postgres",
+                    admin_username=admin_username,
                     admin_credentials=admin_credentials,
+                    migration_username=migration_username,
+                    migration_credentials=migration_credentials,
                     application_credentials=application_credentials,
                     confirmed=True,
                 )
@@ -152,7 +225,27 @@ class PostgreSQLUserService:
                 f"{diagnostic}"
             ) from None
         finally:
-            engine.dispose()
+            try:
+                if temporary_createdb:
+                    with engine.connect() as connection:
+                        quote = connection.dialect.identifier_preparer.quote_identifier
+                        exists = connection.execute(
+                            text("SELECT 1 FROM pg_roles WHERE rolname = :name"),
+                            {"name": migration_username},
+                        ).scalar_one_or_none()
+                        if exists is not None:
+                            connection.exec_driver_sql(
+                                f"ALTER ROLE {quote(migration_username)} NOCREATEDB"
+                            )
+            except Exception:
+                raise RuntimeError(
+                    "Die Einrichtung ist fehlgeschlagen und das vorübergehende "
+                    "CREATEDB-Recht der Migrationsrolle konnte nicht entfernt "
+                    "werden. Lassen Sie dieses Recht durch die PostgreSQL-"
+                    "Administration prüfen und widerrufen."
+                ) from None
+            finally:
+                engine.dispose()
 
     @staticmethod
     def _sqlstate(error: BaseException) -> str | None:
@@ -177,7 +270,7 @@ class PostgreSQLUserService:
         return None
 
     @staticmethod
-    def _create_role(connection, username, credentials):
+    def _create_role(connection, username, credentials, *, createdb=False):
         from psycopg import sql
 
         driver = connection.connection.driver_connection
@@ -185,16 +278,19 @@ class PostgreSQLUserService:
             credentials.password.encode(), username.encode(), b"scram-sha-256"
         ).decode()
         # Nur der SCRAM-Verifier erreicht das SQL, auch bei Server-Protokollierung.
+        createdb_option = sql.SQL("CREATEDB" if createdb else "NOCREATEDB")
         statement = sql.SQL(
-            "CREATE ROLE {} LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE "
+            "CREATE ROLE {} LOGIN NOSUPERUSER {} NOCREATEROLE "
             "NOREPLICATION NOBYPASSRLS PASSWORD {}"
-        ).format(sql.Identifier(username), sql.Literal(verifier))
+        ).format(sql.Identifier(username), createdb_option, sql.Literal(verifier))
         with driver.cursor() as cursor:
             cursor.execute(statement)
 
-    def _grant_existing_access(self, config, admin_credentials, credentials):
+    def _grant_existing_access(
+        self, config, admin_username, admin_credentials, credentials
+    ):
         url = make_url(config.database_url)
-        admin_url = url.set(username="postgres")
+        admin_url = url.set(username=admin_username)
         admin_config = replace(config, database_url_override=str(admin_url))
         DatabaseMigrationService(
             application_config=admin_config,

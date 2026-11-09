@@ -29,9 +29,12 @@ class PostgreSQLUserDialog(QDialog):
         )
         layout = QVBoxLayout(self)
         description = QLabel(
-            "Die Einrichtung erfolgt über postgres. Geben Sie einen neuen "
-            "Benutzernamen und dessen Passwort ein.\n"
-            "Vorhandene Benutzer werden nicht verändert."
+            "Geben Sie die ausdrücklich bereitgestellte Administrationsrolle und "
+            "die Zugangsdaten für die neuen Rollen ein. Vorhandene Benutzer werden "
+            "nicht verändert. Bei einer neuen Datenbank werden Betriebs- und "
+            "Migrationsrolle getrennt angelegt. Die Migrationsrolle erhält "
+            "CREATEDB nur vorübergehend für die Datenbankanlage; SimpleOB entzieht "
+            "dieses Recht vor den Migrationen wieder."
         )
         description.setWordWrap(True)
         layout.addWidget(description)
@@ -42,15 +45,29 @@ class PostgreSQLUserDialog(QDialog):
         self._username = QLineEdit(url.username or "")
         self._password = QLineEdit()
         self._repeat = QLineEdit()
+        self._migration_username = QLineEdit("simpleob_migrator")
+        self._migration_password = QLineEdit()
+        self._migration_repeat = QLineEdit()
+        self._admin_username = QLineEdit()
         self._admin_password = QLineEdit()
         form.addRow("Neuer Benutzer", self._username)
         for label, edit in (
             ("Neues Passwort", self._password),
             ("Passwort wiederholen", self._repeat),
-            ("Passwort von postgres", self._admin_password),
         ):
             edit.setEchoMode(QLineEdit.EchoMode.Password)
             form.addRow(label, edit)
+        if new_database:
+            form.addRow("Neue Migrationsrolle", self._migration_username)
+            for label, edit in (
+                ("Passwort der Migrationsrolle", self._migration_password),
+                ("Passwort wiederholen", self._migration_repeat),
+            ):
+                edit.setEchoMode(QLineEdit.EchoMode.Password)
+                form.addRow(label, edit)
+        form.addRow("Administrationsrolle", self._admin_username)
+        form.addRow("Passwort der Administrationsrolle", self._admin_password)
+        self._admin_password.setEchoMode(QLineEdit.EchoMode.Password)
         layout.addLayout(form)
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
@@ -63,19 +80,48 @@ class PostgreSQLUserDialog(QDialog):
     def done(self, result):
         self._password.clear()
         self._repeat.clear()
+        self._migration_password.clear()
+        self._migration_repeat.clear()
         self._admin_password.clear()
         super().done(result)
 
     def _create_user(self):
         username = self._username.text().strip()
-        if not username or not self._password.text():
+        if (
+            not username
+            or not self._password.text()
+            or not self._admin_username.text().strip()
+            or not self._admin_password.text()
+        ):
             QMessageBox.warning(
-                self, "Benutzeranlage", "Benutzername und Passwort fehlen."
+                self,
+                "Benutzeranlage",
+                "Betriebsrolle, Administrationsrolle und die zugehörigen Passwörter sind erforderlich.",
             )
             return
         if self._password.text() != self._repeat.text():
             QMessageBox.warning(
                 self, "Benutzeranlage", "Die Passwörter stimmen nicht überein."
+            )
+            return
+        if self._new_database and (
+            not self._migration_username.text().strip()
+            or not self._migration_password.text()
+        ):
+            QMessageBox.warning(
+                self,
+                "Benutzeranlage",
+                "Migrationsrolle und Passwort sind erforderlich.",
+            )
+            return
+        if (
+            self._new_database
+            and self._migration_password.text() != self._migration_repeat.text()
+        ):
+            QMessageBox.warning(
+                self,
+                "Benutzeranlage",
+                "Die Passwörter der Migrationsrolle stimmen nicht überein.",
             )
             return
         url = make_url(self._config.database_url).set(username=username)
@@ -89,7 +135,9 @@ class PostgreSQLUserDialog(QDialog):
                 self,
                 "Benutzeranlage bestätigen",
                 f"{action}?\n\nServer: {url.host}:{url.port}\n"
-                f"Datenbank: {url.database}\nBenutzer: {username}",
+                f"Datenbank: {url.database}\nBetriebsrolle: {username}\n"
+                f"Migrationsrolle: {self._migration_username.text().strip() if self._new_database else 'nicht betroffen'}\n"
+                f"Administrationsrolle: {self._admin_username.text().strip()}",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
             )
@@ -101,8 +149,19 @@ class PostgreSQLUserDialog(QDialog):
                 application_config=replace(
                     self._config, database_url_override=str(url)
                 ),
+                admin_username=self._admin_username.text().strip(),
                 admin_credentials=PostgreSQLCredentials(self._admin_password.text()),
                 application_credentials=PostgreSQLCredentials(self._password.text()),
+                migration_username=(
+                    self._migration_username.text().strip()
+                    if self._new_database
+                    else None
+                ),
+                migration_credentials=(
+                    PostgreSQLCredentials(self._migration_password.text())
+                    if self._new_database
+                    else None
+                ),
                 new_database=self._new_database,
                 confirmed=True,
             )
@@ -111,8 +170,10 @@ class PostgreSQLUserDialog(QDialog):
             return
         finally:
             self._admin_password.clear()
-        self._password.clear()
-        self._repeat.clear()
+            self._migration_password.clear()
+            self._migration_repeat.clear()
+            self._password.clear()
+            self._repeat.clear()
         QMessageBox.information(
             self,
             "Benutzeranlage",

@@ -1,5 +1,4 @@
-
-"""Kontrollierte Wartungsisolierung einer PostgreSQL-Testdatenbank."""
+"""Kontrollierte Wartungsisolierung einer PostgreSQL-Zieldatenbank."""
 
 from __future__ import annotations
 
@@ -13,35 +12,32 @@ from simpleob.core.config import ApplicationConfig
 from simpleob.database.postgresql_migration_lock import (
     MIGRATION_LOCK_KEY,
 )
+from simpleob.database.postgresql_session_inspection import (
+    inspect_postgresql_sessions,
+)
 
-TEST_DATABASE = "simpleob_migration_test"
 
-
-def _count_test_database_sessions(
+def _count_database_sessions(
     connection: Connection,
-    *,
-    excluded_pid: int | None = None,
+    database_name: str,
 ) -> int:
-    """Zählt Sitzungen der Testdatenbank ohne eine erlaubte Sitzung."""
+    """Zählt Sitzungen der Ziel-Datenbank ohne eine erlaubte Sitzung."""
     return int(
         connection.execute(
             text(
                 "SELECT COUNT(*) "
                 "FROM pg_stat_activity "
                 "WHERE datname = :database_name "
-                "AND (CAST(:excluded_pid AS integer) IS NULL "
-                "OR pid <> CAST(:excluded_pid AS integer))"
+                "AND pid <> pg_backend_pid()"
             ),
-            {
-                "database_name": TEST_DATABASE,
-                "excluded_pid": excluded_pid,
-            },
+            {"database_name": database_name},
         ).scalar_one()
     )
 
 
 def _migration_backend_pid(
     connection: Connection,
+    target_database: str,
 ) -> int:
     """Prüft die übergebene Migrationsverbindung und ermittelt ihre PID."""
     if connection.closed or connection.dialect.name != "postgresql":
@@ -53,10 +49,10 @@ def _migration_backend_pid(
         text("SELECT current_database(), pg_backend_pid()")
     ).one()
 
-    if database_name != TEST_DATABASE:
+    if database_name != target_database:
         raise ValueError(
-            "Die Migrationsverbindung muss zur Datenbank "
-            "'simpleob_migration_test' gehören."
+            "Die Migrationsverbindung muss zur bestätigten "
+            "Ziel-Datenbank gehören."
         )
 
     return int(backend_pid)
@@ -66,12 +62,13 @@ def _migration_backend_pid(
 def postgresql_maintenance_isolation(
     *,
     application_config: ApplicationConfig,
+    target_database: str,
     admin_connection: Connection | None = None,
     migration_connection: Connection | None = None,
+    migration_owner_connection: Connection | None = None,
+    session_inspection_connection: Connection | None = None,
 ) -> Iterator[None]:
-    """Sperrt neue Verbindungen während eines Wartungsabschnitts.
-
-    Ausschließlich für simpleob_migration_test.
+    """Sperrt neue Verbindungen der ausdrücklich bestätigten Zieldatenbank.
 
     Bei übergebener admin_connection muss der Aufrufer die
     administrative Advisory-Sperre bereits halten. Diese Funktion
@@ -84,27 +81,22 @@ def postgresql_maintenance_isolation(
 
     if (
         url.get_backend_name() != "postgresql"
-        or url.database != TEST_DATABASE
+        or not target_database
+        or url.database != target_database
+        or target_database in {"postgres", "template0", "template1"}
     ):
         raise ValueError(
-            "Die Wartungsisolierung ist ausschließlich "
-            "für 'simpleob_migration_test' zugelassen."
+            "Die Wartungsisolierung erfordert die ausdrücklich bestätigte "
+            "Ziel-Datenbank."
         )
 
     if url.password is not None:
-        raise ValueError(
-            "Passwörter in der Datenbank-URL "
-            "werden nicht unterstützt."
-        )
+        raise ValueError("Passwörter in der Datenbank-URL werden nicht unterstützt.")
 
     if admin_connection is not None:
-        if (
-            admin_connection.closed
-            or admin_connection.dialect.name != "postgresql"
-        ):
+        if admin_connection.closed or admin_connection.dialect.name != "postgresql":
             raise ValueError(
-                "Es ist eine offene administrative "
-                "PostgreSQL-Verbindung erforderlich."
+                "Es ist eine offene administrative PostgreSQL-Verbindung erforderlich."
             )
 
         admin_database = admin_connection.execute(
@@ -113,8 +105,7 @@ def postgresql_maintenance_isolation(
 
         if admin_database != "postgres":
             raise ValueError(
-                "Die administrative Verbindung muss zur "
-                "Datenbank 'postgres' gehören."
+                "Die administrative Verbindung muss zur Datenbank 'postgres' gehören."
             )
 
         # PostgreSQL-Advisory-Sperren sind sitzungsgebunden.
@@ -143,58 +134,103 @@ def postgresql_maintenance_isolation(
             )
 
     excluded_pid = (
-        _migration_backend_pid(migration_connection)
+        _migration_backend_pid(migration_connection, target_database)
         if migration_connection is not None
         else None
     )
+    operation_connection = migration_owner_connection or admin_connection
+    if operation_connection is None:
+        raise RuntimeError(
+            "Für die Wartungsisolierung wird eine administrative "
+            "oder migrationsberechtigte Verbindung benötigt."
+        )
+    if operation_connection.closed or operation_connection.dialect.name != "postgresql":
+        raise ValueError("Die Wartungsverbindung ist nicht gültig.")
+    operation_database = operation_connection.execute(
+        text("SELECT current_database(), current_user")
+    ).one()
+    if operation_database.current_database != "postgres":
+        raise ValueError(
+            "Die Wartungsverbindung muss zur Datenbank 'postgres' gehören."
+        )
+    if migration_owner_connection is not None:
+        owner_check = operation_connection.execute(
+            text(
+                "SELECT pg_get_userbyid(datdba) = current_user "
+                "FROM pg_database WHERE datname = :database_name"
+            ),
+            {"database_name": target_database},
+        ).scalar_one_or_none()
+        if not owner_check:
+            raise RuntimeError(
+                "Die Migrationsrolle ist nicht Eigentümerin der "
+                "PostgreSQL-Testdatenbank und darf die Wartungssperre "
+                "nicht ändern."
+            )
+
+    inspection_connection = session_inspection_connection or migration_connection
+    if inspection_connection is None:
+        inspection_connection = operation_connection
+    if inspection_connection.dialect.name != "postgresql":
+        raise ValueError("Die Sitzungsprüfverbindung ist nicht gültig.")
 
     @contextmanager
-    def isolate(connection: Connection) -> Iterator[None]:
-        status = connection.execute(
-            text(
-                "SELECT datallowconn FROM pg_database "
-                "WHERE datname = :database_name"
-            ),
-            {"database_name": TEST_DATABASE},
+    def isolate() -> Iterator[None]:
+        status = operation_connection.execute(
+            text("SELECT datallowconn FROM pg_database WHERE datname = :database_name"),
+            {"database_name": target_database},
         ).scalar_one_or_none()
 
         if status is None:
-            raise RuntimeError(
-                "Die PostgreSQL-Testdatenbank existiert nicht."
-            )
+            raise RuntimeError("Die bestätigte PostgreSQL-Ziel-Datenbank existiert nicht.")
 
         if not status:
             raise RuntimeError(
-                "Die PostgreSQL-Testdatenbank ist bereits "
+                "Die PostgreSQL-Ziel-Datenbank ist bereits "
                 "für neue Verbindungen gesperrt. "
                 "Der Wartungszustand ist ungeklärt."
             )
 
-        sessions_before = _count_test_database_sessions(
-            connection,
-            excluded_pid=excluded_pid,
-        )
+        if session_inspection_connection is not None:
+            inspection_database = inspection_connection.execute(
+                text("SELECT current_database()")
+            ).scalar_one()
+            if inspection_database != target_database:
+                raise ValueError(
+                    "Die Sitzungsprüfverbindung muss zur "
+                    "bestätigten PostgreSQL-Ziel-Datenbank gehören."
+                )
+            sessions_before = inspect_postgresql_sessions(
+                inspection_connection,
+                excluded_pids=(excluded_pid,) if excluded_pid else (),
+            ).other_session_count
+        else:
+            sessions_before = _count_database_sessions(inspection_connection, target_database)
 
         if sessions_before:
             raise RuntimeError(
-                "Die PostgreSQL-Testdatenbank wird noch "
+                "Die PostgreSQL-Ziel-Datenbank wird noch "
                 f"von {sessions_before} Sitzung(en) verwendet. "
                 "Die Wartungsisolierung wurde nicht aktiviert."
             )
 
-        connection.execute(
+        operation_connection.execute(
             text(
-                'ALTER DATABASE "simpleob_migration_test" '
-                "WITH ALLOW_CONNECTIONS false"
+                "ALTER DATABASE "
+                + operation_connection.dialect.identifier_preparer.quote_identifier(target_database)
+                + " WITH ALLOW_CONNECTIONS false"
             )
         )
 
         # Ab hier muss jede Ausnahme die Verbindungssperre aufheben.
         try:
-            sessions_after = _count_test_database_sessions(
-                connection,
-                excluded_pid=excluded_pid,
-            )
+            if session_inspection_connection is not None:
+                sessions_after = inspect_postgresql_sessions(
+                    inspection_connection,
+                    excluded_pids=(excluded_pid,) if excluded_pid else (),
+                ).other_session_count
+            else:
+                sessions_after = _count_database_sessions(inspection_connection, target_database)
 
             if sessions_after:
                 raise RuntimeError(
@@ -205,16 +241,42 @@ def postgresql_maintenance_isolation(
 
             yield
         finally:
-            connection.execute(
-                text(
-                    'ALTER DATABASE "simpleob_migration_test" '
-                    "WITH ALLOW_CONNECTIONS true"
+            try:
+                operation_connection.execute(
+                    text(
+                        "ALTER DATABASE "
+                        + operation_connection.dialect.identifier_preparer.quote_identifier(target_database)
+                        + " WITH ALLOW_CONNECTIONS true"
+                    )
                 )
-            )
+            except Exception:
+                if migration_owner_connection is None or admin_connection is None:
+                    raise RuntimeError(
+                        "Die Wartungssperre konnte nicht aufgehoben werden. "
+                        f"{target_database} kann weiterhin für neue "
+                        "Verbindungen gesperrt sein; bitte den Datenbankstatus "
+                        "administrativ prüfen."
+                    ) from None
+                try:
+                    admin_connection.execute(
+                        text(
+                            "ALTER DATABASE "
+                            + admin_connection.dialect.identifier_preparer.quote_identifier(target_database)
+                            + " WITH ALLOW_CONNECTIONS true"
+                        )
+                    )
+                except Exception:
+                    raise RuntimeError(
+                        "Die Wartungssperre konnte weder mit der "
+                        "Migrationsrolle noch mit der Administrationsrolle "
+                        f"aufgehoben werden. {target_database} kann "
+                        "weiterhin für neue Verbindungen gesperrt sein; "
+                        "bitte den Datenbankstatus administrativ prüfen."
+                    ) from None
 
     if admin_connection is not None:
         # Die Sperre gehört dem Aufrufer.
-        with isolate(admin_connection):
+        with isolate():
             yield
         return
 
@@ -232,12 +294,11 @@ def postgresql_maintenance_isolation(
 
             if not acquired:
                 raise RuntimeError(
-                    "Eine andere administrative PostgreSQL-Wartung "
-                    "ist bereits aktiv."
+                    "Eine andere administrative PostgreSQL-Wartung ist bereits aktiv."
                 )
 
             try:
-                with isolate(connection):
+                with isolate():
                     yield
             finally:
                 connection.execute(

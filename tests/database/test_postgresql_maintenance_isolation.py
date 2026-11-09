@@ -57,19 +57,21 @@ def _connections_allowed(database_url: str) -> bool:
 
 
 def test_rejects_sqlite() -> None:
-    with pytest.raises(ValueError, match="ausschließlich"):
+    with pytest.raises(ValueError, match="bestätigte"):
         with postgresql_maintenance_isolation(
             application_config=_config("sqlite:///test.db"),
+            target_database=TEST_DATABASE,
         ):
             pass
 
 
 def test_rejects_other_postgresql_database() -> None:
-    with pytest.raises(ValueError, match="ausschließlich"):
+    with pytest.raises(ValueError, match="bestätigte"):
         with postgresql_maintenance_isolation(
             application_config=_config(
                 "postgresql+psycopg://ralf@localhost:5432/SimpleOB"
             ),
+            target_database=TEST_DATABASE,
         ):
             pass
 
@@ -81,6 +83,7 @@ def test_rejects_password_in_url() -> None:
                 "postgresql+psycopg://ralf:secret@localhost:5432/"
                 "simpleob_migration_test"
             ),
+            target_database=TEST_DATABASE,
         ):
             pass
 
@@ -113,7 +116,8 @@ def test_rejects_already_blocked_database(
                     match="bereits.*gesperrt",
                 ):
                     with postgresql_maintenance_isolation(
-                        application_config=_config(database_url),
+        application_config=_config(database_url),
+        target_database=TEST_DATABASE,
                     ):
                         pytest.fail(
                             "Bereits gesperrte Datenbank wurde akzeptiert."
@@ -162,7 +166,8 @@ def test_rejects_concurrent_administrative_lock(
                     match="andere administrative PostgreSQL-Wartung",
                 ):
                     with postgresql_maintenance_isolation(
-                        application_config=_config(database_url),
+        application_config=_config(database_url),
+        target_database=TEST_DATABASE,
                     ):
                         pytest.fail(
                             "Parallele Wartung wurde nicht verhindert."
@@ -184,6 +189,7 @@ def test_maintenance_isolation_restores_connections_after_success(
 
     with postgresql_maintenance_isolation(
         application_config=_config(database_url),
+        target_database=TEST_DATABASE,
     ):
         assert _connections_allowed(database_url) is False
 
@@ -210,7 +216,8 @@ def test_maintenance_isolation_restores_connections_after_error(
         match="Simulierter Wartungsfehler",
     ):
         with postgresql_maintenance_isolation(
-            application_config=_config(database_url),
+        application_config=_config(database_url),
+        target_database=TEST_DATABASE,
         ):
             assert _connections_allowed(database_url) is False
 
@@ -236,7 +243,8 @@ def test_rejects_existing_database_session(
                 match="Sitzung",
             ):
                 with postgresql_maintenance_isolation(
-                    application_config=_config(database_url),
+        application_config=_config(database_url),
+        target_database=TEST_DATABASE,
                 ):
                     pytest.fail(
                         "Wartungsisolierung trotz bestehender "
@@ -269,7 +277,8 @@ def test_accepts_existing_administrative_and_migration_connections(
             with postgresql_migration_lock(admin_connection):
                 with database_engine.connect() as migration_connection:
                     with postgresql_maintenance_isolation(
-                        application_config=_config(database_url),
+        application_config=_config(database_url),
+        target_database=TEST_DATABASE,
                         admin_connection=admin_connection,
                         migration_connection=migration_connection,
                     ):
@@ -301,7 +310,8 @@ def test_rejects_unlocked_administrative_connection(
                 match="erforderliche PostgreSQL-Sperre",
             ):
                 with postgresql_maintenance_isolation(
-                    application_config=_config(database_url),
+        application_config=_config(database_url),
+        target_database=TEST_DATABASE,
                     admin_connection=admin_connection,
                 ):
                     pytest.fail(
@@ -337,7 +347,8 @@ def test_rejects_other_sessions_with_migration_connection(
                             match="Sitzung",
                         ):
                             with postgresql_maintenance_isolation(
-                                application_config=_config(database_url),
+        application_config=_config(database_url),
+        target_database=TEST_DATABASE,
                                 admin_connection=admin_connection,
                                 migration_connection=migration_connection,
                             ):

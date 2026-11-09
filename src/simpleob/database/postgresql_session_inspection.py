@@ -24,6 +24,8 @@ class PostgreSQLSessionInspection:
 
 def inspect_postgresql_sessions(
     connection: Connection,
+    *,
+    excluded_pids: tuple[int, ...] = (),
 ) -> PostgreSQLSessionInspection:
     """Ermittelt andere Sitzungen derselben PostgreSQL-Datenbank.
 
@@ -35,17 +37,18 @@ def inspect_postgresql_sessions(
     """
 
     if connection.dialect.name != "postgresql":
-        raise ValueError(
-            "Die Sitzungsprüfung ist nur für PostgreSQL vorgesehen."
-        )
+        raise ValueError("Die Sitzungsprüfung ist nur für PostgreSQL vorgesehen.")
 
+    excluded = tuple(int(pid) for pid in excluded_pids)
+    exclusion_sql = "".join(f" AND pid <> {pid}" for pid in excluded)
     rows = connection.execute(
         text(
-            """
+            f"""
             SELECT state, COUNT(*) AS session_count
             FROM pg_stat_activity
             WHERE datname = current_database()
               AND pid <> pg_backend_pid()
+              {exclusion_sql}
             GROUP BY state
             """
         )

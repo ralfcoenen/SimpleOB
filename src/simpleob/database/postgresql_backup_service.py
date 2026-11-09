@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -10,6 +9,10 @@ from pathlib import Path
 from sqlalchemy.engine import make_url
 
 from simpleob.core.config import ApplicationConfig
+from simpleob.database.connection_credentials import (
+    PostgreSQLCredentials,
+    postgresql_tool_environment,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -28,8 +31,10 @@ class PostgreSQLBackupService:
         self,
         *,
         application_config: ApplicationConfig,
+        credentials: PostgreSQLCredentials | None = None,
     ) -> None:
         self._application_config = application_config
+        self._credentials = credentials
 
     def create_backup(
         self,
@@ -98,31 +103,29 @@ class PostgreSQLBackupService:
         command.append(database_name)
 
         try:
-            environment = os.environ.copy()
+            with postgresql_tool_environment(
+                database_url,
+                self._credentials,
+            ) as environment:
+                subprocess.run(
+                    command,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    env=environment,
+                )
 
-            # Eine eventuell vorhandene Passwortvariable
-            # wird nicht an den Unterprozess weitergegeben.
-            environment.pop("PGPASSWORD", None)
-
-            subprocess.run(
-                command,
-                check=True,
-                capture_output=True,
-                text=True,
-                env=environment,
-            )
-
-            subprocess.run(
-                [
-                    "pg_restore",
-                    "--list",
-                    str(backup_path),
-                ],
-                check=True,
-                capture_output=True,
-                text=True,
-                env=environment,
-            )
+                subprocess.run(
+                    [
+                        "pg_restore",
+                        "--list",
+                        str(backup_path),
+                    ],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    env=environment,
+                )
 
             backup_size = backup_path.stat().st_size
 
@@ -141,11 +144,11 @@ class PostgreSQLBackupService:
             OSError,
             subprocess.CalledProcessError,
             RuntimeError,
-        ) as exc:
+        ):
             backup_path.unlink(missing_ok=True)
 
             raise RuntimeError(
                 "Die PostgreSQL-Datensicherung "
                 "konnte nicht erfolgreich erstellt "
                 "und geprüft werden."
-            ) from exc
+            ) from None

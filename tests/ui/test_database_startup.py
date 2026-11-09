@@ -395,3 +395,33 @@ def test_postgresql_password_error_without_sqlstate_is_recognized():
     assert qt_main._is_postgresql_authentication_error(
         error
     ) is True
+
+
+@pytest.mark.parametrize("outcome", ["ready", "cancel", "change", "failed_recheck"])
+def test_outdated_postgresql_requires_upgrade_and_runtime_recheck(monkeypatch, config, outcome):
+    from simpleob.database.migration_service import (
+        PostgreSQLSchemaInspection,
+        PostgreSQLSchemaStatus,
+    )
+    from simpleob.ui_qt import postgresql_startup_upgrade
+
+    config = replace(config, database_url_override="postgresql+psycopg://operator@localhost/books")
+    runtime = PostgreSQLCredentials("runtime-secret")
+    migration = MagicMock()
+    migration.check_ready_for_start.side_effect = [RuntimeError("outdated"),
+        RuntimeError("still incompatible") if outcome == "failed_recheck" else None]
+    migration.inspect_postgresql_schema.return_value = PostgreSQLSchemaInspection(
+        PostgreSQLSchemaStatus.OUTDATED, "old", "head"
+    )
+    monkeypatch.setattr(qt_main, "DatabaseMigrationService", lambda **kwargs: migration)
+    monkeypatch.setattr(qt_main, "_request_postgresql_credentials", lambda config: runtime)
+    offer = MagicMock(return_value="ready" if outcome == "failed_recheck" else outcome)
+    monkeypatch.setattr(postgresql_startup_upgrade, "offer_postgresql_upgrade", offer)
+    monkeypatch.setattr(qt_main.QMessageBox, "question", lambda *args: QMessageBox.StandardButton.No)
+    dialog = MagicMock()
+    dialog.exec.return_value = QDialog.DialogCode.Rejected
+    monkeypatch.setattr(qt_main, "DatabaseConfigurationDialog", lambda **kwargs: dialog)
+    result = qt_main._prepare_database_connection(config)
+    assert result == ((config, runtime) if outcome == "ready" else None)
+    assert migration.check_ready_for_start.call_count == (2 if outcome in {"ready", "failed_recheck"} else 1)
+    migration.upgrade_to_head.assert_not_called()

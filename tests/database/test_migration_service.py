@@ -845,12 +845,28 @@ def test_postgresql_connection_upgrade_rejects_sqlite(
 
     try:
         with engine.connect() as connection:
-            with pytest.raises(ValueError, match="ausschließlich"):
+            with pytest.raises(RuntimeError, match="PostgreSQLAdministrationService"):
                 service.upgrade_postgresql_on_connection(connection)
     finally:
         engine.dispose()
 
     upgrade_mock.assert_not_called()
+
+
+def test_internal_postgresql_upgrade_requires_admin_capability() -> None:
+    """Der interne Alembic-Pfad lässt sich ohne Adminfreigabe nicht aufrufen."""
+    from unittest.mock import Mock
+
+    service = DatabaseMigrationService(
+        application_config=Mock(database_url="postgresql://user@host/db")
+    )
+
+    with pytest.raises(PermissionError, match="nicht freigegeben"):
+        service._upgrade_postgresql_on_connection(
+            Mock(),
+            target_database="db",
+            authorization=object(),
+        )
 
 
 def test_postgresql_connection_upgrade_rejects_wrong_database(
@@ -880,7 +896,7 @@ def test_postgresql_connection_upgrade_rejects_wrong_database(
 
     connection = Mock()
 
-    with pytest.raises(ValueError, match="ausschließlich"):
+    with pytest.raises(RuntimeError, match="PostgreSQLAdministrationService"):
         service.upgrade_postgresql_on_connection(connection)
 
     upgrade_mock.assert_not_called()
@@ -921,8 +937,8 @@ def test_postgresql_connection_upgrade_rejects_wrong_connection(
     try:
         with engine.connect() as connection:
             with pytest.raises(
-                ValueError,
-                match="offene PostgreSQL-Verbindung",
+                RuntimeError,
+                match="PostgreSQLAdministrationService",
             ):
                 service.upgrade_postgresql_on_connection(connection)
     finally:
@@ -1026,12 +1042,10 @@ def test_postgresql_connection_upgrade_checks_actual_database(
     )
 
     with pytest.raises(
-        ValueError,
-        match="tatsächliche Migrationsverbindung",
+        RuntimeError,
+        match="PostgreSQLAdministrationService",
     ):
         service.upgrade_postgresql_on_connection(connection)
 
-    connection.exec_driver_sql.assert_called_once_with(
-        "SELECT current_database()"
-    )
+    connection.exec_driver_sql.assert_not_called()
     upgrade_mock.assert_not_called()
