@@ -12,6 +12,7 @@ data/config.toml
 
 # Konfiguration
 .env
+/config/postgres-test.env
 
 # Virtuelle Umgebungen
 .venv/
