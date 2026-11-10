@@ -123,7 +123,8 @@ Für die Nutzung von PostgreSQL werden benötigt:
 - ein installierter und gestarteter PostgreSQL-Server,
 - der Servername beziehungsweise die Netzwerkadresse,
 - die Portnummer, üblicherweise `5432`,
-- eine PostgreSQL-Anwendungsrolle mit Zugangsdaten,
+- eine Betriebsrolle für die normale Nutzung und eine getrennte
+  Migrationsrolle für die Schemaeinrichtung,
 - eine bereits eingerichtete SimpleOB-Datenbank oder die Berechtigung, eine neue Datenbank anzulegen.
 
 SimpleOB installiert und konfiguriert den PostgreSQL-Server nicht selbst.
@@ -132,32 +133,87 @@ Der Datenbankserver kann auf demselben Computer oder auf einem anderen erreichba
 
 Für die Einrichtung einer neuen SimpleOB-Datenbank ist zusätzlich eine administrative PostgreSQL-Rolle erforderlich, die Datenbanken anlegen darf.
 
+SimpleOB verwendet für die getrennte Einrichtung eine **Betriebsrolle** für
+den laufenden Buchhaltungsbetrieb und eine **Migrationsrolle** für die
+Datenbank und ihre Schemaobjekte. Die Zugangsdaten der Administration werden
+nur für den Einrichtungsvorgang abgefragt und nicht in der
+SimpleOB-Konfiguration gespeichert.
+Auch das Passwort der Betriebsrolle wird nicht in der
+SimpleOB-Konfiguration gespeichert; SimpleOB fragt es beim Öffnen der
+PostgreSQL-Verbindung ab.
+
 ### 2.5 Neue PostgreSQL-Datenbank anlegen
 
-Öffnen Sie den Dialog **Datenbank konfigurieren** und wählen Sie **PostgreSQL**.
+SimpleOB bietet zwei Wege, eine neue PostgreSQL-Datenbank mit getrennten
+Rollen einzurichten. In beiden Fällen wird die neue Datenbank mit der
+Migrationsrolle als Eigentümerin angelegt. Diese Rolle führt die
+Alembic-Erstinitialisierung aus. Die Betriebsrolle erhält anschließend die
+Rechte für den normalen Betrieb: Verbindung zur Datenbank, Nutzung des
+Schemas, Lesen und Ändern der Anwendungsdaten sowie Nutzung der Sequenzen.
+Sie erhält keine Eigentümer- oder Schemaänderungsrechte. Die Tabelle
+`alembic_version` darf sie nur lesen. Passende Standardrechte sorgen dafür,
+dass künftige Anwendungstabellen und Sequenzen ebenfalls die vorgesehenen
+Betriebsrechte erhalten.
 
-Tragen Sie die Verbindungsdaten ein:
+#### Weg 1: Rollen sind bereits vorhanden
 
-1. **Server:** Name oder Adresse des PostgreSQL-Servers.
-2. **Port:** Portnummer des Servers.
-3. **Benutzer:** PostgreSQL-Rolle, die SimpleOB später verwendet.
-4. **Datenbank:** Name der neu anzulegenden Datenbank.
+Öffnen Sie **Datenbank konfigurieren**, wählen Sie **PostgreSQL** und tragen
+Sie Server, Port, Betriebsrolle, Migrationsrolle und den Namen der neuen
+Datenbank ein. Wählen Sie **Neue PostgreSQL-Datenbank anlegen …** und
+bestätigen Sie den angezeigten Server, Datenbanknamen und die beiden Rollen.
+Geben Sie anschließend die Zugangsdaten für die Administration, die
+Migrationsrolle und die Betriebsrolle ein. Die drei Rollen müssen verschieden
+sein und die Betriebs- und Migrationsrollen müssen bereits als PostgreSQL-
+Loginrollen existieren.
 
-Wählen Sie anschließend **Neue PostgreSQL-Datenbank anlegen …**.
+Die administrative Rolle muss die Datenbankanlage ermöglichen und die
+erforderlichen Rollen- und Eigentümerprüfungen bestehen. Je nach vorhandenen
+Rechten kann die Administration die Datenbank direkt mit der Migrationsrolle
+als Eigentümerin anlegen. Andernfalls kann die Migrationsrolle dafür
+vorübergehend `CREATEDB` benötigen; SimpleOB prüft und entzieht dieses Recht
+vor der Schemaerstellung. Die Migrationsrolle darf nicht dauerhaft
+`SUPERUSER`, `CREATEROLE` oder `CREATEDB` besitzen. Bei PostgreSQL-Versionen
+vor 15 kann für die sichere Einrichtung des Schemas `public` zusätzlich ein
+administrativer Zugriff mit ausreichenden Schema-Eigentümerrechten nötig
+sein.
 
-SimpleOB zeigt die vorgesehenen Datenbankdaten zur Bestätigung an.
+#### Weg 2: Rollen und Datenbank gemeinsam anlegen
 
-Nach Ihrer Bestätigung werden die administrative PostgreSQL-Rolle und deren Passwort sowie das Passwort der Anwendungsrolle abgefragt.
+Im Dialog **Datenbank konfigurieren** können Sie stattdessen
+**Neue Datenbank samt neuem Benutzer …** wählen. Geben Sie die neue
+Betriebsrolle mit Passwort, eine neue Migrationsrolle mit Passwort sowie die
+administrative Rolle und deren Passwort ein. Nach der Bestätigung legt
+SimpleOB beide Loginrollen und die Datenbank an, führt die Alembic-
+Erstinitialisierung aus und prüft den Zugriff der Betriebsrolle. Die
+Migrationsrolle erhält `CREATEDB` nur vorübergehend für die Datenbankanlage;
+SimpleOB entzieht dieses Recht anschließend. Die Administration benötigt
+`CREATEROLE` oder `SUPERUSER`, um die Rollen anzulegen und das vorübergehende
+Recht wieder zu entfernen.
 
-Die administrative Rolle benötigt die Berechtigung `CREATEDB` oder entsprechende weitergehende Rechte. Die angegebene Anwendungsrolle muss bereits auf dem PostgreSQL-Server existieren.
+Nach erfolgreicher Einrichtung kann die Datenbankverbindung mit der
+Betriebsrolle geprüft und übernommen werden. Administrations- und
+Migrationspasswörter werden nicht dauerhaft gespeichert. Die Einrichtung
+überschreibt keine vorhandene Datenbank. Scheitert ein Schritt nach der
+Datenbankanlage, löscht SimpleOB die möglicherweise teilweise eingerichtete
+Datenbank nicht automatisch; lassen Sie den Zustand administrativ prüfen.
 
-SimpleOB legt die neue Datenbank mit der Anwendungsrolle als Eigentümer an und richtet anschließend das benötigte Datenbankschema ein.
+#### Zentral verwalteter PostgreSQL-Server
 
-Nach erfolgreicher Einrichtung kann die Verbindungskonfiguration übernommen werden.
+Bei einem Server im LAN müssen Serveradresse, Port und Netzwerkzugriff für
+SimpleOB eingerichtet sein. Ein externer PostgreSQL-Administrator kann die
+Betriebs- und Migrationsrollen vorab bereitstellen. Für den Weg mit bereits
+vorhandenen Rollen muss die SimpleOB-Ersteinrichtung dennoch den administrativen
+Zugang für die Datenbankanlage und ihre Prüfungen verwenden. Der Weg
+**Neue Datenbank samt neuem Benutzer …** legt Rollen selbst an und benötigt
+dafür ebenfalls administrative Zugangsdaten.
 
-> **Wichtig:** Die Funktion dient ausschließlich zur Anlage einer neuen Datenbank. Eine bereits vorhandene PostgreSQL-Datenbank wird nicht überschrieben.
-
-Schlägt die Einrichtung nach der Datenbankanlage fehl, wird die angelegte Datenbank nicht automatisch gelöscht. In diesem Fall sollte die Ursache administrativ geprüft werden, bevor weitere Maßnahmen erfolgen.
+Der aktuelle Einrichtungsdialog bietet keinen separaten Übergabemodus, in dem
+ein Administrator die Datenbank und das vollständige SimpleOB-Schema
+unabhängig vorbereitet und der Anwender die Ersteinrichtung anschließend nur
+mit Betriebszugang abschließt. Stimmen Sie daher mit dem Serveradministrator
+ab, wer die Einrichtung ausführt und wie die nur vorübergehend benötigten
+Zugangsdaten sicher bereitgestellt werden. SimpleOB richtet den
+PostgreSQL-Server selbst nicht ein.
 
 ### 2.6 Vorhandene PostgreSQL-Datenbank verwenden
 
@@ -170,6 +226,18 @@ SimpleOB prüft die Erreichbarkeit und den Datenbankzustand.
 Nur wenn die Prüfung erfolgreich ist, sollte die Konfiguration übernommen werden.
 
 Eine vorhandene PostgreSQL-Datenbank wird beim normalen Programmstart nicht automatisch migriert.
+
+Ist eine bekannte ältere Alembic-Revision vorhanden, bleibt der
+Buchhaltungsbetrieb zunächst gesperrt. SimpleOB zeigt Datenbank sowie
+aktuelle und erwartete Revision an und bietet ein ausdrücklich bestätigtes
+administratives Upgrade an. Dafür werden Migrations- und
+Administrationszugang abgefragt. Vor der Migration erstellt SimpleOB eine
+Sicherung und prüft eine tatsächliche Wiederherstellung; die übrigen
+SimpleOB-Verbindungen müssen beendet sein. Nach erfolgreicher Migration
+prüft SimpleOB erneut den Schema-Stand mit der Betriebsrolle. Bei unbekanntem
+oder ungeeignetem Schemazustand wird kein Upgrade angeboten. Es gibt keine
+automatische Migration beim Start und keine automatische Wiederherstellung
+nach einem Fehler.
 
 ## 3. Anwendungsdaten und Datensicherung
 
@@ -441,7 +509,101 @@ angelegt wurde.
 Eine neue Buchhaltung wird im Startdialog mit
 **„Neue Buchhaltung anlegen“** angelegt.
 
-SimpleOB fragt zunächst folgende Angaben ab:
+Im Dialog **„Neue Buchhaltung“** erfassen Sie den Unternehmensnamen sowie
+Beginn und Ende des ersten Geschäftsjahres. Dort wählen Sie auch den
+Kontenrahmen. **„SimpleOB-Standard“** ist vorausgewählt. Über
+**„Eigene CSV wählen …“** kann stattdessen eine Kontenrahmen-CSV geladen
+werden. CSV-Dateien müssen die Kontospalten `account_number`, `name` und
+`account_type` enthalten. HGB-Zuordnungen können mit den Spalten
+`statement_type`, `debit_position_code` und `credit_position_code`
+mitgeliefert werden. Die Datei ist semikolongetrennt; die Kontotypen
+werden als `ASSET`, `LIABILITY`, `EQUITY`, `REVENUE` oder `EXPENSE`
+angegeben. Fehlende Pflichtspalten, unbekannte Kontotypen, fehlerhafte
+Zeilen oder ungültige Beikonfigurationen werden als Importfehler angezeigt
+und verhindern die Fortsetzung.
+
+Zu einer CSV können gleichnamige Konfigurationsdateien gehören:
+`<dateiname>.config.json` enthält Systemkonten, Steuerkonten und
+Kontenrollen. Eine dort referenzierte Taxonomie-CSV kann ausdrückliche
+E-Bilanz-Zuordnungen enthalten. Beim Speichern eigener Vorlagen verwaltet
+SimpleOB diese Dateien gemeinsam. Eine JSON-Datei allein ist kein
+Kontenrahmenimport; als Ausgangspunkt wird die Konten-CSV ausgewählt.
+Wählen Sie für eine CSV ohne passende Beikonfiguration die Option
+**„Zuordnungen neben der CSV als wiederverwendbare Vorlage speichern“**,
+wenn die beim Anlegen festgelegten Zuordnungen neben dieser CSV gespeichert
+werden sollen.
+
+Für einen anderen als den unveränderten SimpleOB-Standardkontenrahmen
+zeigt SimpleOB vor der Fortsetzung einen Warnhinweis, den Sie bestätigen
+müssen. Danach öffnet sich **„Kontenkonfiguration“** für Systemkonten,
+USt-Konten und Kontenrollen, damit Sie die zum ausgewählten Kontenrahmen
+passenden Konten prüfen oder zuordnen können. Die Zuordnungen werden auf
+existierende Konten und passende Kontotypen geprüft. Kontrollieren Sie
+außerdem die fachliche Richtigkeit der HGB-Zuordnungen. Fehlende oder
+fehlerhafte Zuordnungen können die davon abhängigen Buchungs-, Abschluss-
+oder E-Bilanz-Funktionen verhindern.
+
+#### Kontenrahmen vor der Mandantenanlage bearbeiten
+
+Mit **„Kontenrahmen bearbeiten …“** öffnen Sie den
+**„Kontenrahmen bearbeiten“**-Dialog für den ausgewählten Kontenrahmen.
+Die Tabelle zeigt Kontonummer, Bezeichnung, Kontotyp und HGB-Zuordnung;
+über das Suchfeld können Sie nach Kontonummer oder Bezeichnung suchen.
+
+1. Wählen Sie **„Neues Konto“**, **„Bearbeiten“** oder **„Entfernen“**.
+2. Im Konto-Dialog können Sie Kontonummer, Bezeichnung, Kontotyp und
+   HGB-Zuordnungen bearbeiten. Für ein neu angelegtes oder bearbeitetes
+   Konto ist **„HGB-Zuordnung erforderlich“** zunächst aktiviert. Eine
+   kontoindividuelle Ausnahme kann ausdrücklich gewählt werden, etwa für
+   ein Eröffnungsbilanz- oder GuV-Sammelkonto, das keine eigene Bilanz-
+   oder GuV-Position benötigt. Bereits importierte Konten ohne HGB-
+   Zuordnung werden dadurch nicht pauschal abgelehnt.
+3. Im Vorlagenmodus steht außerdem **„E-Bilanz-Taxonomiezuordnung“** zur
+   Verfügung. Sie können eine ausdrücklich passende Position auswählen
+   oder **„Keine explizite Zuordnung“** belassen. Es wird keine Position
+   automatisch ergänzt. Unterstützt wird Taxonomieversion 6.9; die
+   auswählbaren Positionen hängen von der HGB-Zuordnung und der verfügbaren
+   Taxonomiekonfiguration ab. Ist eine bestehende Zuordnung nach einer
+   HGB-Änderung nicht mehr passend, muss sie ausdrücklich korrigiert oder
+   entfernt werden.
+4. Mit **„Systemkonten und Kontenrollen …“** öffnen Sie die
+   **„Kontenkonfiguration“** für die Arbeitskopie. Dort können Sie auch
+   Umsatzsteuer- und Vorsteuerkonten prüfen und ändern. Änderungen werden
+   erst nach Bestätigung in die Arbeitskopie übernommen.
+5. Mit **„Änderungen übernehmen“** kehren Sie mit der bearbeiteten
+   Arbeitskopie zur Mandantenanlage zurück. **„Abbrechen“** verwirft die
+   Änderungen aus diesem Editoraufruf.
+
+Beim Hinzufügen oder Ändern prüft der Editor, ob die Kontonummer bereits
+im Kontenrahmen vergeben ist. Wird eine Nummer geändert, zeigt
+SimpleOB die betroffenen Systemkonto-, Steuerkonto-, Rollen- und
+Taxonomiereferenzen an. Sie können deren gemeinsame Übernahme auf die neue
+Nummer ausdrücklich bestätigen; ohne diese Bestätigung wird eine
+referenzierte Nummernänderung nicht vorgenommen. Ein Konto mit solchen
+Referenzen kann nicht entfernt werden, bevor die Zuordnungen korrigiert
+sind. Der Kontenrahmen muss außerdem strukturell gültig bleiben und seine
+Zuordnungen müssen auf vorhandene Konten verweisen.
+
+Der Editor bearbeitet nur eine unabhängige Arbeitskopie der Vorlage. Die
+mitgelieferte Vorlage und Konten bereits angelegter Mandanten werden dabei
+nicht verändert. Die bearbeitete Arbeitskopie wird erst bei erfolgreicher
+Mandantenanlage für den neuen Mandanten verwendet.
+
+Mit **„Als Vorlage speichern …“** können Sie die Arbeitskopie unter einem
+neuen Namen als wiederverwendbare eigene Vorlage sichern. Falls notwendige
+System-, Steuer- oder Rollenzuordnungen noch fehlen, können Sie diese vor
+dem Speichern im vorhandenen Konfigurationsdialog ergänzen. Eine vorhandene
+Vorlage gleichen Namens wird nicht überschrieben. Gespeicherte Vorlagen
+liegen unter `~/Library/Application Support/SimpleOB/chart_of_accounts_templates/`
+und erscheinen später wieder in der Kontenrahmenauswahl. Das Speichern
+schließt den Editor nicht und legt keinen Mandanten an.
+
+E-Bilanz-Taxonomiezuordnungen sind optional und nicht jedes Konto benötigt
+eine explizite Position. Kontenrahmen mit einer anderen als Taxonomie 6.9
+angegebenen Version werden zurückgewiesen. Die Kontenrahmenbearbeitung
+ändert keine HGB-Struktur und fügt keine Taxonomiepositionen hinzu.
+
+SimpleOB fragt folgende Unternehmens- und Geschäftsjahresangaben ab:
 
 - Unternehmensname,
 - Beginn des ersten Geschäftsjahres,
@@ -451,8 +613,11 @@ Datumsangaben können im Format `TT.MM.JJJJ` eingegeben werden.
 SimpleOB akzeptiert außerdem Eingaben in den Formen `TTMMJJJJ`
 und `TTMMJJ` und normalisiert gültige Eingaben.
 
-Mit **„Buchhaltung anlegen“** werden das neue Unternehmen und sein
-erstes Geschäftsjahr angelegt und anschließend geöffnet.
+Mit **„Buchhaltung anlegen“** werden die ausgewählte Kontenrahmen-
+Konfiguration geprüft, das neue Unternehmen und sein erstes Geschäftsjahr
+angelegt und anschließend geöffnet. Bei einem individuellen Kontenrahmen
+müssen Sie die angezeigte Bestätigung und die Kontenkonfiguration
+abschließen, bevor die Anlage fortgesetzt wird.
 
 Die weiteren Unternehmens- und Steuerdaten werden nicht in diesem
 ersten Dialog erfasst. Sie werden anschließend über die
@@ -669,6 +834,12 @@ Positionen von Bilanz und Gewinn- und Verlustrechnung verbunden.
 Darüber hinaus können bestimmte Konten besondere Funktionen übernehmen,
 beispielsweise als Umsatzsteuerkonto, Eröffnungsbilanzkonto oder
 Bankkonto.
+
+Der Kontenrahmeneditor aus Kapitel 6.2 bearbeitet eine Vorlage vor der
+Mandantenanlage. Die folgenden Abschnitte dieses Kapitels beschreiben
+dagegen die Konten und Zuordnungen des bereits geöffneten Mandanten.
+Änderungen an einer Vorlage ändern den Kontenbestand eines vorhandenen
+Mandanten nicht.
 
 ### 8.1 Kontenübersicht
 

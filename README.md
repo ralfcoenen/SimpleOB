@@ -143,7 +143,7 @@ scripts/build_user_manual.sh
 
 Das Benutzerhandbuch enthält insbesondere Hinweise zu Installation und erstem Start unter macOS, Mandanten und Geschäftsjahren, Buchführung und Jahresabschluss, E-Bilanz, ELSTER-Zertifikat und ELSTER-Datenlieferant, Test- und Produktivübermittlung sowie Datenbankaktualisierungen.
 
-Es beschreibt außerdem offene Posten, Zahlungen, Rückerstattungen, Mandantensicherungen und die informative Umsatzüberwachung zur Kleinunternehmerregelung samt ihren fachlichen Grenzen.
+Es beschreibt außerdem offene Posten, Zahlungen, Rückerstattungen, Mandantensicherungen und die informative Umsatzüberwachung zur Kleinunternehmerregelung samt ihren fachlichen Grenzen. Ergänzt sind die [PostgreSQL-Ersteinrichtung mit getrennten Rollen](docs/SimpleOB_Benutzerhandbuch.md#25-neue-postgresql-datenbank-anlegen) sowie die [Auswahl, Bearbeitung und Wiederverwendung eigener Kontenrahmenvorlagen](docs/SimpleOB_Benutzerhandbuch.md#kontenrahmen-vor-der-mandantenanlage-bearbeiten).
 
 ## Datenhaltung, Sicherung und Aktualisierungen
 
