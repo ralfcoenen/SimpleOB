@@ -52,6 +52,52 @@ def test_sqlite_is_selected_by_default(
     assert dialog._selected_url() is None
 
 
+@pytest.mark.parametrize("confirm", [False, True])
+def test_recovery_dialog_requires_confirmation_for_sqlite_selection(
+    app,
+    config: ApplicationConfig,
+    monkeypatch,
+    confirm: bool,
+) -> None:
+    config.database_file.write_bytes(b"pre-existing SQLite database")
+    dialog = DatabaseConfigurationDialog(
+        config=config,
+        configuration_notice=(
+            "Configuration is missing. SQLite file is already present."
+        ),
+    )
+    assert dialog._configuration_notice_label is not None
+    assert "already present" in dialog._configuration_notice_label.text()
+
+    events = []
+    monkeypatch.setattr(
+        dialog,
+        "_check_connection",
+        lambda: events.append("check") or None,
+    )
+    monkeypatch.setattr(
+        "simpleob.ui_qt.database_configuration_dialog.QMessageBox.question",
+        lambda *args, **kwargs: (
+            events.append("confirm")
+            or (
+                QMessageBox.StandardButton.Yes
+                if confirm
+                else QMessageBox.StandardButton.No
+            )
+        ),
+    )
+
+    dialog._accept_configuration()
+
+    assert dialog.result() == (
+        QDialog.DialogCode.Accepted if confirm else QDialog.DialogCode.Rejected
+    )
+    assert dialog.selected_database_url is None
+    assert events == (["confirm", "check"] if confirm else ["confirm"])
+    assert config.database_file.read_bytes() == b"pre-existing SQLite database"
+    assert not config.config_file.exists()
+
+
 def test_postgresql_url_is_constructed(
     app,
     config: ApplicationConfig,

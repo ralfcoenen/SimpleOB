@@ -92,20 +92,33 @@ class Database:
 # Übergangskompatibilität
 # ---------------------------------------------------------
 
-_default_database = Database(
-    load_config()
-)
+_default_database: Database | None = None
 
-engine = _default_database.engine
+
+def _get_default_database() -> Database:
+    """Erzeugt die Kompatibilitätsdatenbank erst bei tatsächlicher Verwendung."""
+
+    global _default_database
+    if _default_database is None:
+        _default_database = Database(load_config())
+    return _default_database
+
+
+def __getattr__(name: str) -> Engine:
+    """Liefert die bisherige globale Engine erst bei explizitem Zugriff."""
+
+    if name == "engine":
+        return _get_default_database().engine
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def create_database() -> None:
     """Erzeugt die Tabellen der Standarddatenbank."""
 
-    _default_database.create_database()
+    _get_default_database().create_database()
 
 
 def create_session() -> Session:
     """Erzeugt eine Sitzung der Standarddatenbank."""
 
-    return _default_database.create_session()
+    return _get_default_database().create_session()

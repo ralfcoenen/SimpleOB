@@ -20,6 +20,8 @@ from simpleob.client_transfer.importer import ClientTransferImporter
 from simpleob.client_transfer.model import ClientTransfer
 from simpleob.core.config import (
     ApplicationConfig,
+    ConfigurationFileError,
+    InvalidDatabaseConfigurationError,
     load_config,
     load_installed_config,
     prepare_application_data_directories,
@@ -240,6 +242,59 @@ def _load_application_config():
     return load_config()
 
 
+def _load_startup_configuration() -> (
+    tuple[
+        ApplicationConfig,
+        str | None,
+    ]
+    | None
+):
+    """Lädt die Konfiguration oder meldet sichere Startfehler vor DB-Zugriff."""
+
+    try:
+        config = _load_application_config()
+    except InvalidDatabaseConfigurationError as exc:
+        return (
+            exc.recovery_config,
+            "Der Datenbankeintrag in der lesbaren Konfiguration ist ungültig.\n"
+            f"{exc.message}\n\n"
+            "Wählen Sie die Datenbankverbindung erneut. Andere lesbare "
+            "Einstellungen bleiben erhalten. Die Datei wird erst nach "
+            "erfolgreicher Datenbankprüfung geändert.",
+        )
+    except ConfigurationFileError as exc:
+        QMessageBox.critical(
+            None,
+            "SimpleOB – Konfiguration kann nicht geladen werden",
+            f"Die Konfigurationsdatei kann nicht sicher geladen werden:\n\n"
+            f"{exc}\n\n"
+            "SimpleOB stellt keine Datenbankverbindung her und ändert die "
+            "Datei nicht. Korrigieren Sie die Datei mit einem Texteditor "
+            "oder prüfen Sie ihre Leseberechtigungen und starten Sie SimpleOB "
+            "anschließend erneut.",
+        )
+        return None
+
+    if config.config_file.is_file():
+        return config, None
+
+    sqlite_state = (
+        "Eine SQLite-Datenbankdatei ist bereits vorhanden."
+        if config.database_file.is_file()
+        else "Es ist noch keine SQLite-Datenbankdatei vorhanden."
+    )
+    return (
+        config,
+        "Die Konfigurationsdatei fehlt:\n"
+        f"{config.config_file}\n\n"
+        "Wählen Sie ausdrücklich die zu verwendende Datenbank. SQLite "
+        "wird vorgeschlagen.\n"
+        f"Standardpfad: {config.database_file}\n{sqlite_state}\n\n"
+        "Abbrechen beendet den Start, ohne eine Datenbank zu öffnen oder "
+        "anzulegen.",
+    )
+
+
 def _ensure_eric_privacy_acknowledgement(
     *,
     config: ApplicationConfig,
@@ -339,19 +394,21 @@ class _DatabaseConnectionChangeRequested(Exception):
 
 def _prepare_database_connection(
     config: ApplicationConfig,
-) -> tuple[
-    ApplicationConfig,
-    PostgreSQLCredentials | None,
-] | None:
+    *,
+    configuration_notice: str | None = None,
+) -> (
+    tuple[
+        ApplicationConfig,
+        PostgreSQLCredentials | None,
+    ]
+    | None
+):
     """Prüft die Datenbank und ermöglicht eine Korrektur."""
 
     def is_postgresql(
         candidate: ApplicationConfig,
     ) -> bool:
-        return (
-            make_url(candidate.database_url).get_backend_name()
-            == "postgresql"
-        )
+        return make_url(candidate.database_url).get_backend_name() == "postgresql"
 
     def check_database(
         candidate: ApplicationConfig,
@@ -386,50 +443,53 @@ def _prepare_database_connection(
         else:
             migration_service.upgrade_to_head()
 
-    credentials = _request_postgresql_credentials(config)
+    requires_database_selection = configuration_notice is not None
+    credentials = (
+        None if requires_database_selection else _request_postgresql_credentials(config)
+    )
 
-    if is_postgresql(config) and credentials is None:
+    if (
+        not requires_database_selection
+        and is_postgresql(config)
+        and credentials is None
+    ):
         return None
 
     original_config = config
     pending_configuration = False
+    error_message: str | None = None
     while True:
-        try:
-            check_database(config, credentials)
-            if pending_configuration:
-                save_database_configuration(original_config, config.database_url_override)
-            return config, credentials
-
-        except _DatabaseStartupCancelled:
-            return None
-        except _DatabaseConnectionChangeRequested:
-            error_message = None
-        except Exception as exc:
-            if (
-                is_postgresql(config)
-                and _is_postgresql_authentication_error(exc)
-            ):
-                result = QMessageBox.question(
-                    None,
-                    "SimpleOB – PostgreSQL-Anmeldung",
-                    "Die PostgreSQL-Anmeldung ist fehlgeschlagen.\n\n"
-                    "Möchten Sie das Passwort erneut eingeben?",
-                    QMessageBox.StandardButton.Yes
-                    | QMessageBox.StandardButton.No,
-                    QMessageBox.StandardButton.Yes,
-                )
-
-                if result == QMessageBox.StandardButton.Yes:
-                    credentials = _request_postgresql_credentials(
-                        config
+        if not requires_database_selection:
+            try:
+                check_database(config, credentials)
+                if pending_configuration:
+                    save_database_configuration(
+                        original_config,
+                        config.database_url_override,
+                    )
+                return config, credentials
+            except _DatabaseStartupCancelled:
+                return None
+            except _DatabaseConnectionChangeRequested:
+                error_message = None
+            except Exception as exc:
+                if is_postgresql(config) and _is_postgresql_authentication_error(exc):
+                    result = QMessageBox.question(
+                        None,
+                        "SimpleOB – PostgreSQL-Anmeldung",
+                        "Die PostgreSQL-Anmeldung ist fehlgeschlagen.\n\n"
+                        "Möchten Sie das Passwort erneut eingeben?",
+                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                        QMessageBox.StandardButton.Yes,
                     )
 
-                    if credentials is None:
-                        return None
+                    if result == QMessageBox.StandardButton.Yes:
+                        credentials = _request_postgresql_credentials(config)
+                        if credentials is None:
+                            return None
+                        continue
 
-                    continue
-
-            error_message = str(exc)
+                error_message = str(exc)
 
         if error_message is not None:
             result = QMessageBox.question(
@@ -446,6 +506,9 @@ def _prepare_database_connection(
 
         dialog = DatabaseConfigurationDialog(
             config=config,
+            configuration_notice=(
+                configuration_notice if requires_database_selection else None
+            ),
         )
 
         if dialog.exec() != QDialog.DialogCode.Accepted:
@@ -464,6 +527,8 @@ def _prepare_database_connection(
         config = candidate
         credentials = candidate_credentials
         pending_configuration = True
+        requires_database_selection = False
+        configuration_notice = None
 
 
 def main() -> None:
@@ -472,7 +537,10 @@ def main() -> None:
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
 
-    config = _load_application_config()
+    startup_configuration = _load_startup_configuration()
+    if startup_configuration is None:
+        return
+    config, configuration_notice = startup_configuration
 
     prepare_application_data_directories(
         config
@@ -502,7 +570,10 @@ def main() -> None:
             )
         )
 
-    prepared_connection = _prepare_database_connection(config)
+    prepared_connection = _prepare_database_connection(
+        config,
+        configuration_notice=configuration_notice,
+    )
 
     if prepared_connection is None:
         return

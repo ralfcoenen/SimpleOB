@@ -1,10 +1,16 @@
 """Tests für die Anwendungskonfiguration."""
 
+import importlib.util
 import sys
 from pathlib import Path
 
+import pytest
+
 from simpleob.core.config import (
     ApplicationConfig,
+    ConfigurationReadError,
+    ConfigurationSyntaxError,
+    InvalidDatabaseConfigurationError,
     bundled_eric_lib_dir,
     default_config,
     desktop_application_data_dir,
@@ -45,6 +51,43 @@ def test_default_config_uses_project_data_directory() -> None:
     assert config.eric_lib_dir is None
 
 
+def test_config_module_import_does_not_read_development_config(
+    monkeypatch,
+) -> None:
+    import simpleob.core.config as config_module
+
+    module_name = "simpleob.core._config_import_probe"
+    spec = importlib.util.spec_from_file_location(
+        module_name,
+        Path(config_module.__file__),
+    )
+    assert spec is not None and spec.loader is not None
+    probe = importlib.util.module_from_spec(spec)
+    source_config = config_module.DEFAULT_CONFIG_FILE
+    original_stat = Path.stat
+    original_open = Path.open
+
+    def denied_config_stat(path: Path, *args, **kwargs):
+        if path == source_config:
+            raise PermissionError("Config file must not be read at import")
+        return original_stat(path, *args, **kwargs)
+
+    def denied_config_open(path: Path, *args, **kwargs):
+        if path == source_config:
+            raise PermissionError("Config file must not be read at import")
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "stat", denied_config_stat)
+    monkeypatch.setattr(Path, "open", denied_config_open)
+    sys.modules[module_name] = probe
+    try:
+        spec.loader.exec_module(probe)
+    finally:
+        sys.modules.pop(module_name, None)
+
+    assert probe.DATA_DIR == probe.DEFAULT_DATA_DIR
+
+
 def test_load_config_uses_defaults_when_file_is_missing(
     tmp_path: Path,
 ) -> None:
@@ -76,6 +119,67 @@ def test_load_config_uses_defaults_when_file_is_missing(
     )
 
     assert config.eric_lib_dir is None
+
+
+@pytest.mark.parametrize("sqlite_exists", [False, True])
+def test_missing_config_does_not_create_or_change_sqlite_database(
+    tmp_path: Path,
+    sqlite_exists: bool,
+) -> None:
+    config_file = tmp_path / "config.toml"
+    database_file = tmp_path / "openbilanz.db"
+    if sqlite_exists:
+        database_file.write_bytes(b"existing test database bytes")
+
+    defaults = ApplicationConfig(
+        data_dir=tmp_path,
+        database_file=database_file,
+        taxonomy_dir=tmp_path / "taxonomy",
+        config_file=config_file,
+    )
+
+    config = load_config(config_file, defaults=defaults)
+
+    assert config.database_url == f"sqlite:///{database_file}"
+    assert not config_file.exists()
+    assert database_file.exists() is sqlite_exists
+    if sqlite_exists:
+        assert database_file.read_bytes() == b"existing test database bytes"
+
+
+def test_load_config_reports_toml_syntax_error_without_changing_file(
+    tmp_path: Path,
+) -> None:
+    config_file = tmp_path / "config.toml"
+    original = b"[database\nurl = 'sqlite:///broken.db'\n"
+    config_file.write_bytes(original)
+
+    with pytest.raises(ConfigurationSyntaxError, match="TOML-Syntaxfehler"):
+        load_config(config_file)
+
+    assert config_file.read_bytes() == original
+
+
+def test_load_config_reports_unreadable_file(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    config_file = tmp_path / "config.toml"
+    config_file.write_text("[database]\n", encoding="utf-8")
+    original_open = Path.open
+
+    def denied_open(path: Path, *args, **kwargs):
+        if path == config_file:
+            raise PermissionError("Permission denied")
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", denied_open)
+
+    with pytest.raises(ConfigurationReadError, match="Berechtigungsfehler"):
+        load_config(config_file)
+
+    with original_open(config_file, "r", encoding="utf-8") as file:
+        assert file.read() == "[database]\n"
 
 
 def test_load_config_reads_toml_file(
@@ -825,20 +929,26 @@ def test_load_config_rejects_empty_database_url(
 def test_load_config_rejects_unsupported_database_url(
     tmp_path: Path,
 ) -> None:
-    import pytest
-
     config_file = tmp_path / "config.toml"
 
     config_file.write_text(
-        '[database]\nurl = "mysql://localhost/test"\n',
+        '[application]\ndata_dir = "/tmp/preserved-data"\n'
+        '\n[database]\nfile = "/tmp/preserved.db"\n'
+        'url = "mysql://localhost/test"\n'
+        '\n[taxonomy]\nroot = "/tmp/preserved-taxonomy"\n',
         encoding="utf-8",
     )
 
-    with pytest.raises(
-        ValueError,
-        match="Unterstützte Datenbank-URLs",
-    ):
+    with pytest.raises(InvalidDatabaseConfigurationError) as exc_info:
         load_config(config_file)
+
+    recovery = exc_info.value.recovery_config
+    assert recovery.database_url_override is None
+    assert recovery.data_dir == Path("/tmp/preserved-data")
+    assert recovery.database_file == Path("/tmp/preserved.db")
+    assert recovery.taxonomy_dir == Path("/tmp/preserved-taxonomy")
+    assert "mysql://" not in str(exc_info.value)
+    assert "mysql://localhost/test" in config_file.read_text(encoding="utf-8")
 
 
 def test_save_database_configuration_persists_postgresql(

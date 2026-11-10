@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import stat
 import sys
 import tomllib
 from dataclasses import dataclass
@@ -42,6 +43,43 @@ class ApplicationConfig:
             return self.database_url_override
 
         return f"sqlite:///{self.database_file}"
+
+
+class ConfigurationFileError(Exception):
+    """Eine Konfigurationsdatei kann nicht sicher gelesen oder geparst werden."""
+
+    def __init__(self, path: Path, message: str) -> None:
+        self.path = path
+        self.message = message
+        super().__init__(f"{path}: {message}")
+
+
+class ConfigurationSyntaxError(ConfigurationFileError):
+    """Die Konfigurationsdatei enthält ungültige TOML-Syntax."""
+
+
+class ConfigurationReadError(ConfigurationFileError):
+    """Die Konfigurationsdatei ist nicht lesbar oder keine reguläre Datei."""
+
+
+class ConfigurationValueError(ConfigurationFileError):
+    """Ein anderer Konfigurationswert ist ungültig."""
+
+
+class InvalidDatabaseConfigurationError(ValueError):
+    """Die übrige Konfiguration ist lesbar, aber die Datenbank-URL ungültig."""
+
+    def __init__(
+        self,
+        path: Path,
+        message: str,
+        recovery_config: ApplicationConfig,
+    ) -> None:
+        self.path = path
+        self.message = message
+        self.recovery_config = recovery_config
+        super().__init__(f"{path}: {message}")
+
 
 @property
 def database_url(self) -> str:
@@ -153,7 +191,9 @@ def load_config(
         else effective_defaults.config_file
     )
 
-    if not path.is_file():
+    try:
+        file_mode = path.stat().st_mode
+    except FileNotFoundError:
         return ApplicationConfig(
             data_dir=effective_defaults.data_dir,
             database_file=effective_defaults.database_file,
@@ -164,82 +204,105 @@ def load_config(
             eric_data_supplier=effective_defaults.eric_data_supplier,
             eric_certificate_path=effective_defaults.eric_certificate_path,
         )
+    except OSError as exc:
+        raise ConfigurationReadError(
+            path,
+            f"Datei- oder Berechtigungsfehler beim Zugriff: {exc.strerror or exc}",
+        ) from exc
 
-    with path.open("rb") as file:
-        data = tomllib.load(file)
+    if not stat.S_ISREG(file_mode):
+        raise ConfigurationReadError(
+            path,
+            "Der Konfigurationspfad ist keine reguläre Datei.",
+        )
 
-    application = data.get(
-        "application",
-        {},
-    )
+    try:
+        with path.open("rb") as file:
+            data = tomllib.load(file)
+    except tomllib.TOMLDecodeError as exc:
+        raise ConfigurationSyntaxError(
+            path,
+            f"TOML-Syntaxfehler: {exc}",
+        ) from exc
+    except OSError as exc:
+        raise ConfigurationReadError(
+            path,
+            f"Datei- oder Berechtigungsfehler beim Lesen: {exc.strerror or exc}",
+        ) from exc
 
-    database = data.get(
-        "database",
-        {},
-    )
+    application = _configuration_table(data, "application", path)
+    database = _configuration_table(data, "database", path)
+    taxonomy = _configuration_table(data, "taxonomy", path)
+    eric = _configuration_table(data, "eric", path)
 
     database_url_override = database.get("url")
-
+    invalid_database_message: str | None = None
     if database_url_override is not None:
         if not isinstance(database_url_override, str):
-            raise ValueError(
-                "database.url muss eine Zeichenkette sein."
-            )
+            invalid_database_message = "database.url muss eine Zeichenkette sein."
+            database_url_override = None
+        else:
+            database_url_override = database_url_override.strip()
+            if not database_url_override:
+                invalid_database_message = "database.url darf nicht leer sein."
+                database_url_override = None
+            elif not database_url_override.startswith(
+                ("sqlite:///", "postgresql+psycopg://")
+            ):
+                invalid_database_message = (
+                    "Nicht unterstützter Datenbanktyp. Unterstützt werden "
+                    "SQLite und PostgreSQL mit psycopg."
+                )
+                database_url_override = None
+            else:
+                from sqlalchemy.engine import make_url
+                from sqlalchemy.exc import ArgumentError
 
-        database_url_override = database_url_override.strip()
+                try:
+                    parsed_database_url = make_url(database_url_override)
+                except (ArgumentError, TypeError, ValueError):
+                    invalid_database_message = (
+                        "database.url ist keine gültige Datenbank-URL."
+                    )
+                    database_url_override = None
+                else:
+                    if parsed_database_url.password is not None:
+                        invalid_database_message = (
+                            "database.url darf kein Passwort enthalten. "
+                            "Das Passwort wird beim Verbinden abgefragt."
+                        )
+                        database_url_override = None
 
-        if not database_url_override:
-            raise ValueError(
-                "database.url darf nicht leer sein."
-            )
-
-        if not database_url_override.startswith(
-            ("sqlite:///", "postgresql+psycopg://")
-        ):
-            raise ValueError(
-                "Unterstützte Datenbank-URLs beginnen mit "
-                "'sqlite:///' oder 'postgresql+psycopg://'."
-            )
-
-    taxonomy = data.get(
-        "taxonomy",
-        {},
+    data_dir = _configured_path(
+        application,
+        "data_dir",
+        str(effective_defaults.data_dir),
+        path,
     )
-
-    eric = data.get(
-        "eric",
-        {},
+    database_file = _configured_path(
+        database,
+        "file",
+        str(data_dir / "openbilanz.db"),
+        path,
     )
-
-    data_dir = Path(
-        application.get(
-            "data_dir",
-            str(effective_defaults.data_dir),
-        )
-    ).expanduser()
-
-    database_file = Path(
-        database.get(
-            "file",
-            str(data_dir / "openbilanz.db"),
-        )
-    ).expanduser()
-
-    taxonomy_dir = Path(
-        taxonomy.get(
-            "root",
-            str(data_dir / "taxonomy"),
-        )
-    ).expanduser()
+    taxonomy_dir = _configured_path(
+        taxonomy,
+        "root",
+        str(data_dir / "taxonomy"),
+        path,
+    )
 
     eric_lib_dir_value = eric.get(
         "lib_dir",
     )
-    eric_lib_dir = (
-        Path(eric_lib_dir_value).expanduser()
-        if eric_lib_dir_value
-        else None
-    )
+    eric_lib_dir = None
+    if eric_lib_dir_value:
+        eric_lib_dir = _configured_path(
+            eric,
+            "lib_dir",
+            "",
+            path,
+        )
 
     data_supplier = eric.get(
         "data_supplier",
@@ -247,16 +310,13 @@ def load_config(
     )
 
     if isinstance(data_supplier, str):
-        legacy_parts = [
-            part.strip()
-            for part in data_supplier.split(";")
-        ]
+        legacy_parts = [part.strip() for part in data_supplier.split(";")]
 
         if len(legacy_parts) != 10:
-            raise ValueError(
-                "Der alte Wert eric.data_supplier "
-                "muss aus genau 10 durch Semikolon "
-                "getrennten Feldern bestehen."
+            raise ConfigurationValueError(
+                path,
+                "Der alte Wert eric.data_supplier muss aus genau 10 durch "
+                "Semikolon getrennten Feldern bestehen.",
             )
 
         eric_data_supplier = ElsterDataSupplier(
@@ -276,18 +336,10 @@ def load_config(
         eric_data_supplier = ElsterDataSupplier(
             name=str(data_supplier.get("name", "")),
             street=str(data_supplier.get("street", "")),
-            house_number=str(
-                data_supplier.get("house_number", "")
-            ),
-            house_number_suffix=str(
-                data_supplier.get("house_number_suffix", "")
-            ),
-            address_addition=str(
-                data_supplier.get("address_addition", "")
-            ),
-            postal_code=str(
-                data_supplier.get("postal_code", "")
-            ),
+            house_number=str(data_supplier.get("house_number", "")),
+            house_number_suffix=str(data_supplier.get("house_number_suffix", "")),
+            address_addition=str(data_supplier.get("address_addition", "")),
+            postal_code=str(data_supplier.get("postal_code", "")),
             city=str(data_supplier.get("city", "")),
             country=str(data_supplier.get("country", "")),
             phone=str(data_supplier.get("phone", "")),
@@ -295,9 +347,10 @@ def load_config(
         )
 
     else:
-        raise ValueError(
-            "eric.data_supplier muss eine TOML-Tabelle "
-            "oder ein alter Zeichenkettenwert sein."
+        raise ConfigurationValueError(
+            path,
+            "eric.data_supplier muss eine TOML-Tabelle oder ein alter "
+            "Zeichenkettenwert sein.",
         )
 
     if not eric_data_supplier.is_configured:
@@ -312,7 +365,16 @@ def load_config(
         else None
     )
 
-    return ApplicationConfig(
+    eric_certificate_path = None
+    if eric_certificate_path_value:
+        eric_certificate_path = _configured_path(
+            eric,
+            "certificate_path",
+            "",
+            path,
+        )
+
+    config = ApplicationConfig(
         data_dir=data_dir,
         database_file=database_file,
         taxonomy_dir=taxonomy_dir,
@@ -321,8 +383,51 @@ def load_config(
         eric_lib_dir=eric_lib_dir,
         eric_data_supplier=eric_data_supplier,
         eric_certificate_path=eric_certificate_path,
-
     )
+
+    if invalid_database_message is not None:
+        raise InvalidDatabaseConfigurationError(
+            path,
+            invalid_database_message,
+            config,
+        )
+
+    return config
+
+
+def _configuration_table(
+    data: dict[str, object],
+    name: str,
+    path: Path,
+) -> dict[str, object]:
+    value = data.get(name, {})
+    if not isinstance(value, dict):
+        raise ConfigurationValueError(
+            path,
+            f"Der Abschnitt [{name}] muss eine TOML-Tabelle sein.",
+        )
+    return value
+
+
+def _configured_path(
+    section: dict[str, object],
+    key: str,
+    default: str,
+    config_file: Path,
+) -> Path:
+    value = section.get(key, default)
+    if not isinstance(value, str) or not value:
+        raise ConfigurationValueError(
+            config_file,
+            f"Der Konfigurationswert {key!r} muss ein nichtleerer Pfad sein.",
+        )
+    try:
+        return Path(value).expanduser()
+    except (TypeError, ValueError) as exc:
+        raise ConfigurationValueError(
+            config_file,
+            f"Der Konfigurationswert {key!r} ist kein gültiger Pfad.",
+        ) from exc
 
 
 def load_installed_config() -> ApplicationConfig:
@@ -330,10 +435,27 @@ def load_installed_config() -> ApplicationConfig:
 
     defaults = installed_config()
 
-    config = load_config(
-        defaults.config_file,
-        defaults=defaults,
-    )
+    try:
+        config = load_config(
+            defaults.config_file,
+            defaults=defaults,
+        )
+    except InvalidDatabaseConfigurationError as exc:
+        recovery_config = ApplicationConfig(
+            data_dir=exc.recovery_config.data_dir,
+            database_file=exc.recovery_config.database_file,
+            taxonomy_dir=exc.recovery_config.taxonomy_dir,
+            config_file=exc.recovery_config.config_file,
+            database_url_override=None,
+            eric_lib_dir=defaults.eric_lib_dir,
+            eric_data_supplier=exc.recovery_config.eric_data_supplier,
+            eric_certificate_path=exc.recovery_config.eric_certificate_path,
+        )
+        raise InvalidDatabaseConfigurationError(
+            exc.path,
+            exc.message,
+            recovery_config,
+        ) from exc
 
     return ApplicationConfig(
         data_dir=config.data_dir,
@@ -765,7 +887,10 @@ def _default_config_for_data_dir(
 # Übergangskompatibilität
 # ---------------------------------------------------------
 
-_current_config = load_config()
+# Historische Konstanten bleiben für Importkompatibilität erhalten, dürfen
+# aber beim Modulimport keine Konfigurationsdatei lesen. Der Anwendungsstart
+# lädt und validiert die Datei ausdrücklich über load_config().
+_current_config = _default_config_for_data_dir(DEFAULT_DATA_DIR)
 
 DATA_DIR = _current_config.data_dir
 DATABASE_FILE = _current_config.database_file

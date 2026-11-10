@@ -50,10 +50,13 @@ class DatabaseConfigurationDialog(QDialog):
         self,
         *,
         config: ApplicationConfig,
+        configuration_notice: str | None = None,
     ) -> None:
         super().__init__()
 
         self._config = config
+        self._configuration_notice = configuration_notice
+        self._configuration_notice_label: QLabel | None = None
         self.selected_database_url: str | None = None
 
         self._checked_database_url: str | None = None
@@ -81,6 +84,10 @@ class DatabaseConfigurationDialog(QDialog):
         layout.addWidget(
             QLabel("Datenbankverbindung auswählen")
         )
+        if self._configuration_notice is not None:
+            self._configuration_notice_label = QLabel(self._configuration_notice)
+            self._configuration_notice_label.setWordWrap(True)
+            layout.addWidget(self._configuration_notice_label)
 
         form = QFormLayout()
 
@@ -677,6 +684,44 @@ class DatabaseConfigurationDialog(QDialog):
         )
 
     def _accept_configuration(self) -> None:
+        if self._configuration_notice is not None:
+            try:
+                selected_url = self._selected_url()
+            except ValueError as exc:
+                QMessageBox.warning(
+                    self,
+                    "Datenbankverbindung",
+                    str(exc),
+                )
+                return
+
+            if selected_url is None:
+                database_target = f"SQLite-Datei: {self._config.database_file}\n" + (
+                    "Die Datei ist bereits vorhanden."
+                    if self._config.database_file.is_file()
+                    else "Die Datei ist noch nicht vorhanden und kann erst nach Ihrer Auswahl angelegt werden."
+                )
+            else:
+                url = make_url(selected_url)
+                database_target = (
+                    f"PostgreSQL-Datenbank: {url.database or '(ohne Namen)'}\n"
+                    f"Server: {url.host or '(ohne Server)'}:{url.port or 5432}\n"
+                    f"Betriebsrolle: {url.username or '(ohne Benutzer)'}"
+                )
+            answer = QMessageBox.question(
+                self,
+                "Datenbankauswahl bestätigen",
+                f"Soll SimpleOB diese Datenbankauswahl verwenden?\n\n"
+                f"{database_target}\n\n"
+                "Die Konfiguration wird erst gespeichert, nachdem die "
+                "Datenbankprüfung beim Programmstart erfolgreich war. Bei "
+                "Abbruch bleibt die vorhandene Konfigurationsdatei unverändert.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                return
+
         try:
             database_url = self._check_connection()
         except Exception as exc:
