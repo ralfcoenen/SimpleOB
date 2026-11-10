@@ -25,7 +25,7 @@ def _app():
 
 
 def test_accounting_and_fixed_asset_forms_use_central_date_fields():
-    app = _app()
+    _app()
     company_id = uuid4()
     company = Company(company_id=company_id, name="Test GmbH")
     fiscal_year = FiscalYear(date(2026, 1, 1), date(2026, 12, 31))
