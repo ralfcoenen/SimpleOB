@@ -468,6 +468,22 @@ class PostgreSQLExistingInstallationInspector:
                 tuple(notes),
             )
 
+        alembic_write_privileges = tuple(
+            privilege
+            for name, privilege, allowed in (
+                runtime.table_privileges if runtime else ()
+            )
+            if name == "alembic_version"
+            and privilege in {"INSERT", "UPDATE", "DELETE"}
+            and allowed
+        )
+        if alembic_write_privileges:
+            blockers.append(
+                "Die Anwendungsrolle besitzt unzulässige effektive "
+                "Änderungsrechte auf alembic_version. Prüfen Sie direkte, "
+                "geerbte und PUBLIC-Berechtigungen."
+            )
+
         missing_runtime = [
             (name, privilege)
             for name, privilege, allowed in (

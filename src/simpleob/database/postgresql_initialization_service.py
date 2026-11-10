@@ -16,12 +16,17 @@ from simpleob.database.connection_credentials import (
     PostgreSQLCredentials,
     database_connect_args,
 )
+from simpleob.database.database import Base
 from simpleob.database.migration_service import (
     DatabaseMigrationService,
     PostgreSQLSchemaStatus,
 )
 from simpleob.database.postgresql_migration_lock import (
     postgresql_migration_lock,
+)
+from simpleob.database.postgresql_runtime_privileges import (
+    enforce_read_only_alembic_version,
+    grant_application_table_privileges,
 )
 
 
@@ -469,11 +474,16 @@ class PostgreSQLInitializationService:
         )
         try:
             with migration_engine.begin() as connection:
-                quote = connection.dialect.identifier_preparer.quote_identifier
-                connection.exec_driver_sql(
-                    "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public "
-                    f"TO {quote(operating_role)}"
+                grant_application_table_privileges(
+                    connection,
+                    operating_role=operating_role,
+                    table_names=Base.metadata.tables,
                 )
+                enforce_read_only_alembic_version(
+                    connection,
+                    operating_role=operating_role,
+                )
+                quote = connection.dialect.identifier_preparer.quote_identifier
                 connection.exec_driver_sql(
                     "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public "
                     f"TO {quote(operating_role)}"
@@ -559,15 +569,13 @@ class PostgreSQLInitializationService:
                         "Die Betriebsrolle besitzt über eine Rollenmitgliedschaft Eigentümerrechte."
                     )
 
-                from simpleob.database.database import Base
-
                 expected_tables = set(Base.metadata.tables) | {"alembic_version"}
                 inspector = inspect(connection)
                 if set(inspector.get_table_names(schema="public")) != expected_tables:
                     raise RuntimeError(
                         "Die initialisierte Datenbank enthält nicht die erwarteten SimpleOB-Tabellen."
                     )
-                for table_name in sorted(expected_tables):
+                for table_name in sorted(set(Base.metadata.tables)):
                     for privilege in ("SELECT", "INSERT", "UPDATE", "DELETE"):
                         if not connection.execute(
                             text(
@@ -581,16 +589,45 @@ class PostgreSQLInitializationService:
                             raise RuntimeError(
                                 "Der Betriebsrolle fehlen erforderliche Tabellenrechte."
                             )
-                for sequence_name in inspector.get_sequence_names(schema="public"):
-                    if not connection.execute(
+                if not connection.execute(
+                    text(
+                        "SELECT has_table_privilege(current_user, "
+                        "'public.alembic_version', 'SELECT')"
+                    )
+                ).scalar_one():
+                    raise RuntimeError(
+                        "Der Betriebsrolle fehlt das Leserecht auf alembic_version."
+                    )
+                if any(
+                    connection.execute(
                         text(
-                            "SELECT has_sequence_privilege(current_user, :sequence_name, 'USAGE')"
+                            "SELECT has_table_privilege(current_user, "
+                            "'public.alembic_version', :privilege)"
                         ),
-                        {"sequence_name": f'public."{sequence_name}"'},
-                    ).scalar_one():
-                        raise RuntimeError(
-                            "Der Betriebsrolle fehlen erforderliche Sequenzrechte."
-                        )
+                        {"privilege": privilege},
+                    ).scalar_one()
+                    for privilege in ("INSERT", "UPDATE", "DELETE")
+                ):
+                    raise RuntimeError(
+                        "Die Betriebsrolle besitzt unzulässige Änderungsrechte "
+                        "auf alembic_version. Prüfen Sie direkte, geerbte und "
+                        "PUBLIC-Berechtigungen."
+                    )
+                for sequence_name in inspector.get_sequence_names(schema="public"):
+                    for privilege in ("USAGE", "SELECT"):
+                        if not connection.execute(
+                            text(
+                                "SELECT has_sequence_privilege(current_user, "
+                                ":sequence_name, :privilege)"
+                            ),
+                            {
+                                "sequence_name": f'public."{sequence_name}"',
+                                "privilege": privilege,
+                            },
+                        ).scalar_one():
+                            raise RuntimeError(
+                                "Der Betriebsrolle fehlen erforderliche Sequenzrechte."
+                            )
                 owners = connection.execute(
                     text(
                         "SELECT DISTINCT pg_get_userbyid(relowner) FROM pg_class c "

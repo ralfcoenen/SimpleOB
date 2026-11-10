@@ -13,6 +13,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import URL, Connection
 
 from simpleob.core.config import ApplicationConfig
+from simpleob.database import models
 from simpleob.database.connection_credentials import PostgreSQLCredentials
 from simpleob.database.migration_service import (
     DatabaseMigrationService,
@@ -20,6 +21,9 @@ from simpleob.database.migration_service import (
 )
 from simpleob.database.postgresql_administration_service import (
     PostgreSQLAdministrationService,
+)
+from simpleob.database.postgresql_initialization_service import (
+    PostgreSQLInitializationService,
 )
 from simpleob.database.postgresql_maintenance_isolation import (
     postgresql_maintenance_isolation,
@@ -31,7 +35,7 @@ from simpleob.database.postgresql_migration_safety import (
 
 
 @pytest.mark.integration
-def test_split_role_administrative_upgrade_on_isolated_postgresql(
+def test_initialized_database_completes_administrative_upgrade_on_isolated_postgresql(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -127,9 +131,6 @@ def test_split_role_administrative_upgrade_on_isolated_postgresql(
                 "CREATE ROLE simpleob_weak_admin LOGIN "
                 "PASSWORD 'temporary-weak-admin-secret'"
             )
-            connection.exec_driver_sql(
-                "CREATE DATABASE simpleob_customer_books OWNER simpleob_migrator"
-            )
 
         migration_url = URL.create(
             "postgresql+psycopg",
@@ -146,6 +147,30 @@ def test_split_role_administrative_upgrade_on_isolated_postgresql(
             config_file=tmp_path / "config.toml",
             database_url_override=migration_url.render_as_string(hide_password=True),
         )
+        operating_url = migration_url.set(username="simpleob_operator")
+        operating_credentials = PostgreSQLCredentials(operating_password)
+        application_config = ApplicationConfig(
+            data_dir=tmp_path,
+            database_file=tmp_path / "unused.sqlite",
+            taxonomy_dir=tmp_path,
+            config_file=tmp_path / "config.toml",
+            database_url_override=operating_url.render_as_string(hide_password=True),
+        )
+
+        initialization = PostgreSQLInitializationService().initialize_database(
+            application_config=application_config,
+            admin_username="postgres",
+            admin_credentials=PostgreSQLCredentials(postgres_password),
+            migration_username="simpleob_migrator",
+            migration_credentials=migration_credentials,
+            application_credentials=operating_credentials,
+            confirmed=True,
+        )
+        assert initialization.initialized
+        assert initialization.database_name == "simpleob_customer_books"
+        assert initialization.owner_role == "simpleob_migrator"
+        assert initialization.operating_role == "simpleob_operator"
+
         migration_service = DatabaseMigrationService(
             application_config=migration_config,
             credentials=migration_credentials,
@@ -157,55 +182,45 @@ def test_split_role_administrative_upgrade_on_isolated_postgresql(
         )
         engines.append(migration_engine)
         with migration_engine.connect() as connection:
+            for table_name in models.Base.metadata.tables:
+                for privilege in ("SELECT", "INSERT", "UPDATE", "DELETE"):
+                    assert connection.execute(
+                        text(
+                            "SELECT has_table_privilege(:role, :table_name, :privilege)"
+                        ),
+                        {
+                            "role": "simpleob_operator",
+                            "table_name": f'public."{table_name}"',
+                            "privilege": privilege,
+                        },
+                    ).scalar_one()
+            assert connection.execute(
+                text(
+                    "SELECT has_table_privilege('simpleob_operator', "
+                    "'public.alembic_version', 'SELECT')"
+                )
+            ).scalar_one()
+            assert not any(
+                connection.execute(
+                    text(
+                        "SELECT has_table_privilege('simpleob_operator', "
+                        "'public.alembic_version', :privilege)"
+                    ),
+                    {"privilege": privilege},
+                ).scalar_one()
+                for privilege in ("INSERT", "UPDATE", "DELETE")
+            )
+
+            # Nach erfolgreicher Erstinitialisierung wird derselbe temporäre
+            # Mandant auf einen bekannten älteren Revisionsstand gesetzt.
+            # Das Upgrade selbst läuft unten ausschließlich administrativ.
             alembic_config = migration_service._create_alembic_config()
             alembic_config.attributes["connection"] = connection
+            connection.rollback()
             with connection.begin():
-                command.upgrade(alembic_config, "a6d18f2c94b7")
-
-        with migration_engine.begin() as connection:
-            connection.exec_driver_sql(
-                "GRANT CONNECT ON DATABASE simpleob_customer_books TO simpleob_operator"
-            )
-            connection.exec_driver_sql(
-                "GRANT USAGE ON SCHEMA public TO simpleob_operator"
-            )
-            connection.exec_driver_sql(
-                "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public "
-                "TO simpleob_operator"
-            )
-            connection.exec_driver_sql(
-                "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public "
-                "TO simpleob_operator"
-            )
-            connection.exec_driver_sql(
-                "ALTER DEFAULT PRIVILEGES FOR ROLE simpleob_migrator "
-                "IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE "
-                "ON TABLES TO simpleob_operator"
-            )
-            connection.exec_driver_sql(
-                "ALTER DEFAULT PRIVILEGES FOR ROLE simpleob_migrator "
-                "IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES "
-                "TO simpleob_operator"
-            )
-            connection.exec_driver_sql(
-                "GRANT SELECT ON TABLE public.alembic_version TO simpleob_operator"
-            )
-            connection.exec_driver_sql(
-                "REVOKE INSERT, UPDATE, DELETE ON TABLE public.alembic_version "
-                "FROM simpleob_operator"
-            )
+                command.downgrade(alembic_config, "a6d18f2c94b7")
         migration_engine.dispose()
         engines.remove(migration_engine)
-
-        operating_url = migration_url.set(username="simpleob_operator")
-        operating_credentials = PostgreSQLCredentials(operating_password)
-        application_config = ApplicationConfig(
-            data_dir=tmp_path,
-            database_file=tmp_path / "unused.sqlite",
-            taxonomy_dir=tmp_path,
-            config_file=tmp_path / "config.toml",
-            database_url_override=operating_url.render_as_string(hide_password=True),
-        )
         approval = PostgreSQLMigrationApproval(
             migration_confirmed=True,
             maintenance_confirmed=True,
@@ -456,6 +471,61 @@ def test_split_role_administrative_upgrade_on_isolated_postgresql(
                     "WHERE datname = 'simpleob_customer_books'"
                 )
             ).scalar_one()
+
+        # Default privileges for application tables created by the migration
+        # owner remain in force after upgrade, while alembic_version stays
+        # read-only for the operating role.
+        post_upgrade_migration_engine = create_engine(
+            migration_url,
+            connect_args={"password": migration_password},
+            hide_parameters=True,
+        )
+        post_upgrade_operating_engine = create_engine(
+            operating_url,
+            connect_args={"password": operating_password},
+            hide_parameters=True,
+        )
+        engines.extend([post_upgrade_migration_engine, post_upgrade_operating_engine])
+        with post_upgrade_migration_engine.begin() as connection:
+            connection.exec_driver_sql(
+                "CREATE TABLE public.runtime_privilege_probe (id integer)"
+            )
+        with post_upgrade_operating_engine.connect() as connection:
+            assert all(
+                connection.execute(
+                    text(
+                        "SELECT has_table_privilege(current_user, :table_name, "
+                        ":privilege)"
+                    ),
+                    {
+                        "table_name": f'public."{table_name}"',
+                        "privilege": privilege,
+                    },
+                ).scalar_one()
+                for table_name in (
+                    *models.Base.metadata.tables,
+                    "runtime_privilege_probe",
+                )
+                for privilege in ("SELECT", "INSERT", "UPDATE", "DELETE")
+            )
+            assert connection.execute(
+                text(
+                    "SELECT has_table_privilege(current_user, "
+                    "'public.alembic_version', 'SELECT')"
+                )
+            ).scalar_one()
+            assert not any(
+                connection.execute(
+                    text(
+                        "SELECT has_table_privilege(current_user, "
+                        "'public.alembic_version', :privilege)"
+                    ),
+                    {"privilege": privilege},
+                ).scalar_one()
+                for privilege in ("INSERT", "UPDATE", "DELETE")
+            )
+        with post_upgrade_migration_engine.begin() as connection:
+            connection.exec_driver_sql("DROP TABLE public.runtime_privilege_probe")
     finally:
         for engine in engines:
             engine.dispose()

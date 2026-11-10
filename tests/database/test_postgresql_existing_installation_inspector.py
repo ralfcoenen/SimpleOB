@@ -65,6 +65,7 @@ def _role_privileges(
     sequence_allowed=True,
     database_create=False,
     schema_create=False,
+    alembic_dml=False,
 ):
     table_owners, sequence_owners = _owners()
     return PostgreSQLRolePrivileges(
@@ -75,7 +76,16 @@ def _role_privileges(
         schema_usage=True,
         schema_create=schema_create,
         table_privileges=tuple(
-            (owner.name, privilege, table_allowed)
+            (
+                owner.name,
+                privilege,
+                (
+                    alembic_dml
+                    if owner.name == "alembic_version"
+                    and privilege in {"INSERT", "UPDATE", "DELETE"}
+                    else table_allowed
+                ),
+            )
             for owner in table_owners
             for privilege in ("SELECT", "INSERT", "UPDATE", "DELETE")
         ),
@@ -152,6 +162,15 @@ def test_separated_roles_require_runtime_and_future_object_privileges():
     assert assessment == PostgreSQLOwnershipAssessment.SPLIT_ROLES_COMPATIBLE
     assert migration_role == "migrator"
     assert not blockers
+
+
+def test_writable_alembic_version_blocks_separated_role_compatibility():
+    assessment, _, blockers, _ = _classify(
+        role_privileges=(_role_privileges(alembic_dml=True),)
+    )
+
+    assert assessment == PostgreSQLOwnershipAssessment.INCONSISTENT_OWNERSHIP
+    assert any("Änderungsrechte auf alembic_version" in item for item in blockers)
 
 
 @pytest.mark.parametrize(
@@ -509,6 +528,67 @@ def test_existing_installation_inspection_on_isolated_postgresql_18(tmp_path):
             hide_parameters=True,
         )
         engines.append(object_admin_engine)
+
+        # Effective grants from PUBLIC must also make the split-role
+        # assessment fail, even when the direct role ACL is read-only.
+        with object_admin_engine.begin() as connection:
+            connection.exec_driver_sql(
+                "GRANT UPDATE ON TABLE public.alembic_version TO PUBLIC"
+            )
+        public_write = PostgreSQLExistingInstallationInspector(
+            application_config=operator_config,
+            credentials=operator_credentials,
+        ).inspect()
+        assert (
+            public_write.ownership_assessment
+            == PostgreSQLOwnershipAssessment.INCONSISTENT_OWNERSHIP
+        )
+        assert any(
+            "Änderungsrechte auf alembic_version" in item
+            for item in public_write.blockers
+        )
+        with object_admin_engine.begin() as connection:
+            connection.exec_driver_sql(
+                "REVOKE UPDATE ON TABLE public.alembic_version FROM PUBLIC"
+            )
+
+        # Role-membership grants are effective too and must not be treated as
+        # a compatible runtime role.
+        with bootstrap_engine.begin() as connection:
+            connection.exec_driver_sql("CREATE ROLE simpleob_version_writer NOLOGIN")
+        with object_admin_engine.begin() as connection:
+            connection.exec_driver_sql(
+                "GRANT UPDATE ON TABLE public.alembic_version "
+                "TO simpleob_version_writer"
+            )
+        with bootstrap_engine.begin() as connection:
+            connection.exec_driver_sql(
+                "GRANT simpleob_version_writer TO simpleob_operator"
+            )
+        inherited_write = PostgreSQLExistingInstallationInspector(
+            application_config=operator_config,
+            credentials=operator_credentials,
+        ).inspect()
+        assert (
+            inherited_write.ownership_assessment
+            == PostgreSQLOwnershipAssessment.INCONSISTENT_OWNERSHIP
+        )
+        assert any(
+            "Änderungsrechte auf alembic_version" in item
+            for item in inherited_write.blockers
+        )
+        with bootstrap_engine.begin() as connection:
+            connection.exec_driver_sql(
+                "REVOKE simpleob_version_writer FROM simpleob_operator"
+            )
+        with object_admin_engine.begin() as connection:
+            connection.exec_driver_sql(
+                "REVOKE UPDATE ON TABLE public.alembic_version "
+                "FROM simpleob_version_writer"
+            )
+        with bootstrap_engine.begin() as connection:
+            connection.exec_driver_sql("DROP ROLE simpleob_version_writer")
+
         with object_admin_engine.begin() as connection:
             connection.exec_driver_sql(
                 "ALTER TABLE public.mandanten OWNER TO simpleob_other_owner"

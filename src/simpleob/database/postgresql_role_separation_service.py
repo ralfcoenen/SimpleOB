@@ -22,6 +22,10 @@ from simpleob.database.postgresql_existing_installation_inspector import (
     PostgreSQLExistingInstallationInspector,
     PostgreSQLOwnershipAssessment,
 )
+from simpleob.database.postgresql_runtime_privileges import (
+    enforce_read_only_alembic_version,
+    grant_application_table_privileges,
+)
 from simpleob.database.postgresql_user_service import PostgreSQLUserService
 
 
@@ -459,17 +463,14 @@ class PostgreSQLRoleSeparationService:
                 connection.exec_driver_sql(
                     f"GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO {role}"
                 )
-                for table_name in sorted(models.Base.metadata.tables):
-                    connection.exec_driver_sql(
-                        "GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "
-                        f"public.{quote(table_name)} TO {role}"
-                    )
-                connection.exec_driver_sql(
-                    f"GRANT SELECT ON TABLE public.{quote('alembic_version')} TO {role}"
+                grant_application_table_privileges(
+                    connection,
+                    operating_role=operating_username,
+                    table_names=models.Base.metadata.tables,
                 )
-                connection.exec_driver_sql(
-                    "REVOKE INSERT, UPDATE, DELETE ON TABLE "
-                    f"public.{quote('alembic_version')} FROM {role}"
+                enforce_read_only_alembic_version(
+                    connection,
+                    operating_role=operating_username,
                 )
                 default_privileges = (
                     f"ALTER DEFAULT PRIVILEGES FOR ROLE {quote(owner_role)} "

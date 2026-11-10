@@ -18,6 +18,10 @@ from simpleob.database.postgresql_initialization_service import (
     PostgreSQLInitializationService,
 )
 from simpleob.database.postgresql_migration_lock import postgresql_migration_lock
+from simpleob.database.postgresql_runtime_privileges import (
+    enforce_read_only_alembic_version,
+    grant_application_table_privileges,
+)
 
 
 class PostgreSQLUserService:
@@ -334,10 +338,15 @@ class PostgreSQLUserService:
                     f"GRANT CONNECT ON DATABASE {quote(url.database)} TO {role}"
                 )
                 connection.exec_driver_sql(f"GRANT USAGE ON SCHEMA public TO {role}")
-                for name in sorted(expected):
-                    connection.exec_driver_sql(
-                        f"GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.{quote(name)} TO {role}"
-                    )
+                grant_application_table_privileges(
+                    connection,
+                    operating_role=url.username,
+                    table_names=set(expected) - {"alembic_version"},
+                )
+                enforce_read_only_alembic_version(
+                    connection,
+                    operating_role=url.username,
+                )
                 connection.exec_driver_sql(
                     f"GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO {role}"
                 )
@@ -372,7 +381,7 @@ class PostgreSQLUserService:
                     raise RuntimeError(
                         "Unerwartete Datenbank, Rolle oder Anwendungsschema."
                     )
-                for name in sorted(set(Base.metadata.tables) | {"alembic_version"}):
+                for name in sorted(Base.metadata.tables):
                     for privilege in ("SELECT", "INSERT", "UPDATE", "DELETE"):
                         if not connection.execute(
                             text(
@@ -381,13 +390,40 @@ class PostgreSQLUserService:
                             {"table": f'public."{name}"', "privilege": privilege},
                         ).scalar_one():
                             raise RuntimeError("Erforderliche Tabellenrechte fehlen.")
-                for name in inspect(connection).get_sequence_names(schema="public"):
-                    if not connection.execute(
+                if not connection.execute(
+                    text(
+                        "SELECT has_table_privilege(current_user, "
+                        "'public.alembic_version', 'SELECT')"
+                    )
+                ).scalar_one():
+                    raise RuntimeError("Das Leserecht auf alembic_version fehlt.")
+                if any(
+                    connection.execute(
                         text(
-                            "SELECT has_sequence_privilege(current_user, :sequence, 'USAGE')"
+                            "SELECT has_table_privilege(current_user, "
+                            "'public.alembic_version', :privilege)"
                         ),
-                        {"sequence": 'public."' + name.replace('"', '""') + '"'},
-                    ).scalar_one():
-                        raise RuntimeError("Erforderliche Sequenzrechte fehlen.")
+                        {"privilege": privilege},
+                    ).scalar_one()
+                    for privilege in ("INSERT", "UPDATE", "DELETE")
+                ):
+                    raise RuntimeError(
+                        "Die Betriebsrolle besitzt unzulässige Änderungsrechte "
+                        "auf alembic_version. Prüfen Sie direkte, geerbte und "
+                        "PUBLIC-Berechtigungen."
+                    )
+                for name in inspect(connection).get_sequence_names(schema="public"):
+                    for privilege in ("USAGE", "SELECT"):
+                        if not connection.execute(
+                            text(
+                                "SELECT has_sequence_privilege(current_user, "
+                                ":sequence, :privilege)"
+                            ),
+                            {
+                                "sequence": 'public."' + name.replace('"', '""') + '"',
+                                "privilege": privilege,
+                            },
+                        ).scalar_one():
+                            raise RuntimeError("Erforderliche Sequenzrechte fehlen.")
         finally:
             engine.dispose()

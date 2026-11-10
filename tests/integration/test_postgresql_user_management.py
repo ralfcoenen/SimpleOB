@@ -216,6 +216,30 @@ def test_user_management_on_isolated_cluster(tmp_path):
                     "WHERE c.relkind='S' AND n.nspname='public' LIMIT 1), 'USAGE')"
                 )
             ).scalar_one()
+            for operating_role in ("owner_one", "user_two"):
+                assert conn.execute(
+                    text(
+                        "SELECT has_table_privilege(:role, "
+                        "'public.alembic_version', 'SELECT') "
+                        "AND NOT has_table_privilege(:role, "
+                        "'public.alembic_version', 'INSERT') "
+                        "AND NOT has_table_privilege(:role, "
+                        "'public.alembic_version', 'UPDATE') "
+                        "AND NOT has_table_privilege(:role, "
+                        "'public.alembic_version', 'DELETE')"
+                    ),
+                    {"role": operating_role},
+                ).scalar_one()
+                assert all(
+                    conn.execute(
+                        text(
+                            "SELECT has_table_privilege(:role, "
+                            "'public.mandanten', :privilege)"
+                        ),
+                        {"role": operating_role, "privilege": privilege},
+                    ).scalar_one()
+                    for privilege in ("SELECT", "INSERT", "UPDATE", "DELETE")
+                )
             assert not any(
                 conn.execute(
                     text(

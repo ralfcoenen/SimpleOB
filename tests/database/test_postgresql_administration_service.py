@@ -1004,6 +1004,16 @@ def split_role_upgrade(monkeypatch, tmp_path):
                 state.allowed = sql.endswith("true")
                 state.events.append("allow" if state.allowed else "isolate")
                 return result()
+            if sql.startswith('GRANT SELECT ON TABLE public."alembic_version"'):
+                assert url.username == "migrator"
+                state.events.append("alembic-select-grant")
+                return result()
+            if sql.startswith(
+                'REVOKE INSERT, UPDATE, DELETE ON TABLE public."alembic_version"'
+            ):
+                assert url.username == "migrator"
+                state.events.append("alembic-dml-revoke")
+                return result()
             raise AssertionError("Unerwartetes SQL: " + sql)
 
         connection.execute.side_effect = execute
@@ -1150,7 +1160,15 @@ def test_execute_migration_outdated_success_simulated(
     assert any(
         connection.engine.url.username == "operator" for connection in unit.connections
     )
-    assert unit.state.events == ["backup", "restore", "isolate", "upgrade", "allow"]
+    assert unit.state.events == [
+        "backup",
+        "restore",
+        "isolate",
+        "upgrade",
+        "alembic-select-grant",
+        "alembic-dml-revoke",
+        "allow",
+    ]
     assert unit.state.allowed and not unit.state.locked
     assert not unit.state.transaction
 

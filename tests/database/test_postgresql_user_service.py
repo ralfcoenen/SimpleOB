@@ -174,6 +174,21 @@ def test_existing_access_grants_are_transactional_and_keep_owners(config):
         'GRANT CONNECT ON DATABASE "books" TO "new_user"' == s for s in statements
     )
     assert any('ON TABLE public."buchungen"' in s for s in statements)
+    assert (
+        'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public."buchungen" TO "new_user"'
+    ) in statements
+    assert (
+        'GRANT SELECT ON TABLE public."alembic_version" TO "new_user"'
+    ) in statements
+    assert (
+        'REVOKE INSERT, UPDATE, DELETE ON TABLE public."alembic_version" '
+        'FROM "new_user"'
+    ) in statements
+    assert not any(
+        "INSERT, UPDATE, DELETE" in statement
+        and 'public."alembic_version" TO "new_user"' in statement
+        for statement in statements
+    )
     assert any("ON ALL SEQUENCES" in s for s in statements)
     assert any('ALTER DEFAULT PRIVILEGES FOR ROLE "old_owner"' in s for s in statements)
     assert not any("OWNER TO" in s or "ALTER TABLE" in s for s in statements)

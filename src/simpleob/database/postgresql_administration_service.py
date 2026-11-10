@@ -41,6 +41,9 @@ from simpleob.database.postgresql_migration_safety import (
 from simpleob.database.postgresql_restore_verification import (
     PostgreSQLRestoreVerificationService,
 )
+from simpleob.database.postgresql_runtime_privileges import (
+    enforce_read_only_alembic_version,
+)
 from simpleob.database.postgresql_session_inspection import (
     inspect_postgresql_sessions,
 )
@@ -1067,6 +1070,12 @@ class PostgreSQLAdministrationService:
                                         migration_connection,
                                         target_database,
                                     )
+                                    migration_connection.rollback()
+                                    with migration_connection.begin():
+                                        enforce_read_only_alembic_version(
+                                            migration_connection,
+                                            operating_role=self._operating_username,
+                                        )
                                     final_inspection = self._migration_service.inspect_postgresql_schema_on_connection(
                                         migration_connection
                                     )

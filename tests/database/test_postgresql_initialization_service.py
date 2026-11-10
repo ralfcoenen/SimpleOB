@@ -8,6 +8,10 @@ from simpleob.database.connection_credentials import PostgreSQLCredentials
 from simpleob.database.postgresql_initialization_service import (
     PostgreSQLInitializationService,
 )
+from simpleob.database.postgresql_runtime_privileges import (
+    enforce_read_only_alembic_version,
+    grant_application_table_privileges,
+)
 
 
 def _config(tmp_path):
@@ -167,6 +171,40 @@ def test_new_database_configuration_installs_limited_grants():
     )
     assert not any(
         'GRANT CREATE ON SCHEMA public TO "operator"' in s for s in statements
+    )
+
+
+def test_runtime_table_grants_keep_alembic_version_read_only():
+    connection = MagicMock()
+    connection.dialect.identifier_preparer.quote_identifier.side_effect = lambda value: (
+        f'"{value}"'
+    )
+
+    grant_application_table_privileges(
+        connection,
+        operating_role="operator",
+        table_names={"buchungen", "alembic_version"},
+    )
+    enforce_read_only_alembic_version(
+        connection,
+        operating_role="operator",
+    )
+
+    statements = [call.args[0] for call in connection.exec_driver_sql.call_args_list]
+    assert (
+        'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public."buchungen" TO "operator"'
+    ) in statements
+    assert (
+        'GRANT SELECT ON TABLE public."alembic_version" TO "operator"'
+    ) in statements
+    assert (
+        'REVOKE INSERT, UPDATE, DELETE ON TABLE public."alembic_version" '
+        'FROM "operator"'
+    ) in statements
+    assert not any(
+        "INSERT, UPDATE, DELETE" in statement
+        and 'public."alembic_version" TO "operator"' in statement
+        for statement in statements
     )
 
 
