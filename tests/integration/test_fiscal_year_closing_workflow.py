@@ -26,13 +26,16 @@ from simpleob.database.booking_repository import BookingRepository
 from simpleob.database.company_repository import CompanyRepository
 from simpleob.database.database import Base
 from simpleob.domain.account_type import AccountType
+from simpleob.domain.accounting_account_roles import AccountingAccountRoles
 from simpleob.domain.booking import Booking
 from simpleob.domain.booking_line import BookingLine
+from simpleob.domain.booking_type import BookingType
 from simpleob.domain.company import Company
 from simpleob.domain.entry_side import EntrySide
 from simpleob.domain.fiscal_year import FiscalYear
 from simpleob.domain.fiscal_year_status import FiscalYearStatus
 from simpleob.domain.journal import Journal
+from simpleob.domain.vat_accounts import VatAccounts
 from simpleob.hgb.balance_sheet_structure import (
     create_hgb_balance_sheet_structure,
 )
@@ -48,6 +51,9 @@ from simpleob.services.fiscal_year_closing_workflow import (
     FiscalYearClosingWorkflow,
 )
 from simpleob.services.posting_service import PostingService
+from simpleob.services.vat_reconciliation_service import (
+    VatReconciliationService,
+)
 
 
 def test_closes_fiscal_year_and_persists_closing_bookings() -> None:
@@ -765,6 +771,181 @@ def test_postgresql_closing_recalculates_stale_income_statement() -> None:
 
     finally:
         engine.dispose()
+
+
+def test_vat_reconciliation_requires_confirmation_and_fresh_snapshot() -> None:
+    """Die bestätigte Buchung wird nur für denselben gesperrten Stand gespeichert."""
+
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine)
+    company = Company(company_id=uuid4(), name="Umsatzsteuer UG")
+    fiscal_year = FiscalYear(date(2026, 1, 1), date(2026, 12, 31))
+    assets, liabilities = create_hgb_balance_sheet_structure()
+    income_statement_root = create_hgb_income_statement_structure()
+    provider = HgbFinancialStatementPositionProvider(
+        (assets, liabilities, income_statement_root)
+    )
+    csv_file = (
+        Path(__file__).resolve().parents[2]
+        / "src"
+        / "simpleob"
+        / "resources"
+        / "chart_of_accounts"
+        / "openbilanz_standard.csv"
+    )
+    chart = CsvChartOfAccountsImporter(
+        position_provider=provider,
+    ).load(csv_file)
+    vat_accounts = VatAccounts("1571", "1576", "1771", "1776")
+    roles = AccountingAccountRoles(
+        cash_accounts=frozenset(),
+        bank_accounts=frozenset(),
+        general_rate_sales_accounts=frozenset(),
+        vat_advance_payments=frozenset({"3820"}),
+        vat_current_year=frozenset({"3840"}),
+        vat_prior_year_receivables=frozenset({"1422"}),
+        vat_prior_year_payables=frozenset({"3841"}),
+    )
+    initial_bookings = (
+        Booking(
+            booking_date=date(2026, 6, 1),
+            lines=(
+                BookingLine("1000", EntrySide.DEBIT, Decimal("10000.00")),
+                BookingLine("1771", EntrySide.CREDIT, Decimal("10000.00")),
+            ),
+        ),
+        Booking(
+            booking_date=date(2026, 6, 2),
+            lines=(
+                BookingLine("1571", EntrySide.DEBIT, Decimal("4000.00")),
+                BookingLine("2000", EntrySide.CREDIT, Decimal("4000.00")),
+            ),
+        ),
+        Booking(
+            booking_date=date(2026, 6, 3),
+            lines=(
+                BookingLine("3820", EntrySide.DEBIT, Decimal("5000.00")),
+                BookingLine("1000", EntrySide.CREDIT, Decimal("5000.00")),
+            ),
+        ),
+    )
+    posting_service = PostingService()
+
+    with Session() as session:
+        company_repository = CompanyRepository(session)
+        booking_repository = BookingRepository(session)
+        company_repository.add(company)
+        company_repository.add_fiscal_year(company.company_id, fiscal_year)
+        for booking in initial_bookings:
+            booking_repository.add(
+                company_id=company.company_id,
+                fiscal_year=fiscal_year,
+                booking=booking,
+            )
+
+        source_ledger = Ledger()
+        for booking in initial_bookings:
+            posting_service.post_booking(booking=booking, ledger=source_ledger)
+        stored_bookings = booking_repository.list_for_fiscal_year(
+            company_id=company.company_id,
+            fiscal_year=fiscal_year,
+        )
+        proposal = VatReconciliationService().build_proposal(
+            bookings=stored_bookings,
+            ledger=source_ledger,
+            fiscal_year=fiscal_year,
+            vat_accounts=vat_accounts,
+            account_roles=roles,
+            chart_of_accounts=chart,
+        )
+        workflow = FiscalYearClosingWorkflow(
+            session=session,
+            booking_repository=booking_repository,
+            company_repository=company_repository,
+            closing_service=ClosingService(),
+            posting_service=posting_service,
+            statement_builder=FinancialStatementBuilder(
+                AccountMapper(chart)
+            ),
+            income_statement_position=income_statement_root,
+            account_types={
+                account.account_number: account.account_type
+                for account in chart.accounts
+            },
+        )
+
+        with pytest.raises(ValueError, match="nicht ausdrücklich bestätigt"):
+            workflow.post_vat_reconciliation(
+                company_id=company.company_id,
+                fiscal_year=fiscal_year,
+                confirmed_proposal=proposal,
+                confirmed=False,
+                vat_accounts=vat_accounts,
+                account_roles=roles,
+                chart_of_accounts=chart,
+            )
+
+        changed_booking = Booking(
+            booking_date=date(2026, 12, 20),
+            lines=(
+                BookingLine("1576", EntrySide.DEBIT, Decimal("10.00")),
+                BookingLine("2000", EntrySide.CREDIT, Decimal("10.00")),
+            ),
+        )
+        booking_repository.add(
+            company_id=company.company_id,
+            fiscal_year=fiscal_year,
+            booking=changed_booking,
+        )
+        with pytest.raises(ValueError, match="Buchungsstand hat sich"):
+            workflow.post_vat_reconciliation(
+                company_id=company.company_id,
+                fiscal_year=fiscal_year,
+                confirmed_proposal=proposal,
+                confirmed=True,
+                vat_accounts=vat_accounts,
+                account_roles=roles,
+                chart_of_accounts=chart,
+            )
+
+        after_stale_attempt = booking_repository.list_for_fiscal_year(
+            company_id=company.company_id,
+            fiscal_year=fiscal_year,
+        )
+        assert not any(
+            (booking.description or "").startswith(
+                "Umsatzsteuerverrechnung Konto"
+            )
+            for booking in after_stale_attempt
+        )
+
+        current_ledger = Ledger()
+        for booking in after_stale_attempt:
+            posting_service.post_booking(booking=booking, ledger=current_ledger)
+        current_proposal = VatReconciliationService().build_proposal(
+            bookings=after_stale_attempt,
+            ledger=current_ledger,
+            fiscal_year=fiscal_year,
+            vat_accounts=vat_accounts,
+            account_roles=roles,
+            chart_of_accounts=chart,
+        )
+        posted = workflow.post_vat_reconciliation(
+            company_id=company.company_id,
+            fiscal_year=fiscal_year,
+            confirmed_proposal=current_proposal,
+            confirmed=True,
+            vat_accounts=vat_accounts,
+            account_roles=roles,
+            chart_of_accounts=chart,
+        )
+
+        assert len(posted) == 4
+        assert all(booking.is_balanced for booking in posted)
+        assert all(booking.booking_type is BookingType.REGULAR for booking in posted)
+
+    engine.dispose()
 
 
 

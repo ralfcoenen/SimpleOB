@@ -28,6 +28,7 @@ class ClosingFrame(QWidget):
         on_close: Callable[[], None],
         on_edit_profit_appropriation: Callable[[], None],
         on_post_previous_profit_appropriation: Callable[[], None],
+        on_vat_reconciliation: Callable[[], None] | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -40,6 +41,7 @@ class ClosingFrame(QWidget):
         self._on_post_previous_profit_appropriation = (
             on_post_previous_profit_appropriation
         )
+        self._on_vat_reconciliation = on_vat_reconciliation
 
         self._create_ui()
 
@@ -90,6 +92,17 @@ class ClosingFrame(QWidget):
             self._on_validate
         )
         buttons_layout.addWidget(self._validate_button)
+
+        self._vat_reconciliation_button = QPushButton(
+            "Umsatzsteuerverrechnung vorschlagen"
+        )
+        if self._on_vat_reconciliation is not None:
+            self._vat_reconciliation_button.clicked.connect(
+                self._on_vat_reconciliation
+            )
+        else:
+            self._vat_reconciliation_button.setEnabled(False)
+        buttons_layout.addWidget(self._vat_reconciliation_button)
 
         self._close_button = QPushButton(
             "Geschäftsjahr abschließen"
@@ -165,10 +178,14 @@ class ClosingFrame(QWidget):
         if status is FiscalYearStatus.OPEN:
             text = "Geschäftsjahr: Offen"
             self._validate_button.setEnabled(True)
+            self._vat_reconciliation_button.setEnabled(
+                self._on_vat_reconciliation is not None
+            )
             self._close_button.setEnabled(False)
         else:
             text = "Geschäftsjahr: Abgeschlossen"
             self._validate_button.setEnabled(False)
+            self._vat_reconciliation_button.setEnabled(False)
             self._close_button.setEnabled(False)
 
         self._fiscal_year_status_label.setText(text)

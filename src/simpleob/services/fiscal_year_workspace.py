@@ -170,6 +170,10 @@ from simpleob.services.taxonomy_management_service import (
     TaxonomyManagementService,
     TaxonomyStatus,
 )
+from simpleob.services.vat_reconciliation_service import (
+    VatReconciliationProposal,
+    VatReconciliationService,
+)
 from simpleob.taxonomy.arelle_adapter import (
     ArelleValidationResult,
 )
@@ -213,6 +217,7 @@ class FiscalYearWorkspace:
         posting_service: PostingService,
         reporting_service: ReportingService | None = None,
         closing_workflow: FiscalYearClosingWorkflow,
+        vat_reconciliation_service: VatReconciliationService | None = None,
         closing_consistency_service: ClosingConsistencyService,
         e_bilanz_preparation_service: EBilanzPreparationService,
         e_bilanz_service: EBilanzService,
@@ -281,6 +286,9 @@ class FiscalYearWorkspace:
             else ReportingService()
         )
         self._closing_workflow = closing_workflow
+        self._vat_reconciliation_service = (
+            vat_reconciliation_service or VatReconciliationService()
+        )
         self._closing_consistency_service = closing_consistency_service
 
         self._journal = Journal()
@@ -1123,6 +1131,53 @@ class FiscalYearWorkspace:
             balances=balances,
             mapper=mapper,
         )
+
+    def build_vat_reconciliation_proposal(
+        self,
+        *,
+        chart_of_accounts: ChartOfAccountsTemplate,
+    ) -> VatReconciliationProposal:
+        """Ermittelt eine unverbindliche Umsatzsteuerverrechnungsvorschau."""
+
+        _control_accounts, vat_accounts, account_roles = (
+            self.load_account_configuration()
+        )
+        bookings = self._booking_repository.list_for_fiscal_year(
+            company_id=self._context.company.company_id,
+            fiscal_year=self._context.fiscal_year,
+        )
+        return self._vat_reconciliation_service.build_proposal(
+            bookings=bookings,
+            ledger=self._ledger,
+            fiscal_year=self._context.fiscal_year,
+            vat_accounts=vat_accounts,
+            account_roles=account_roles,
+            chart_of_accounts=chart_of_accounts,
+        )
+
+    def confirm_vat_reconciliation(
+        self,
+        *,
+        proposal: VatReconciliationProposal,
+        chart_of_accounts: ChartOfAccountsTemplate,
+        confirmed: bool,
+    ) -> tuple[Booking, ...]:
+        """Bestätigt und speichert die Vorschau unter der Jahressperre."""
+
+        _control_accounts, vat_accounts, account_roles = (
+            self.load_account_configuration()
+        )
+        booking = self._closing_workflow.post_vat_reconciliation(
+            company_id=self._context.company.company_id,
+            fiscal_year=self._context.fiscal_year,
+            confirmed_proposal=proposal,
+            confirmed=confirmed,
+            vat_accounts=vat_accounts,
+            account_roles=account_roles,
+            chart_of_accounts=chart_of_accounts,
+        )
+        self.reload()
+        return booking
 
     def list_shareholders(
         self,

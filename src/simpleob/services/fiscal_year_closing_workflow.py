@@ -17,15 +17,22 @@ from simpleob.accounting.ledger import Ledger
 from simpleob.database.booking_repository import BookingRepository
 from simpleob.database.company_repository import CompanyRepository
 from simpleob.domain.account_type import AccountType
+from simpleob.domain.accounting_account_roles import AccountingAccountRoles
+from simpleob.domain.booking import Booking
 from simpleob.domain.booking_type import BookingType
 from simpleob.domain.chart_of_accounts_template import (
     ChartOfAccountsTemplate,
 )
 from simpleob.domain.fiscal_year import FiscalYear
 from simpleob.domain.money import ZERO
+from simpleob.domain.vat_accounts import VatAccounts
 from simpleob.services.closing_result import ClosingResult
 from simpleob.services.closing_service import ClosingService
 from simpleob.services.posting_service import PostingService
+from simpleob.services.vat_reconciliation_service import (
+    VatReconciliationProposal,
+    VatReconciliationService,
+)
 
 
 class FiscalYearClosingWorkflow:
@@ -42,6 +49,7 @@ class FiscalYearClosingWorkflow:
         statement_builder: FinancialStatementBuilder | None = None,
         income_statement_position: FinancialStatementPosition | None = None,
         account_types: dict[str, AccountType] | None = None,
+        vat_reconciliation_service: VatReconciliationService | None = None,
     ) -> None:
         self._session = session
         self._booking_repository = booking_repository
@@ -67,6 +75,87 @@ class FiscalYearClosingWorkflow:
         self._statement_builder = statement_builder
         self._income_statement_position = income_statement_position
         self._account_types = account_types
+        self._vat_reconciliation_service = (
+            vat_reconciliation_service or VatReconciliationService()
+        )
+
+    def post_vat_reconciliation(
+        self,
+        *,
+        company_id: UUID,
+        fiscal_year: FiscalYear,
+        confirmed_proposal: VatReconciliationProposal,
+        confirmed: bool,
+        vat_accounts: VatAccounts,
+        account_roles: AccountingAccountRoles,
+        chart_of_accounts: ChartOfAccountsTemplate,
+    ) -> tuple[Booking, ...]:
+        """Speichert einen bestätigten Vorschlag nach gesperrter Neuberechnung."""
+
+        if confirmed is not True:
+            raise ValueError(
+                "Die Umsatzsteuerverrechnung wurde nicht ausdrücklich "
+                "bestätigt."
+            )
+        if self._posting_service is None:
+            raise RuntimeError(
+                "Für die Umsatzsteuerverrechnung ist die transaktionale "
+                "Hauptbuch-Neuberechnung nicht konfiguriert."
+            )
+
+        try:
+            self._company_repository.lock_open_fiscal_year(
+                company_id,
+                fiscal_year,
+            )
+            bookings = self._booking_repository.list_for_fiscal_year(
+                company_id=company_id,
+                fiscal_year=fiscal_year,
+            )
+            ledger = Ledger()
+            for booking in bookings:
+                if booking.booking_type is BookingType.CLOSING:
+                    raise ValueError(
+                        "Das Geschäftsjahr enthält bereits "
+                        "Abschlussbuchungen."
+                    )
+                self._posting_service.post_booking(
+                    booking=booking,
+                    ledger=ledger,
+                )
+
+            current_proposal = (
+                self._vat_reconciliation_service.build_proposal(
+                    bookings=bookings,
+                    ledger=ledger,
+                    fiscal_year=fiscal_year,
+                    vat_accounts=vat_accounts,
+                    account_roles=account_roles,
+                    chart_of_accounts=chart_of_accounts,
+                )
+            )
+            if current_proposal.snapshot != confirmed_proposal.snapshot:
+                raise ValueError(
+                    "Der Buchungsstand hat sich seit der Vorschau geändert. "
+                    "Bitte erstellen und prüfen Sie einen neuen Vorschlag."
+                )
+
+            if not current_proposal.bookings:
+                self._session.commit()
+                return ()
+
+            for booking in current_proposal.bookings:
+                self._booking_repository.add(
+                    company_id=company_id,
+                    fiscal_year=fiscal_year,
+                    booking=booking,
+                    commit=False,
+                )
+            self._session.commit()
+            return current_proposal.bookings
+        except Exception:
+            self._session.rollback()
+            raise
 
     def close(
         self,

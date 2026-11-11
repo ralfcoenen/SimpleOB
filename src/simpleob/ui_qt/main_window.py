@@ -109,6 +109,9 @@ from simpleob.services.pdf_reporting_service import PdfReportingService
 from simpleob.services.receivable_invoice_posting_service import (
     ReceivableInvoicePostingService,
 )
+from simpleob.services.vat_reconciliation_service import (
+    VatReconciliationProposal,
+)
 from simpleob.ui_qt.account_configuration_dialog import (
     AccountConfigurationDialog,
 )
@@ -1851,6 +1854,7 @@ class MainWindow(QMainWindow):
             on_post_previous_profit_appropriation=(
                 self._post_previous_profit_appropriation
             ),
+            on_vat_reconciliation=self._propose_vat_reconciliation,
             parent=self._closing_tab,
         )
 
@@ -4788,6 +4792,128 @@ class MainWindow(QMainWindow):
         )
 
         self._closing_frame.update_consistency(result)
+
+    def _propose_vat_reconciliation(self) -> None:
+        """Zeigt und bestätigt einen Hauptbuch-basierten Vorschlag."""
+
+        if self._workspace.is_closed:
+            return
+
+        try:
+            proposal = self._workspace.build_vat_reconciliation_proposal(
+                chart_of_accounts=self._chart_of_accounts,
+            )
+        except (ValueError, RuntimeError) as exc:
+            QMessageBox.warning(
+                self,
+                "Umsatzsteuerverrechnung nicht möglich",
+                str(exc),
+            )
+            return
+
+        details = self._vat_reconciliation_proposal_text(proposal)
+        details += (
+            "\n\nHinweis: Die Berechnung verwendet ausschließlich "
+            "vorhandene Hauptbuchsalden. Bitte prüfen Sie selbst die "
+            "sachliche und zeitliche Zuordnung der Vorauszahlungen und "
+            "Erstattungen zum angezeigten Geschäftsjahr."
+        )
+        if not proposal.bookings:
+            QMessageBox.information(
+                self,
+                "Umsatzsteuerverrechnung",
+                details + "\n\nEs ist keine weitere Buchung erforderlich.",
+            )
+            return
+
+        answer = QMessageBox.question(
+            self,
+            "Umsatzsteuerverrechnung bestätigen",
+            details
+            + "\n\nSoll dieser Buchungsvorschlag jetzt gespeichert werden?",
+            QMessageBox.StandardButton.Yes
+            | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+
+        try:
+            bookings = self._workspace.confirm_vat_reconciliation(
+                proposal=proposal,
+                chart_of_accounts=self._chart_of_accounts,
+                confirmed=True,
+            )
+        except (ValueError, DatabaseLockError, RuntimeError) as exc:
+            QMessageBox.warning(
+                self,
+                "Umsatzsteuerverrechnung nicht gespeichert",
+                str(exc),
+            )
+            return
+
+        self._refresh_journal()
+        self._refresh_balance_sheet()
+        self._refresh_closing()
+        if not bookings:
+            QMessageBox.information(
+                self,
+                "Umsatzsteuerverrechnung",
+                "Der Buchungsstand ist bereits ausgeglichen.",
+            )
+        else:
+            QMessageBox.information(
+                self,
+                "Umsatzsteuerverrechnung",
+                "Die bestätigte Umsatzsteuerverrechnung wurde gebucht.",
+            )
+
+    @staticmethod
+    def _vat_reconciliation_proposal_text(
+        proposal: VatReconciliationProposal,
+    ) -> str:
+        lines = [
+            f"Geschäftsjahr {proposal.fiscal_year.display_name}",
+            "",
+            "Kontensalden (Soll / Haben; Eröffnungsanteil):",
+        ]
+        for balance in proposal.account_balances:
+            lines.append(
+                f"{balance.account_number} {balance.account_name}: "
+                f"{balance.debit_balance:.2f} € / "
+                f"{balance.credit_balance:.2f} €; Eröffnung "
+                f"{balance.opening_balance:.2f} €"
+            )
+
+        lines.extend(("", "Buchungsvorschlag:"))
+        if not proposal.bookings:
+            lines.append("Keine Verrechnungsbuchung erforderlich.")
+        else:
+            for booking in proposal.bookings:
+                lines.append(f"{booking.description}:")
+                for line in booking.lines:
+                    side = "Soll" if line.side is EntrySide.DEBIT else "Haben"
+                    lines.append(
+                        f"  {side} {line.account_number}: "
+                        f"{line.amount:.2f} €"
+                    )
+
+        amount = proposal.resulting_clearing_balance
+        if amount > ZERO:
+            result = f"Forderung: {amount:.2f} € Sollsaldo"
+        elif amount < ZERO:
+            result = f"Verbindlichkeit: {-amount:.2f} € Habensaldo"
+        else:
+            result = "Ergebnis: ausgeglichen"
+        lines.extend(
+            (
+                "",
+                f"Vorhandener Saldo Verrechnungskonto: "
+                f"{proposal.existing_clearing_balance:.2f} €",
+                f"Ergebnis nach Vorschlag: {result}",
+            )
+        )
+        return "\n".join(lines)
 
     def _close_fiscal_year(self) -> None:
         """Schließt das Geschäftsjahr persistent ab."""
