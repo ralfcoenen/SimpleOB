@@ -44,6 +44,7 @@ from simpleob.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
 from simpleob.accounting.income_statement import IncomeStatement
+from simpleob.amount_input import format_german_amount
 from simpleob.client_transfer.archive import (
     write_client_transfer_archive,
 )
@@ -67,6 +68,7 @@ from simpleob.domain.chart_of_accounts_template import (
 from simpleob.domain.credit_note import CreditNoteKind
 from simpleob.domain.elster_data_supplier import ElsterDataSupplier
 from simpleob.domain.entry_side import EntrySide
+from simpleob.domain.errors import UnknownAccountError
 from simpleob.domain.fiscal_year_status import FiscalYearStatus
 from simpleob.domain.vat_accounts import VatAccounts
 from simpleob.eric.elster_bilanz_transmission_service import (
@@ -108,9 +110,6 @@ from simpleob.services.payment_allocation_correction_service import (
 from simpleob.services.pdf_reporting_service import PdfReportingService
 from simpleob.services.receivable_invoice_posting_service import (
     ReceivableInvoicePostingService,
-)
-from simpleob.services.vat_reconciliation_service import (
-    VatReconciliationProposal,
 )
 from simpleob.ui_qt.account_configuration_dialog import (
     AccountConfigurationDialog,
@@ -171,6 +170,9 @@ from simpleob.ui_qt.tax_depreciation_adjustment_dialog import (
 from simpleob.ui_qt.vat_booking_frame import (
     ResponsiveBookingSplitter,
     VatBookingFrame,
+)
+from simpleob.ui_qt.vat_reconciliation_preview_dialog import (
+    VatReconciliationPreviewDialog,
 )
 
 ZERO = Decimal("0.00")
@@ -4803,6 +4805,14 @@ class MainWindow(QMainWindow):
             proposal = self._workspace.build_vat_reconciliation_proposal(
                 chart_of_accounts=self._chart_of_accounts,
             )
+            _control_accounts, _vat_accounts, account_roles = (
+                self._workspace.load_account_configuration()
+            )
+            if len(account_roles.vat_current_year) != 1:
+                raise ValueError(
+                    "Das Umsatzsteuer-Verrechnungskonto ist nicht eindeutig konfiguriert."
+                )
+            clearing_account_number = next(iter(account_roles.vat_current_year))
         except (ValueError, RuntimeError) as exc:
             QMessageBox.warning(
                 self,
@@ -4811,31 +4821,14 @@ class MainWindow(QMainWindow):
             )
             return
 
-        details = self._vat_reconciliation_proposal_text(proposal)
-        details += (
-            "\n\nHinweis: Die Berechnung verwendet ausschließlich "
-            "vorhandene Hauptbuchsalden. Bitte prüfen Sie selbst die "
-            "sachliche und zeitliche Zuordnung der Vorauszahlungen und "
-            "Erstattungen zum angezeigten Geschäftsjahr."
-        )
-        if not proposal.bookings:
-            QMessageBox.information(
-                self,
-                "Umsatzsteuerverrechnung",
-                details + "\n\nEs ist keine weitere Buchung erforderlich.",
-            )
-            return
-
-        answer = QMessageBox.question(
+        dialog = VatReconciliationPreviewDialog(
             self,
-            "Umsatzsteuerverrechnung bestätigen",
-            details
-            + "\n\nSoll dieser Buchungsvorschlag jetzt gespeichert werden?",
-            QMessageBox.StandardButton.Yes
-            | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
+            proposal=proposal,
+            clearing_account_number=clearing_account_number,
         )
-        if answer != QMessageBox.StandardButton.Yes:
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        if not proposal.bookings:
             return
 
         try:
@@ -4868,53 +4861,6 @@ class MainWindow(QMainWindow):
                 "Die bestätigte Umsatzsteuerverrechnung wurde gebucht.",
             )
 
-    @staticmethod
-    def _vat_reconciliation_proposal_text(
-        proposal: VatReconciliationProposal,
-    ) -> str:
-        lines = [
-            f"Geschäftsjahr {proposal.fiscal_year.display_name}",
-            "",
-            "Kontensalden (Soll / Haben; Eröffnungsanteil):",
-        ]
-        for balance in proposal.account_balances:
-            lines.append(
-                f"{balance.account_number} {balance.account_name}: "
-                f"{balance.debit_balance:.2f} € / "
-                f"{balance.credit_balance:.2f} €; Eröffnung "
-                f"{balance.opening_balance:.2f} €"
-            )
-
-        lines.extend(("", "Buchungsvorschlag:"))
-        if not proposal.bookings:
-            lines.append("Keine Verrechnungsbuchung erforderlich.")
-        else:
-            for booking in proposal.bookings:
-                lines.append(f"{booking.description}:")
-                for line in booking.lines:
-                    side = "Soll" if line.side is EntrySide.DEBIT else "Haben"
-                    lines.append(
-                        f"  {side} {line.account_number}: "
-                        f"{line.amount:.2f} €"
-                    )
-
-        amount = proposal.resulting_clearing_balance
-        if amount > ZERO:
-            result = f"Forderung: {amount:.2f} € Sollsaldo"
-        elif amount < ZERO:
-            result = f"Verbindlichkeit: {-amount:.2f} € Habensaldo"
-        else:
-            result = "Ergebnis: ausgeglichen"
-        lines.extend(
-            (
-                "",
-                f"Vorhandener Saldo Verrechnungskonto: "
-                f"{proposal.existing_clearing_balance:.2f} €",
-                f"Ergebnis nach Vorschlag: {result}",
-            )
-        )
-        return "\n".join(lines)
-
     def _close_fiscal_year(self) -> None:
         """Schließt das Geschäftsjahr persistent ab."""
 
@@ -4923,6 +4869,46 @@ class MainWindow(QMainWindow):
 
         if self._current_income_statement is None:
             return
+
+        vat_balances = self._unreconciled_vat_source_balances()
+        if vat_balances:
+            details = "\n".join(
+                f"{number} · {name}: {side} {format_german_amount(amount)} €"
+                for number, name, side, amount in vat_balances
+            )
+            warning = QMessageBox(self)
+            warning.setIcon(QMessageBox.Icon.Warning)
+            warning.setWindowTitle("Umsatzsteuerkonten nicht verrechnet")
+            warning.setText(
+                "Auf Umsatzsteuer-, Vorsteuer- oder Vorauszahlungskonten "
+                "bestehen noch Salden."
+            )
+            warning.setInformativeText(
+                f"{details}\n\n"
+                "Sie können zuerst die Umsatzsteuerverrechnung aufrufen, "
+                "den Jahresabschluss bewusst ohne Verrechnung fortsetzen "
+                "oder abbrechen."
+            )
+            reconcile_button = warning.addButton(
+                "Umsatzsteuerverrechnung aufrufen",
+                QMessageBox.ButtonRole.ActionRole,
+            )
+            continue_button = warning.addButton(
+                "Ohne Verrechnung fortfahren",
+                QMessageBox.ButtonRole.AcceptRole,
+            )
+            abort_button = warning.addButton(
+                "Abbrechen",
+                QMessageBox.ButtonRole.RejectRole,
+            )
+            warning.setDefaultButton(abort_button)
+            warning.exec()
+
+            if warning.clickedButton() is reconcile_button:
+                self._propose_vat_reconciliation()
+                return
+            if warning.clickedButton() is not continue_button:
+                return
 
         answer = QMessageBox.question(
             self,
@@ -4968,6 +4954,49 @@ class MainWindow(QMainWindow):
             "Jahresabschluss",
             "Das Geschäftsjahr wurde erfolgreich abgeschlossen.",
         )
+
+    def _unreconciled_vat_source_balances(
+        self,
+    ) -> tuple[tuple[str, str, str, Decimal], ...]:
+        """Liefert nicht ausgeglichene Quellkonten der USt-Verrechnung."""
+
+        try:
+            _control_accounts, vat_accounts, account_roles = (
+                self._workspace.load_account_configuration()
+            )
+        except (RuntimeError, ValueError):
+            # Die optionale Prüfung darf Mandanten ohne Umsatzsteuer-
+            # Kontenkonfiguration nicht am Jahresabschluss hindern.
+            return ()
+
+        source_accounts = (
+            vat_accounts.account_numbers
+            | account_roles.vat_advance_payments
+        )
+        balances: list[tuple[str, str, str, Decimal]] = []
+        for account_number in sorted(source_accounts):
+            if not self._workspace.ledger.has_account(account_number):
+                continue
+
+            balance = self._workspace.ledger.get_account(account_number)
+            if balance.debit_balance:
+                amount = balance.debit_balance
+                side = "Sollsaldo"
+            elif balance.credit_balance:
+                amount = balance.credit_balance
+                side = "Habensaldo"
+            else:
+                continue
+
+            try:
+                account_name = self._chart_of_accounts.account(
+                    account_number
+                ).name
+            except UnknownAccountError:
+                account_name = "Kontobezeichnung nicht verfügbar"
+            balances.append((account_number, account_name, side, amount))
+
+        return tuple(balances)
 
     def _refresh_after_closing(self) -> None:
         """Aktualisiert die für den Jahresabschluss relevanten Daten."""

@@ -223,3 +223,36 @@ def test_same_bookings_produce_no_duplicate_after_proposal_is_posted() -> None:
 
     assert not second.bookings
     assert second.resulting_clearing_balance == Decimal("-1000.00")
+
+
+def test_later_vat_booking_is_included_in_a_new_reconciliation_proposal() -> None:
+    ledger = Ledger()
+    _post(ledger, "1000", "1771", "10000.00")
+    _post(ledger, "1571", "2000", "4000.00")
+    _post(ledger, "3820", "1000", "5000.00")
+    service = VatReconciliationService()
+    initial = service.build_proposal(
+        bookings=(),
+        ledger=ledger,
+        fiscal_year=FISCAL_YEAR,
+        vat_accounts=VAT_ACCOUNTS,
+        account_roles=ROLES,
+        chart_of_accounts=CHART,
+    )
+    for booking in initial.bookings:
+        PostingService().post_booking(booking=booking, ledger=ledger)
+
+    _post(ledger, "1000", "1771", "250.00")
+    later = service.build_proposal(
+        bookings=initial.bookings,
+        ledger=ledger,
+        fiscal_year=FISCAL_YEAR,
+        vat_accounts=VAT_ACCOUNTS,
+        account_roles=ROLES,
+        chart_of_accounts=CHART,
+    )
+
+    assert len(later.bookings) == 1
+    assert later.bookings[0].debit_total == Decimal("250.00")
+    assert later.bookings[0].credit_total == Decimal("250.00")
+    assert later.resulting_clearing_balance == Decimal("-1250.00")

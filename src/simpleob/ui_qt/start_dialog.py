@@ -1,6 +1,7 @@
 """PySide6-Startdialog für SimpleOB."""
 
 from collections.abc import Callable
+from datetime import timedelta
 from pathlib import Path
 
 from PySide6.QtWidgets import (
@@ -31,7 +32,9 @@ from simpleob.core.config import (
     save_database_configuration,
 )
 from simpleob.core.context import ApplicationContext
+from simpleob.database.booking_repository import BookingRepository
 from simpleob.database.company_repository import CompanyRepository
+from simpleob.domain.booking_type import BookingType
 from simpleob.domain.company import Company
 from simpleob.domain.fiscal_year import FiscalYear
 from simpleob.importers.chart_of_accounts_template_bundle_importer import (
@@ -54,6 +57,7 @@ class StartDialog(QDialog):
         self,
         *,
         repository: CompanyRepository,
+        booking_repository: BookingRepository | None = None,
         config: ApplicationConfig,
         import_client_transfer: (
             Callable[[ClientTransfer], None] | None
@@ -72,6 +76,7 @@ class StartDialog(QDialog):
         self._config = config
 
         self._repository = repository
+        self._booking_repository = booking_repository
         self._import_client_transfer = import_client_transfer
         self._delete_client = delete_client
         self._taxonomy_choices_provider = taxonomy_choices_provider
@@ -139,6 +144,9 @@ class StartDialog(QDialog):
         )
 
         self._fiscal_year_box = QComboBox()
+        self._fiscal_year_box.currentIndexChanged.connect(
+            self._refresh_opening_transfer_button
+        )
         form_layout.addRow(
             "Geschäftsjahr",
             self._fiscal_year_box,
@@ -191,6 +199,15 @@ class StartDialog(QDialog):
         button_layout.addWidget(
             self._new_fiscal_year_button
         )
+
+        self._opening_transfer_button = QPushButton(
+            "Vorjahressalden übernehmen"
+        )
+        self._opening_transfer_button.setEnabled(False)
+        self._opening_transfer_button.clicked.connect(
+            self._request_opening_transfer
+        )
+        button_layout.addWidget(self._opening_transfer_button)
 
         database_button = QPushButton(
             "Datenbank wechseln …"
@@ -261,6 +278,7 @@ class StartDialog(QDialog):
             self._fiscal_year_box.clear()
             self._fiscal_year_by_display_name = {}
             self._new_fiscal_year_button.setEnabled(False)
+            self._opening_transfer_button.setEnabled(False)
             self._open_button.setEnabled(False)
             return
 
@@ -308,10 +326,12 @@ class StartDialog(QDialog):
                 "noch kein Geschäftsjahr vorhanden."
             )
             self._open_button.setEnabled(False)
+            self._opening_transfer_button.setEnabled(False)
             return
 
         self._status_label.clear()
         self._open_button.setEnabled(True)
+        self._refresh_opening_transfer_button()
 
     def _selected_company(
         self,
@@ -328,6 +348,106 @@ class StartDialog(QDialog):
         return self._fiscal_year_by_display_name.get(
             self._fiscal_year_box.currentText()
         )
+
+    def _eligible_opening_transfer(
+        self,
+    ) -> tuple[FiscalYear, FiscalYear] | None:
+        """Liefert Ziel- und Quelljahr, falls eine Übernahme möglich ist."""
+
+        company = self._selected_company()
+        target_fiscal_year = self._selected_fiscal_year()
+        if (
+            company is None
+            or target_fiscal_year is None
+            or self._booking_repository is None
+        ):
+            return None
+
+        managed_fiscal_years = self._repository.get_managed_fiscal_years(
+            company.company_id
+        )
+        managed_by_year = {
+            managed.fiscal_year: managed
+            for managed in managed_fiscal_years
+        }
+        target = managed_by_year.get(target_fiscal_year)
+        if (
+            target is None
+            or not target.is_open
+            or target.has_opening_source
+        ):
+            return None
+
+        predecessor_end = target_fiscal_year.start_date - timedelta(days=1)
+        source = next(
+            (
+                managed
+                for managed in managed_fiscal_years
+                if managed.fiscal_year.end_date == predecessor_end
+            ),
+            None,
+        )
+        if source is None or not source.is_closed:
+            return None
+
+        existing_bookings = self._booking_repository.list_for_fiscal_year(
+            company_id=company.company_id,
+            fiscal_year=target_fiscal_year,
+        )
+        if any(
+            booking.booking_type is BookingType.OPENING
+            for booking in existing_bookings
+        ):
+            return None
+
+        return target_fiscal_year, source.fiscal_year
+
+    def _refresh_opening_transfer_button(
+        self,
+        _index: int = -1,
+    ) -> None:
+        """Aktualisiert die Verfügbarkeit der Übernahmeaktion."""
+
+        self._opening_transfer_button.setEnabled(
+            self._eligible_opening_transfer() is not None
+        )
+
+    def _request_opening_transfer(self) -> None:
+        """Bestätigt und beauftragt die nachträgliche Saldenübernahme."""
+
+        request = self._eligible_opening_transfer()
+        if request is None:
+            self._refresh_opening_transfer_button()
+            return
+
+        target_fiscal_year, source_fiscal_year = request
+        decision = QMessageBox.question(
+            self,
+            "Vorjahressalden übernehmen",
+            (
+                f"Quellgeschäftsjahr: {source_fiscal_year.display_name}\n"
+                f"Zielgeschäftsjahr: {target_fiscal_year.display_name}\n\n"
+                "Die Schlussbilanzsalden des Vorjahres werden als "
+                "Eröffnungsbuchungen in das Zielgeschäftsjahr übernommen.\n\n"
+                "Möchten Sie fortfahren?"
+            ),
+            QMessageBox.StandardButton.Yes
+            | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Cancel,
+        )
+        if decision != QMessageBox.StandardButton.Yes:
+            return
+
+        company = self._selected_company()
+        if company is None:
+            return
+
+        self.opening_transfer_request = request
+        self.result = ApplicationContext(
+            company=company,
+            fiscal_year=target_fiscal_year,
+        )
+        self.accept()
 
     def _open(self) -> None:
         """Erzeugt den Anwendungskontext."""

@@ -233,6 +233,58 @@ def _stage_new_company_chart_initialization(
     )
 
 
+def _execute_opening_transfer_request(
+    *,
+    opening_transfer_request,
+    context,
+    session,
+    booking_repository,
+    company_repository,
+    posting_service,
+    account_types,
+    account_roles,
+    chart_of_accounts,
+    control_accounts,
+) -> None:
+    """Führt einen ausdrücklich angeforderten Saldovortrag aus."""
+
+    if opening_transfer_request is None:
+        return
+
+    target_fiscal_year, source_fiscal_year = opening_transfer_request
+    if target_fiscal_year != context.fiscal_year:
+        raise RuntimeError(
+            "Das für die Saldenübernahme vorgesehene Geschäftsjahr "
+            "stimmt nicht mit dem ausgewählten Geschäftsjahr überein."
+        )
+
+    transfer_service = FiscalYearTransferService(
+        opening_balance_account_number=(
+            control_accounts.opening_balance_account
+        ),
+        profit_account_number=control_accounts.profit_account,
+        loss_account_number=control_accounts.loss_account,
+        profit_loss_carryforward_account_number=(
+            control_accounts.profit_loss_carryforward_account
+        ),
+    )
+    opening_workflow = FiscalYearOpeningWorkflow(
+        session=session,
+        booking_repository=booking_repository,
+        company_repository=company_repository,
+        transfer_service=transfer_service,
+        posting_service=posting_service,
+    )
+    opening_workflow.open(
+        company_id=context.company.company_id,
+        source_fiscal_year=source_fiscal_year,
+        target_fiscal_year=target_fiscal_year,
+        account_types=account_types,
+        account_roles=account_roles,
+        chart_of_accounts=chart_of_accounts,
+    )
+
+
 def _load_application_config():
     """Lädt die Konfiguration passend zur Ausführungsumgebung."""
 
@@ -898,6 +950,7 @@ def main() -> None:
         while True:
             dialog = StartDialog(
                 repository=company_repository,
+                booking_repository=booking_repository,
                 config=config,
                 import_client_transfer=(
                     import_client_transfer
@@ -1046,54 +1099,20 @@ def main() -> None:
                 )
             )
 
-            if opening_transfer_request is not None:
-                (
-                    target_fiscal_year,
-                    source_fiscal_year,
-                ) = opening_transfer_request
-
-                if target_fiscal_year != context.fiscal_year:
-                    raise RuntimeError(
-                        "Das für die Saldenübernahme "
-                        "vorgesehene Geschäftsjahr stimmt "
-                        "nicht mit dem ausgewählten "
-                        "Geschäftsjahr überein."
-                    )
-
-                transfer_service = FiscalYearTransferService(
-                    opening_balance_account_number=(
-                        control_accounts.opening_balance_account
-                    ),
-                    profit_account_number=(
-                        control_accounts.profit_account
-                    ),
-                    loss_account_number=(
-                        control_accounts.loss_account
-                    ),
-                    profit_loss_carryforward_account_number=(
-                        control_accounts
-                        .profit_loss_carryforward_account
-                    ),
-                )
-
-                opening_workflow = FiscalYearOpeningWorkflow(
-                    session=session,
-                    booking_repository=booking_repository,
-                    company_repository=company_repository,
-                    transfer_service=transfer_service,
-                    posting_service=posting_service,
-                )
-
-                opening_workflow.open(
-                    company_id=context.company.company_id,
-                    source_fiscal_year=source_fiscal_year,
-                    target_fiscal_year=target_fiscal_year,
-                    account_types=(
-                        financial_statement_context.account_types
-                    ),
-                    account_roles=account_roles,
-                    chart_of_accounts=chart_of_accounts,
-                )
+            _execute_opening_transfer_request(
+                opening_transfer_request=opening_transfer_request,
+                context=context,
+                session=session,
+                booking_repository=booking_repository,
+                company_repository=company_repository,
+                posting_service=posting_service,
+                account_types=(
+                    financial_statement_context.account_types
+                ),
+                account_roles=account_roles,
+                chart_of_accounts=chart_of_accounts,
+                control_accounts=control_accounts,
+            )
 
             closing_accounts = ClosingAccounts(
                 income_summary_account=(
