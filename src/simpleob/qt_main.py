@@ -1005,6 +1005,12 @@ def main() -> None:
                 )
             )
 
+            account_roles = (
+                chart_of_accounts_repository.load_account_roles(
+                    context.company.company_id
+                )
+            )
+
             if vat_accounts is None:
                 raise RuntimeError(
                     "Die Umsatzsteuerkonten des Unternehmens "
@@ -1014,6 +1020,12 @@ def main() -> None:
             if control_accounts is None:
                 raise RuntimeError(
                     "Die technischen Konten des Unternehmens "
+                    "konnten nicht geladen werden."
+                )
+
+            if account_roles is None:
+                raise RuntimeError(
+                    "Die Kontenrollen des Unternehmens "
                     "konnten nicht geladen werden."
                 )
 
@@ -1079,6 +1091,8 @@ def main() -> None:
                     account_types=(
                         financial_statement_context.account_types
                     ),
+                    account_roles=account_roles,
+                    chart_of_accounts=chart_of_accounts,
                 )
 
             closing_accounts = ClosingAccounts(

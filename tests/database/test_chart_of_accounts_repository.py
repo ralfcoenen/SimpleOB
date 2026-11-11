@@ -6,6 +6,9 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from simpleob.accounting.financial_statement_context import (
+    create_standard_financial_statement_context,
+)
 from simpleob.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
@@ -36,6 +39,67 @@ from simpleob.domain.chart_of_accounts_template import (
 from simpleob.domain.company import Company
 from simpleob.domain.template_account import TemplateAccount
 from simpleob.domain.vat_accounts import VatAccounts
+
+
+def test_persists_and_reloads_vat_closing_roles_without_schema_changes() -> None:
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine)
+    company = Company(company_id=uuid4(), name="USt-Rollen UG")
+    context = create_standard_financial_statement_context()
+    provider = HgbFinancialStatementPositionProvider(
+        (context.assets, context.liabilities, context.income_statement)
+    )
+    roles = AccountingAccountRoles(
+        cash_accounts=frozenset(),
+        bank_accounts=frozenset(),
+        general_rate_sales_accounts=frozenset(),
+        vat_advance_payments=frozenset({"3820"}),
+        vat_current_year=frozenset({"3840"}),
+        vat_prior_year_receivables=frozenset({"1422"}),
+        vat_prior_year_payables=frozenset({"3841"}),
+    )
+
+    with Session() as session:
+        CompanyRepository(session).add(company)
+        repository = ChartOfAccountsRepository(session)
+        repository.save_for_company(
+            company_id=company.company_id,
+            chart_of_accounts=context.chart_of_accounts,
+            accounts=context.accounts,
+        )
+        repository.save_account_roles(
+            company_id=company.company_id,
+            account_roles=roles,
+        )
+        invalid_roles = AccountingAccountRoles(
+            cash_accounts=frozenset(),
+            bank_accounts=frozenset(),
+            general_rate_sales_accounts=frozenset(),
+            vat_advance_payments=frozenset({"3841"}),
+            vat_current_year=frozenset({"3840"}),
+            vat_prior_year_receivables=frozenset({"1422"}),
+            vat_prior_year_payables=frozenset({"1771"}),
+        )
+        with pytest.raises(ValueError, match="Vorauszahlungskonten.*Aktivkonten"):
+            repository.save_account_roles(
+                company_id=company.company_id,
+                account_roles=invalid_roles,
+            )
+        loaded = repository.load_account_roles(company.company_id)
+        loaded_chart = repository.load_for_company(
+            company_id=company.company_id,
+            position_provider=provider,
+        )
+
+    assert loaded == roles
+    assert loaded_chart is not None
+    rules = {
+        rule.account_number: rule
+        for rule in loaded_chart[0].account_mapping_rules
+    }
+    assert rules["3840"].debit_position.code == "HGB.266.AKTIVA.B.II.4"
+    assert rules["3840"].credit_position.code == "HGB.266.PASSIVA.C.8"
 
 
 def test_saves_and_loads_chart_of_accounts() -> None:

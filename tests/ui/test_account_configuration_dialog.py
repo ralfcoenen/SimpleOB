@@ -28,20 +28,24 @@ def _dialog() -> AccountConfigurationDialog:
             TemplateAccount(
                 account_number=number,
                 name=name,
-                account_type=AccountType.ASSET,
+                account_type=account_type,
             )
         )
-        for number, name in (
-            ("1000", "Kasse Betrieb"),
-            ("1001", "Weitere Kasse"),
-            ("1100", "Kundenforderungen"),
-            ("1400", "Lieferantenguthaben"),
-            ("1600", "Lieferantenverbindlichkeiten"),
-            ("1610", "Kundenguthaben"),
-            ("1800", "Bankkonto mit einer besonders langen Bezeichnung"),
-            ("1801", "Zweites Bankkonto"),
-            ("4000", "Umsatzerlöse"),
-            ("4001", "Weitere Umsatzerlöse"),
+        for number, name, account_type in (
+            ("1000", "Kasse Betrieb", AccountType.ASSET),
+            ("1001", "Weitere Kasse", AccountType.ASSET),
+            ("1100", "Kundenforderungen", AccountType.ASSET),
+            ("1400", "Lieferantenguthaben", AccountType.ASSET),
+            ("1600", "Lieferantenverbindlichkeiten", AccountType.ASSET),
+            ("1610", "Kundenguthaben", AccountType.ASSET),
+            ("1800", "Bankkonto mit einer besonders langen Bezeichnung", AccountType.ASSET),
+            ("1801", "Zweites Bankkonto", AccountType.ASSET),
+            ("4000", "Umsatzerlöse", AccountType.ASSET),
+            ("4001", "Weitere Umsatzerlöse", AccountType.ASSET),
+            ("3820", "Umsatzsteuer-Vorauszahlungen", AccountType.ASSET),
+            ("3840", "Umsatzsteuer laufendes Jahr", AccountType.LIABILITY),
+            ("1422", "Umsatzsteuerforderungen Vorjahr", AccountType.ASSET),
+            ("3841", "Umsatzsteuerverbindlichkeiten Vorjahr", AccountType.LIABILITY),
         )
     )
     return AccountConfigurationDialog(
@@ -86,16 +90,29 @@ def _account_item(dialog, account_number: str):
     raise AssertionError(f"Konto {account_number} fehlt in der Liste")
 
 
-def test_dialog_shows_all_seven_roles_and_full_account_labels():
+def test_dialog_shows_all_eleven_roles_and_full_account_labels():
     dialog = _dialog()
     _show_roles_tab(dialog)
 
-    assert dialog._role_list.count() == 7
+    assert dialog._role_list.count() == 11
     assert dialog._role_list.item(0).text() == "Kasse"
-    assert dialog._role_list.item(6).text() == "Lieferantenguthaben"
+    assert dialog._role_list.item(10).text() == "Umsatzsteuerverbindlichkeiten Vorjahr"
     item = _account_item(dialog, "1800")
     assert item.text() == "1800 – Bankkonto mit einer besonders langen Bezeichnung"
     assert dialog._role_account_list.width() > dialog._role_list.width()
+
+
+def test_vat_role_lists_filter_to_the_required_account_type():
+    dialog = _dialog()
+    _show_roles_tab(dialog)
+    dialog._role_list.setCurrentRow(8)
+
+    assert _account_item(dialog, "3840")
+    assert all(
+        dialog._role_account_list.item(index).data(Qt.ItemDataRole.UserRole)
+        not in {"3820", "1422"}
+        for index in range(dialog._role_account_list.count())
+    )
 
 
 def test_switching_roles_preserves_multiple_unsaved_assignments_until_save():

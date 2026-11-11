@@ -149,6 +149,28 @@ def test_loads_standard_chart_with_reusable_configuration():
     assert bundle.vat_accounts.input_tax_7 == "1571"
     assert bundle.account_roles is not None
     assert bundle.account_roles.customer_receivables == frozenset({"1400"})
+    assert bundle.account_roles.vat_advance_payments == frozenset({"3820"})
+    assert bundle.account_roles.vat_current_year == frozenset({"3840"})
+    assert bundle.account_roles.vat_prior_year_receivables == frozenset({"1422"})
+    assert bundle.account_roles.vat_prior_year_payables == frozenset({"3841"})
+    mappings = {
+        rule.account_number: rule
+        for rule in bundle.chart.account_mapping_rules
+    }
+    template_accounts = {
+        account.account_number: account
+        for account in bundle.chart.accounts
+    }
+    assert template_accounts["1422"].name == "Umsatzsteuerforderungen Vorjahr"
+    assert template_accounts["1422"].account_type is AccountType.ASSET
+    assert template_accounts["3820"].name == "Umsatzsteuer-Vorauszahlungen"
+    assert template_accounts["3820"].account_type is AccountType.ASSET
+    assert template_accounts["3840"].name == "Umsatzsteuer laufendes Jahr"
+    assert template_accounts["3840"].account_type is AccountType.LIABILITY
+    assert template_accounts["3841"].name == "Umsatzsteuerverbindlichkeiten Vorjahr"
+    assert template_accounts["3841"].account_type is AccountType.LIABILITY
+    assert mappings["3840"].debit_position.code == "HGB.266.AKTIVA.B.II.4"
+    assert mappings["3840"].credit_position.code == "HGB.266.PASSIVA.C.8"
     assert bundle.taxonomy_version == "6.9"
     assert bundle.taxonomy_mappings
 

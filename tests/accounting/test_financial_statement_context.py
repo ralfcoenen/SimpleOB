@@ -1,5 +1,6 @@
 """Tests für den gemeinsamen Abschlusskontext."""
 
+from simpleob.accounting.account_balance import AccountBalance
 from simpleob.accounting.financial_statement_builder import (
     FinancialStatementBuilder,
 )
@@ -43,3 +44,19 @@ def test_creates_standard_financial_statement_context(
         for account
         in context.chart_of_accounts.accounts
     }
+
+
+def test_maps_vat_current_year_account_by_balance_side():
+    context = create_standard_financial_statement_context()
+
+    debit_position, debit_amount = context.account_mapper.map_balance(
+        AccountBalance("3840", debit=12, credit=0)
+    )
+    credit_position, credit_amount = context.account_mapper.map_balance(
+        AccountBalance("3840", debit=0, credit=19)
+    )
+
+    assert debit_position.code == "HGB.266.AKTIVA.B.II.4"
+    assert debit_amount == 12
+    assert credit_position.code == "HGB.266.PASSIVA.C.8"
+    assert credit_amount == 19

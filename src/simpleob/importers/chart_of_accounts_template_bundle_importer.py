@@ -82,6 +82,18 @@ class ChartOfAccountsTemplateBundleImporter:
             supplier_credit_balances=self._account_set(
                 roles_data, "supplier_credit_balances"
             ),
+            vat_advance_payments=self._account_set(
+                roles_data, "vat_advance_payments"
+            ),
+            vat_current_year=self._account_set(
+                roles_data, "vat_current_year"
+            ),
+            vat_prior_year_receivables=self._account_set(
+                roles_data, "vat_prior_year_receivables"
+            ),
+            vat_prior_year_payables=self._account_set(
+                roles_data, "vat_prior_year_payables"
+            ),
         )
 
         taxonomy_version = data.get("taxonomy_version")
@@ -337,6 +349,26 @@ class ChartOfAccountsTemplateBundleImporter:
                 AccountType.ASSET,
                 "Lieferantenguthaben",
             ),
+            (
+                roles.vat_advance_payments,
+                AccountType.ASSET,
+                "Umsatzsteuer-Vorauszahlungen",
+            ),
+            (
+                roles.vat_current_year,
+                AccountType.LIABILITY,
+                "Umsatzsteuer laufendes Jahr",
+            ),
+            (
+                roles.vat_prior_year_receivables,
+                AccountType.ASSET,
+                "Umsatzsteuerforderungen Vorjahr",
+            ),
+            (
+                roles.vat_prior_year_payables,
+                AccountType.LIABILITY,
+                "Umsatzsteuerverbindlichkeiten Vorjahr",
+            ),
         ) if roles is not None else ()
         expected_control_types = (
             (
@@ -374,6 +406,54 @@ class ChartOfAccountsTemplateBundleImporter:
                     f"{expected_type.name}: "
                     + ", ".join(unsuitable)
                 )
+
+        if roles is not None:
+            mapping_by_number = {
+                rule.account_number: rule
+                for rule in chart.account_mapping_rules
+            }
+            vat_role_mappings = (
+                (
+                    roles.vat_advance_payments,
+                    "debit_position",
+                    "HGB.266.AKTIVA.B.II.4",
+                    "Umsatzsteuer-Vorauszahlungen",
+                ),
+                (
+                    roles.vat_current_year,
+                    "debit_position",
+                    "HGB.266.AKTIVA.B.II.4",
+                    "Umsatzsteuer laufendes Jahr (Soll)",
+                ),
+                (
+                    roles.vat_current_year,
+                    "credit_position",
+                    "HGB.266.PASSIVA.C.8",
+                    "Umsatzsteuer laufendes Jahr (Haben)",
+                ),
+                (
+                    roles.vat_prior_year_receivables,
+                    "debit_position",
+                    "HGB.266.AKTIVA.B.II.4",
+                    "Umsatzsteuerforderungen Vorjahr",
+                ),
+                (
+                    roles.vat_prior_year_payables,
+                    "credit_position",
+                    "HGB.266.PASSIVA.C.8",
+                    "Umsatzsteuerverbindlichkeiten Vorjahr",
+                ),
+            )
+            for account_set, side, expected_code, label in vat_role_mappings:
+                for number in account_set:
+                    rule = mapping_by_number.get(number)
+                    position = getattr(rule, side, None)
+                    if position is None or position.code != expected_code:
+                        side_label = "Soll" if side == "debit_position" else "Haben"
+                        raise ValueError(
+                            f"{label} {number} benötigt die HGB-{side_label}-Zuordnung "
+                            f"{expected_code}."
+                        )
 
         for account_set, expected_type, label in (
             (frozenset((vat.input_tax_7, vat.input_tax_19)), AccountType.ASSET, "Vorsteuer"),

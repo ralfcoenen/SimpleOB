@@ -26,7 +26,11 @@
     "customer_receivables": ["1400"],
     "supplier_payables": ["1600"],
     "customer_credit_balances": ["1610"],
-    "supplier_credit_balances": ["1410"]
+    "supplier_credit_balances": ["1410"],
+    "vat_advance_payments": ["3820"],
+    "vat_current_year": ["3840"],
+    "vat_prior_year_receivables": ["1422"],
+    "vat_prior_year_payables": ["3841"]
   },
   "taxonomy_version": "6.9",
   "taxonomy_mapping_file": "../e_bilanz/account_mappings/6.9/openbilanz_standard.csv"

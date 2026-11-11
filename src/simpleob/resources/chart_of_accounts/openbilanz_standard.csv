@@ -10,6 +10,7 @@ account_number;name;account_type;statement_type;debit_position_code;credit_posit
 1200;Bank;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.IV;
 1400;Forderungen aus Lieferungen und Leistungen;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.II.1;
 1410;Lieferantenguthaben;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.II.4;
+1422;Umsatzsteuerforderungen Vorjahr;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.II.4;
 1571;Abziehbare Vorsteuer 7 %;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.II.4;
 1576;Abziehbare Vorsteuer 19 %;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.II.4;
 1600;Verbindlichkeiten aus Lieferungen und Leistungen;LIABILITY;BALANCE_SHEET;;HGB.266.PASSIVA.C.4
@@ -17,6 +18,9 @@ account_number;name;account_type;statement_type;debit_position_code;credit_posit
 1700;Sonstige Verbindlichkeiten;LIABILITY;BALANCE_SHEET;;HGB.266.PASSIVA.C.8
 1771;Umsatzsteuer 7 %;LIABILITY;BALANCE_SHEET;;HGB.266.PASSIVA.C.8
 1776;Umsatzsteuer 19 %;LIABILITY;BALANCE_SHEET;;HGB.266.PASSIVA.C.8
+3820;Umsatzsteuer-Vorauszahlungen;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.II.4;
+3840;Umsatzsteuer laufendes Jahr;LIABILITY;BALANCE_SHEET;HGB.266.AKTIVA.B.II.4;HGB.266.PASSIVA.C.8
+3841;Umsatzsteuerverbindlichkeiten Vorjahr;LIABILITY;BALANCE_SHEET;;HGB.266.PASSIVA.C.8
 2970;Gewinnvortrag / Verlustvortrag;EQUITY;BALANCE_SHEET;;HGB.266.PASSIVA.A.IV
 3100;Fremdleistungen;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.5.b;
 4210;Miete/Pacht unbewegliche Wirtschaftsgüter;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;

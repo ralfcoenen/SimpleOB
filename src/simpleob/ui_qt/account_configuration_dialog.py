@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 )
 
 from simpleob.domain.account import Account
+from simpleob.domain.account_type import AccountType
 from simpleob.domain.accounting_account_roles import (
     AccountingAccountRoles,
 )
@@ -70,6 +71,10 @@ class AccountConfigurationDialog(QDialog):
             ("Lieferantenverbindlichkeiten", "supplier_payables"),
             ("Kundenguthaben", "customer_credit_balances"),
             ("Lieferantenguthaben", "supplier_credit_balances"),
+            ("Umsatzsteuer-Vorauszahlungen", "vat_advance_payments"),
+            ("Umsatzsteuer laufendes Jahr", "vat_current_year"),
+            ("Umsatzsteuerforderungen Vorjahr", "vat_prior_year_receivables"),
+            ("Umsatzsteuerverbindlichkeiten Vorjahr", "vat_prior_year_payables"),
         )
         self._role_assignments = {
             field_name: set(getattr(self._account_roles, field_name))
@@ -293,8 +298,9 @@ class AccountConfigurationDialog(QDialog):
         layout = QVBoxLayout(parent)
 
         description = QLabel(
-            "Mehrere Konten können je Rolle ausgewählt werden. "
-            "Ein Konto darf nur einer dieser Rollen angehören."
+            "Je nach Rolle können ein oder mehrere Konten ausgewählt werden. "
+            "Ein Konto darf nur einer dieser Rollen angehören. "
+            "Umsatzsteuerrollen sind jeweils einzeln zuzuordnen."
         )
         description.setWordWrap(True)
         layout.addWidget(description)
@@ -387,7 +393,15 @@ class AccountConfigurationDialog(QDialog):
                 if field_name != self._current_role_key
                 for account_number in self._role_assignments[field_name]
             }
+            expected_type = {
+                "vat_advance_payments": AccountType.ASSET,
+                "vat_current_year": AccountType.LIABILITY,
+                "vat_prior_year_receivables": AccountType.ASSET,
+                "vat_prior_year_payables": AccountType.LIABILITY,
+            }.get(self._current_role_key)
             for account in self._accounts:
+                if expected_type is not None and account.account_type is not expected_type:
+                    continue
                 other_role = assigned_elsewhere.get(account.number)
                 item = QListWidgetItem(str(account))
                 item.setData(Qt.ItemDataRole.UserRole, account.number)
@@ -416,6 +430,19 @@ class AccountConfigurationDialog(QDialog):
             self._role_account_list.blockSignals(False)
 
     def _on_role_account_changed(self, _item: QListWidgetItem) -> None:
+        if (
+            self._current_role_key is not None
+            and self._current_role_key.startswith("vat_")
+            and _item.checkState() == Qt.CheckState.Checked
+        ):
+            self._role_account_list.blockSignals(True)
+            try:
+                for index in range(self._role_account_list.count()):
+                    item = self._role_account_list.item(index)
+                    if item is not _item:
+                        item.setCheckState(Qt.CheckState.Unchecked)
+            finally:
+                self._role_account_list.blockSignals(False)
         self._capture_visible_role_assignments()
 
     def _create_account_combobox(
@@ -656,6 +683,18 @@ class AccountConfigurationDialog(QDialog):
                 ),
                 supplier_credit_balances=frozenset(
                     self._role_assignments["supplier_credit_balances"]
+                ),
+                vat_advance_payments=frozenset(
+                    self._role_assignments["vat_advance_payments"]
+                ),
+                vat_current_year=frozenset(
+                    self._role_assignments["vat_current_year"]
+                ),
+                vat_prior_year_receivables=frozenset(
+                    self._role_assignments["vat_prior_year_receivables"]
+                ),
+                vat_prior_year_payables=frozenset(
+                    self._role_assignments["vat_prior_year_payables"]
                 ),
             )
 

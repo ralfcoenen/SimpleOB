@@ -47,6 +47,10 @@ class AccountingAccountRoles:
     supplier_payables: frozenset[str] = frozenset()
     customer_credit_balances: frozenset[str] = frozenset()
     supplier_credit_balances: frozenset[str] = frozenset()
+    vat_advance_payments: frozenset[str] = frozenset()
+    vat_current_year: frozenset[str] = frozenset()
+    vat_prior_year_receivables: frozenset[str] = frozenset()
+    vat_prior_year_payables: frozenset[str] = frozenset()
 
     def __post_init__(self) -> None:
         _validate_account_numbers(
@@ -77,6 +81,43 @@ class AccountingAccountRoles:
             field_name="supplier_credit_balances",
             account_numbers=self.supplier_credit_balances,
         )
+        _validate_account_numbers(
+            field_name="vat_advance_payments",
+            account_numbers=self.vat_advance_payments,
+        )
+        _validate_account_numbers(
+            field_name="vat_current_year",
+            account_numbers=self.vat_current_year,
+        )
+        _validate_account_numbers(
+            field_name="vat_prior_year_receivables",
+            account_numbers=self.vat_prior_year_receivables,
+        )
+        _validate_account_numbers(
+            field_name="vat_prior_year_payables",
+            account_numbers=self.vat_prior_year_payables,
+        )
+        for field_name in (
+            "vat_advance_payments",
+            "vat_current_year",
+            "vat_prior_year_receivables",
+            "vat_prior_year_payables",
+        ):
+            if len(getattr(self, field_name)) > 1:
+                raise ValueError(
+                    f"Für {field_name} darf höchstens ein Konto "
+                    "konfiguriert sein."
+                )
+        vat_role_values = (
+            self.vat_advance_payments,
+            self.vat_current_year,
+            self.vat_prior_year_receivables,
+            self.vat_prior_year_payables,
+        )
+        if any(vat_role_values) and not all(vat_role_values):
+            raise ValueError(
+                "Die Umsatzsteuerrollen müssen vollständig zugeordnet sein."
+            )
         if len(self.customer_receivables) > 1:
             raise ValueError(
                 "Es darf höchstens ein Kundenforderungskonto "
@@ -105,6 +146,10 @@ class AccountingAccountRoles:
             self.supplier_payables,
             self.customer_credit_balances,
             self.supplier_credit_balances,
+            self.vat_advance_payments,
+            self.vat_current_year,
+            self.vat_prior_year_receivables,
+            self.vat_prior_year_payables,
         )
 
         for index, account_numbers in enumerate(role_sets):
@@ -137,4 +182,8 @@ class AccountingAccountRoles:
             self.supplier_payables,
             self.customer_credit_balances,
             self.supplier_credit_balances,
+            self.vat_advance_payments,
+            self.vat_current_year,
+            self.vat_prior_year_receivables,
+            self.vat_prior_year_payables,
         )

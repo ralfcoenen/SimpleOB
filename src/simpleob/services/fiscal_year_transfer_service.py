@@ -5,9 +5,11 @@ from decimal import Decimal
 
 from simpleob.accounting.ledger import Ledger
 from simpleob.domain.account_type import AccountType
+from simpleob.domain.accounting_account_roles import AccountingAccountRoles
 from simpleob.domain.booking import Booking
 from simpleob.domain.booking_line import BookingLine
 from simpleob.domain.booking_type import BookingType
+from simpleob.domain.chart_of_accounts_template import ChartOfAccountsTemplate
 from simpleob.domain.entry_side import EntrySide
 
 
@@ -41,6 +43,8 @@ class FiscalYearTransferService:
         ledger: Ledger,
         account_types: dict[str, AccountType],
         opening_date: date,
+        account_roles: AccountingAccountRoles | None = None,
+        chart_of_accounts: ChartOfAccountsTemplate | None = None,
     ) -> tuple[Booking, ...]:
         """Erzeugt Saldovorträge für Bestandskonten."""
 
@@ -51,6 +55,25 @@ class FiscalYearTransferService:
             AccountType.LIABILITY,
             AccountType.EQUITY,
         }
+
+        vat_current_account = None
+        vat_receivable_account = None
+        vat_payable_account = None
+        if account_roles is not None and account_roles.vat_current_year:
+            (
+                vat_current_account,
+            ) = tuple(account_roles.vat_current_year)
+            (
+                vat_receivable_account,
+            ) = tuple(account_roles.vat_prior_year_receivables)
+            (
+                vat_payable_account,
+            ) = tuple(account_roles.vat_prior_year_payables)
+            self._validate_vat_transfer_configuration(
+                account_roles=account_roles,
+                account_types=account_types,
+                chart_of_accounts=chart_of_accounts,
+            )
 
         for balance in ledger.balances():
             source_account_number = balance.account_number
@@ -71,11 +94,17 @@ class FiscalYearTransferService:
             ):
                 continue
 
-            target_account_number = (
-                self._opening_account_number(
+            if source_account_number == vat_current_account:
+                if balance.debit_balance > Decimal("0.00"):
+                    target_account_number = vat_receivable_account
+                elif balance.credit_balance > Decimal("0.00"):
+                    target_account_number = vat_payable_account
+                else:
+                    continue
+            else:
+                target_account_number = self._opening_account_number(
                     source_account_number
                 )
-            )
 
             booking = self._create_opening_booking(
                 source_account_number=source_account_number,
@@ -91,6 +120,80 @@ class FiscalYearTransferService:
                 )
 
         return tuple(bookings)
+
+    @staticmethod
+    def _validate_vat_transfer_configuration(
+        *,
+        account_roles: AccountingAccountRoles,
+        account_types: dict[str, AccountType],
+        chart_of_accounts: ChartOfAccountsTemplate | None,
+    ) -> None:
+        """Prüft die Umsatzsteuerkonten vor dem Erzeugen von Buchungen."""
+
+        configured = (
+            (account_roles.vat_advance_payments, AccountType.ASSET, "Umsatzsteuer-Vorauszahlung"),
+            (account_roles.vat_current_year, AccountType.LIABILITY, "Umsatzsteuer laufendes Jahr"),
+            (account_roles.vat_prior_year_receivables, AccountType.ASSET, "Umsatzsteuerforderung Vorjahr"),
+            (account_roles.vat_prior_year_payables, AccountType.LIABILITY, "Umsatzsteuerverbindlichkeit Vorjahr"),
+        )
+        for accounts, expected_type, label in configured:
+            number = next(iter(accounts))
+            if number not in account_types:
+                raise ValueError(
+                    f"Das konfigurierte Konto {label} {number} "
+                    "ist im Mandantenkontenrahmen nicht vorhanden."
+                )
+            if account_types[number] is not expected_type:
+                raise ValueError(
+                    f"Das konfigurierte Konto {label} {number} muss "
+                    f"den Kontotyp {expected_type.name} haben."
+                )
+
+        if chart_of_accounts is None:
+            raise ValueError(
+                "Die HGB-Zuordnungen der Umsatzsteuerkonten können "
+                "bei der Geschäftsjahresübernahme nicht geprüft werden."
+            )
+
+        chart_account_numbers = {
+            account.account_number
+            for account in chart_of_accounts.accounts
+        }
+        missing_from_chart = sorted(
+            number
+            for accounts, _expected_type, _label in configured
+            for number in accounts
+            if number not in chart_account_numbers
+        )
+        if missing_from_chart:
+            raise ValueError(
+                "Konfigurierte Umsatzsteuerkonten fehlen im "
+                "Mandantenkontenrahmen: "
+                + ", ".join(missing_from_chart)
+            )
+
+        rules = {
+            rule.account_number: rule
+            for rule in chart_of_accounts.account_mapping_rules
+        }
+        required_positions = (
+            (account_roles.vat_advance_payments, "debit_position", "HGB.266.AKTIVA.B.II.4"),
+            (account_roles.vat_current_year, "debit_position", "HGB.266.AKTIVA.B.II.4"),
+            (account_roles.vat_current_year, "credit_position", "HGB.266.PASSIVA.C.8"),
+            (account_roles.vat_prior_year_receivables, "debit_position", "HGB.266.AKTIVA.B.II.4"),
+            (account_roles.vat_prior_year_payables, "credit_position", "HGB.266.PASSIVA.C.8"),
+        )
+        for accounts, side, expected_code in required_positions:
+            number = next(iter(accounts))
+            rule = rules.get(number)
+            position = getattr(rule, side, None)
+            if position is None or position.code != expected_code:
+                side_label = "Soll" if side == "debit_position" else "Haben"
+                raise ValueError(
+                    f"Dem Umsatzsteuerkonto {number} fehlt die "
+                    f"erforderliche HGB-{side_label}-Zuordnung "
+                    f"{expected_code}."
+                )
 
     def _opening_account_number(
         self,

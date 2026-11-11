@@ -89,6 +89,10 @@ class ChartOfAccountsInitializationService:
                     output_tax_19="1776",
                 )
             if account_roles is None:
+                has_vat_transfer_accounts = all(
+                    standard_chart_of_accounts.contains(number)
+                    for number in ("3820", "3840", "1422", "3841")
+                )
                 account_roles = AccountingAccountRoles(
                     cash_accounts=frozenset(("1000",)),
                     bank_accounts=frozenset(("1200",)),
@@ -97,6 +101,26 @@ class ChartOfAccountsInitializationService:
                     supplier_payables=frozenset(("1600",)),
                     customer_credit_balances=frozenset(("1610",)),
                     supplier_credit_balances=frozenset(("1410",)),
+                    vat_advance_payments=(
+                        frozenset(("3820",))
+                        if has_vat_transfer_accounts
+                        else frozenset()
+                    ),
+                    vat_current_year=(
+                        frozenset(("3840",))
+                        if has_vat_transfer_accounts
+                        else frozenset()
+                    ),
+                    vat_prior_year_receivables=(
+                        frozenset(("1422",))
+                        if has_vat_transfer_accounts
+                        else frozenset()
+                    ),
+                    vat_prior_year_payables=(
+                        frozenset(("3841",))
+                        if has_vat_transfer_accounts
+                        else frozenset()
+                    ),
                 )
 
         if control_accounts is None or vat_accounts is None:

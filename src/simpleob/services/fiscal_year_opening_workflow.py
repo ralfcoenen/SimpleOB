@@ -10,8 +10,10 @@ from simpleob.accounting.ledger import Ledger
 from simpleob.database.booking_repository import BookingRepository
 from simpleob.database.company_repository import CompanyRepository
 from simpleob.domain.account_type import AccountType
+from simpleob.domain.accounting_account_roles import AccountingAccountRoles
 from simpleob.domain.booking import Booking
 from simpleob.domain.booking_type import BookingType
+from simpleob.domain.chart_of_accounts_template import ChartOfAccountsTemplate
 from simpleob.domain.fiscal_year import FiscalYear
 from simpleob.services.fiscal_year_transfer_service import (
     FiscalYearTransferService,
@@ -44,6 +46,8 @@ class FiscalYearOpeningWorkflow:
         source_fiscal_year: FiscalYear,
         target_fiscal_year: FiscalYear,
         account_types: Mapping[str, AccountType],
+        account_roles: AccountingAccountRoles | None = None,
+        chart_of_accounts: ChartOfAccountsTemplate | None = None,
     ) -> tuple[Booking, ...]:
         """Eröffnet ein Geschäftsjahr aus den Salden des Vorjahres."""
 
@@ -179,6 +183,8 @@ class FiscalYearOpeningWorkflow:
                     ledger=source_ledger,
                     account_types=dict(account_types),
                     opening_date=target_fiscal_year.start_date,
+                    account_roles=account_roles,
+                    chart_of_accounts=chart_of_accounts,
                 )
             )
 

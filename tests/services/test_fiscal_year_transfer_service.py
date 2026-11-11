@@ -3,12 +3,19 @@
 from datetime import date
 from decimal import Decimal
 
+import pytest
+
+from simpleob.accounting.financial_statement_position import FinancialStatementPosition
 from simpleob.accounting.ledger import Ledger
+from simpleob.domain.account_mapping_rule import AccountMappingRule
 from simpleob.domain.account_type import AccountType
+from simpleob.domain.accounting_account_roles import AccountingAccountRoles
 from simpleob.domain.booking import Booking
 from simpleob.domain.booking_line import BookingLine
+from simpleob.domain.chart_of_accounts_template import ChartOfAccountsTemplate
 from simpleob.domain.entry_side import EntrySide
 from simpleob.domain.journal import Journal
+from simpleob.domain.template_account import TemplateAccount
 from simpleob.services.fiscal_year_transfer_service import (
     FiscalYearTransferService,
 )
@@ -233,3 +240,151 @@ def test_creates_opening_bookings_for_credit_balances() -> None:
             amount=Decimal("17000.00"),
         ),
     )
+
+
+def _vat_transfer_configuration(*, missing_mapping: str | None = None):
+    accounts = (
+        TemplateAccount("3820", "Umsatzsteuer-Vorauszahlungen", AccountType.ASSET),
+        TemplateAccount("3840", "Umsatzsteuer laufendes Jahr", AccountType.LIABILITY),
+        TemplateAccount("1422", "Umsatzsteuerforderungen Vorjahr", AccountType.ASSET),
+        TemplateAccount("3841", "Umsatzsteuerverbindlichkeiten Vorjahr", AccountType.LIABILITY),
+    )
+    positions = {
+        "asset": FinancialStatementPosition(
+            "HGB.266.AKTIVA.B.II.4", "Sonstige Vermögensgegenstände"
+        ),
+        "liability": FinancialStatementPosition(
+            "HGB.266.PASSIVA.C.8", "Sonstige Verbindlichkeiten"
+        ),
+    }
+    mapping_sides = {
+        "3820": ("asset", None),
+        "3840": ("asset", "liability"),
+        "1422": ("asset", None),
+        "3841": (None, "liability"),
+    }
+    rules = tuple(
+        AccountMappingRule(
+            account_number=number,
+            debit_position=positions[debit] if debit else None,
+            credit_position=positions[credit] if credit else None,
+        )
+        for number, (debit, credit) in mapping_sides.items()
+        if number != missing_mapping
+    )
+    chart = ChartOfAccountsTemplate(
+        name="VAT test chart",
+        accounts=accounts,
+        account_mapping_rules=rules,
+    )
+    roles = AccountingAccountRoles(
+        cash_accounts=frozenset(),
+        bank_accounts=frozenset(),
+        general_rate_sales_accounts=frozenset(),
+        vat_advance_payments=frozenset({"3820"}),
+        vat_current_year=frozenset({"3840"}),
+        vat_prior_year_receivables=frozenset({"1422"}),
+        vat_prior_year_payables=frozenset({"3841"}),
+    )
+    account_types = {
+        account.account_number: account.account_type
+        for account in accounts
+    }
+    account_types["9000"] = AccountType.EQUITY
+    return chart, roles, account_types
+
+
+def _vat_transfer_service() -> FiscalYearTransferService:
+    return FiscalYearTransferService(
+        opening_balance_account_number="9000",
+        profit_account_number="8020",
+        loss_account_number="8021",
+        profit_loss_carryforward_account_number="2970",
+    )
+
+
+def _vat_openings(ledger: Ledger, *, missing_mapping: str | None = None):
+    chart, roles, account_types = _vat_transfer_configuration(
+        missing_mapping=missing_mapping
+    )
+    return _vat_transfer_service().create_opening_bookings(
+        ledger=ledger,
+        account_types=account_types,
+        opening_date=date(2027, 1, 1),
+        account_roles=roles,
+        chart_of_accounts=chart,
+    )
+
+
+def test_carries_debit_balance_of_vat_current_year_to_prior_year_receivable():
+    ledger = Ledger()
+    ledger.post("3840", "9000", Decimal("125.50"))
+
+    (booking,) = _vat_openings(ledger)
+
+    assert booking.lines == (
+        BookingLine("1422", EntrySide.DEBIT, Decimal("125.50")),
+        BookingLine("9000", EntrySide.CREDIT, Decimal("125.50")),
+    )
+
+
+def test_carries_credit_balance_of_vat_current_year_to_prior_year_payable():
+    ledger = Ledger()
+    ledger.post("9000", "3840", Decimal("75.25"))
+
+    (booking,) = _vat_openings(ledger)
+
+    assert booking.lines == (
+        BookingLine("9000", EntrySide.DEBIT, Decimal("75.25")),
+        BookingLine("3841", EntrySide.CREDIT, Decimal("75.25")),
+    )
+
+
+def test_does_not_create_vat_opening_for_zero_balance():
+    ledger = Ledger()
+    ledger.post("3840", "9000", Decimal("100.00"))
+    ledger.post("9000", "3840", Decimal("100.00"))
+
+    assert _vat_openings(ledger) == ()
+
+
+def test_carries_existing_prior_year_vat_balances_on_the_same_accounts():
+    ledger = Ledger()
+    ledger.post("1422", "9000", Decimal("40.00"))
+    ledger.post("9000", "3841", Decimal("80.00"))
+
+    bookings = _vat_openings(ledger)
+
+    target_lines = {
+        line.account_number: line
+        for booking in bookings
+        for line in booking.lines
+        if line.account_number in {"1422", "3841"}
+    }
+    assert target_lines == {
+        "1422": BookingLine("1422", EntrySide.DEBIT, Decimal("40.00")),
+        "3841": BookingLine("3841", EntrySide.CREDIT, Decimal("80.00")),
+    }
+    assert all(
+        sum(line.amount for line in booking.lines if line.side is EntrySide.DEBIT)
+        == sum(line.amount for line in booking.lines if line.side is EntrySide.CREDIT)
+        for booking in bookings
+    )
+
+
+def test_rejects_missing_vat_opening_account_or_hgb_mapping():
+    ledger = Ledger()
+    ledger.post("3840", "9000", Decimal("10.00"))
+    chart, roles, account_types = _vat_transfer_configuration()
+    account_types.pop("1422")
+    with pytest.raises(ValueError, match="1422.*nicht vorhanden"):
+        _vat_transfer_service().create_opening_bookings(
+            ledger=ledger,
+            account_types=account_types,
+            opening_date=date(2027, 1, 1),
+            account_roles=roles,
+            chart_of_accounts=chart,
+        )
+
+    with pytest.raises(ValueError, match="3841.*HGB-Haben-Zuordnung"):
+        _vat_openings(ledger, missing_mapping="3841")

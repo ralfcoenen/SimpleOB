@@ -1368,6 +1368,26 @@ class ChartOfAccountsRepository:
                 AccountType.REVENUE,
                 "Umsatzerlöskonten müssen Ertragskonten sein",
             ),
+            (
+                account_roles.vat_advance_payments,
+                AccountType.ASSET,
+                "Umsatzsteuer-Vorauszahlungskonten müssen Aktivkonten sein",
+            ),
+            (
+                account_roles.vat_current_year,
+                AccountType.LIABILITY,
+                "Umsatzsteuerkonten des laufenden Jahres müssen Passivkonten sein",
+            ),
+            (
+                account_roles.vat_prior_year_receivables,
+                AccountType.ASSET,
+                "Umsatzsteuerforderungen aus Vorjahren müssen Aktivkonten sein",
+            ),
+            (
+                account_roles.vat_prior_year_payables,
+                AccountType.LIABILITY,
+                "Umsatzsteuerverbindlichkeiten aus Vorjahren müssen Passivkonten sein",
+            ),
         ):
             unsuitable = sorted(
                 number
@@ -1376,6 +1396,59 @@ class ChartOfAccountsRepository:
             )
             if unsuitable:
                 raise ValueError(message + ": " + ", ".join(unsuitable))
+
+        account_mappings = {
+            number: (debit_code, credit_code)
+            for number, debit_code, credit_code in self._session.query(
+                Konto.account_number,
+                Konto.debit_position_code,
+                Konto.credit_position_code,
+            ).filter(Konto.mandant_id == company_model.id).all()
+        }
+        required_vat_mappings = (
+            (
+                account_roles.vat_advance_payments,
+                "debit",
+                "HGB.266.AKTIVA.B.II.4",
+                "Umsatzsteuer-Vorauszahlungen",
+            ),
+            (
+                account_roles.vat_current_year,
+                "debit",
+                "HGB.266.AKTIVA.B.II.4",
+                "Umsatzsteuer laufendes Jahr (Soll)",
+            ),
+            (
+                account_roles.vat_current_year,
+                "credit",
+                "HGB.266.PASSIVA.C.8",
+                "Umsatzsteuer laufendes Jahr (Haben)",
+            ),
+            (
+                account_roles.vat_prior_year_receivables,
+                "debit",
+                "HGB.266.AKTIVA.B.II.4",
+                "Umsatzsteuerforderungen Vorjahr",
+            ),
+            (
+                account_roles.vat_prior_year_payables,
+                "credit",
+                "HGB.266.PASSIVA.C.8",
+                "Umsatzsteuerverbindlichkeiten Vorjahr",
+            ),
+        )
+        for account_set, side, expected_code, label in required_vat_mappings:
+            for number in account_set:
+                debit_code, credit_code = account_mappings.get(
+                    number, (None, None)
+                )
+                actual_code = debit_code if side == "debit" else credit_code
+                if actual_code != expected_code:
+                    side_label = "Soll" if side == "debit" else "Haben"
+                    raise ValueError(
+                        f"{label} {number} benötigt die HGB-{side_label}-"
+                        f"Zuordnung {expected_code}."
+                    )
 
         unsuitable_receivable_accounts = {
             account_number
@@ -1503,6 +1576,22 @@ class ChartOfAccountsRepository:
                 "SUPPLIER_CREDIT_BALANCES",
                 account_roles.supplier_credit_balances,
             ),
+            (
+                "VAT_ADVANCE_PAYMENTS",
+                account_roles.vat_advance_payments,
+            ),
+            (
+                "VAT_CURRENT_YEAR",
+                account_roles.vat_current_year,
+            ),
+            (
+                "VAT_PRIOR_YEAR_RECEIVABLES",
+                account_roles.vat_prior_year_receivables,
+            ),
+            (
+                "VAT_PRIOR_YEAR_PAYABLES",
+                account_roles.vat_prior_year_payables,
+            ),
         )
 
         for role, role_account_numbers in role_assignments:
@@ -1610,6 +1699,30 @@ class ChartOfAccountsRepository:
             if model.role == "GENERAL_RATE_SALES"
         )
 
+        vat_advance_payments = frozenset(
+            model.account_number
+            for model in models
+            if model.role == "VAT_ADVANCE_PAYMENTS"
+        )
+
+        vat_current_year = frozenset(
+            model.account_number
+            for model in models
+            if model.role == "VAT_CURRENT_YEAR"
+        )
+
+        vat_prior_year_receivables = frozenset(
+            model.account_number
+            for model in models
+            if model.role == "VAT_PRIOR_YEAR_RECEIVABLES"
+        )
+
+        vat_prior_year_payables = frozenset(
+            model.account_number
+            for model in models
+            if model.role == "VAT_PRIOR_YEAR_PAYABLES"
+        )
+
         customer_receivables = frozenset(
             model.account_number
             for model in models
@@ -1642,6 +1755,10 @@ class ChartOfAccountsRepository:
             "SUPPLIER_PAYABLES",
             "CUSTOMER_CREDIT_BALANCES",
             "SUPPLIER_CREDIT_BALANCES",
+            "VAT_ADVANCE_PAYMENTS",
+            "VAT_CURRENT_YEAR",
+            "VAT_PRIOR_YEAR_RECEIVABLES",
+            "VAT_PRIOR_YEAR_PAYABLES",
         }
 
         unknown_roles = {
@@ -1670,6 +1787,10 @@ class ChartOfAccountsRepository:
             supplier_payables=supplier_payables,
             customer_credit_balances=customer_credit_balances,
             supplier_credit_balances=supplier_credit_balances,
+            vat_advance_payments=vat_advance_payments,
+            vat_current_year=vat_current_year,
+            vat_prior_year_receivables=vat_prior_year_receivables,
+            vat_prior_year_payables=vat_prior_year_payables,
         )
 
     def validate_customer_receivable_account(
