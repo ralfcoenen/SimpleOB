@@ -222,3 +222,67 @@ def test_uses_explicit_account_taxonomy_concept_as_fallback() -> None:
             "bs.ass.currAss.receiv.trade.other",
         ): Decimal("2500.00"),
     }
+
+
+def test_rolls_deep_taxonomy_values_up_without_double_counting() -> None:
+    lease_fix_other = (
+        "is.netIncome.regular.operatingTC."
+        "otherCost.leaseFix.other"
+    )
+    lease_fix = (
+        "is.netIncome.regular.operatingTC."
+        "otherCost.leaseFix"
+    )
+    lease_movable_other = (
+        "is.netIncome.regular.operatingTC."
+        "otherCost.leaseMoveable.other"
+    )
+    lease_movable = (
+        "is.netIncome.regular.operatingTC."
+        "otherCost.leaseMovable"
+    )
+
+    details = (
+        _detail(
+            position_code="HGB.275.GKV.8",
+            account_number="6310",
+            account_description="Miete unbewegliche Wirtschaftsgüter",
+            balance="700.00",
+        ),
+        _detail(
+            position_code="HGB.275.GKV.8",
+            account_number="6311",
+            account_description="Weitere Miete unbewegliche Wirtschaftsgüter",
+            balance="500.00",
+        ),
+        _detail(
+            position_code="HGB.275.GKV.8",
+            account_number="6835",
+            account_description="Miete bewegliche Wirtschaftsgüter",
+            balance="800.00",
+        ),
+    )
+
+    values = GaapCi69AccountDetailValueBuilder.build(
+        account_details=details,
+        account_taxonomy_concepts={
+            "6310": lease_fix_other,
+            "6311": lease_fix_other,
+            "6835": lease_movable_other,
+        },
+        account_taxonomy_calculation_ancestors={
+            "6310": ((lease_fix, Decimal("1")),),
+            "6311": ((lease_fix, Decimal("1")),),
+            "6835": ((lease_movable, Decimal("1")),),
+        },
+    )
+
+    assert values == {
+        (lease_fix_other,): Decimal("1200.00"),
+        (lease_fix,): Decimal("1200.00"),
+        (lease_movable_other,): Decimal("800.00"),
+        (lease_movable,): Decimal("800.00"),
+    }
+    assert (
+        "is.netIncome.regular.operatingTC.otherCost",
+    ) not in values

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from decimal import Decimal
 
 from simpleob.domain.e_bilanz_account_detail import (
     EBilanzAccountDetail,
@@ -75,6 +76,9 @@ class GaapCi69AccountDetailValueBuilder:
         bank_accounts: Iterable[str] = (),
         input_tax_receivable_accounts: Iterable[str] = (),
         account_taxonomy_concepts: dict[str, str] | None = None,
+        account_taxonomy_calculation_ancestors: (
+            dict[str, tuple[tuple[str, Decimal], ...]] | None
+        ) = None,
     ) -> dict[FactPlanPath, FactPlanValue]:
         """Erzeugt die konkret ableitbaren GAAP-CI-Unterpositionen."""
 
@@ -107,6 +111,11 @@ class GaapCi69AccountDetailValueBuilder:
         )
         taxonomy_concepts = cls._normalize_taxonomy_concepts(
             account_taxonomy_concepts
+        )
+        taxonomy_ancestors = (
+            cls._normalize_account_taxonomy_ancestors(
+                account_taxonomy_calculation_ancestors
+            )
         )
 
         values: dict[FactPlanPath, FactPlanValue] = {}
@@ -189,6 +198,16 @@ class GaapCi69AccountDetailValueBuilder:
                     amount=abs(detail.balance),
                 )
 
+                for ancestor_name, weight in taxonomy_ancestors.get(
+                    account_number,
+                    (),
+                ):
+                    cls._add_value(
+                        values=values,
+                        concept_name=ancestor_name,
+                        amount=abs(detail.balance) * weight,
+                    )
+
         return values
 
     @staticmethod
@@ -264,6 +283,75 @@ class GaapCi69AccountDetailValueBuilder:
             result[
                 normalized_account_number
             ] = normalized_concept_name
+
+        return result
+
+    @staticmethod
+    def _normalize_account_taxonomy_ancestors(
+        account_taxonomy_calculation_ancestors: (
+            dict[str, tuple[tuple[str, Decimal], ...]] | None
+        ),
+    ) -> dict[str, tuple[tuple[str, Decimal], ...]]:
+        if account_taxonomy_calculation_ancestors is None:
+            return {}
+
+        if not isinstance(
+            account_taxonomy_calculation_ancestors,
+            dict,
+        ):
+            raise TypeError(
+                "account_taxonomy_calculation_ancestors must be a dict"
+            )
+
+        result: dict[str, tuple[tuple[str, Decimal], ...]] = {}
+
+        for account_number, ancestors in (
+            account_taxonomy_calculation_ancestors.items()
+        ):
+            if not isinstance(account_number, str):
+                raise TypeError(
+                    "taxonomy ancestor account numbers must be strings"
+                )
+
+            normalized_account_number = account_number.strip()
+
+            if not normalized_account_number:
+                raise ValueError(
+                    "taxonomy ancestor account numbers must not be empty"
+                )
+
+            if not isinstance(ancestors, tuple):
+                raise TypeError(
+                    "taxonomy calculation ancestors must be tuples"
+                )
+
+            normalized_ancestors: list[tuple[str, Decimal]] = []
+
+            for ancestor_name, weight in ancestors:
+                if not isinstance(ancestor_name, str):
+                    raise TypeError(
+                        "taxonomy ancestor concept names must be strings"
+                    )
+
+                normalized_ancestor_name = ancestor_name.strip()
+
+                if not normalized_ancestor_name:
+                    raise ValueError(
+                        "taxonomy ancestor concept names must not be empty"
+                    )
+
+                if not isinstance(weight, Decimal):
+                    raise TypeError(
+                        "taxonomy calculation weights must be Decimal values"
+                    )
+
+                normalized_ancestors.append(
+                    (normalized_ancestor_name, weight)
+                )
+
+            result[normalized_account_number] = tuple(
+                normalized_ancestors
+            )
 
         return result
 

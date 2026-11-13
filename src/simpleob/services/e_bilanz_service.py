@@ -31,9 +31,7 @@ from simpleob.domain.vat_accounts import VatAccounts
 from simpleob.eric.bilanz_generation.bvv_value_builder import (
     BvvValueBuilder,
 )
-from simpleob.eric.bilanz_generation.fact_plan import (
-    FactPlanState,
-)
+from simpleob.eric.bilanz_generation.fact_plan import FactPlanState
 from simpleob.eric.bilanz_generation.fact_plan_resolver import (
     FactPlanResolver,
 )
@@ -189,14 +187,11 @@ class EBilanzService:
             position
         )
 
-        child_concept_ids = {
-            relation.child_concept_id
-            for relation in gaap_ci_model.calculation.relations
-            if (
-                relation.parent_concept_id
-                == parent_concept.concept_id
+        child_concept_ids = (
+            gaap_ci_model.calculation.descendants_of(
+                parent_concept.concept_id
             )
-        }
+        )
 
         choices: list[tuple[str, str]] = []
 
@@ -406,6 +401,174 @@ class EBilanzService:
                 )
             )
 
+        taxonomy_mapper = TaxonomyMapper(
+            create_hgb_gaap_ci_mapping(
+                assets=self._assets,
+                liabilities=self._liabilities,
+                income_statement=self._income_statement,
+            ),
+            gaap_ci_model,
+        )
+
+        effective_fact_plan = profile.fact_plan
+
+        explicit_taxonomy_concepts = (
+            account_taxonomy_concepts or {}
+        )
+
+        extended_concepts: set[str] = set()
+        concept_parents: dict[str, str] = {}
+        account_calculation_ancestors: dict[
+            str,
+            tuple[tuple[str, Decimal], ...],
+        ] = {}
+
+        for detail in account_details:
+            target_concept_name = (
+                explicit_taxonomy_concepts.get(
+                    detail.account_number
+                )
+            )
+
+            if target_concept_name is None:
+                continue
+
+            target_concept = (
+                gaap_ci_model.concepts.by_name(
+                    target_concept_name
+                )
+            )
+
+            if target_concept is None:
+                raise ValueError(
+                    "account taxonomy concept not found: "
+                    f"{target_concept_name}"
+                )
+
+            parent_concept = (
+                taxonomy_mapper.concept_for(
+                    detail.position
+                )
+            )
+
+            calculation_paths = (
+                gaap_ci_model.calculation.paths_between(
+                    parent_concept.concept_id,
+                    target_concept.concept_id,
+                )
+            )
+
+            if not calculation_paths:
+                raise ValueError(
+                    "account taxonomy concept is not a "
+                    "calculation descendant of the mapped HGB concept: "
+                    f"account={detail.account_number}, "
+                    f"parent={parent_concept.name}, "
+                    f"child={target_concept_name}"
+                )
+
+            if len(calculation_paths) != 1:
+                raise ValueError(
+                    "account taxonomy concept has ambiguous "
+                    "calculation paths from the mapped HGB concept: "
+                    f"account={detail.account_number}, "
+                    f"parent={parent_concept.name}, "
+                    f"child={target_concept_name}"
+                )
+
+            cumulative_weight = Decimal("1")
+            rollup_ancestors: list[tuple[str, Decimal]] = []
+            path = calculation_paths[0]
+
+            for relation in path[:-1]:
+                cumulative_weight *= relation.weight
+                ancestor_concept = (
+                    gaap_ci_model.concepts.by_id(
+                        relation.child_concept_id
+                    )
+                )
+
+                if ancestor_concept is None:
+                    raise ValueError(
+                        "Calculation ancestor concept not found: "
+                        f"{relation.child_concept_id}"
+                    )
+
+                rollup_ancestors.append(
+                    (
+                        ancestor_concept.name,
+                        cumulative_weight,
+                    )
+                )
+                existing_parent = concept_parents.get(
+                    ancestor_concept.name
+                )
+                if (
+                    existing_parent is not None
+                    and existing_parent != parent_concept.name
+                ):
+                    raise ValueError(
+                        "Calculation ancestor has ambiguous "
+                        "mapped HGB parents: "
+                        f"{ancestor_concept.name}"
+                    )
+                concept_parents[
+                    ancestor_concept.name
+                ] = parent_concept.name
+                extended_concepts.add(
+                    ancestor_concept.name
+                )
+
+            existing_ancestors = account_calculation_ancestors.get(
+                detail.account_number
+            )
+            normalized_ancestors = tuple(rollup_ancestors)
+
+            if (
+                existing_ancestors is not None
+                and existing_ancestors != normalized_ancestors
+            ):
+                raise ValueError(
+                    "Account taxonomy mapping resolves to "
+                    "conflicting calculation paths: "
+                    f"account={detail.account_number}"
+                )
+
+            account_calculation_ancestors[
+                detail.account_number
+            ] = normalized_ancestors
+            existing_parent = concept_parents.get(
+                target_concept_name
+            )
+            if (
+                existing_parent is not None
+                and existing_parent != parent_concept.name
+            ):
+                raise ValueError(
+                    "Account taxonomy concept has ambiguous "
+                    "mapped HGB parents: "
+                    f"{target_concept_name}"
+                )
+            concept_parents[target_concept_name] = (
+                parent_concept.name
+            )
+            extended_concepts.add(
+                target_concept_name
+            )
+
+        for concept_name in extended_concepts:
+            if effective_fact_plan.node_for(concept_name) is not None:
+                continue
+
+            effective_fact_plan = (
+                effective_fact_plan.with_conditional_child(
+                    parent_concept_name=concept_parents[
+                        concept_name
+                    ],
+                    child_concept_name=concept_name,
+                )
+            )
+
         account_detail_values = (
             GaapCi69AccountDetailValueBuilder.build(
                 account_details=account_details,
@@ -429,109 +592,11 @@ class EBilanzService:
                 account_taxonomy_concepts=(
                     account_taxonomy_concepts
                 ),
+                account_taxonomy_calculation_ancestors=(
+                    account_calculation_ancestors
+                ),
             )
         )
-
-        taxonomy_mapper = TaxonomyMapper(
-            create_hgb_gaap_ci_mapping(
-                assets=self._assets,
-                liabilities=self._liabilities,
-                income_statement=self._income_statement,
-            ),
-            gaap_ci_model,
-        )
-
-        effective_fact_plan = profile.fact_plan
-
-        explicit_taxonomy_concepts = (
-            account_taxonomy_concepts or {}
-        )
-
-        extended_concepts: set[str] = set()
-
-        for detail in account_details:
-            target_concept_name = (
-                explicit_taxonomy_concepts.get(
-                    detail.account_number
-                )
-            )
-
-            if target_concept_name is None:
-                continue
-
-            if target_concept_name in extended_concepts:
-                continue
-
-            target_concept = (
-                gaap_ci_model.concepts.by_name(
-                    target_concept_name
-                )
-            )
-
-            if target_concept is None:
-                raise ValueError(
-                    "account taxonomy concept not found: "
-                    f"{target_concept_name}"
-                )
-
-            parent_concept = (
-                taxonomy_mapper.concept_for(
-                    detail.position
-                )
-            )
-
-            candidate_roles = {
-                relation.role_uri
-                for relation
-                in gaap_ci_model.calculation.relations
-                if (
-                    relation.child_concept_id
-                    == target_concept.concept_id
-                )
-            }
-
-            has_expected_parent = any(
-                any(
-                    relation.parent_concept_id
-                    == parent_concept.concept_id
-                    for relation
-                    in gaap_ci_model.calculation.parents_of(
-                        target_concept.concept_id,
-                        role_uri=role_uri,
-                    )
-                )
-                for role_uri in candidate_roles
-            )
-
-            if not has_expected_parent:
-                raise ValueError(
-                    "account taxonomy concept is not a direct "
-                    "calculation child of the mapped HGB concept: "
-                    f"account={detail.account_number}, "
-                    f"parent={parent_concept.name}, "
-                    f"child={target_concept_name}"
-                )
-
-            if (
-                effective_fact_plan.node_for(
-                    target_concept_name
-                )
-                is None
-            ):
-                effective_fact_plan = (
-                    effective_fact_plan.with_conditional_child(
-                        parent_concept_name=(
-                            parent_concept.name
-                        ),
-                        child_concept_name=(
-                            target_concept_name
-                        ),
-                    )
-                )
-
-            extended_concepts.add(
-                target_concept_name
-            )
 
         has_tax_reconciliation = (
             current_depreciation_difference != Decimal("0.00")
@@ -748,6 +813,27 @@ class EBilanzService:
             gaap_ci_values=gaap_ci_values,
             previous_fiscal_year=previous_fiscal_year,
         )
+
+        existing_value_sources = (
+            values,
+            balance_sheet_values,
+            income_statement_values,
+            profit_appropriation_values,
+            bvv_values,
+        )
+
+        for existing_values in existing_value_sources:
+            for path in set(account_detail_values).intersection(
+                existing_values
+            ):
+                if account_detail_values[path] != existing_values[path]:
+                    raise ValueError(
+                        "Account detail value conflicts with an "
+                        "existing taxonomy value: "
+                        f"{'.'.join(path)}"
+                    )
+
+                account_detail_values.pop(path)
 
         values.update(
             balance_sheet_values

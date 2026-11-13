@@ -278,14 +278,23 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
         final_fact_plan
     )
 
+    intermediate_account_detail_path = (
+        "bs.ass.currAss.receiv.trade",
+        "bs.ass.currAss.receiv.trade.otherSubtotal",
+    )
     structural_account_detail_path = (
         "bs.ass.currAss.receiv.trade",
+        "bs.ass.currAss.receiv.trade.otherSubtotal",
         "bs.ass.currAss.receiv.trade.other",
     )
-
-    extended_fact_plan.path_for.return_value = (
-        structural_account_detail_path
-    )
+    extended_fact_plan.path_for.side_effect = {
+        "bs.ass.currAss.receiv.trade.otherSubtotal": (
+            intermediate_account_detail_path
+        ),
+        "bs.ass.currAss.receiv.trade.other": (
+            structural_account_detail_path
+        ),
+    }.get
 
     profile.fact_plan.node_for.return_value = None
     profile.fact_plan.with_conditional_child.return_value = (
@@ -306,9 +315,13 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
     balance_sheet_values = {
         ("bs.test",): Decimal("100.00"),
         ("bs.eqLiab.equity",): Decimal("100.00"),
+        intermediate_account_detail_path: Decimal("100.00"),
     }
     income_statement_values = {
         ("is.test",): Decimal("100.00"),
+        (
+            "is.netIncome.regular.operatingTC.otherCost",
+        ): Decimal("6394.00"),
     }
 
     profit_appropriation_data = ProfitAppropriationAnnualData(
@@ -348,6 +361,9 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
     }
 
     account_detail_values = {
+        (
+            "bs.ass.currAss.receiv.trade.otherSubtotal",
+        ): Decimal("100.00"),
         (
             "bs.ass.currAss.receiv.trade.other",
         ): Decimal("100.00"),
@@ -402,6 +418,21 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
     calculation_relation.role_uri = (
         "http://example.test/calculation-role"
     )
+    intermediate_relation = Mock()
+    intermediate_relation.parent_concept_id = (
+        parent_concept.concept_id
+    )
+    intermediate_relation.child_concept_id = "subtotal-concept-id"
+    intermediate_relation.weight = Decimal("1")
+    target_relation = Mock()
+    target_relation.parent_concept_id = "subtotal-concept-id"
+    target_relation.child_concept_id = target_concept.concept_id
+    target_relation.weight = Decimal("1")
+    intermediate_concept = Mock()
+    intermediate_concept.concept_id = "subtotal-concept-id"
+    intermediate_concept.name = (
+        "bs.ass.currAss.receiv.trade.otherSubtotal"
+    )
 
     gaap_ci_model.concepts.by_name.return_value = (
         target_concept
@@ -409,9 +440,10 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
     gaap_ci_model.calculation.relations = (
         calculation_relation,
     )
-    gaap_ci_model.calculation.parents_of.return_value = (
-        calculation_relation,
+    gaap_ci_model.calculation.paths_between.return_value = (
+        (intermediate_relation, target_relation),
     )
+    gaap_ci_model.concepts.by_id.return_value = intermediate_concept
 
     account_balance_builder = Mock()
     fixed_asset_schedule_builder = Mock()
@@ -614,6 +646,14 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
                 "bs.ass.currAss.receiv.trade.other"
             ),
         },
+        account_taxonomy_calculation_ancestors={
+            "1400": (
+                (
+                    "bs.ass.currAss.receiv.trade.otherSubtotal",
+                    Decimal("1"),
+                ),
+            ),
+        },
     )
 
     value_builder.assert_called_once()
@@ -638,16 +678,17 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
         "bs.ass.currAss.receiv.trade.other"
     )
 
-    gaap_ci_model.calculation.parents_of.assert_called_once_with(
+    gaap_ci_model.calculation.paths_between.assert_called_once_with(
+        parent_concept.concept_id,
         target_concept.concept_id,
-        role_uri=calculation_relation.role_uri,
     )
 
-    profile.fact_plan.with_conditional_child.assert_called_once_with(
-        parent_concept_name=parent_concept.name,
-        child_concept_name=(
-            "bs.ass.currAss.receiv.trade.other"
-        ),
+    assert profile.fact_plan.with_conditional_child.call_count == 1
+    assert (
+        profile.fact_plan.with_conditional_child.call_args.kwargs[
+            "parent_concept_name"
+        ]
+        == parent_concept.name
     )
 
     extended_fact_plan.with_state.assert_called_once_with(
@@ -671,9 +712,7 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
         is final_fact_plan
     )
 
-    extended_fact_plan.path_for.assert_called_once_with(
-        "bs.ass.currAss.receiv.trade.other"
-    )
+    assert extended_fact_plan.path_for.call_count == 2
 
     resolver_values = (
         fact_plan_resolver.call_args.kwargs["values"]
@@ -682,9 +721,19 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
     for path, value in profit_appropriation_values.items():
         assert resolver_values[path] == value
 
+    assert resolver_values[
+        ("is.netIncome.regular.operatingTC.otherCost",)
+    ] == Decimal("6394.00")
+
     assert (
         resolver_values[
             structural_account_detail_path
+        ]
+        == Decimal("100.00")
+    )
+    assert (
+        resolver_values[
+            intermediate_account_detail_path
         ]
         == Decimal("100.00")
     )
@@ -720,6 +769,80 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
     account_balance_builder.build.assert_called_once()
 
     document_builder.build_xml.assert_called_once()
+
+def test_account_taxonomy_choices_include_calculation_descendants() -> None:
+    fiscal_year = FiscalYear(
+        start_date=date(2026, 1, 1),
+        end_date=date(2026, 12, 31),
+    )
+    position = FinancialStatementPosition(
+        code="HGB.275.GKV.8",
+        name="Sonstige betriebliche Aufwendungen",
+    )
+    parent = Mock()
+    parent.concept_id = "other-cost"
+    parent.name = "otherCost"
+    direct_child = Mock()
+    direct_child.concept_id = "lease-fix"
+    direct_child.name = "leaseFix"
+    deep_child = Mock()
+    deep_child.concept_id = "lease-fix-other"
+    deep_child.name = "leaseFix.other"
+    model = Mock()
+    model.calculation.descendants_of.return_value = (
+        direct_child.concept_id,
+        deep_child.concept_id,
+    )
+    model.concepts.by_id.side_effect = {
+        direct_child.concept_id: direct_child,
+        deep_child.concept_id: deep_child,
+    }.get
+    model.label_for.side_effect = {
+        direct_child.concept_id: "Miete unbewegliche Güter",
+        deep_child.concept_id: "Übrige Miete unbeweglicher Güter",
+    }.get
+
+    resolver = Mock()
+    resolver.gaap_ci_fiscal_entry_point.return_value = Path(
+        "taxonomy.xsd"
+    )
+    adapter = Mock()
+    adapter.model.return_value = model
+    service = EBilanzService(
+        resolver=resolver,
+        adapter=adapter,
+        company_data_mapper=GcdCompanyDataMapper(),
+        assets=position,
+        liabilities=position,
+        income_statement=position,
+    )
+    taxonomy_mapper = Mock()
+    taxonomy_mapper.concept_for.return_value = parent
+
+    with (
+        patch(
+            "simpleob.services.e_bilanz_service."
+            "create_hgb_gaap_ci_mapping",
+            return_value=Mock(),
+        ),
+        patch(
+            "simpleob.services.e_bilanz_service.TaxonomyMapper",
+            return_value=taxonomy_mapper,
+        ),
+    ):
+        choices = service.account_taxonomy_choices(
+            fiscal_year=fiscal_year,
+            position=position,
+        )
+
+    assert {name for name, _label in choices} == {
+        "leaseFix",
+        "leaseFix.other",
+    }
+    model.calculation.descendants_of.assert_called_once_with(
+        parent.concept_id
+    )
+
 
 def test_e_bilanz_service_rejects_account_taxonomy_concept_with_wrong_parent(
 ) -> None:
@@ -843,7 +966,7 @@ def test_e_bilanz_service_rejects_account_taxonomy_concept_with_wrong_parent(
 
     gaap_ci_model.concepts.by_name.return_value = target_concept
     gaap_ci_model.calculation.relations = (relation,)
-    gaap_ci_model.calculation.parents_of.return_value = (relation,)
+    gaap_ci_model.calculation.paths_between.return_value = ()
 
     taxonomy_mapper = Mock()
     taxonomy_mapper.concept_for.return_value = expected_parent
@@ -906,8 +1029,8 @@ def test_e_bilanz_service_rejects_account_taxonomy_concept_with_wrong_parent(
         with pytest.raises(
             ValueError,
             match=(
-                "account taxonomy concept is not a direct "
-                "calculation child"
+                "account taxonomy concept is not a "
+                "calculation descendant"
             ),
         ):
             service.build(
@@ -932,9 +1055,9 @@ def test_e_bilanz_service_rejects_account_taxonomy_concept_with_wrong_parent(
     taxonomy_mapper.concept_for.assert_called_once_with(
         account_detail.position
     )
-    gaap_ci_model.calculation.parents_of.assert_called_once_with(
+    gaap_ci_model.calculation.paths_between.assert_called_once_with(
+        expected_parent.concept_id,
         target_concept.concept_id,
-        role_uri=relation.role_uri,
     )
     profile.fact_plan.with_conditional_child.assert_not_called()
 
