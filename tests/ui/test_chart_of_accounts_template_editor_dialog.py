@@ -427,6 +427,73 @@ def test_template_mode_requires_hgb_by_default_and_allows_explicit_exception(
     dialog.close()
 
 
+def test_account_editor_rejects_eric_reported_en_dash_and_keeps_umlauts(
+    monkeypatch,
+):
+    _app()
+    assets, liabilities, income_statement = _roots()
+    dialog = AccountEditorDialog(
+        None,
+        assets=assets,
+        liabilities=liabilities,
+        income_statement=income_statement,
+        template_mode=True,
+        hgb_mapping_required=False,
+    )
+    dialog._account_number_entry.setText("7100")
+    dialog._name_entry.setText("SimpleOB – Jahresüberschuss")
+    errors = []
+    monkeypatch.setattr(
+        "simpleob.ui_qt.account_editor_dialog.QMessageBox.critical",
+        lambda *_args: errors.append(_args),
+    )
+
+    dialog._save()
+
+    assert errors
+    assert "U+2013" in errors[0][2]
+    assert dialog.result is None
+
+    dialog._name_entry.setText("Umsätze, Rücklagen und Güter")
+    dialog._save()
+
+    assert dialog.result is not None
+    assert dialog.result.account.name == "Umsätze, Rücklagen und Güter"
+    dialog.close()
+
+
+def test_account_editor_rejects_eric_reported_en_dash_when_editing(
+    monkeypatch,
+):
+    _app()
+    assets, liabilities, income_statement = _roots()
+    account = Account(
+        TemplateAccount("7100", "Bankkonto", AccountType.ASSET)
+    )
+    mapping_rule = AccountMappingRule("7100", assets.children[0], None)
+    dialog = AccountEditorDialog(
+        None,
+        assets=assets,
+        liabilities=liabilities,
+        income_statement=income_statement,
+        account=account,
+        mapping_rule=mapping_rule,
+    )
+    dialog._name_entry.setText("Bank – laufend")
+    errors = []
+    monkeypatch.setattr(
+        "simpleob.ui_qt.account_editor_dialog.QMessageBox.critical",
+        lambda *_args: errors.append(_args),
+    )
+
+    dialog._save()
+
+    assert errors
+    assert "U+2013" in errors[0][2]
+    assert dialog.result is None
+    dialog.close()
+
+
 def test_template_mode_edit_uses_same_hgb_requirement_and_exception(
     monkeypatch,
 ):

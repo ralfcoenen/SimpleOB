@@ -23,7 +23,10 @@ from simpleob.accounting.statement_category import StatementCategory
 from simpleob.domain.account import Account
 from simpleob.domain.account_mapping_rule import AccountMappingRule
 from simpleob.domain.account_type import AccountType
-from simpleob.domain.template_account import TemplateAccount
+from simpleob.domain.template_account import (
+    TemplateAccount,
+    validate_ebilanz_account_description,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -539,6 +542,8 @@ class AccountEditorDialog(QDialog):
                 .text()
                 .strip()
             )
+
+            validate_ebilanz_account_description(name)
 
             account_type = (
                 self._selected_account_type()
