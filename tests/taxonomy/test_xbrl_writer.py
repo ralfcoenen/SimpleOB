@@ -270,6 +270,126 @@ def test_xbrl_writer_serializes_fact() -> None:
     assert element.attrib["decimals"] == "2"
 
 
+@pytest.mark.parametrize(
+    ("amount", "expected"),
+    (
+        (Decimal("1200.000"), "1200.00"),
+        (Decimal("800.000"), "800.00"),
+        (Decimal("-800.000"), "-800.00"),
+        (Decimal("1200.00"), "1200.00"),
+    ),
+)
+def test_xbrl_writer_formats_monetary_facts_with_two_decimals(
+    amount: Decimal,
+    expected: str,
+) -> None:
+    concept = TaxonomyConcept(
+        name="is.netIncome.regular.operatingTC.otherCost",
+        concept_id=(
+            "de-gaap-ci_is.netIncome.regular.operatingTC.otherCost"
+        ),
+        type_name="xbrli:monetaryItemType",
+        substitution_group="xbrli:item",
+        period_type=TaxonomyPeriodType.DURATION,
+        balance=TaxonomyBalance.NONE,
+        abstract=False,
+        nillable=True,
+    )
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+    fact = TaxonomyFact(
+        concept=concept,
+        amount=amount,
+        context=context,
+        unit=TaxonomyUnit.eur(),
+    )
+
+    element = TaxonomyXbrlWriter().fact_element(
+        fact=fact,
+        context_id="ctx-2025",
+        unit_id="EUR",
+        namespace=DE_GAAP_CI_NAMESPACE,
+    )
+
+    assert element.text == expected
+
+
+def test_xbrl_writer_does_not_round_subcent_monetary_facts() -> None:
+    concept = TaxonomyConcept(
+        name="is.netIncome.regular.operatingTC.otherCost",
+        concept_id=(
+            "de-gaap-ci_is.netIncome.regular.operatingTC.otherCost"
+        ),
+        type_name="xbrli:monetaryItemType",
+        substitution_group="xbrli:item",
+        period_type=TaxonomyPeriodType.DURATION,
+        balance=TaxonomyBalance.NONE,
+        abstract=False,
+        nillable=True,
+    )
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+    fact = TaxonomyFact(
+        concept=concept,
+        amount=Decimal("1.234"),
+        context=context,
+        unit=TaxonomyUnit.eur(),
+    )
+
+    with pytest.raises(ValueError, match="without rounding"):
+        TaxonomyXbrlWriter().fact_element(
+            fact=fact,
+            context_id="ctx-2025",
+            unit_id="EUR",
+            namespace=DE_GAAP_CI_NAMESPACE,
+        )
+
+
+def test_xbrl_writer_preserves_non_monetary_decimal_format() -> None:
+    concept = TaxonomyConcept(
+        name="test.ratio",
+        concept_id="test_ratio",
+        type_name="xbrli:decimalItemType",
+        substitution_group="xbrli:item",
+        period_type=TaxonomyPeriodType.DURATION,
+        balance=TaxonomyBalance.NONE,
+        abstract=False,
+        nillable=True,
+    )
+    context = TaxonomyContext(
+        entity_identifier="DE123456789",
+        entity_scheme=TEST_ENTITY_SCHEME,
+        period_type=TaxonomyPeriodType.DURATION,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+    fact = TaxonomyFact(
+        concept=concept,
+        amount=Decimal("3.000"),
+        context=context,
+        unit=TaxonomyUnit.pure(),
+    )
+
+    element = TaxonomyXbrlWriter().fact_element(
+        fact=fact,
+        context_id="ctx-2025",
+        unit_id="PURE",
+        namespace=DE_GAAP_CI_NAMESPACE,
+    )
+
+    assert element.text == "3.000"
+
+
 def test_xbrl_writer_builds_instance_document() -> None:
     """Context, Unit und Fact werden zu einer XBRL-Instanz kombiniert."""
 

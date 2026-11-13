@@ -1,5 +1,6 @@
 """Serialisierung taxonomischer Daten als XBRL."""
 
+from decimal import Decimal
 from xml.etree import ElementTree as ET
 
 from simpleob.taxonomy.account_balance_tuple import (
@@ -37,6 +38,23 @@ XSI_NAMESPACE = "http://www.w3.org/2001/XMLSchema-instance"
 
 class TaxonomyXbrlWriter:
     """Serialisiert Taxonomie-Objekte als XBRL-Elemente."""
+
+    @staticmethod
+    def _fact_amount_text(fact: TaxonomyFact) -> str:
+        """Formatiert Geldwerte centgenau und andere Zahlen unverändert."""
+
+        if fact.concept.type_name != "xbrli:monetaryItemType":
+            return str(fact.amount)
+
+        amount_text = format(fact.amount, ".2f")
+
+        if Decimal(amount_text) != fact.amount:
+            raise ValueError(
+                "monetary fact amount cannot be represented "
+                "with two decimal places without rounding"
+            )
+
+        return amount_text
 
     def namespace_for(
         self,
@@ -184,7 +202,7 @@ class TaxonomyXbrlWriter:
             },
         )
 
-        element.text = str(fact.amount)
+        element.text = self._fact_amount_text(fact)
 
         return element
 
