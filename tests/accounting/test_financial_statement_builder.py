@@ -1,11 +1,17 @@
 from decimal import Decimal
 
+import pytest
+
 from simpleob.accounting.account_balance import AccountBalance
+from simpleob.accounting.balance_sheet import BalanceSheet
 from simpleob.accounting.financial_statement_builder import (
     FinancialStatementBuilder,
 )
 from simpleob.accounting.financial_statement_position import (
     FinancialStatementPosition,
+)
+from simpleob.accounting.hgb_financial_statement_position_provider import (
+    HgbFinancialStatementPositionProvider,
 )
 from simpleob.accounting.mapper import AccountMapper
 from simpleob.accounting.statement_category import StatementCategory
@@ -17,6 +23,9 @@ from simpleob.domain.chart_of_accounts_template import (
 from simpleob.domain.template_account import TemplateAccount
 from simpleob.hgb.balance_sheet_structure import (
     create_hgb_balance_sheet_structure,
+)
+from simpleob.hgb.income_statement_structure import (
+    create_hgb_income_statement_structure,
 )
 from simpleob.services.closing_result import ClosingResult
 
@@ -284,6 +293,80 @@ def test_aggregates_equity_positions_to_liabilities() -> None:
 
     assert amounts[equity] == Decimal("55000.00")
     assert amounts[liabilities] == Decimal("55000.00")
+
+
+@pytest.mark.parametrize(
+    ("loss_account_number", "loss_account_name"),
+    (
+        ("8021", "Jahresfehlbetrag"),
+        ("9503", "SimpleOB – Jahresfehlbetrag"),
+    ),
+)
+def test_direct_hgb_balance_sheet_balances_with_booked_loss_account(
+    loss_account_number: str,
+    loss_account_name: str,
+) -> None:
+    assets, liabilities = create_hgb_balance_sheet_structure()
+    income_statement = create_hgb_income_statement_structure()
+    provider = HgbFinancialStatementPositionProvider(
+        (assets, liabilities, income_statement)
+    )
+    bank_position = provider.get("HGB.266.AKTIVA.B.IV")
+    capital_position = provider.get("HGB.266.PASSIVA.A.I")
+    loss_position = provider.get("HGB.266.PASSIVA.A.V")
+    chart = ChartOfAccountsTemplate(
+        name="Jahresfehlbetrag-Test",
+        accounts=(
+            TemplateAccount("1800", "Bank", AccountType.ASSET),
+            TemplateAccount(
+                "2900",
+                "Gezeichnetes Kapital",
+                AccountType.EQUITY,
+            ),
+            TemplateAccount(
+                loss_account_number,
+                loss_account_name,
+                AccountType.EQUITY,
+            ),
+        ),
+        account_mapping_rules=(
+            AccountMappingRule(
+                account_number="1800",
+                debit_position=bank_position,
+                credit_position=None,
+            ),
+            AccountMappingRule(
+                account_number="2900",
+                debit_position=None,
+                credit_position=capital_position,
+            ),
+            AccountMappingRule(
+                account_number=loss_account_number,
+                debit_position=loss_position,
+                credit_position=None,
+            ),
+        ),
+    )
+    balances = (
+        AccountBalance("1800", debit=Decimal("4000.00")),
+        AccountBalance("2900", credit=Decimal("5000.00")),
+        AccountBalance(loss_account_number, debit=Decimal("1000.00")),
+    )
+
+    amounts = FinancialStatementBuilder(AccountMapper(chart)).build(
+        balances=balances,
+        root_positions=(assets, liabilities),
+    )
+    balance_sheet = BalanceSheet(
+        assets=assets,
+        liabilities=liabilities,
+        amounts=amounts,
+    )
+
+    assert amounts[loss_position] == Decimal("-1000.00")
+    assert balance_sheet.amount_for(assets) == Decimal("4000.00")
+    assert balance_sheet.amount_for(liabilities) == Decimal("4000.00")
+    assert balance_sheet.is_balanced()
 
 
 def test_build_includes_closing_result_in_result_position() -> None:

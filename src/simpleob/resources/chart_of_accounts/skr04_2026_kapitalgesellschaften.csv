@@ -1,0 +1,249 @@
+account_number;name;account_type;statement_type;debit_position_code;credit_position_code
+0100;Entgeltlich erworbene Konzessionen, gewerbliche Schutzrechte und ähnliche Rechte und Werte sowie Lizenzen an solchen Rechten und Werten;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.A.I.2;
+0135;EDV-Software;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.A.I.2;
+0143;Selbst geschaffene immaterielle Vermögensgegenstände;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.A.I.1;
+0144;EDV-Software;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.A.I.1;
+0170;Geleistete Anzahlungen auf immaterielle Vermögensgegenstände;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.A.I.4;
+0400;Technische Anlagen und Maschinen;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.A.II.2;
+0440;Maschinen;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.A.II.2;
+0460;Maschinengebundene Werkzeuge;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.A.II.2;
+0500;Andere Anlagen, Betriebs- und Geschäftsausstattung;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.A.II.3;
+0520;Pkw;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.A.II.3;
+0620;Werkzeuge;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.A.II.3;
+0630;Betriebsausstattung;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.A.II.3;
+0635;Geschäftsausstattung;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.A.II.3;
+0650;Büroeinrichtung;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.A.II.3;
+0670;Geringwertige Wirtschaftsgüter;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.A.II.3;
+0675;Wirtschaftsgüter (Sammelposten);ASSET;BALANCE_SHEET;HGB.266.AKTIVA.A.II.3;
+0690;Sonstige Betriebs- und Geschäftsausstattung;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.A.II.3;
+1000;Roh-, Hilfs- und Betriebsstoffe (Bestand);ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.I.1;
+1040;Unfertige Erzeugnisse, unfertige Leistungen (Bestand);ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.I.2;
+1050;Unfertige Erzeugnisse (Bestand);ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.I.2;
+1080;Unfertige Leistungen (Bestand);ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.I.2;
+1100;Fertige Erzeugnisse und Waren (Bestand);ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.I.3;
+1110;Fertige Erzeugnisse (Bestand);ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.I.3;
+1140;Waren (Bestand);ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.I.3;
+1180;Geleistete Anzahlungen auf Vorräte;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.I.4;
+1181;Geleistete Anzahlungen 7 % Vorsteuer;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.I.4;
+1186;Geleistete Anzahlungen 19 % Vorsteuer;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.I.4;
+1200;Forderungen aus Lieferungen und Leistungen;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.II.1;
+1300;Sonstige Vermögensgegenstände;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.II.4;
+1310;Forderungen gegen Vorstandsmitglieder und Geschäftsführer;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.II.4;HGB.266.PASSIVA.C.8
+1340;Forderungen gegen Personal aus Lohn- und Gehaltsabrechnung;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.II.4;
+1350;Kautionen;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.II.4;
+1360;Darlehen;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.II.4;
+1369;Forderungen gegenüber Krankenkassen aus Aufwendungsausgleichsgesetz;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.II.4;
+1370;Durchlaufende Posten;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.II.4;HGB.266.PASSIVA.C.8
+1378;Ansprüche aus Rückdeckungsversicherungen;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.II.4;
+1400;Abziehbare Vorsteuer;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.II.4;
+1401;Abziehbare Vorsteuer 7 %;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.II.4;
+1406;Abziehbare Vorsteuer 19 %;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.II.4;
+1410;Aufzuteilende Vorsteuer;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.II.4;
+1411;Aufzuteilende Vorsteuer 7 %;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.II.4;
+1416;Aufzuteilende Vorsteuer 19 %;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.II.4;
+1420;Forderungen aus Umsatzsteuer-Vorauszahlungen;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.II.4;
+1422;Umsatzsteuerforderungen Vorjahr;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.II.4;
+1434;Vorsteuer in Folgeperiode/ im Folgejahr abziehbar;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.II.4;
+1435;Forderungen aus Gewerbesteuerüberzahlungen;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.II.4;
+1450;Körperschaftsteuerrückforderung;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.II.4;
+1460;Geldtransit;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.IV;
+1600;Kasse;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.IV;
+1800;Bank;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.IV;
+1900;Aktive Rechnungsabgrenzung;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.C;
+2900;Gezeichnetes Kapital17);EQUITY;BALANCE_SHEET;;HGB.266.PASSIVA.A.I
+2920;Kapitalrücklage17);EQUITY;BALANCE_SHEET;;HGB.266.PASSIVA.A.II
+2930;Gesetzliche Rücklage17);EQUITY;BALANCE_SHEET;;HGB.266.PASSIVA.A.III.1
+2960;Andere Gewinnrücklagen17);EQUITY;BALANCE_SHEET;;HGB.266.PASSIVA.A.III.4
+2970;Gewinnvortrag vor Verwendung17);EQUITY;BALANCE_SHEET;;HGB.266.PASSIVA.A.IV
+2978;Verlustvortrag vor Verwendung17);EQUITY;BALANCE_SHEET;HGB.266.PASSIVA.A.IV;
+3035;Gewerbesteuerrückstellung nach § 4 Abs. 5b EStG;LIABILITY;BALANCE_SHEET;;HGB.266.PASSIVA.B.2
+3040;Körperschaftsteuerrückstellung;LIABILITY;BALANCE_SHEET;;HGB.266.PASSIVA.B.2
+3070;Sonstige Rückstellungen;LIABILITY;BALANCE_SHEET;;HGB.266.PASSIVA.B.3
+3250;Erhaltene Anzahlungen auf Bestellungen (Verbindlichkeiten);LIABILITY;BALANCE_SHEET;;HGB.266.PASSIVA.C.3
+3300;Verbindlichkeiten aus Lieferungen und Leistungen;LIABILITY;BALANCE_SHEET;;HGB.266.PASSIVA.C.4
+3550;Erhaltene Kautionen;LIABILITY;BALANCE_SHEET;;HGB.266.PASSIVA.C.8
+3560;Darlehen;LIABILITY;BALANCE_SHEET;;HGB.266.PASSIVA.C.8
+3610;Kreditkartenabrechnung;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.II.4;HGB.266.PASSIVA.C.8
+3700;Verbindlichkeiten aus Steuern und Abgaben;LIABILITY;BALANCE_SHEET;;HGB.266.PASSIVA.C.8
+3759;Voraussichtliche Beitragsschuld gegenüber den Sozialversicherungsträgern;LIABILITY;BALANCE_SHEET;;HGB.266.PASSIVA.C.8
+3800;Umsatzsteuer;LIABILITY;BALANCE_SHEET;;HGB.266.PASSIVA.C.8
+3801;Umsatzsteuer 7 %;LIABILITY;BALANCE_SHEET;;HGB.266.PASSIVA.C.8
+3806;Umsatzsteuer 19 %;LIABILITY;BALANCE_SHEET;;HGB.266.PASSIVA.C.8
+3810;Umsatzsteuer nicht fällig;LIABILITY;BALANCE_SHEET;;HGB.266.PASSIVA.C.8
+3811;Umsatzsteuer nicht fällig 7 %;LIABILITY;BALANCE_SHEET;;HGB.266.PASSIVA.C.8
+3816;Umsatzsteuer nicht fällig 19 %;LIABILITY;BALANCE_SHEET;;HGB.266.PASSIVA.C.8
+3820;Umsatzsteuer-Vorauszahlungen;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.II.4;
+3840;Umsatzsteuer laufendes Jahr;LIABILITY;BALANCE_SHEET;HGB.266.AKTIVA.B.II.4;HGB.266.PASSIVA.C.8
+3841;Umsatzsteuerverbindlichkeiten Vorjahr;LIABILITY;BALANCE_SHEET;;HGB.266.PASSIVA.C.8
+3900;Passive Rechnungsabgrenzung;LIABILITY;BALANCE_SHEET;;HGB.266.PASSIVA.D
+4200;Erlöse;REVENUE;INCOME_STATEMENT;;HGB.275.GKV.1
+4290;Erlöse 0 % USt;REVENUE;INCOME_STATEMENT;;HGB.275.GKV.1
+4300;Erlöse 7 % USt;REVENUE;INCOME_STATEMENT;;HGB.275.GKV.1
+4400;Erlöse 19 % USt;REVENUE;INCOME_STATEMENT;;HGB.275.GKV.1
+4449;Erlöse aus im Inland steuerpflichtigen elektronischen Dienstleistungen 19 % USt;REVENUE;INCOME_STATEMENT;;HGB.275.GKV.1
+4499;Nebenerlöse (Bezug zu Materialaufwand);REVENUE;INCOME_STATEMENT;;HGB.275.GKV.1
+4560;Provisionsumsätze;REVENUE;INCOME_STATEMENT;;HGB.275.GKV.1
+4700;Erlösschmälerungen;REVENUE;INCOME_STATEMENT;HGB.275.GKV.1;
+4710;Erlösschmälerungen 7 % USt;REVENUE;INCOME_STATEMENT;HGB.275.GKV.1;
+4719;Erlösschmälerungen 0 % USt;REVENUE;INCOME_STATEMENT;HGB.275.GKV.1;
+4720;Erlösschmälerungen 19 % USt;REVENUE;INCOME_STATEMENT;HGB.275.GKV.1;
+4800;Bestandsveränderungen - fertige Erzeugnisse;REVENUE;INCOME_STATEMENT;HGB.275.GKV.2;HGB.275.GKV.2
+4810;Bestandsveränderungen - unfertige Erzeugnisse;REVENUE;INCOME_STATEMENT;HGB.275.GKV.2;HGB.275.GKV.2
+4815;Bestandsveränderungen - unfertige Leistungen;REVENUE;INCOME_STATEMENT;HGB.275.GKV.2;HGB.275.GKV.2
+4824;Aktivierte Eigenleistungen (den Herstellungskosten zurechenbare Fremdkapitalzinsen);REVENUE;INCOME_STATEMENT;;HGB.275.GKV.3
+4825;Aktivierte Eigenleistungen zur Erstellung von selbst geschaffenen immateriellen Vermögensgegenständen;REVENUE;INCOME_STATEMENT;;HGB.275.GKV.3
+4830;Sonstige betriebliche Erträge;REVENUE;INCOME_STATEMENT;;HGB.275.GKV.4
+4833;Andere Nebenerlöse;REVENUE;INCOME_STATEMENT;;HGB.275.GKV.1
+4835;Sonstige Erträge betrieblich und regelmäßig;REVENUE;INCOME_STATEMENT;;HGB.275.GKV.4
+4836;Sonstige Erträge betrieblich und regelmäßig 19 % USt;REVENUE;INCOME_STATEMENT;;HGB.275.GKV.4
+4838;Erstattete Vorsteuer anderer Länder;REVENUE;INCOME_STATEMENT;;HGB.275.GKV.4
+4839;Sonstige Erträge unregelmäßig;REVENUE;INCOME_STATEMENT;;HGB.275.GKV.4
+4845;Erlöse aus Verkäufen Sachanlagevermögen 19 % USt (bei Buchgewinn);REVENUE;INCOME_STATEMENT;;HGB.275.GKV.4
+4849;Erlöse aus Verkäufen Sachanlagevermögen (bei Buchgewinn);REVENUE;INCOME_STATEMENT;;HGB.275.GKV.4
+4850;Erlöse aus Verkäufen immaterieller Vermögensgegenstände (bei Buchgewinn);REVENUE;INCOME_STATEMENT;;HGB.275.GKV.4
+4856;Anlagenabgänge immaterielle Vermögensgegenstände (Restbuchwert bei Buchgewinn);EXPENSE;INCOME_STATEMENT;HGB.275.GKV.4;
+4862;Erlöse aus Vermietung und Verpachtung 19 % USt;REVENUE;INCOME_STATEMENT;;HGB.275.GKV.1
+4930;Erträge aus der Auflösung von Rückstellungen;REVENUE;INCOME_STATEMENT;;HGB.275.GKV.4
+4970;Versicherungsentschädigungen und Schadenersatzleistungen;REVENUE;INCOME_STATEMENT;;HGB.275.GKV.4
+4972;Erstattungen Aufwendungsausgleichsgesetz;REVENUE;INCOME_STATEMENT;;HGB.275.GKV.4
+5100;Einkauf Roh-, Hilfs- und Betriebsstoffe;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.5.a;
+5110;Einkauf Roh-, Hilfs- und Betriebsstoffe 7 % Vorsteuer;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.5.a;
+5129;Einkauf Roh-, Hilfs- und Betriebsstoffe ohne Vorsteuerabzug;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.5.a;
+5130;Einkauf Roh-, Hilfs- und Betriebsstoffe 19 % Vorsteuer;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.5.a;
+5171;Einkauf Roh-, Hilfs- und Betriebsstoffe 7,8 % Vorsteuer8);EXPENSE;INCOME_STATEMENT;HGB.275.GKV.5.a;
+5191;Energiestoffe (Fertigung) 7 % Vorsteuer;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.5.a;
+5192;Energiestoffe (Fertigung) 19 % Vorsteuer;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.5.a;
+5200;Wareneingang;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.5.a;
+5300;Wareneingang 7 % Vorsteuer;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.5.a;
+5349;Wareneingang ohne Vorsteuerabzug;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.5.a;
+5400;Wareneingang 19 % Vorsteuer;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.5.a;
+5600;Nicht abziehbare Vorsteuer;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.5.a;
+5800;Bezugsnebenkosten;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.5.a;
+5900;Fremdleistungen;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.5.b;
+5906;Fremdleistungen 19 % Vorsteuer;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.5.b;
+5908;Fremdleistungen 7 % Vorsteuer;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.5.b;
+5909;Fremdleistungen ohne Vorsteuer;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.5.b;
+5970;Fremdleistungen (Miet- und Pachtzinsen bewegliche Wirtschaftsgüter);EXPENSE;INCOME_STATEMENT;HGB.275.GKV.5.b;
+5975;Fremdleistungen (Miet- und Pachtzinsen unbewegliche Wirtschaftsgüter);EXPENSE;INCOME_STATEMENT;HGB.275.GKV.5.b;
+5980;Fremdleistungen (Entgelte für Rechte und Lizenzen);EXPENSE;INCOME_STATEMENT;HGB.275.GKV.5.b;
+6000;Löhne und Gehälter;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.6.a;
+6010;Löhne;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.6.a;
+6027;Geschäftsführergehälter;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.6.a;
+6030;Aushilfslöhne;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.6.a;
+6035;Löhne für Minijobs;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.6.a;
+6060;Freiwillige soziale Aufwendungen, lohnsteuerpflichtig;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.6.a;
+6076;Aufwendungen aus der Veränderung von Urlaubsrückstellungen;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.6.a;
+6079;Aufwendungen aus der Veränderung von Urlaubsrückstellungen für Minijobber;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.6.a;
+6100;Soziale Abgaben und Aufwendungen für Altersversorgung und für Unterstützung;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.6.b;
+6110;Gesetzliche soziale Aufwendungen;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.6.b;
+6120;Beiträge zur Berufsgenossenschaft;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.6.b;
+6140;Aufwendungen für Altersversorgung;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.6.b;
+6147;Pauschale Steuer auf sonstige Bezüge (z. B. Direktversicherungen);EXPENSE;INCOME_STATEMENT;HGB.275.GKV.6.b;
+6150;Versorgungskassen;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.6.b;
+6170;Sonstige soziale Abgaben;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.6.b;
+6171;Soziale Abgaben für Minijobber;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.6.b;
+6200;Abschreibungen auf immaterielle Vermögensgegenstände;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.7.a;
+6201;Abschreibungen auf selbst geschaffene immaterielle Vermögensgegenstände;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.7.a;
+6205;Abschreibungen auf den Geschäfts- oder Firmenwert;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.7.a;
+6222;Abschreibungen auf Fahrzeuge;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.7.a;
+6232;Absetzung für außergewöhnliche technische und wirtschaftliche Abnutzung der Fahrzeuge;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.7.a;
+6240;Abschreibungen auf Sachanlagen auf Grund steuerlicher Sondervorschriften;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.7.a;
+6260;Sofortabschreibung geringwertiger Wirtschaftsgüter;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.7.a;
+6262;Abschreibungen auf aktivierte, geringwertige Wirtschaftsgüter;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.7.a;
+6264;Abschreibungen auf den Sammelposten Wirtschaftsgüter;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.7.a;
+6270;Abschreibungen auf sonstige Vermögensgegenstände des Umlaufvermögens (soweit unüblich hoch);EXPENSE;INCOME_STATEMENT;HGB.275.GKV.7.b;
+6272;Abschreibungen auf Umlaufvermögen, steuerrechtlich bedingt (soweit unüblich hoch);EXPENSE;INCOME_STATEMENT;HGB.275.GKV.7.b;
+6278;Abschreibungen auf Roh-, Hilfs- und Betriebsstoffe/Waren (soweit unüblich hoch);EXPENSE;INCOME_STATEMENT;HGB.275.GKV.7.b;
+6279;Abschreibungen auf fertige und unfertige Erzeugnisse (soweit unüblich hoch);EXPENSE;INCOME_STATEMENT;HGB.275.GKV.7.b;
+6281;Forderungsverluste 7 % USt (soweit unüblich hoch);EXPENSE;INCOME_STATEMENT;HGB.275.GKV.7.b;
+6286;Forderungsverluste 19 % USt (soweit unüblich hoch);EXPENSE;INCOME_STATEMENT;HGB.275.GKV.7.b;
+6300;Sonstige betriebliche Aufwendungen;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6303;Fremdleistungen/Fremdarbeiten;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6305;Raumkosten;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6310;Miete (unbewegliche Wirtschaftsgüter);EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6316;Pacht (unbewegliche Wirtschaftsgüter);EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6318;Aufwendungen für gemietete oder gepachtete unbewegliche Wirtschaftsgüter, die gewerbesteuerlich hinzuzurechnen sind;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6325;Gas, Strom, Wasser;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6330;Reinigung;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6335;Instandhaltung betrieblicher Räume;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6345;Sonstige Raumkosten;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6400;Versicherungen;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6420;Beiträge;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6436;Steuerlich abzugsfähige Verspätungszuschläge und Zwangsgelder;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6437;Steuerlich nicht abzugsfähige Verspätungszuschläge und Zwangsgelder;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6460;Reparaturen und Instandhaltung von technischen Anlagen und Maschinen;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6470;Reparaturen und Instandhaltungen von anderen Anlagen und Betriebs- und Geschäftsausstattung;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6475;Zuführung zu Aufwandsrückstellungen;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6485;Reparaturen und Instandhaltung von anderen Anlagen;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6490;Sonstige Reparaturen und Instandhaltungen;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6495;Wartungskosten für Hard- und Software;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6498;Mietleasing bewegliche Wirtschaftsgüter für technische Anlagen und Maschinen;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6500;Fahrzeugkosten18);EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6520;Fahrzeug-Versicherungen;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6530;Laufende Fahrzeug-Betriebskosten;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6540;Fahrzeug-Reparaturen;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6550;Garagenmiete;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6600;Werbekosten;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6640;Bewirtungskosten;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6644;Nicht abzugsfähige Bewirtungskosten;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6650;Reisekosten Arbeitnehmer;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6660;Reisekosten Arbeitnehmer Übernachtungsaufwand;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6663;Reisekosten Arbeitnehmer Fahrtkosten;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6664;Reisekosten Arbeitnehmer Verpflegungsmehraufwand;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6668;Kilometergelderstattung Arbeitnehmer;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6700;Kosten der Warenabgabe;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6760;Transportversicherungen;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6790;Aufwand für Gewährleistungen;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6800;Porto;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6805;Telefon;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6810;Internetkosten;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6815;Bürobedarf;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6820;Zeitschriften, Bücher, digitale Medien (Fachliteratur);EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6821;Fortbildungskosten;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6822;Freiwillige Sozialleistungen;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6825;Rechts- und Beratungskosten;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6827;Abschluss- und Prüfungskosten;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6830;Buchführungskosten;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6835;Mieten für Einrichtungen (bewegliche Wirtschaftsgüter);EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6836;Pacht (bewegliche Wirtschaftsgüter);EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6838;Aufwendungen für gemietete oder gepachtete bewegliche Wirtschaftsgüter, die gewerbesteuerlich hinzuzurechnen sind;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6840;Mietleasing bewegliche Wirtschaftsgüter für Betriebs- und Geschäftsausstattung;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6845;Werkzeuge und Kleingeräte;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6850;Sonstiger Betriebsbedarf;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6855;Nebenkosten des Geldverkehrs;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6860;Nicht abziehbare Vorsteuer;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6885;Erlöse aus Verkäufen Sachanlagevermögen 19 % USt (bei Buchverlust);REVENUE;INCOME_STATEMENT;;HGB.275.GKV.8
+6889;Erlöse aus Verkäufen Sachanlagevermögen (bei Buchverlust);REVENUE;INCOME_STATEMENT;;HGB.275.GKV.8
+6890;Erlöse aus Verkäufen immaterieller Vermögensgegenstände (bei Buchverlust);REVENUE;INCOME_STATEMENT;;HGB.275.GKV.8
+6895;Anlagenabgänge Sachanlagen (Restbuchwert bei Buchverlust);EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6896;Anlagenabgänge immaterielle Vermögensgegenstände (Restbuchwert bei Buchverlust);EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6930;Forderungsverluste (übliche Höhe);EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6931;Forderungsverluste 7 % USt (übliche Höhe);EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+6936;Forderungsverluste 19 % USt (übliche Höhe);EXPENSE;INCOME_STATEMENT;HGB.275.GKV.8;
+7011;Erträge aus Ausleihungen des Finanzanlagevermögens;REVENUE;INCOME_STATEMENT;;HGB.275.GKV.10
+7100;Sonstige Zinsen und ähnliche Erträge;REVENUE;INCOME_STATEMENT;;HGB.275.GKV.11
+7142;Zinserträge aus der Abzinsung von Rückstellungen;REVENUE;INCOME_STATEMENT;;HGB.275.GKV.11
+7300;Zinsen und ähnliche Aufwendungen;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.13;
+7318;Zinsen auf Kontokorrentkonten;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.13;
+7323;Abschreibungen auf ein Agio oder Disagio/Damnum zur Finanzierung;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.13;
+7324;Abschreibungen auf ein Agio oder Disagio/Damnum zur Finanzierung des Anlagevermögens;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.13;
+7326;Zinsen zur Finanzierung des Anlagevermögens;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.13;
+7362;Zinsaufwendungen aus der Abzinsung von Rückstellungen;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.13;
+7600;Körperschaftsteuer;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.14;
+7608;Solidaritätszuschlag;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.14;
+7610;Gewerbesteuer;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.14;
+7643;Erträge aus der Auflösung von Gewerbesteuerrückstellungen nach § 4 Abs. 5b EStG;REVENUE;INCOME_STATEMENT;;HGB.275.GKV.14
+7646;Aufwendungen aus der Zuführung zu Steuerrückstellungen für Steuerstundung (BStBK);EXPENSE;INCOME_STATEMENT;HGB.275.GKV.14;
+7648;Erträge aus der Auflösung von Steuerrückstellungen für Steuerstundung (BStBK);REVENUE;INCOME_STATEMENT;;HGB.275.GKV.14
+7650;Sonstige Betriebssteuern;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.16;
+7685;Kfz-Steuer;EXPENSE;INCOME_STATEMENT;HGB.275.GKV.16;
+7694;Erträge aus der Auflösung von Rückstellungen für sonstige Steuern;REVENUE;INCOME_STATEMENT;;HGB.275.GKV.16
+7700;Gewinnvortrag nach Verwendung;EQUITY;BALANCE_SHEET;;HGB.266.PASSIVA.A.IV
+7720;Verlustvortrag nach Verwendung;EQUITY;BALANCE_SHEET;HGB.266.PASSIVA.A.IV;
+9000;Saldenvorträge, Sachkonten;EQUITY;;;
+3500;Sonstige Verbindlichkeiten;LIABILITY;BALANCE_SHEET;;HGB.266.PASSIVA.C.8
+3519;Verbindlichkeiten gegenüber Gesellschaftern für offene Ausschüttungen;LIABILITY;BALANCE_SHEET;;HGB.266.PASSIVA.C.8
+6220;Abschreibungen auf Sachanlagen (ohne AfA auf Fahrzeuge und Gebäude);EXPENSE;INCOME_STATEMENT;HGB.275.GKV.7.a;
+9501;SimpleOB – GuV-Sammelkonto;EQUITY;;;
+9502;SimpleOB – Jahresüberschuss;EQUITY;BALANCE_SHEET;;HGB.266.PASSIVA.A.V
+9503;SimpleOB – Jahresfehlbetrag;EQUITY;BALANCE_SHEET;HGB.266.PASSIVA.A.V;

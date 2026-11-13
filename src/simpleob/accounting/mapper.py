@@ -35,7 +35,11 @@ class AccountMapper:
                 if rule.debit_position is not None:
                     return (
                         rule.debit_position,
-                        balance.debit_balance,
+                        (
+                            -balance.debit_balance
+                            if account.account_type is AccountType.EQUITY
+                            else balance.debit_balance
+                        ),
                     )
 
                 if (

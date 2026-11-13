@@ -1,0 +1,58 @@
+{
+  "format_version": 1,
+  "system_accounts": {
+    "opening_balance_account": "9000",
+    "income_summary_account": "9501",
+    "profit_account": "9502",
+    "loss_account": "9503",
+    "profit_loss_carryforward_account": "2970",
+    "statutory_reserve_account": "2930",
+    "other_revenue_reserves_account": "2960",
+    "distribution_liability_account": "3519",
+    "depreciation_expense_account": "6220",
+    "fixed_asset_disposal_gain_account": "4830",
+    "fixed_asset_disposal_loss_account": "6300"
+  },
+  "vat_accounts": {
+    "input_tax_7": "1401",
+    "input_tax_19": "1406",
+    "output_tax_7": "3801",
+    "output_tax_19": "3806"
+  },
+  "account_roles": {
+    "cash_accounts": [
+      "1600"
+    ],
+    "bank_accounts": [
+      "1800"
+    ],
+    "general_rate_sales_accounts": [
+      "4400"
+    ],
+    "customer_receivables": [
+      "1200"
+    ],
+    "supplier_payables": [
+      "3300"
+    ],
+    "customer_credit_balances": [
+      "3500"
+    ],
+    "supplier_credit_balances": [
+      "1300"
+    ],
+    "vat_advance_payments": [
+      "3820"
+    ],
+    "vat_current_year": [
+      "3840"
+    ],
+    "vat_prior_year_receivables": [
+      "1422"
+    ],
+    "vat_prior_year_payables": [
+      "3841"
+    ]
+  },
+  "taxonomy_version": "6.9"
+}
