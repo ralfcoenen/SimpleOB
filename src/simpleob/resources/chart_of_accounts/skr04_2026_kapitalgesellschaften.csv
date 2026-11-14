@@ -244,6 +244,6 @@ account_number;name;account_type;statement_type;debit_position_code;credit_posit
 3500;Sonstige Verbindlichkeiten;LIABILITY;BALANCE_SHEET;;HGB.266.PASSIVA.C.8
 3519;Verbindlichkeiten gegenüber Gesellschaftern für offene Ausschüttungen;LIABILITY;BALANCE_SHEET;;HGB.266.PASSIVA.C.8
 6220;Abschreibungen auf Sachanlagen (ohne AfA auf Fahrzeuge und Gebäude);EXPENSE;INCOME_STATEMENT;HGB.275.GKV.7.a;
-9501;SimpleOB – GuV-Sammelkonto;EQUITY;;;
-9502;SimpleOB - Jahresüberschuss;EQUITY;BALANCE_SHEET;;HGB.266.PASSIVA.A.V
-9503;SimpleOB – Jahresfehlbetrag;EQUITY;BALANCE_SHEET;HGB.266.PASSIVA.A.V;
+9501;GuV-Sammelkonto;EQUITY;;;
+9502;Jahresüberschuss;EQUITY;BALANCE_SHEET;;HGB.266.PASSIVA.A.V
+9503;Jahresfehlbetrag;EQUITY;BALANCE_SHEET;HGB.266.PASSIVA.A.V;
