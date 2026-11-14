@@ -54,5 +54,6 @@
       "3841"
     ]
   },
-  "taxonomy_version": "6.9"
+  "taxonomy_version": "6.9",
+  "taxonomy_mapping_file": "skr04_2026_kapitalgesellschaften_taxonomy_mapping.csv"
 }

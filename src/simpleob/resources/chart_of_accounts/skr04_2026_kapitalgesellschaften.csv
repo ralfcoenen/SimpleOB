@@ -46,7 +46,7 @@ account_number;name;account_type;statement_type;debit_position_code;credit_posit
 1434;Vorsteuer in Folgeperiode/ im Folgejahr abziehbar;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.II.4;
 1435;Forderungen aus Gewerbesteuerüberzahlungen;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.II.4;
 1450;Körperschaftsteuerrückforderung;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.II.4;
-1460;Geldtransit;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.IV;
+1460;Geldtransit;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.II.4;HGB.266.PASSIVA.C.8
 1600;Kasse;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.IV;
 1800;Bank;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.B.IV;
 1900;Aktive Rechnungsabgrenzung;ASSET;BALANCE_SHEET;HGB.266.AKTIVA.C;
