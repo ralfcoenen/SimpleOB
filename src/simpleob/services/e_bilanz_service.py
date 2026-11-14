@@ -575,6 +575,10 @@ class EBilanzService:
                 tax_liability_accounts=(
                     vat_accounts.output_tax_7,
                     vat_accounts.output_tax_19,
+                    *sorted(account_roles.vat_current_year),
+                    *sorted(
+                        account_roles.vat_prior_year_payables
+                    ),
                 ),
                 general_rate_sales_accounts=(
                     account_roles.general_rate_sales_accounts

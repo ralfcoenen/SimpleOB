@@ -70,11 +70,34 @@ def test_splits_other_and_tax_liabilities() -> None:
             account_description="Umsatzsteuer 19 %",
             balance="-798.32",
         ),
+        _detail(
+            position_code="HGB.266.PASSIVA.C.8",
+            account_number="3840",
+            account_description="Umsatzsteuer laufendes Jahr",
+            balance="-3247.93",
+        ),
+        _detail(
+            position_code="HGB.266.PASSIVA.C.8",
+            account_number="3841",
+            account_description="Umsatzsteuerverbindlichkeiten Vorjahr",
+            balance="-100.00",
+        ),
+        _detail(
+            position_code="HGB.266.AKTIVA.B.II.4",
+            account_number="3840",
+            account_description="Umsatzsteuer laufendes Jahr",
+            balance="3247.93",
+        ),
     )
 
     values = GaapCi69AccountDetailValueBuilder.build(
         account_details=details,
-        tax_liability_accounts=("1776",),
+        tax_liability_accounts=(
+            "1771",
+            "1776",
+            "3840",
+            "3841",
+        ),
     )
 
     assert values == {
@@ -83,7 +106,7 @@ def test_splits_other_and_tax_liabilities() -> None:
         ): Decimal("4000.00"),
         (
             "bs.eqLiab.liab.other.theroffTax",
-        ): Decimal("798.32"),
+        ): Decimal("4146.25"),
     }
 
 def test_build_maps_general_rate_sales_to_value_bearing_chain() -> None:

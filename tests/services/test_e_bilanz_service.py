@@ -189,6 +189,12 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
     account_roles.general_rate_sales_accounts = frozenset(
         {"8400"}
     )
+    account_roles.vat_current_year = frozenset(
+        {"3840"}
+    )
+    account_roles.vat_prior_year_payables = frozenset(
+        {"3841"}
+    )
 
     gcd_path = Path("/tmp/gcd.xsd")
     gaap_ci_path = Path("/tmp/gaap-ci.xsd")
@@ -627,6 +633,8 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
         tax_liability_accounts=(
             "1771",
             "1776",
+            "3840",
+            "3841",
         ),
         general_rate_sales_accounts=frozenset(
             {"8400"}
@@ -879,6 +887,8 @@ def test_e_bilanz_service_rejects_account_taxonomy_concept_with_wrong_parent(
     account_roles.cash_accounts = frozenset({"1000"})
     account_roles.bank_accounts = frozenset({"1200"})
     account_roles.general_rate_sales_accounts = frozenset({"8400"})
+    account_roles.vat_current_year = frozenset()
+    account_roles.vat_prior_year_payables = frozenset()
 
     gcd_path = Path("/tmp/gcd.xsd")
     gaap_ci_path = Path("/tmp/gaap-ci.xsd")
@@ -1115,6 +1125,8 @@ def test_hgbm_builders_integrate_bvv_book_value_differences(
     account_roles.general_rate_sales_accounts = frozenset(
         {"8400"}
     )
+    account_roles.vat_current_year = frozenset()
+    account_roles.vat_prior_year_payables = frozenset()
 
     gcd_path = Path("/tmp/gcd.xsd")
     gaap_ci_path = Path("/tmp/gaap-ci.xsd")
