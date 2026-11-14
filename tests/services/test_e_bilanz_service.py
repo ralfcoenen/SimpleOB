@@ -1243,6 +1243,10 @@ def test_hgbm_builders_integrate_bvv_book_value_differences(
 
     profile = Mock()
     profile.fact_plan = Mock()
+    ev_nil_fact_plan = Mock()
+    profile.fact_plan.with_state.return_value = (
+        ev_nil_fact_plan
+    )
 
     concepts = Mock()
 
@@ -1531,13 +1535,25 @@ def test_hgbm_builders_integrate_bvv_book_value_differences(
         in report_profile.report_elements
     )
 
-    profile.fact_plan.with_state.assert_not_called()
+    profile.fact_plan.with_state.assert_called_once_with(
+        concept_name=(
+            "genInfo.report.id.reportElement."
+            "reportElements.EV"
+        ),
+        state=FactPlanState.NIL,
+    )
 
     assert (
         fact_plan_resolver.call_args.kwargs[
             "fact_plan"
         ]
-        is profile.fact_plan
+        is ev_nil_fact_plan
+    )
+
+    assert (
+        "genInfo.report.id.reportElement."
+        "reportElements.EV"
+        not in report_profile.report_elements
     )
 
     fact_plan_values = (

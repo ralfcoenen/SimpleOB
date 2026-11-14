@@ -918,6 +918,20 @@ class EBilanzService:
                 )
             )
 
+        if (
+            master_data.supports_e_bilanz
+            and profit_appropriation_data is None
+        ):
+            effective_fact_plan = (
+                effective_fact_plan.with_state(
+                    concept_name=(
+                        "genInfo.report.id.reportElement."
+                        "reportElements.EV"
+                    ),
+                    state=FactPlanState.NIL,
+                )
+            )
+
         resolved_fact_plan = (
             FactPlanResolver.resolve(
                 fact_plan=effective_fact_plan,
