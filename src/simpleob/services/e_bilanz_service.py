@@ -146,6 +146,31 @@ class EBilanzService:
         self._liabilities = liabilities
         self._income_statement = income_statement
 
+    @staticmethod
+    def _mapped_tangible_depreciation(
+        *,
+        account_details: tuple[EBilanzAccountDetail, ...],
+        account_taxonomy_concepts: Mapping[str, str],
+    ) -> Decimal:
+        prefix = (
+            "is.netIncome.regular.operatingTC."
+            "deprAmort.fixAss.tan."
+        )
+        return sum(
+            (
+                abs(detail.balance)
+                for detail in account_details
+                if (
+                    (concept_name := account_taxonomy_concepts.get(
+                        detail.account_number
+                    ))
+                    is not None
+                    and concept_name.startswith(prefix)
+                )
+            ),
+            Decimal("0.00"),
+        )
+
     def account_taxonomy_choices(
         self,
         *,
@@ -376,12 +401,24 @@ class EBilanzService:
             )
         )
 
+        mapped_tangible_depreciation = (
+            self._mapped_tangible_depreciation(
+                account_details=account_details,
+                account_taxonomy_concepts=(
+                    account_taxonomy_concepts or {}
+                ),
+            )
+        )
+
         income_statement_values = (
             GaapCi69IncomeStatementValueBuilder.build(
                 income_statement=income_statement,
                 assets=balance_sheet.assets,
                 liabilities=balance_sheet.liabilities,
                 fixed_asset_schedule=fixed_asset_schedule,
+                mapped_tangible_depreciation=(
+                    mapped_tangible_depreciation
+                ),
                 fixed_asset_disposal_details=(
                     fixed_asset_disposal_details
                 ),

@@ -20,6 +20,8 @@ class GaapCi69Values:
     earnings_after_taxes: Decimal
     operating_total_cost: Decimal
     gross_trading_profit: Decimal
+    total_output: Decimal = ZERO
+    financial_result: Decimal = ZERO
 
 
 class GaapCi69ValueCalculator:
@@ -51,6 +53,20 @@ class GaapCi69ValueCalculator:
             - amounts_by_code["HGB.275.GKV.5"]
         )
 
+        total_output = (
+            amounts_by_code["HGB.275.GKV.1"]
+            + amounts_by_code["HGB.275.GKV.2"]
+            + amounts_by_code["HGB.275.GKV.3"]
+        )
+
+        financial_result = (
+            amounts_by_code["HGB.275.GKV.9"]
+            + amounts_by_code["HGB.275.GKV.10"]
+            + amounts_by_code["HGB.275.GKV.11"]
+            - amounts_by_code["HGB.275.GKV.12"]
+            - amounts_by_code["HGB.275.GKV.13"]
+        )
+
         operating_total_cost = (
             gross_trading_profit
             + amounts_by_code["HGB.275.GKV.4"]
@@ -69,6 +85,8 @@ class GaapCi69ValueCalculator:
             earnings_after_taxes=earnings_after_taxes,
             operating_total_cost=operating_total_cost,
             gross_trading_profit=gross_trading_profit,
+            total_output=total_output,
+            financial_result=financial_result,
         )
 
     @classmethod
@@ -90,6 +108,11 @@ class GaapCi69ValueCalculator:
             "HGB.275.GKV.6",
             "HGB.275.GKV.7",
             "HGB.275.GKV.8",
+            "HGB.275.GKV.9",
+            "HGB.275.GKV.10",
+            "HGB.275.GKV.11",
+            "HGB.275.GKV.12",
+            "HGB.275.GKV.13",
             "HGB.275.GKV.16",
         )
 

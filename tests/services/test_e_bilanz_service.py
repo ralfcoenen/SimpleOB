@@ -20,6 +20,9 @@ from simpleob.domain.company import Company
 from simpleob.domain.company_master_data import (
     CompanyMasterData,
 )
+from simpleob.domain.e_bilanz_account_detail import (
+    EBilanzAccountDetail,
+)
 from simpleob.domain.fiscal_year import FiscalYear
 from simpleob.domain.profit_appropriation_annual_data import (
     ProfitAppropriationAnnualData,
@@ -48,6 +51,46 @@ from simpleob.taxonomy.gcd_company_data_mapper import (
     GcdCompanyDataMapper,
 )
 from simpleob.taxonomy.taxonomy import TaxonomyVersion
+
+
+def test_mapped_tangible_depreciation_uses_selected_depreciation_accounts() -> None:
+    depreciation_detail = EBilanzAccountDetail(
+        position=FinancialStatementPosition(
+            code="HGB.275.GKV.7.a",
+            name="Abschreibungen auf Sachanlagen",
+        ),
+        account_number="6220",
+        account_description="AfA Sachanlagen",
+        balance=Decimal("833.33"),
+    )
+    other_expense_detail = EBilanzAccountDetail(
+        position=FinancialStatementPosition(
+            code="HGB.275.GKV.8",
+            name="Sonstige betriebliche Aufwendungen",
+        ),
+        account_number="6820",
+        account_description="Fortbildungskosten",
+        balance=Decimal("750.00"),
+    )
+
+    result = EBilanzService._mapped_tangible_depreciation(
+        account_details=(
+            depreciation_detail,
+            other_expense_detail,
+        ),
+        account_taxonomy_concepts={
+            "6220": (
+                "is.netIncome.regular.operatingTC."
+                "deprAmort.fixAss.tan.otherMisc"
+            ),
+            "6820": (
+                "is.netIncome.regular.operatingTC."
+                "otherCost.training"
+            ),
+        },
+    )
+
+    assert result == Decimal("833.33")
 
 
 class FakeResolver:
@@ -619,6 +662,7 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
         assets=assets,
         liabilities=liabilities,
         fixed_asset_schedule=(),
+        mapped_tangible_depreciation=Decimal("0.00"),
         fixed_asset_disposal_details=(),
     )
 

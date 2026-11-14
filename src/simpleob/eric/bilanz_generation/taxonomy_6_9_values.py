@@ -413,6 +413,17 @@ class Taxonomy69ValueBuilder:
             )
         ] = gaap_ci_values.gross_trading_profit
 
+        values[
+            (
+                "is.netIncome.regular.operatingTC."
+                "grossTradingProfit.totalOutput",
+            )
+        ] = gaap_ci_values.total_output
+
+        values[
+            ("is.netIncome.regular.fin",)
+        ] = gaap_ci_values.financial_result
+
     @staticmethod
     def _validate_inputs(
         *,

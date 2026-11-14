@@ -44,6 +44,8 @@ def _income_statement() -> IncomeStatement:
         positions["HGB.275.GKV.6"]: Decimal("25000.00"),
         positions["HGB.275.GKV.7"]: Decimal("10000.00"),
         positions["HGB.275.GKV.8"]: Decimal("15000.00"),
+        positions["HGB.275.GKV.11"]: Decimal("45.00"),
+        positions["HGB.275.GKV.13"]: Decimal("240.00"),
         positions["HGB.275.GKV.16"]: Decimal("1000.00"),
     }
 
@@ -60,6 +62,16 @@ def test_calculates_gross_trading_profit() -> None:
     )
 
     assert values.gross_trading_profit == Decimal("75000.00")
+
+
+def test_calculates_total_output_and_financial_result() -> None:
+    values = GaapCi69ValueCalculator.calculate(
+        income_statement=_income_statement(),
+        net_income=Decimal("15000.00"),
+    )
+
+    assert values.total_output == Decimal("105000.00")
+    assert values.financial_result == Decimal("-195.00")
 
 
 def test_calculates_operating_total_cost() -> None:

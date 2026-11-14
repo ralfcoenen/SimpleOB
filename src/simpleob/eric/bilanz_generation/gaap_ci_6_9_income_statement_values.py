@@ -97,6 +97,7 @@ class GaapCi69IncomeStatementValueBuilder:
             FixedAssetSchedulePosition,
             ...
         ] = (),
+        mapped_tangible_depreciation: Decimal = ZERO,
         fixed_asset_disposal_details: tuple[
             FixedAssetDisposalDetail,
             ...
@@ -191,6 +192,9 @@ class GaapCi69IncomeStatementValueBuilder:
         cls._add_fixed_asset_depreciation_values(
             values=values,
             fixed_asset_schedule=fixed_asset_schedule,
+            mapped_tangible_depreciation=(
+                mapped_tangible_depreciation
+            ),
         )
 
         cls._add_fixed_asset_disposal_values(
@@ -228,6 +232,7 @@ class GaapCi69IncomeStatementValueBuilder:
             FixedAssetSchedulePosition,
             ...
         ],
+        mapped_tangible_depreciation: Decimal = ZERO,
     ) -> None:
         tangible_depreciation = sum(
             (
@@ -243,17 +248,39 @@ class GaapCi69IncomeStatementValueBuilder:
         if tangible_depreciation == ZERO:
             return
 
+        if not isinstance(mapped_tangible_depreciation, Decimal):
+            raise TypeError(
+                "mapped_tangible_depreciation must be a Decimal"
+            )
+
+        if mapped_tangible_depreciation < ZERO:
+            raise ValueError(
+                "mapped_tangible_depreciation must not be negative"
+            )
+
+        if mapped_tangible_depreciation > tangible_depreciation:
+            raise ValueError(
+                "Mapped tangible depreciation exceeds the fixed-asset "
+                "schedule amount"
+            )
+
         values[
             (
                 _TANGIBLE_FIXED_ASSET_DEPRECIATION_CONCEPT,
             )
         ] = tangible_depreciation
 
-        values[
-            (
-                _TANGIBLE_FIXED_ASSET_OTHER_DEPRECIATION_CONCEPT,
-            )
-        ] = tangible_depreciation
+        remaining_depreciation = (
+            tangible_depreciation
+            - mapped_tangible_depreciation
+        )
+
+        if remaining_depreciation != ZERO:
+            values[
+                (
+                    _TANGIBLE_FIXED_ASSET_OTHER_DEPRECIATION_CONCEPT,
+                )
+            ] = remaining_depreciation
 
     @classmethod
     def _add_fixed_asset_disposal_values(

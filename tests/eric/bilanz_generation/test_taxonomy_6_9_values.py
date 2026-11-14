@@ -60,6 +60,8 @@ def _gaap_ci_values() -> GaapCi69Values:
         earnings_after_taxes=Decimal("4600.00"),
         operating_total_cost=Decimal("5000.00"),
         gross_trading_profit=Decimal("6000.00"),
+        total_output=Decimal("59000.00"),
+        financial_result=Decimal("-195.00"),
     )
 
 
@@ -224,6 +226,17 @@ def test_builds_report_elements_and_gaap_ci_values() -> None:
             ),
         )
     ] == Decimal("6000.00")
+
+    assert values[
+        (
+            "is.netIncome.regular.operatingTC."
+            "grossTradingProfit.totalOutput",
+        )
+    ] == Decimal("59000.00")
+
+    assert values[
+        ("is.netIncome.regular.fin",)
+    ] == Decimal("-195.00")
 
 
 def test_standard_report_profile_omits_stu() -> None:
