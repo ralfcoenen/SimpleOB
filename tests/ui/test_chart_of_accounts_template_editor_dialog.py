@@ -2,7 +2,11 @@ from dataclasses import replace
 from pathlib import Path
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication, QDialog, QMessageBox
+from PySide6.QtWidgets import (
+    QApplication,
+    QDialog,
+    QMessageBox,
+)
 
 from simpleob.accounting.hgb_financial_statement_position_provider import (
     HgbFinancialStatementPositionProvider,
@@ -38,7 +42,10 @@ from simpleob.ui_qt.account_editor_dialog import (
 from simpleob.ui_qt.chart_of_accounts_template_editor_dialog import (
     ChartOfAccountsTemplateEditorDialog,
 )
-from simpleob.ui_qt.new_company_dialog import NewCompanyDialog
+from simpleob.ui_qt.new_company_dialog import (
+    NewCompanyDialog,
+    _available_chart_template_paths,
+)
 
 
 def _app():
@@ -70,6 +77,48 @@ def _editor(bundle, *, templates_directory=None, taxonomy_choices_provider=None)
         liabilities=liabilities,
         income_statement=income_statement,
     )
+
+
+def test_available_chart_templates_exclude_referenced_taxonomy_csv(tmp_path):
+    chart_directory = (
+        Path(__file__).resolve().parents[2]
+        / "src"
+        / "simpleob"
+        / "resources"
+        / "chart_of_accounts"
+    )
+    template_directory = tmp_path / "templates"
+    template_directory.mkdir()
+    custom_directory = template_directory / "Custom"
+    custom_directory.mkdir()
+    custom_chart = custom_directory / "Custom.csv"
+    custom_chart.write_text(
+        "account_number;name;account_type\n7000;Konto;ASSET\n",
+        encoding="utf-8",
+    )
+
+    paths = _available_chart_template_paths(
+        chart_directory,
+        template_directory,
+    )
+
+    assert chart_directory / "openbilanz_standard.csv" in paths
+    assert chart_directory / "skr04_2026_kapitalgesellschaften.csv" in paths
+    assert (
+        chart_directory / "skr04_2026_kapitalgesellschaften_taxonomy_mapping.csv"
+        not in paths
+    )
+    assert custom_chart in paths
+
+
+def test_taxonomy_mapping_label_uses_only_saved_mapping():
+    assert ChartOfAccountsTemplateEditorDialog._taxonomy_mapping_label(
+        "7000",
+        {"7000": "is.netIncome.regular.operatingTC.otherCost.training"},
+    ) == "is.netIncome.regular.operatingTC.otherCost.training"
+    assert ChartOfAccountsTemplateEditorDialog._taxonomy_mapping_label(
+        "7001", {"7000": "sample.concept"}
+    ) == ""
 
 
 def _single_account_bundle(*, mapped=True, taxonomy=None):

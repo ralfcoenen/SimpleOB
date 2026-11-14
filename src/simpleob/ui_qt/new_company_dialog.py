@@ -1,5 +1,6 @@
 """PySide6-Dialog zum Anlegen einer neuen Buchhaltung."""
 
+import json
 from collections.abc import Callable
 from datetime import date
 from pathlib import Path
@@ -49,6 +50,48 @@ from simpleob.ui_qt.account_configuration_dialog import AccountConfigurationDial
 from simpleob.ui_qt.chart_of_accounts_template_editor_dialog import (
     ChartOfAccountsTemplateEditorDialog,
 )
+
+
+def _available_chart_template_paths(
+    chart_directory: Path,
+    template_directory: Path,
+) -> tuple[Path, ...]:
+    """Listet Kontenrahmen, nicht aber referenzierte Taxonomie-CSV-Dateien."""
+
+    candidates = (
+        *chart_directory.glob("*.csv"),
+        *(
+            path
+            for path in template_directory.glob("*/*.csv")
+            if path.name == f"{path.parent.name}.csv"
+        ),
+    )
+    directories = {path.parent for path in candidates}
+    taxonomy_mapping_paths: set[Path] = set()
+    for directory in directories:
+        for config_path in directory.glob("*.config.json"):
+            try:
+                config = json.loads(config_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            if not isinstance(config, dict):
+                continue
+            mapping_file = config.get("taxonomy_mapping_file")
+            if isinstance(mapping_file, str) and mapping_file.strip():
+                taxonomy_mapping_paths.add(
+                    (directory / mapping_file).resolve()
+                )
+
+    return tuple(
+        sorted(
+            (
+                path
+                for path in candidates
+                if path.resolve() not in taxonomy_mapping_paths
+            ),
+            key=lambda path: str(path).casefold(),
+        )
+    )
 
 
 class NewCompanyDialog(QDialog):
@@ -125,18 +168,9 @@ class NewCompanyDialog(QDialog):
 
         chart_row = QHBoxLayout()
         self._chart_box = QComboBox()
-        self._chart_paths = tuple(
-            sorted(
-                (
-                    *self._chart_directory.glob("*.csv"),
-                    *(
-                        path
-                        for path in self._template_directory.glob("*/*.csv")
-                        if path.name == f"{path.parent.name}.csv"
-                    ),
-                ),
-                key=lambda path: str(path).casefold(),
-            )
+        self._chart_paths = _available_chart_template_paths(
+            self._chart_directory,
+            self._template_directory,
         )
         for chart_path in self._chart_paths:
             self._chart_box.addItem(

@@ -1,6 +1,6 @@
 # SimpleOB – Benutzerhandbuch
 
-**Anwenderhandbuch für SimpleOB 0.52.0**
+**Anwenderhandbuch für SimpleOB 0.53.0**
 
 ## 1. Über SimpleOB
 
@@ -67,7 +67,11 @@ zur Mandanten- und Geschäftsjahrauswahl zurück.
 
 SimpleOB wird als macOS-Anwendung `SimpleOB.app` bereitgestellt.
 
-Die Anwendung kann in den Ordner **Programme** kopiert und von dort gestartet werden.
+Entpacken Sie das bereitgestellte macOS-Paket und kopieren Sie
+`SimpleOB.app` in den Ordner **Programme**. Das Benutzerhandbuch liegt im
+Release-Paket als separate PDF-Datei neben der App; es ist nicht in das
+App-Bundle eingebettet. Starten Sie SimpleOB anschließend aus dem Ordner
+**Programme**.
 
 Die persönlichen Anwendungsdaten befinden sich außerhalb von `SimpleOB.app`. Eine vorhandene Datenbank wird deshalb beim Austausch der Anwendung gegen eine neuere Programmversion nicht durch das App-Bundle ersetzt.
 
@@ -325,9 +329,13 @@ SimpleOB prüft beim Programmstart, ob das vorhandene PostgreSQL-Datenbankschema
 
 Eine automatische Migration vorhandener PostgreSQL-Datenbanken erfolgt beim normalen Programmstart nicht.
 
-Ist die Datenbank nicht auf dem erforderlichen Stand, muss die Aktualisierung zunächst administrativ geklärt und durchgeführt werden.
-
-Vor einer solchen Aktualisierung ist eine geeignete PostgreSQL-Datensicherung erforderlich.
+Bei einer bekannten älteren Revision kann SimpleOB ein ausdrücklich zu
+bestätigendes administratives Upgrade anbieten. Der Ablauf fragt die
+erforderlichen Migrations- und Administrationszugänge ab, erstellt vorab
+eine Sicherung und prüft deren Wiederherstellung. Die übrigen
+SimpleOB-Verbindungen müssen dafür beendet sein. Details und Grenzen des
+Dialogs stehen in Abschnitt 2.6. Bei unbekannten oder ungeeigneten
+Schema-Ständen wird kein Upgrade angeboten.
 
 Die Funktion **Neue PostgreSQL-Datenbank anlegen …** darf nicht verwendet werden, um eine bestehende Datenbank zu aktualisieren.
 
@@ -511,7 +519,17 @@ Eine neue Buchhaltung wird im Startdialog mit
 
 Im Dialog **„Neue Buchhaltung“** erfassen Sie den Unternehmensnamen sowie
 Beginn und Ende des ersten Geschäftsjahres. Dort wählen Sie auch den
-Kontenrahmen. **„SimpleOB-Standard“** ist vorausgewählt. Über
+Kontenrahmen. **„SimpleOB-Standard“** ist vorausgewählt. Die mitgelieferte
+Vorlage `skr04_2026_kapitalgesellschaften` stellt einen SKR04-Kontenrahmen
+für Kapitalgesellschaften bereit. Wählen Sie diese Vorlage im Feld
+**„Kontenrahmen“**, wenn Sie damit arbeiten möchten. Ihre Konfiguration
+verweist auf die mitgelieferte Taxonomie-Mapping-Datei. SimpleOB lädt diese
+Zuordnungen zusammen mit dem Kontenrahmen; die Mapping-CSV wird nicht als
+separater Kontenrahmen angeboten. Die expliziten Taxonomiezuordnungen werden
+bei der E-Bilanz-Aufbereitung berücksichtigt und können im Editor geprüft
+oder angepasst werden.
+
+Über
 **„Eigene CSV wählen …“** kann stattdessen eine Kontenrahmen-CSV geladen
 werden. CSV-Dateien müssen die Kontospalten `account_number`, `name` und
 `account_type` enthalten. HGB-Zuordnungen können mit den Spalten
@@ -547,8 +565,10 @@ oder E-Bilanz-Funktionen verhindern.
 
 Mit **„Kontenrahmen bearbeiten …“** öffnen Sie den
 **„Kontenrahmen bearbeiten“**-Dialog für den ausgewählten Kontenrahmen.
-Die Tabelle zeigt Kontonummer, Bezeichnung, Kontotyp und HGB-Zuordnung;
-über das Suchfeld können Sie nach Kontonummer oder Bezeichnung suchen.
+Die Tabelle zeigt Kontonummer, Bezeichnung, Kontotyp, HGB-Zuordnung und
+eine vorhandene Taxonomiezuordnung. Leere Taxonomie-Felder bedeuten, dass
+für dieses Konto keine explizite Zuordnung hinterlegt ist. Über das
+Suchfeld können Sie nach Kontonummer oder Bezeichnung suchen.
 
 1. Wählen Sie **„Neues Konto“**, **„Bearbeiten“** oder **„Entfernen“**.
 2. Im Konto-Dialog können Sie Kontonummer, Bezeichnung, Kontotyp und
@@ -623,7 +643,21 @@ Die weiteren Unternehmens- und Steuerdaten werden nicht in diesem
 ersten Dialog erfasst. Sie werden anschließend über die
 Unternehmensstammdaten gepflegt.
 
-### 6.3 Unternehmensstammdaten
+### 6.3 Gesellschafterangaben
+
+Die Gesellschafter des Mandanten verwalten Sie über **Verwaltung →
+Gesellschafter…**. Dort können Sie Gesellschafter hinzufügen, bearbeiten
+und nach einer Bestätigung löschen. Für jeden Eintrag sind Gesellschafter-
+Nummer, Name, Anteil-Zähler, Anteil-Nenner und Rechtsstatus erforderlich.
+Vorname, Steuernummer samt Bundesland, Steuer-ID und Wirtschafts-ID sind
+weitere Eingabefelder. Tragen Sie nur die tatsächlichen Angaben des
+Mandanten ein; SimpleOB erzeugt oder ergänzt keine Identifikationsdaten.
+
+SimpleOB übernimmt die gespeicherten Gesellschafterangaben in die E-Bilanz.
+Prüfen Sie deshalb die Angaben vor der Vorbereitung und Erzeugung der
+E-Bilanz auf Vollständigkeit und Richtigkeit.
+
+### 6.4 Unternehmensstammdaten
 
 Nach dem Öffnen einer Buchhaltung können die
 **Unternehmensstammdaten** aufgerufen und bearbeitet werden.
@@ -668,7 +702,7 @@ Eingabe.
 E-Bilanz aus. Eine bereits vorbereitete E-Bilanz sollte deshalb nach
 einer Änderung der Stammdaten erneut erstellt und geprüft werden.
 
-### 6.4 Mandant und Datenlieferant sind unterschiedliche Angaben
+### 6.5 Mandant und Datenlieferant sind unterschiedliche Angaben
 
 Die Unternehmensstammdaten beschreiben das Unternehmen, für das die
 Buchhaltung und E-Bilanz erstellt werden.
@@ -680,18 +714,18 @@ dagegen den Ersteller beziehungsweise Lieferanten der an ELSTER
 Beide Angaben können daher voneinander abweichen und werden in SimpleOB
 getrennt verwaltet.
 
-### 6.5 Weitere Geschäftsjahre
+### 6.6 Weitere Geschäftsjahre
 
 Weitere Geschäftsjahre können im Startdialog für das ausgewählte
 Unternehmen über **„Neues Geschäftsjahr“** angelegt werden.
 
 Die Einzelheiten dazu werden im folgenden Kapitel beschrieben.
 
-### 6.6 Mandanten importieren und exportieren
+### 6.7 Mandanten importieren und exportieren
 
 SimpleOB unterstützt den Export und Import der im `.simpleob`-Format
 abgebildeten Mandantendaten. Bei Mandanten mit OP-Verwaltung ist dieses Format
-in Version 0.52.0 keine vollständige Sicherung oder Übertragung; siehe
+in Version 0.53.0 keine vollständige Sicherung oder Übertragung; siehe
 Kapitel 14.2.
 
 Den Export starten Sie im geöffneten Mandanten über **Verwaltung → Mandant
@@ -699,7 +733,7 @@ exportieren …**. Den Import finden Sie im Startfenster unter **Mandant
 importieren …**. Die Einzelheiten stehen in Kapitel 14 **„Datenaustausch und
 Mandantensicherung“**.
 
-### 6.7 Mandanten vollständig löschen
+### 6.8 Mandanten vollständig löschen
 
 Im Startfenster kann der ausgewählte Mandant über **Mandant vollständig löschen
 …** entfernt werden. Dieser Vorgang löscht unwiderruflich den Mandanten, alle
@@ -712,7 +746,7 @@ Vollständigkeit geprüft, bevor die Löschung beginnen kann. Im anschließenden
 Bestätigungsdialog sehen Sie Mandantenname, Mandanten-ID und Sicherungspfad.
 Zur Bestätigung müssen Sie den vollständigen Mandantennamen exakt eingeben.
 Bei Abbruch, falscher Eingabe oder fehlgeschlagener oder unvollständiger
-Sicherung wird der Mandant nicht gelöscht. In Version 0.52.0 überträgt
+Sicherung wird der Mandant nicht gelöscht. In Version 0.53.0 überträgt
 `.simpleob` keine Geschäftspartner und keine separaten OP-Nebenbuchdaten.
 Wenn solche Daten vorhanden sind, schlägt die Vollständigkeitsprüfung fehl und
 SimpleOB bricht die Löschung ab. Die Einschränkung des Formats ist in Kapitel
@@ -2625,11 +2659,8 @@ manuell in den PIN-Dialog eingegeben.
 Bei der Testübermittlung handelt es sich um eine echte Verbindung zum
 ELSTER-Server.
 
-Der Datensatz wird jedoch als Testsendung mit dem ELSTER-Testmerker
-
-**700000004**
-
-übertragen.
+SimpleOB kennzeichnet den Datensatz dabei als Testsendung. Der Testmerker
+wird von der Anwendung gesetzt und muss nicht manuell eingegeben werden.
 
 SimpleOB weist vor der Übertragung ausdrücklich darauf hin, dass eine
 Verbindung zum ELSTER-Server hergestellt wird.
@@ -2901,7 +2932,7 @@ Dazu gehören insbesondere:
 - Buchungen zur Ergebnisverwendung und
 - erfasste Einlagen.
 
-**Einschränkung in Version 0.52.0:** Das `.simpleob`-Format enthält derzeit
+**Einschränkung in Version 0.53.0:** Das `.simpleob`-Format enthält derzeit
 nicht die Geschäftspartner und separaten OP-Nebenbuchdaten wie Rechnungs-OPs, Zahlungen,
 Zahlungszuordnungen, Verrechnungen, Rückerstattungen und deren Korrekturen.
 Die zugehörigen Hauptbuchungen können im Export enthalten sein, bilden diese
@@ -3093,7 +3124,7 @@ ausschließlich auf eine einzige Sicherungsart zu vertrauen.
 Für die Übertragung eines Mandanten auf einen anderen Rechner kann
 folgender Ablauf verwendet werden:
 
-Dieser Ablauf eignet sich in Version 0.52.0 nicht zur vollständigen
+Dieser Ablauf eignet sich in Version 0.53.0 nicht zur vollständigen
 Übertragung von Geschäftspartner- oder OP-Daten. Wenn die OP-Verwaltung
 verwendet wurde, verwenden Sie `.simpleob` nicht als einzige
 Übertragungsmethode; die dazugehörige Einschränkung ist in Kapitel 14.2
@@ -3318,7 +3349,11 @@ Fehlermeldung an.
 
 Soweit ELSTER beziehungsweise ERiC zusätzliche Fehlerinformationen
 liefert, sollten diese für die weitere Fehleranalyse berücksichtigt
-werden.
+werden. Bei einer Testübermittlung kann der Fehlerdialog zusätzlich
+zurückgelieferte Detailinformationen anzeigen. Prüfen Sie diese Angaben,
+bevor Sie den Vorgang erneut starten. Hinweise zu den lokal gespeicherten
+ERiC-Protokolldateien finden Sie unter **Hilfe → Datenschutz und
+ERiC-Hinweise**.
 
 Bei einem Fehler sollte nicht unmittelbar wiederholt eine
 Produktivübermittlung ausgelöst werden, ohne zuvor die Ursache zu

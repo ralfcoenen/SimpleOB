@@ -4,11 +4,13 @@ from collections.abc import Callable
 from dataclasses import fields, replace
 from pathlib import Path
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QDialog,
     QDialogButtonBox,
     QHBoxLayout,
+    QHeaderView,
     QInputDialog,
     QLabel,
     QLineEdit,
@@ -139,9 +141,15 @@ class ChartOfAccountsTemplateEditorDialog(QDialog):
         self._search_entry.textChanged.connect(self._filter_rows)
         layout.addWidget(self._search_entry)
 
-        self._table = QTableWidget(0, 4)
+        self._table = QTableWidget(0, 5)
         self._table.setHorizontalHeaderLabels(
-            ("Kontonummer", "Bezeichnung", "Kontotyp", "HGB-Zuordnung")
+            (
+                "Kontonummer",
+                "Bezeichnung",
+                "Kontotyp",
+                "HGB-Zuordnung",
+                "Taxonomie-Zuordnung",
+            )
         )
         self._table.setSelectionBehavior(
             QAbstractItemView.SelectionBehavior.SelectRows
@@ -153,7 +161,34 @@ class ChartOfAccountsTemplateEditorDialog(QDialog):
             QAbstractItemView.EditTrigger.NoEditTriggers
         )
         self._table.setSortingEnabled(False)
-        self._table.horizontalHeader().setStretchLastSection(True)
+        self._table.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAsNeeded
+        )
+        header = self._table.horizontalHeader()
+        header.setSectionResizeMode(
+            0,
+            QHeaderView.ResizeMode.ResizeToContents,
+        )
+        header.setSectionResizeMode(
+            1,
+            QHeaderView.ResizeMode.Stretch,
+        )
+        header.setSectionResizeMode(
+            2,
+            QHeaderView.ResizeMode.ResizeToContents,
+        )
+        header.setSectionResizeMode(
+            3,
+            QHeaderView.ResizeMode.Interactive,
+        )
+        header.setSectionResizeMode(
+            4,
+            QHeaderView.ResizeMode.Interactive,
+        )
+        header.setMinimumSectionSize(80)
+        self._table.setColumnWidth(1, 280)
+        self._table.setColumnWidth(3, 230)
+        self._table.setColumnWidth(4, 320)
         layout.addWidget(self._table, 1)
 
         actions = QHBoxLayout()
@@ -243,17 +278,32 @@ class ChartOfAccountsTemplateEditorDialog(QDialog):
         for row, account in enumerate(self._bundle.chart.accounts):
             rule = rules.get(account.account_number)
             mapping = self._mapping_label(rule)
-            for column, value in enumerate(
-                (
-                    account.account_number,
-                    account.name,
-                    self._TYPE_LABELS[account.account_type],
-                    mapping,
-                )
-            ):
-                self._table.setItem(row, column, QTableWidgetItem(value))
+            taxonomy_mapping = self._taxonomy_mapping_label(
+                account.account_number,
+                self._bundle.taxonomy_mappings,
+            )
+            values = (
+                account.account_number,
+                account.name,
+                self._TYPE_LABELS[account.account_type],
+                mapping,
+                taxonomy_mapping,
+            )
+            for column, value in enumerate(values):
+                item = QTableWidgetItem(value)
+                if column == 4 and value:
+                    item.setToolTip(value)
+                self._table.setItem(row, column, item)
         self._filter_rows(self._search_entry.text())
-        self._table.resizeColumnsToContents()
+
+    @staticmethod
+    def _taxonomy_mapping_label(
+        account_number: str,
+        taxonomy_mappings: dict[str, str] | None,
+    ) -> str:
+        """Liefert nur eine explizit gespeicherte Taxonomiezuordnung."""
+
+        return (taxonomy_mappings or {}).get(account_number, "")
 
     @staticmethod
     def _mapping_label(rule: AccountMappingRule | None) -> str:
