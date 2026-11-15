@@ -1,6 +1,6 @@
 # SimpleOB – Benutzerhandbuch
 
-**Anwenderhandbuch für SimpleOB 0.53.0**
+**Anwenderhandbuch für SimpleOB 0.60.0**
 
 ## 1. Über SimpleOB
 
@@ -725,7 +725,7 @@ Die Einzelheiten dazu werden im folgenden Kapitel beschrieben.
 
 SimpleOB unterstützt den Export und Import der im `.simpleob`-Format
 abgebildeten Mandantendaten. Bei Mandanten mit OP-Verwaltung ist dieses Format
-in Version 0.53.0 keine vollständige Sicherung oder Übertragung; siehe
+in Version 0.60.0 keine vollständige Sicherung oder Übertragung; siehe
 Kapitel 14.2.
 
 Den Export starten Sie im geöffneten Mandanten über **Verwaltung → Mandant
@@ -746,7 +746,7 @@ Vollständigkeit geprüft, bevor die Löschung beginnen kann. Im anschließenden
 Bestätigungsdialog sehen Sie Mandantenname, Mandanten-ID und Sicherungspfad.
 Zur Bestätigung müssen Sie den vollständigen Mandantennamen exakt eingeben.
 Bei Abbruch, falscher Eingabe oder fehlgeschlagener oder unvollständiger
-Sicherung wird der Mandant nicht gelöscht. In Version 0.53.0 überträgt
+Sicherung wird der Mandant nicht gelöscht. In Version 0.60.0 überträgt
 `.simpleob` keine Geschäftspartner und keine separaten OP-Nebenbuchdaten.
 Wenn solche Daten vorhanden sind, schlägt die Vollständigkeitsprüfung fehl und
 SimpleOB bricht die Löschung ab. Die Einschränkung des Formats ist in Kapitel
@@ -2932,7 +2932,7 @@ Dazu gehören insbesondere:
 - Buchungen zur Ergebnisverwendung und
 - erfasste Einlagen.
 
-**Einschränkung in Version 0.53.0:** Das `.simpleob`-Format enthält derzeit
+**Einschränkung in Version 0.60.0:** Das `.simpleob`-Format enthält derzeit
 nicht die Geschäftspartner und separaten OP-Nebenbuchdaten wie Rechnungs-OPs, Zahlungen,
 Zahlungszuordnungen, Verrechnungen, Rückerstattungen und deren Korrekturen.
 Die zugehörigen Hauptbuchungen können im Export enthalten sein, bilden diese
@@ -3124,7 +3124,7 @@ ausschließlich auf eine einzige Sicherungsart zu vertrauen.
 Für die Übertragung eines Mandanten auf einen anderen Rechner kann
 folgender Ablauf verwendet werden:
 
-Dieser Ablauf eignet sich in Version 0.53.0 nicht zur vollständigen
+Dieser Ablauf eignet sich in Version 0.60.0 nicht zur vollständigen
 Übertragung von Geschäftspartner- oder OP-Daten. Wenn die OP-Verwaltung
 verwendet wurde, verwenden Sie `.simpleob` nicht als einzige
 Übertragungsmethode; die dazugehörige Einschränkung ist in Kapitel 14.2
