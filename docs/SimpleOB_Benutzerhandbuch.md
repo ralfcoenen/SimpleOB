@@ -1,6 +1,6 @@
 # SimpleOB – Benutzerhandbuch
 
-**Anwenderhandbuch für SimpleOB 0.60.0**
+**Anwenderhandbuch für SimpleOB 0.60.1**
 
 ## 1. Über SimpleOB
 
@@ -571,6 +571,9 @@ für dieses Konto keine explizite Zuordnung hinterlegt ist. Über das
 Suchfeld können Sie nach Kontonummer oder Bezeichnung suchen.
 
 1. Wählen Sie **„Neues Konto“**, **„Bearbeiten“** oder **„Entfernen“**.
+   Zum Entfernen wählen Sie zuvor eine oder mehrere Tabellenzeilen. Unter
+   macOS können Sie mit **Cmd** einzelne Zeilen hinzufügen und mit **Shift**
+   einen Zeilenbereich auswählen.
 2. Im Konto-Dialog können Sie Kontonummer, Bezeichnung, Kontotyp und
    HGB-Zuordnungen bearbeiten. Für ein neu angelegtes oder bearbeitetes
    Konto ist **„HGB-Zuordnung erforderlich“** zunächst aktiviert. Eine
@@ -599,10 +602,14 @@ im Kontenrahmen vergeben ist. Wird eine Nummer geändert, zeigt
 SimpleOB die betroffenen Systemkonto-, Steuerkonto-, Rollen- und
 Taxonomiereferenzen an. Sie können deren gemeinsame Übernahme auf die neue
 Nummer ausdrücklich bestätigen; ohne diese Bestätigung wird eine
-referenzierte Nummernänderung nicht vorgenommen. Ein Konto mit solchen
-Referenzen kann nicht entfernt werden, bevor die Zuordnungen korrigiert
-sind. Der Kontenrahmen muss außerdem strukturell gültig bleiben und seine
-Zuordnungen müssen auf vorhandene Konten verweisen.
+referenzierte Nummernänderung nicht vorgenommen. Nach Bestätigung einer
+Kontolöschung werden die zugehörigen HGB- und Taxonomiezuordnungen aus der
+Arbeitskopie entfernt. Konten, die System-, Steuer- oder Kontenrollen
+zugeordnet sind, können erst entfernt werden, wenn diese Referenzen
+korrigiert wurden. Bei Mehrfachauswahl gilt die Sicherheitsabfrage für die
+gesamte Auswahl; **„Abbrechen“** ist voreingestellt. Der Kontenrahmen muss
+außerdem strukturell gültig bleiben und seine Zuordnungen müssen auf
+vorhandene Konten verweisen.
 
 Der Editor bearbeitet nur eine unabhängige Arbeitskopie der Vorlage. Die
 mitgelieferte Vorlage und Konten bereits angelegter Mandanten werden dabei
@@ -725,7 +732,7 @@ Die Einzelheiten dazu werden im folgenden Kapitel beschrieben.
 
 SimpleOB unterstützt den Export und Import der im `.simpleob`-Format
 abgebildeten Mandantendaten. Bei Mandanten mit OP-Verwaltung ist dieses Format
-in Version 0.60.0 keine vollständige Sicherung oder Übertragung; siehe
+in Version 0.60.1 keine vollständige Sicherung oder Übertragung; siehe
 Kapitel 14.2.
 
 Den Export starten Sie im geöffneten Mandanten über **Verwaltung → Mandant
@@ -746,7 +753,7 @@ Vollständigkeit geprüft, bevor die Löschung beginnen kann. Im anschließenden
 Bestätigungsdialog sehen Sie Mandantenname, Mandanten-ID und Sicherungspfad.
 Zur Bestätigung müssen Sie den vollständigen Mandantennamen exakt eingeben.
 Bei Abbruch, falscher Eingabe oder fehlgeschlagener oder unvollständiger
-Sicherung wird der Mandant nicht gelöscht. In Version 0.60.0 überträgt
+Sicherung wird der Mandant nicht gelöscht. In Version 0.60.1 überträgt
 `.simpleob` keine Geschäftspartner und keine separaten OP-Nebenbuchdaten.
 Wenn solche Daten vorhanden sind, schlägt die Vollständigkeitsprüfung fehl und
 SimpleOB bricht die Löschung ab. Die Einschränkung des Formats ist in Kapitel
@@ -892,9 +899,20 @@ Für jedes Konto werden angezeigt:
 Oberhalb der Tabelle wird außerdem die Anzahl der Buchungen im Journal
 angezeigt.
 
-Ein Konto kann in der Tabelle ausgewählt und anschließend bearbeitet
-oder – soweit verfügbar – einer feineren E-Bilanz-Taxonomieposition
-zugeordnet werden.
+Ein Konto kann in der Tabelle ausgewählt und anschließend bearbeitet,
+gelöscht oder – soweit verfügbar – einer feineren E-Bilanz-Taxonomieposition
+zugeordnet werden. Zum Löschen wählen Sie **„Konto löschen“**. Unter macOS
+können mehrere vollständige Zeilen mit **Cmd** oder **Shift** ausgewählt und
+gemeinsam gelöscht werden. Vor einer Mehrfachlöschung zeigt SimpleOB eine
+Bestätigung; **„Abbrechen“** ist die sichere Standardauswahl.
+
+SimpleOB verhindert die gesamte Löschung, wenn eines der ausgewählten Konten
+in Buchungen eines Geschäftsjahres, in System- oder Steuerkonten, in einer
+Kontenrolle oder in der Anlagenbuchhaltung verwendet wird. Die Prüfung
+umfasst alle Geschäftsjahre. Bei erfolgreicher Löschung werden die
+zugehörigen HGB- und Taxonomiezuordnungen ebenfalls entfernt. Eine
+Mehrfachlöschung wird vollständig oder gar nicht ausgeführt; mindestens ein
+Konto muss im Kontenrahmen verbleiben.
 
 ### 8.2 Neues Konto anlegen
 
@@ -1064,7 +1082,13 @@ Untergliederung vorsehen. In diesem Fall kann für das ausgewählte Konto
 werden.
 
 SimpleOB bietet dabei nur die E-Bilanz-Positionen zur Auswahl an, die
-für die HGB-Zuordnung des betreffenden Kontos zur Verfügung stehen.
+für die HGB-Zuordnung des betreffenden Kontos einen eindeutigen
+Calculation-Pfad besitzen.
+
+Eine bereits gespeicherte Zuordnung wird bei einem Prüf- oder Ladefehler
+angezeigt und nicht stillschweigend durch eine andere Position ersetzt.
+Wählen Sie ausdrücklich eine gültige Position oder entfernen Sie die
+Zuordnung, wenn Sie sie ändern möchten.
 
 Steht für die HGB-Zuordnung keine feinere E-Bilanz-Position zur
 Verfügung, weist SimpleOB darauf hin.
@@ -2449,6 +2473,19 @@ zur Verfügung.
 Damit installiert SimpleOB die für das ausgewählte Geschäftsjahr
 benötigte Taxonomie.
 
+Für Taxonomie 6.9 verwendet SimpleOB das mit der Anwendung ausgelieferte
+lokale Archiv; dafür ist kein erneuter Download erforderlich. Alternativ
+können Sie **„Taxonomie aus ZIP-Datei installieren …“** wählen und ein
+offizielles Taxonomiearchiv angeben. SimpleOB prüft ZIP-Integrität,
+Paketstruktur, Version und erforderliche Entry-Points und zeigt die
+erkannte Version vor der Installation zur Bestätigung an. Manuell wird
+derzeit nur Taxonomie 6.9 installiert. Eine bereits vorhandene Installation
+wird nicht ersetzt.
+
+SimpleOB kann die Herkunft einer selbst ausgewählten Datei nicht
+kryptografisch verifizieren. Verwenden Sie dafür ausschließlich ein
+Archiv aus dem offiziellen Downloadbereich von esteuer.de.
+
 Nach erfolgreicher Installation erscheint eine entsprechende
 Bestätigung.
 
@@ -2932,7 +2969,7 @@ Dazu gehören insbesondere:
 - Buchungen zur Ergebnisverwendung und
 - erfasste Einlagen.
 
-**Einschränkung in Version 0.60.0:** Das `.simpleob`-Format enthält derzeit
+**Einschränkung in Version 0.60.1:** Das `.simpleob`-Format enthält derzeit
 nicht die Geschäftspartner und separaten OP-Nebenbuchdaten wie Rechnungs-OPs, Zahlungen,
 Zahlungszuordnungen, Verrechnungen, Rückerstattungen und deren Korrekturen.
 Die zugehörigen Hauptbuchungen können im Export enthalten sein, bilden diese
@@ -3124,7 +3161,7 @@ ausschließlich auf eine einzige Sicherungsart zu vertrauen.
 Für die Übertragung eines Mandanten auf einen anderen Rechner kann
 folgender Ablauf verwendet werden:
 
-Dieser Ablauf eignet sich in Version 0.60.0 nicht zur vollständigen
+Dieser Ablauf eignet sich in Version 0.60.1 nicht zur vollständigen
 Übertragung von Geschäftspartner- oder OP-Daten. Wenn die OP-Verwaltung
 verwendet wurde, verwenden Sie `.simpleob` nicht als einzige
 Übertragungsmethode; die dazugehörige Einschränkung ist in Kapitel 14.2
