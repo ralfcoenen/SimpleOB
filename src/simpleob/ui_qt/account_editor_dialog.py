@@ -27,6 +27,13 @@ from simpleob.domain.template_account import (
     TemplateAccount,
     validate_ebilanz_account_description,
 )
+from simpleob.taxonomy.errors import (
+    AmbiguousCalculationPathError,
+    CalculationPathNotFoundError,
+    TaxonomyConceptNotFoundError,
+    TaxonomyModelLoadError,
+    TaxonomyModelNotInstalledError,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,6 +77,10 @@ class AccountEditorDialog(QDialog):
             ]
             | None
         ) = None,
+        taxonomy_concept_validator: (
+            Callable[[FinancialStatementPosition, str], object]
+            | None
+        ) = None,
     ) -> None:
         super().__init__(parent)
 
@@ -82,6 +93,7 @@ class AccountEditorDialog(QDialog):
         self._hgb_mapping_required = hgb_mapping_required
         self._original_taxonomy_concept_name = taxonomy_concept_name
         self._taxonomy_choices_provider = taxonomy_choices_provider
+        self._taxonomy_concept_validator = taxonomy_concept_validator
         self._updating_taxonomy_choices = False
         self._taxonomy_selection_touched = False
         self._taxonomy_choice_error: str | None = None
@@ -317,7 +329,7 @@ class AccountEditorDialog(QDialog):
         )
 
     def _update_taxonomy_choices(self) -> None:
-        """Zeigt ausschließlich explizit zulässige Taxonomiepositionen an."""
+        """Zeigt nur eindeutig erreichbare Concepts und den Prüfstatus."""
 
         combo = self._taxonomy_position_box
         if combo is None:
@@ -336,11 +348,12 @@ class AccountEditorDialog(QDialog):
 
         choices: tuple[tuple[str, str], ...] = ()
         self._taxonomy_choice_error = None
+        position: FinancialStatementPosition | None = None
         if self._taxonomy_choices_provider is None:
             if self._original_taxonomy_concept_name is not None:
                 self._taxonomy_choice_error = (
-                    "Die vorhandene Zuordnung kann in diesem Dialog nicht "
-                    "gegen Taxonomie 6.9 geprüft werden."
+                    "Das Taxonomiemodell kann in diesem Dialog nicht geladen "
+                    "werden; die bestehende Zuordnung bleibt unverändert."
                 )
         else:
             try:
@@ -352,26 +365,64 @@ class AccountEditorDialog(QDialog):
                     )
                 choices = self._taxonomy_choices_provider(position)
             except (OSError, ValueError) as exc:
-                self._taxonomy_choice_error = str(exc)
+                self._taxonomy_choice_error = (
+                    self._taxonomy_error_message(exc)
+                )
+            except RuntimeError as exc:
+                self._taxonomy_choice_error = (
+                    self._taxonomy_error_message(exc)
+                )
+
+        concept_names = {concept for concept, _label in choices}
+        selected_is_valid = (
+            selected_concept is not None
+            and selected_concept in concept_names
+        )
+        if selected_concept is not None and not selected_is_valid:
+            if self._taxonomy_choice_error is None:
+                if self._taxonomy_concept_validator is None:
+                    self._taxonomy_choice_error = (
+                        "Die bestehende Zuordnung konnte nicht gegen das "
+                        "geladene Taxonomiemodell geprüft werden."
+                    )
+                elif position is None:
+                    self._taxonomy_choice_error = (
+                        "Für die bestehende Zuordnung ist keine eindeutige "
+                        "HGB-Position ausgewählt."
+                    )
+                else:
+                    try:
+                        self._taxonomy_concept_validator(
+                            position,
+                            selected_concept,
+                        )
+                    except Exception as exc:
+                        self._taxonomy_choice_error = (
+                            self._taxonomy_error_message(exc)
+                        )
+                    else:
+                        self._taxonomy_choice_error = (
+                            "Gültige Zuordnung: genau ein Calculation-Pfad."
+                        )
+                        choices = (
+                            *choices,
+                            (selected_concept, selected_concept),
+                        )
+                        concept_names.add(selected_concept)
 
         self._updating_taxonomy_choices = True
         combo.blockSignals(True)
         try:
             combo.clear()
             combo.addItem("Keine explizite Zuordnung", None)
-            concept_names = {concept for concept, _label in choices}
             if (
                 selected_concept is not None
                 and selected_concept not in concept_names
             ):
                 combo.addItem(
-                    f"Bisherige Zuordnung nicht passend: {selected_concept}",
+                    f"Gespeicherte Zuordnung (nicht auswählbar): "
+                    f"{selected_concept}",
                     ("unavailable", selected_concept),
-                )
-                self._taxonomy_choice_error = (
-                    "Die bisherige Zuordnung passt nicht zur aktuellen "
-                    "HGB-Zuordnung. Wählen Sie eine zulässige Position oder "
-                    "ausdrücklich „Keine explizite Zuordnung“."
                 )
             for concept_name, label in choices:
                 combo.addItem(label, concept_name)
@@ -389,6 +440,50 @@ class AccountEditorDialog(QDialog):
         finally:
             combo.blockSignals(False)
             self._updating_taxonomy_choices = False
+
+        if self._taxonomy_status_label is not None:
+            if selected_is_valid:
+                self._taxonomy_status_label.setText(
+                    "Gültige Zuordnung: genau ein Calculation-Pfad."
+                )
+            elif self._taxonomy_choice_error:
+                self._taxonomy_status_label.setText(
+                    self._taxonomy_choice_error
+                )
+            else:
+                self._taxonomy_status_label.clear()
+
+    @staticmethod
+    def _taxonomy_error_message(exc: Exception) -> str:
+        if isinstance(exc, TaxonomyModelNotInstalledError):
+            return f"Taxonomiemodell nicht installiert. {exc}"
+        if isinstance(exc, TaxonomyModelLoadError):
+            return f"Taxonomiemodell kann nicht geladen werden. {exc}"
+        if isinstance(exc, TaxonomyConceptNotFoundError):
+            return f"Concept im Taxonomiemodell nicht vorhanden. {exc}"
+        if isinstance(exc, CalculationPathNotFoundError):
+            return f"Kein gültiger Calculation-Pfad. {exc}"
+        if isinstance(exc, AmbiguousCalculationPathError):
+            return f"Mehrere gültige Calculation-Pfade. {exc}"
+        if isinstance(exc, FileNotFoundError):
+            return f"Taxonomiemodell nicht installiert. {exc}"
+        if isinstance(exc, (OSError, RuntimeError)):
+            return f"Taxonomiemodell kann nicht geladen werden. {exc}"
+        return str(exc)
+
+    def _hgb_mapping_changed(self) -> bool:
+        if self._mapping_rule is None:
+            return False
+        return (
+            self._debit_positions.get(
+                self._debit_position_box.currentText()
+            )
+            != self._mapping_rule.debit_position
+            or self._credit_positions.get(
+                self._credit_position_box.currentText()
+            )
+            != self._mapping_rule.credit_position
+        )
 
         if self._taxonomy_status_label is not None:
             self._taxonomy_status_label.setText(
@@ -600,16 +695,33 @@ class AccountEditorDialog(QDialog):
                     isinstance(selected_taxonomy, tuple)
                     and selected_taxonomy[:1] == ("unavailable",)
                 ):
-                    raise ValueError(
-                        "Die bisherige E-Bilanz-Taxonomiezuordnung passt nicht "
-                        "zur aktuellen HGB-Zuordnung. Wählen Sie eine gültige "
-                        "Position oder ausdrücklich „Keine explizite Zuordnung“."
+                    if (
+                        self._taxonomy_selection_touched
+                        or selected_taxonomy[1]
+                        != self._original_taxonomy_concept_name
+                    ):
+                        raise ValueError(
+                            self._taxonomy_choice_error
+                            or "Die gespeicherte Zuordnung kann nicht "
+                            "übernommen werden. Wählen Sie ausdrücklich eine "
+                            "gültige Zuordnung oder entfernen Sie sie."
+                        )
+                    if self._hgb_mapping_changed():
+                        raise ValueError(
+                            "Die vorhandene Taxonomiezuordnung wurde erhalten, "
+                            "konnte aber nach der HGB-Änderung nicht als gültig "
+                            "bestätigt werden. Prüfen Sie das Taxonomiemodell "
+                            "und wählen Sie danach eine eindeutige Zuordnung."
+                        )
+                    taxonomy_concept_name = (
+                        self._original_taxonomy_concept_name
                     )
-                taxonomy_concept_name = (
-                    selected_taxonomy
-                    if isinstance(selected_taxonomy, str)
-                    else None
-                )
+                else:
+                    taxonomy_concept_name = (
+                        selected_taxonomy
+                        if isinstance(selected_taxonomy, str)
+                        else None
+                    )
                 taxonomy_mapping_changed = (
                     taxonomy_concept_name
                     != self._original_taxonomy_concept_name

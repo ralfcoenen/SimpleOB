@@ -2,8 +2,14 @@
 
 from decimal import Decimal
 
+import pytest
+
 from simpleob.taxonomy.calculation import TaxonomyCalculationRelation
 from simpleob.taxonomy.calculation_set import TaxonomyCalculationSet
+from simpleob.taxonomy.errors import (
+    AmbiguousCalculationPathError,
+    CalculationPathNotFoundError,
+)
 
 
 def _relation(
@@ -53,3 +59,37 @@ def test_does_not_join_calculation_edges_from_different_roles() -> None:
 
     assert calculation.descendants_of("root") == ("subtotal",)
     assert calculation.paths_between("root", "leaf") == ()
+
+
+def test_unique_path_reuses_calculation_paths_between():
+    first = _relation("root", "leaf")
+    calculation = TaxonomyCalculationSet((first,))
+
+    assert calculation.unique_path_between("root", "leaf") == (first,)
+
+
+def test_unique_path_rejects_missing_path():
+    calculation = TaxonomyCalculationSet(())
+
+    with pytest.raises(
+        CalculationPathNotFoundError,
+        match="kein Calculation-Pfad",
+    ):
+        calculation.unique_path_between("root", "leaf")
+
+
+def test_unique_path_rejects_multiple_paths():
+    calculation = TaxonomyCalculationSet(
+        (
+            _relation("root", "left"),
+            _relation("left", "leaf"),
+            _relation("root", "right"),
+            _relation("right", "leaf"),
+        )
+    )
+
+    with pytest.raises(
+        AmbiguousCalculationPathError,
+        match="mehrere Calculation-Pfade",
+    ):
+        calculation.unique_path_between("root", "leaf")

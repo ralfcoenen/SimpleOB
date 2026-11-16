@@ -5,6 +5,8 @@ from unittest.mock import Mock, patch
 
 from simpleob.domain.fiscal_year import FiscalYear
 from simpleob.services.taxonomy_management_service import (
+    TAXONOMY_6_9_ARCHIVE_NAME,
+    TAXONOMY_6_9_ARCHIVE_SHA256,
     TaxonomyManagementService,
 )
 from simpleob.taxonomy.taxonomy import (
@@ -206,3 +208,67 @@ def test_installs_required_taxonomy_for_fiscal_year(
         version=TaxonomyVersion.V6_9,
         download=download,
     )
+
+
+def test_installs_taxonomy_from_configured_local_archive_without_download(
+    tmp_path: Path,
+) -> None:
+    local_archive = tmp_path / TAXONOMY_6_9_ARCHIVE_NAME
+    local_archive.touch()
+    installation_service = TaxonomyInstallationService(
+        target_root=tmp_path / "taxonomy",
+    )
+    download = Mock()
+    service = TaxonomyManagementService(
+        catalog=TaxonomyCatalog(root=tmp_path / "taxonomy"),
+        installation_service=installation_service,
+        download=download,
+        local_archive=local_archive,
+        local_archive_sha256=TAXONOMY_6_9_ARCHIVE_SHA256,
+    )
+    expected_path = tmp_path / "taxonomy" / "6.9"
+
+    with patch.object(
+        installation_service,
+        "install_from_zip",
+        return_value=expected_path,
+    ) as install_from_zip:
+        installed_path = service.install_required_taxonomy(
+            _fiscal_year(2026)
+        )
+
+    assert installed_path == expected_path
+    install_from_zip.assert_called_once_with(
+        version=TaxonomyVersion.V6_9,
+        source=local_archive,
+        expected_sha256=TAXONOMY_6_9_ARCHIVE_SHA256,
+    )
+    download.assert_not_called()
+
+
+def test_does_not_reinstall_usable_taxonomy_from_local_archive(
+    tmp_path: Path,
+) -> None:
+    _create_complete_taxonomy(
+        tmp_path,
+        version="6.9",
+        date_part="2025-04-01",
+    )
+    installation_service = TaxonomyInstallationService(
+        target_root=tmp_path,
+    )
+    download = Mock()
+    service = TaxonomyManagementService(
+        catalog=TaxonomyCatalog(root=tmp_path),
+        installation_service=installation_service,
+        download=download,
+        local_archive=tmp_path / TAXONOMY_6_9_ARCHIVE_NAME,
+        local_archive_sha256=TAXONOMY_6_9_ARCHIVE_SHA256,
+    )
+
+    installed_path = service.install_required_taxonomy(
+        _fiscal_year(2026)
+    )
+
+    assert installed_path == tmp_path / "6.9"
+    download.assert_not_called()

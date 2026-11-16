@@ -181,6 +181,8 @@ from simpleob.services.receivable_invoice_posting_service import (
 )
 from simpleob.services.reporting_service import ReportingService
 from simpleob.services.taxonomy_management_service import (
+    TAXONOMY_6_9_ARCHIVE_NAME,
+    TAXONOMY_6_9_ARCHIVE_SHA256,
     TaxonomyManagementService,
 )
 from simpleob.taxonomy.arelle_adapter import ArelleAdapter
@@ -674,10 +676,28 @@ def main() -> None:
 
     taxonomy_downloader = TaxonomyDownloader()
 
+    packaged_taxonomy_archive = (
+        Path(__file__).resolve().parent
+        / "resources"
+        / "taxonomy"
+        / TAXONOMY_6_9_ARCHIVE_NAME
+    )
+    source_taxonomy_archive = (
+        Path(__file__).resolve().parents[2]
+        / TAXONOMY_6_9_ARCHIVE_NAME
+    )
+    taxonomy_archive = (
+        packaged_taxonomy_archive
+        if packaged_taxonomy_archive.is_file()
+        else source_taxonomy_archive
+    )
+
     taxonomy_management_service = TaxonomyManagementService(
         catalog=taxonomy_catalog,
         installation_service=taxonomy_installation_service,
         download=taxonomy_downloader.download,
+        local_archive=taxonomy_archive,
+        local_archive_sha256=TAXONOMY_6_9_ARCHIVE_SHA256,
     )
 
     arelle_adapter = ArelleAdapter()
@@ -694,6 +714,17 @@ def main() -> None:
         return template_taxonomy_service.account_taxonomy_choices(
             fiscal_year=fiscal_year,
             position=position,
+        )
+
+    def template_taxonomy_concept_validator(
+        fiscal_year,
+        position,
+        concept_name,
+    ):
+        return template_taxonomy_service.validate_account_taxonomy_concept(
+            fiscal_year=fiscal_year,
+            position=position,
+            concept_name=concept_name,
         )
 
     session = database.create_session()
@@ -957,6 +988,9 @@ def main() -> None:
                 ),
                 delete_client=delete_client,
                 taxonomy_choices_provider=template_taxonomy_choices,
+                taxonomy_concept_validator=(
+                    template_taxonomy_concept_validator
+                ),
             )
 
             if dialog.exec() != QDialog.DialogCode.Accepted:

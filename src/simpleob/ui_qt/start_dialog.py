@@ -70,6 +70,13 @@ class StartDialog(QDialog):
             ]
             | None
         ) = None,
+        taxonomy_concept_validator: (
+            Callable[
+                [FiscalYear, FinancialStatementPosition, str],
+                object,
+            ]
+            | None
+        ) = None,
     ) -> None:
         super().__init__()
 
@@ -80,6 +87,7 @@ class StartDialog(QDialog):
         self._import_client_transfer = import_client_transfer
         self._delete_client = delete_client
         self._taxonomy_choices_provider = taxonomy_choices_provider
+        self._taxonomy_concept_validator = taxonomy_concept_validator
 
         self.result: ApplicationContext | None = None
         self.chart_bundle: ChartOfAccountsTemplateBundle | None = None
@@ -597,6 +605,9 @@ class StartDialog(QDialog):
                 / "chart_of_accounts_templates"
             ),
             taxonomy_choices_provider=self._taxonomy_choices_provider,
+            taxonomy_concept_validator=(
+                self._taxonomy_concept_validator
+            ),
         )
 
         if dialog.exec() != QDialog.DialogCode.Accepted:

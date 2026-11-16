@@ -1,8 +1,9 @@
 from dataclasses import replace
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QItemSelectionModel, Qt
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QApplication,
     QDialog,
     QMessageBox,
@@ -32,6 +33,11 @@ from simpleob.importers.chart_of_accounts_template_bundle_importer import (
 from simpleob.importers.csv_chart_of_accounts_importer import (
     CsvChartOfAccountsImporter,
 )
+from simpleob.taxonomy.errors import (
+    AmbiguousCalculationPathError,
+    CalculationPathNotFoundError,
+    TaxonomyModelNotInstalledError,
+)
 from simpleob.ui_qt.account_configuration_dialog import (
     AccountConfigurationDialog,
 )
@@ -58,7 +64,13 @@ def _roots():
     return assets, liabilities, income_statement
 
 
-def _editor(bundle, *, templates_directory=None, taxonomy_choices_provider=None):
+def _editor(
+    bundle,
+    *,
+    templates_directory=None,
+    taxonomy_choices_provider=None,
+    taxonomy_concept_validator=None,
+):
     assets, liabilities, income_statement = _roots()
     importer = ChartOfAccountsTemplateBundleImporter(
         chart_importer=CsvChartOfAccountsImporter(
@@ -73,6 +85,7 @@ def _editor(bundle, *, templates_directory=None, taxonomy_choices_provider=None)
         bundle_importer=importer,
         templates_directory=templates_directory,
         taxonomy_choices_provider=taxonomy_choices_provider,
+        taxonomy_concept_validator=taxonomy_concept_validator,
         assets=assets,
         liabilities=liabilities,
         income_statement=income_statement,
@@ -143,6 +156,95 @@ def _single_account_bundle(*, mapped=True, taxonomy=None):
         ),
         taxonomy_mappings=taxonomy,
     )
+
+
+def _deletable_bundle():
+    assets, _liabilities, _income_statement = _roots()
+    accounts = tuple(
+        TemplateAccount(number, f"Konto {number}", AccountType.ASSET)
+        for number in ("7000", "7001", "7002", "7003")
+    )
+    return ChartOfAccountsTemplateBundle(
+        chart=ChartOfAccountsTemplate(
+            "Test",
+            accounts,
+            account_mapping_rules=tuple(
+                AccountMappingRule(number, assets.children[0], None)
+                for number in ("7000", "7001", "7002", "7003")
+            ),
+        ),
+        taxonomy_mappings={
+            "7000": "concept.7000",
+            "7001": "concept.7001",
+            "7002": "concept.7002",
+        },
+    )
+
+
+def _select_accounts(dialog, account_numbers):
+    selection = dialog._table.selectionModel()
+    for row in range(dialog._table.rowCount()):
+        if dialog._table.item(row, 0).text() in account_numbers:
+            selection.select(
+                dialog._table.model().index(row, 0),
+                QItemSelectionModel.SelectionFlag.Select
+                | QItemSelectionModel.SelectionFlag.Rows,
+            )
+
+
+def _patch_multi_delete_message_box(monkeypatch, *, clicked_label):
+    class FakeButton:
+        def __init__(self, label):
+            self.label = label
+
+    class FakeMessageBox:
+        Icon = QMessageBox.Icon
+        ButtonRole = QMessageBox.ButtonRole
+        instances = []
+
+        def __init__(self, _parent=None):
+            self.buttons = []
+            self.informative_text = ""
+            self.__class__.instances.append(self)
+
+        def setIcon(self, icon):
+            self.icon = icon
+
+        def setWindowTitle(self, title):
+            self.title = title
+
+        def setText(self, text):
+            self.text = text
+
+        def setInformativeText(self, text):
+            self.informative_text = text
+
+        def addButton(self, label, _role):
+            button = FakeButton(label)
+            self.buttons.append(button)
+            return button
+
+        def setDefaultButton(self, button):
+            self.default_button = button
+
+        def setEscapeButton(self, button):
+            self.escape_button = button
+
+        def exec(self):
+            return 0
+
+        def clickedButton(self):
+            return next(
+                button
+                for button in self.buttons
+                if button.label == clicked_label
+            )
+
+    monkeypatch.setattr(
+        "simpleob.ui_qt.chart_of_accounts_template_editor_dialog.QMessageBox",
+        FakeMessageBox,
+    )
+    return FakeMessageBox
 
 
 def _referenced_bundle():
@@ -443,6 +545,153 @@ def test_unreferenced_account_can_be_removed_from_working_copy(monkeypatch):
     dialog.close()
 
 
+def test_account_with_taxonomy_mapping_can_be_deleted(monkeypatch):
+    _app()
+    source = _deletable_bundle()
+    dialog = _editor(source)
+    _select_accounts(dialog, {"7000"})
+    monkeypatch.setattr(
+        "simpleob.ui_qt.chart_of_accounts_template_editor_dialog.QMessageBox.question",
+        lambda *_args: QMessageBox.StandardButton.Yes,
+    )
+
+    dialog._remove_account()
+
+    assert tuple(
+        account.account_number for account in dialog._bundle.chart.accounts
+    ) == ("7001", "7002", "7003")
+    assert dialog._bundle.taxonomy_mappings == {
+        "7001": "concept.7001",
+        "7002": "concept.7002",
+    }
+    assert all(
+        rule.account_number != "7000"
+        for rule in dialog._bundle.chart.account_mapping_rules
+    )
+    assert dialog._table.selectionModel().selectedRows() == []
+    assert source.taxonomy_mappings["7000"] == "concept.7000"
+    dialog.close()
+
+
+def test_multiple_account_deletion_removes_taxonomy_and_hgb_mappings(
+    monkeypatch,
+):
+    _app()
+    dialog = _editor(_deletable_bundle())
+    assert (
+        dialog._table.selectionMode()
+        == QAbstractItemView.SelectionMode.ExtendedSelection
+    )
+    _select_accounts(dialog, {"7000", "7001"})
+    message_box = _patch_multi_delete_message_box(
+        monkeypatch,
+        clicked_label="Konten löschen",
+    )
+
+    dialog._remove_account()
+
+    assert len(message_box.instances) == 1
+    prompt = message_box.instances[0]
+    assert "2 ausgewählten Konten" in prompt.text
+    assert "Taxonomiezuordnungen" in prompt.informative_text
+    assert "entfernt (2)" in prompt.informative_text
+    assert "HGB-Zuordnungen" in prompt.informative_text
+    assert [button.label for button in prompt.buttons] == [
+        "Abbrechen",
+        "Konten löschen",
+    ]
+    assert prompt.default_button.label == "Abbrechen"
+    assert prompt.escape_button.label == "Abbrechen"
+    assert tuple(
+        account.account_number for account in dialog._bundle.chart.accounts
+    ) == ("7002", "7003")
+    assert dialog._bundle.taxonomy_mappings == {
+        "7002": "concept.7002",
+    }
+    assert tuple(
+        rule.account_number
+        for rule in dialog._bundle.chart.account_mapping_rules
+    ) == ("7002", "7003")
+    assert dialog._table.rowCount() == 2
+    assert dialog._table.selectionModel().selectedRows() == []
+    dialog.close()
+
+
+def test_cancelling_multiple_account_deletion_keeps_working_copy_unchanged(
+    monkeypatch,
+):
+    _app()
+    dialog = _editor(_deletable_bundle())
+    _select_accounts(dialog, {"7000", "7001"})
+    before = dialog._bundle
+    message_box = _patch_multi_delete_message_box(
+        monkeypatch,
+        clicked_label="Abbrechen",
+    )
+
+    dialog._remove_account()
+
+    assert dialog._bundle == before
+    assert len(message_box.instances) == 1
+    assert dialog._table.rowCount() == 4
+    dialog.close()
+
+
+def test_multiple_account_deletion_blocks_system_tax_and_role_references(
+    monkeypatch,
+):
+    _app()
+    dialog = _editor(_referenced_bundle())
+    _select_accounts(dialog, {"7000", "7001", "7004"})
+    before = dialog._bundle
+    warnings = []
+    monkeypatch.setattr(
+        "simpleob.ui_qt.chart_of_accounts_template_editor_dialog.QMessageBox.warning",
+        lambda *args: warnings.append(args),
+    )
+
+    dialog._remove_account()
+
+    assert dialog._bundle == before
+    assert len(warnings) == 1
+    assert "Systemkonto: Eröffnungsbilanzkonto" in warnings[0][2]
+    assert "Steuerkonto:" in warnings[0][2]
+    assert "Kontenrolle: Kasse" in warnings[0][2]
+    assert tuple(
+        account.account_number for account in dialog._bundle.chart.accounts
+    ) == ("7000", "7001", "7002", "7003", "7004")
+    assert dialog._bundle.taxonomy_mappings == {
+        "7000": "sample.concept",
+    }
+    dialog.close()
+
+
+def test_editor_cancel_after_deletion_keeps_source_template_unchanged(
+    monkeypatch,
+):
+    _app()
+    source = _deletable_bundle()
+    dialog = _editor(source)
+    _select_accounts(dialog, {"7000"})
+    monkeypatch.setattr(
+        "simpleob.ui_qt.chart_of_accounts_template_editor_dialog.QMessageBox.question",
+        lambda *_args: QMessageBox.StandardButton.Yes,
+    )
+
+    dialog._remove_account()
+    dialog.reject()
+
+    assert dialog.result is None
+    assert tuple(
+        account.account_number for account in source.chart.accounts
+    ) == ("7000", "7001", "7002", "7003")
+    assert source.taxonomy_mappings == {
+        "7000": "concept.7000",
+        "7001": "concept.7001",
+        "7002": "concept.7002",
+    }
+
+
 def test_template_mode_requires_hgb_by_default_and_allows_explicit_exception(
     monkeypatch,
 ):
@@ -715,6 +964,80 @@ def test_cancelled_account_edit_does_not_change_taxonomy_mapping():
     editor.close()
 
 
+def test_missing_taxonomy_model_preserves_existing_mapping_on_save(monkeypatch):
+    _app()
+
+    def missing_model(_position):
+        raise TaxonomyModelNotInstalledError("Taxonomie 6.9 fehlt")
+
+    editor = _editor(
+        _single_account_bundle(taxonomy={"7000": "existing.concept"}),
+        taxonomy_choices_provider=missing_model,
+    )
+    account = editor._bundle.chart.accounts[0]
+    mapping_rule = editor._bundle.chart.account_mapping_rules[0]
+    dialog = editor._edit_dialog(account=account, mapping_rule=mapping_rule)
+    errors = []
+    monkeypatch.setattr(
+        "simpleob.ui_qt.account_editor_dialog.QMessageBox.critical",
+        lambda *_args: errors.append(_args),
+    )
+
+    assert "Taxonomiemodell nicht installiert" in dialog._taxonomy_status_label.text()
+    dialog._save()
+
+    assert not errors
+    assert dialog.result.taxonomy_concept_name == "existing.concept"
+    editor.close()
+
+
+def test_existing_valid_concept_remains_selected_on_unchanged_save():
+    _app()
+    editor = _editor(
+        _single_account_bundle(taxonomy={"7000": "valid.concept"}),
+        taxonomy_choices_provider=lambda _position: (
+            ("valid.concept", "Gültiges Concept"),
+        ),
+    )
+    account = editor._bundle.chart.accounts[0]
+    mapping_rule = editor._bundle.chart.account_mapping_rules[0]
+    dialog = editor._edit_dialog(account=account, mapping_rule=mapping_rule)
+
+    assert dialog._taxonomy_position_box.currentData() == "valid.concept"
+    assert "genau ein Calculation-Pfad" in dialog._taxonomy_status_label.text()
+    dialog._save()
+
+    assert dialog.result.taxonomy_concept_name == "valid.concept"
+    editor.close()
+
+
+def test_existing_taxonomy_concept_reports_missing_and_ambiguous_paths():
+    _app()
+    for error, expected in (
+        (
+            CalculationPathNotFoundError("kein Pfad"),
+            "Kein gültiger Calculation-Pfad",
+        ),
+        (
+            AmbiguousCalculationPathError("mehrere Pfade"),
+            "Mehrere gültige Calculation-Pfade",
+        ),
+    ):
+        editor = _editor(
+            _single_account_bundle(taxonomy={"7000": "existing.concept"}),
+            taxonomy_choices_provider=lambda _position: (),
+            taxonomy_concept_validator=lambda _position, _concept, error=error: (
+                (_ for _ in ()).throw(error)
+            ),
+        )
+        account = editor._bundle.chart.accounts[0]
+        mapping_rule = editor._bundle.chart.account_mapping_rules[0]
+        dialog = editor._edit_dialog(account=account, mapping_rule=mapping_rule)
+
+        assert expected in dialog._taxonomy_status_label.text()
+        editor.close()
+
+
 def test_renumbering_preserves_taxonomy_mapping_and_hgb_change_requires_correction(
     monkeypatch,
 ):
@@ -757,7 +1080,7 @@ def test_renumbering_preserves_taxonomy_mapping_and_hgb_change_requires_correcti
         if position == another_position
     )
     account_dialog._debit_position_box.setCurrentText(another_label)
-    assert "passt nicht" in account_dialog._taxonomy_status_label.text()
+    assert "konnte nicht gegen" in account_dialog._taxonomy_status_label.text()
     errors = []
     monkeypatch.setattr(
         "simpleob.ui_qt.account_editor_dialog.QMessageBox.critical",

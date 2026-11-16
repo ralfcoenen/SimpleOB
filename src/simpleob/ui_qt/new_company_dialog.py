@@ -110,11 +110,19 @@ class NewCompanyDialog(QDialog):
             ]
             | None
         ) = None,
+        taxonomy_concept_validator: (
+            Callable[
+                [FiscalYear, FinancialStatementPosition, str],
+                object,
+            ]
+            | None
+        ) = None,
     ) -> None:
         super().__init__(parent)
 
         self._repository = repository
         self._taxonomy_choices_provider = taxonomy_choices_provider
+        self._taxonomy_concept_validator = taxonomy_concept_validator
         self.result: ApplicationContext | None = None
         self.chart_bundle: ChartOfAccountsTemplateBundle | None = None
         self.uses_standard_chart = False
@@ -416,6 +424,7 @@ class NewCompanyDialog(QDialog):
 
         assets, liabilities, income_statement = self._create_statement_roots()
         taxonomy_choices_provider = None
+        taxonomy_concept_validator = None
         if self._taxonomy_choices_provider is not None:
             def choices_for_position(position: FinancialStatementPosition):
                 fiscal_year = FiscalYear(
@@ -428,6 +437,22 @@ class NewCompanyDialog(QDialog):
                 )
 
             taxonomy_choices_provider = choices_for_position
+        if self._taxonomy_concept_validator is not None:
+            def validate_concept_for_position(
+                position: FinancialStatementPosition,
+                concept_name: str,
+            ):
+                fiscal_year = FiscalYear(
+                    start_date=self._start_date_entry.date_value(),
+                    end_date=self._end_date_entry.date_value(),
+                )
+                return self._taxonomy_concept_validator(
+                    fiscal_year,
+                    position,
+                    concept_name,
+                )
+
+            taxonomy_concept_validator = validate_concept_for_position
         dialog = ChartOfAccountsTemplateEditorDialog(
             self,
             bundle=bundle,
@@ -435,6 +460,7 @@ class NewCompanyDialog(QDialog):
             templates_directory=self._template_directory,
             prepare_bundle_for_save=self._prepare_bundle_for_template_save,
             taxonomy_choices_provider=taxonomy_choices_provider,
+            taxonomy_concept_validator=taxonomy_concept_validator,
             assets=assets,
             liabilities=liabilities,
             income_statement=income_statement,

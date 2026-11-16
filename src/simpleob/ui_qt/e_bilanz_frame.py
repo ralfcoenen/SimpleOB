@@ -22,6 +22,7 @@ class EBilanzFrame(QWidget):
         self,
         *,
         on_install_taxonomy: Callable[[], None],
+        on_install_taxonomy_from_zip: Callable[[], None],
         on_prepare: Callable[[], None],
         on_build: Callable[[], None],
         on_validate: Callable[[], None],
@@ -55,6 +56,7 @@ class EBilanzFrame(QWidget):
 
         taxonomy_group = self._create_taxonomy_group(
             on_install_taxonomy=on_install_taxonomy,
+            on_install_taxonomy_from_zip=on_install_taxonomy_from_zip,
         )
         bvv_group = self._create_bvv_group(
             on_export_bvv_pdf=on_export_bvv_pdf,
@@ -88,6 +90,7 @@ class EBilanzFrame(QWidget):
         self,
         *,
         on_install_taxonomy: Callable[[], None],
+        on_install_taxonomy_from_zip: Callable[[], None],
     ) -> QGroupBox:
         """Erzeugt den Bereich für Taxonomie und Workflowstatus."""
 
@@ -110,6 +113,20 @@ class EBilanzFrame(QWidget):
         )
         layout.addWidget(
             self._install_taxonomy_button,
+            alignment=Qt.AlignmentFlag.AlignLeft,
+        )
+
+        self._install_taxonomy_from_zip_button = QPushButton(
+            "Taxonomie aus ZIP-Datei installieren …"
+        )
+        self._install_taxonomy_from_zip_button.clicked.connect(
+            on_install_taxonomy_from_zip
+        )
+        self._configure_action_button(
+            self._install_taxonomy_from_zip_button
+        )
+        layout.addWidget(
+            self._install_taxonomy_from_zip_button,
             alignment=Qt.AlignmentFlag.AlignLeft,
         )
 

@@ -22,6 +22,7 @@ class EBilanzAccountMappingDialog(QDialog):
         account_name: str,
         choices: tuple[tuple[str, str], ...],
         current_concept_name: str | None,
+        current_concept_error: str | None = None,
     ) -> None:
         super().__init__(parent)
 
@@ -32,16 +33,6 @@ class EBilanzAccountMappingDialog(QDialog):
 
         self.result: str | None = current_concept_name
         self.saved = False
-
-        self._concept_by_label = {
-            label: concept_name
-            for concept_name, label in choices
-        }
-
-        self._label_by_concept = {
-            concept_name: label
-            for concept_name, label in choices
-        }
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
@@ -65,23 +56,61 @@ class EBilanzAccountMappingDialog(QDialog):
         taxonomy_layout.addWidget(taxonomy_label)
 
         self._combobox = QComboBox()
-        self._combobox.addItems(
-            [
-                label
-                for _, label in choices
-            ]
-        )
         self._combobox.setMinimumWidth(500)
+        self._valid_concepts = {
+            concept_name
+            for concept_name, _label in choices
+        }
+        if (
+            current_concept_name is not None
+            and current_concept_name not in self._valid_concepts
+        ):
+            self._combobox.addItem(
+                f"Gespeicherte Zuordnung (nicht bestätigt): "
+                f"{current_concept_name}",
+                ("unavailable", current_concept_name),
+            )
+        for concept_name, label in choices:
+            self._combobox.addItem(label, concept_name)
 
         if current_concept_name is not None:
-            current_label = self._label_by_concept.get(
-                current_concept_name
-            )
+            for index in range(self._combobox.count()):
+                data = self._combobox.itemData(index)
+                if data == current_concept_name or data == (
+                    "unavailable",
+                    current_concept_name,
+                ):
+                    self._combobox.setCurrentIndex(index)
+                    break
 
-            if current_label is not None:
-                self._combobox.setCurrentText(
-                    current_label
-                )
+        self._status_label = QLabel()
+        self._status_label.setWordWrap(True)
+        if current_concept_error:
+            self._status_label.setText(
+                "Die gespeicherte Zuordnung wurde nicht als gültig bestätigt: "
+                f"{current_concept_error}"
+            )
+        elif (
+            current_concept_name is not None
+            and current_concept_name in self._valid_concepts
+        ):
+            self._status_label.setText(
+                "Die gespeicherte Zuordnung hat genau einen gültigen "
+                "Calculation-Pfad."
+            )
+        elif current_concept_name is None:
+            self._status_label.setText(
+                "Wählen Sie eine Taxonomieposition aus."
+                if choices
+                else "Für diese HGB-Position gibt es keine eindeutige "
+                "Taxonomieposition zur Auswahl."
+            )
+        else:
+            self._status_label.setText(
+                "Die gespeicherte Zuordnung ist in der gültigen Auswahlliste "
+                "nicht enthalten. Wählen Sie eine gültige Position oder "
+                "entfernen Sie die Zuordnung ausdrücklich."
+            )
 
         taxonomy_layout.addWidget(
             self._combobox,
@@ -89,6 +118,7 @@ class EBilanzAccountMappingDialog(QDialog):
         )
 
         layout.addLayout(taxonomy_layout)
+        layout.addWidget(self._status_label)
 
         button_layout = QHBoxLayout()
 
@@ -98,6 +128,7 @@ class EBilanzAccountMappingDialog(QDialog):
         remove_button.clicked.connect(
             self._remove
         )
+        remove_button.setEnabled(current_concept_name is not None)
         button_layout.addWidget(remove_button)
 
         button_layout.addStretch()
@@ -117,6 +148,11 @@ class EBilanzAccountMappingDialog(QDialog):
             self._save
         )
         save_button.setDefault(True)
+        self._save_button = save_button
+        self._combobox.currentIndexChanged.connect(
+            self._update_save_enabled
+        )
+        self._update_save_enabled()
         button_layout.addWidget(save_button)
 
         layout.addLayout(button_layout)
@@ -126,18 +162,23 @@ class EBilanzAccountMappingDialog(QDialog):
     def _save(self) -> None:
         """Übernimmt die ausgewählte Taxonomiezuordnung."""
 
-        label = self._combobox.currentText()
-
-        concept_name = self._concept_by_label.get(
-            label
-        )
-
-        if concept_name is None:
+        concept_name = self._combobox.currentData()
+        if (
+            not isinstance(concept_name, str)
+            or concept_name not in self._valid_concepts
+        ):
             return
 
         self.result = concept_name
         self.saved = True
         self.accept()
+
+    def _update_save_enabled(self) -> None:
+        concept_name = self._combobox.currentData()
+        self._save_button.setEnabled(
+            isinstance(concept_name, str)
+            and concept_name in self._valid_concepts
+        )
 
     def _remove(self) -> None:
         """Entfernt die vorhandene Taxonomiezuordnung."""

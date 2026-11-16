@@ -630,6 +630,9 @@ class MainWindow(QMainWindow):
 
         self._e_bilanz_frame = EBilanzFrame(
             on_install_taxonomy=self._install_required_taxonomy,
+            on_install_taxonomy_from_zip=(
+                self._install_taxonomy_from_zip
+            ),
             on_prepare=self._prepare_e_bilanz,
             on_build=self._build_e_bilanz,
             on_validate=self._validate_e_bilanz,
@@ -699,6 +702,85 @@ class MainWindow(QMainWindow):
             self,
             "Taxonomie",
             "Die benötigte Taxonomie wurde erfolgreich installiert.",
+        )
+
+    def _install_taxonomy_from_zip(self) -> None:
+        """Installiert nach Bestätigung ein ausgewähltes Taxonomiearchiv."""
+
+        filename, _ = QFileDialog.getOpenFileName(
+            self,
+            "Offizielles Taxonomiearchiv auswählen",
+            str(Path.home()),
+            "ZIP-Dateien (*.zip)",
+        )
+        if not filename:
+            return
+
+        archive_path = Path(filename)
+        try:
+            metadata = self._workspace.inspect_taxonomy_archive(
+                archive_path
+            )
+        except Exception as exc:
+            QMessageBox.critical(
+                self,
+                "Taxonomiearchiv ungültig",
+                str(exc),
+            )
+            return
+
+        if metadata.version != "6.9":
+            QMessageBox.critical(
+                self,
+                "Taxonomieversion nicht unterstützt",
+                "Bei manueller ZIP-Installation wird nur Taxonomie 6.9 "
+                "unterstützt. Erkannt wurde Version "
+                f"{metadata.version} ({metadata.release_date}).",
+            )
+            return
+
+        if self._workspace.taxonomy_6_9_installed():
+            QMessageBox.information(
+                self,
+                "Taxonomie bereits vorhanden",
+                "Taxonomie 6.9 ist bereits installiert. Die vorhandene "
+                "Installation wurde nicht verändert.",
+            )
+            return
+
+        answer = QMessageBox.question(
+            self,
+            "Taxonomie 6.9 installieren",
+            "Erkanntes Paket: Taxonomie 6.9, Ausgabe "
+            f"{metadata.release_date}.\n\n"
+            "SimpleOB kann die Herkunft oder Echtheit der ausgewählten "
+            "Datei nicht verifizieren. Verwenden Sie ausschließlich ein "
+            "Archiv aus der offiziellen Quelle: "
+            "https://www.esteuer.de/download/taxonomie_20250618/.\n\n"
+            "Soll dieses Archiv installiert werden?",
+            QMessageBox.StandardButton.Yes
+            | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+
+        try:
+            self._workspace.install_taxonomy_from_archive(archive_path)
+        except Exception as exc:
+            QMessageBox.critical(
+                self,
+                "Taxonomie konnte nicht installiert werden",
+                str(exc),
+            )
+            return
+
+        self._refresh_taxonomy_status()
+        self._refresh_e_bilanz()
+        QMessageBox.information(
+            self,
+            "Taxonomie",
+            "Taxonomie 6.9 wurde erfolgreich installiert.",
         )
 
     def _refresh_bvv_evaluation(self) -> None:
@@ -1969,6 +2051,15 @@ class MainWindow(QMainWindow):
             self._edit_account_button
         )
 
+        self._delete_account_button = QPushButton("Konto löschen")
+        self._delete_account_button.clicked.connect(
+            self._delete_selected_accounts
+        )
+        self._delete_account_button.setEnabled(
+            not self._workspace.is_closed
+        )
+        button_layout.addWidget(self._delete_account_button)
+
         self._e_bilanz_mapping_button = QPushButton(
             "E-Bilanz-Zuordnung"
         )
@@ -2017,7 +2108,7 @@ class MainWindow(QMainWindow):
             QAbstractItemView.SelectionBehavior.SelectRows
         )
         self._account_table.setSelectionMode(
-            QAbstractItemView.SelectionMode.SingleSelection
+            QAbstractItemView.SelectionMode.ExtendedSelection
         )
         self._account_table.setAlternatingRowColors(True)
         self._account_table.itemSelectionChanged.connect(
@@ -5349,6 +5440,14 @@ class MainWindow(QMainWindow):
             )
             return
 
+        if len(selected_rows) > 1:
+            QMessageBox.information(
+                self,
+                "E-Bilanz-Zuordnung",
+                "Bitte wählen Sie für die Zuordnung genau ein Konto aus.",
+            )
+            return
+
         row = selected_rows[0].row()
 
         account_number_item = self._account_table.item(
@@ -5379,15 +5478,7 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            choices = self._workspace.account_taxonomy_choices(
-                account_number=account_number,
-                chart_of_accounts=self._chart_of_accounts,
-            )
-
-            mappings = (
-                self._workspace
-                .load_account_taxonomy_concepts()
-            )
+            mappings = self._workspace.load_account_taxonomy_concepts()
         except (ValueError, DatabaseLockError) as exc:
             QMessageBox.critical(
                 self,
@@ -5396,21 +5487,43 @@ class MainWindow(QMainWindow):
             )
             return
 
-        if not choices:
+        current_concept_name = mappings.get(account_number)
+        choices: tuple[tuple[str, str], ...] = ()
+        validation_error: str | None = None
+        try:
+            choices = self._workspace.account_taxonomy_choices(
+                account_number=account_number,
+                chart_of_accounts=self._chart_of_accounts,
+            )
+        except (OSError, RuntimeError, ValueError) as exc:
+            validation_error = str(exc)
+
+        if (
+            current_concept_name is not None
+            and validation_error is None
+            and current_concept_name
+            not in {concept for concept, _label in choices}
+        ):
+            try:
+                self._workspace.validate_account_taxonomy_concept(
+                    account_number=account_number,
+                    chart_of_accounts=self._chart_of_accounts,
+                    concept_name=current_concept_name,
+                )
+            except (OSError, RuntimeError, ValueError) as exc:
+                validation_error = str(exc)
+
+        if not choices and current_concept_name is None:
             QMessageBox.information(
                 self,
                 "E-Bilanz-Zuordnung",
-                (
-                    "Für die HGB-Zuordnung dieses Kontos "
-                    "stehen keine feineren "
-                    "E-Bilanz-Taxonomiepositionen zur Auswahl."
+                validation_error
+                or (
+                    "Für die HGB-Zuordnung dieses Kontos stehen keine "
+                    "eindeutigen E-Bilanz-Taxonomiepositionen zur Auswahl."
                 ),
             )
             return
-
-        current_concept_name = mappings.get(
-            account_number
-        )
 
         dialog = EBilanzAccountMappingDialog(
             self,
@@ -5418,11 +5531,15 @@ class MainWindow(QMainWindow):
             account_name=account.name,
             choices=choices,
             current_concept_name=current_concept_name,
+            current_concept_error=validation_error,
         )
 
         dialog.exec()
 
         if not dialog.saved:
+            return
+
+        if dialog.result == current_concept_name:
             return
 
         try:
@@ -5464,6 +5581,14 @@ class MainWindow(QMainWindow):
         selected_rows = (
             self._account_table.selectionModel().selectedRows()
         )
+
+        if len(selected_rows) > 1:
+            QMessageBox.information(
+                self,
+                "Konto bearbeiten",
+                "Bitte wählen Sie zum Bearbeiten genau ein Konto aus.",
+            )
+            return
 
         if not selected_rows:
             QMessageBox.information(
@@ -5578,6 +5703,140 @@ class MainWindow(QMainWindow):
                 "Kontenrahmen vollständig wirksam wird."
             ),
         )
+
+    def _delete_selected_accounts(self) -> None:
+        """Löscht ausgewählte, unbenutzte Konten des Mandanten."""
+
+        if self._workspace.is_closed:
+            return
+
+        selected_rows = sorted(
+            self._account_table.selectionModel().selectedRows(),
+            key=lambda index: index.row(),
+        )
+        if not selected_rows:
+            QMessageBox.information(
+                self,
+                "Konten löschen",
+                "Bitte wählen Sie zuerst ein Konto aus.",
+            )
+            return
+
+        account_numbers = tuple(
+            item.text()
+            for row in selected_rows
+            if (item := self._account_table.item(row.row(), 0)) is not None
+        )
+        if not account_numbers:
+            return
+
+        if len(self._accounts) - len(set(account_numbers)) < 1:
+            QMessageBox.information(
+                self,
+                "Konten löschen",
+                "Ein Kontenrahmen muss mindestens ein Konto enthalten.",
+            )
+            return
+
+        account_names = {
+            account.number: account.name for account in self._accounts
+        }
+        details = []
+        taxonomy_concepts_by_version = (
+            self._workspace.load_all_account_taxonomy_concepts()
+        )
+        mapping_count = sum(
+            number in concepts
+            for concepts in taxonomy_concepts_by_version.values()
+            for number in account_numbers
+        )
+        hgb_mapping_count = sum(
+            rule.account_number in account_numbers
+            for rule in self._chart_of_accounts.account_mapping_rules
+        )
+        if mapping_count:
+            details.append(
+                "Vorhandene E-Bilanz-Taxonomiezuordnungen werden "
+                f"ebenfalls entfernt ({mapping_count})."
+            )
+        if hgb_mapping_count:
+            details.append(
+                "Zugehörige HGB-Zuordnungen werden ebenfalls entfernt "
+                f"({hgb_mapping_count})."
+            )
+
+        if len(account_numbers) == 1:
+            number = account_numbers[0]
+            detail_text = " " + " ".join(details) if details else ""
+            answer = QMessageBox.question(
+                self,
+                "Konto löschen",
+                f"Konto {number} – {account_names.get(number, '')} "
+                "dauerhaft aus dem Mandantenkontenrahmen löschen?"
+                f"{detail_text}",
+                QMessageBox.StandardButton.Yes
+                | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                return
+        else:
+            box = QMessageBox(self)
+            box.setIcon(QMessageBox.Icon.Warning)
+            box.setWindowTitle("Konten löschen")
+            box.setText(
+                f"Sollen die {len(account_numbers)} ausgewählten Konten "
+                "dauerhaft aus dem Mandantenkontenrahmen gelöscht werden?"
+            )
+            box.setInformativeText(
+                "Vorhandene Taxonomie- und HGB-Zuordnungen werden "
+                "ebenfalls entfernt."
+                + ("\n" + "\n".join(details) if details else "")
+                + "\nKonten mit Buchungen, Kontenrollen, technischen "
+                "Zuordnungen oder Anlagenbezug können nicht gelöscht werden."
+            )
+            cancel_button = box.addButton(
+                "Abbrechen", QMessageBox.ButtonRole.RejectRole
+            )
+            delete_button = box.addButton(
+                "Konten löschen", QMessageBox.ButtonRole.DestructiveRole
+            )
+            box.setDefaultButton(cancel_button)
+            box.setEscapeButton(cancel_button)
+            box.exec()
+            if box.clickedButton() is not delete_button:
+                return
+
+        try:
+            blocked = self._workspace.delete_accounts(
+                account_numbers=account_numbers
+            )
+        except (RuntimeError, ValueError) as exc:
+            QMessageBox.critical(self, "Konten löschen", str(exc))
+            return
+
+        if blocked:
+            reasons = "\n".join(
+                f"• Konto {number}: {', '.join(account_reasons)}"
+                for number, account_reasons in sorted(blocked.items())
+            )
+            QMessageBox.warning(
+                self,
+                "Konten können nicht gelöscht werden",
+                "Die Auswahl wurde nicht gelöscht. Folgende Konten "
+                "haben fachliche Abhängigkeiten:\n\n"
+                f"{reasons}",
+            )
+            return
+
+        self._activate_account_editing_mode()
+        (
+            self._chart_of_accounts,
+            self._accounts,
+        ) = self._reload_chart_of_accounts()
+        self._account_table.clearSelection()
+        self._account_table.setCurrentCell(-1, -1)
+        self._refresh_accounts()
 
     def _export_company(self) -> None:
         """Exportiert den aktuellen Mandanten als .simpleob-Datei."""
@@ -5898,9 +6157,9 @@ class MainWindow(QMainWindow):
                 account_number=account_number,
                 chart_of_accounts=self._chart_of_accounts,
             )
-        except ValueError:
+        except (OSError, RuntimeError, ValueError):
             self._e_bilanz_mapping_label.setText(
-                "Zuordnung: nicht verfügbar"
+                "Zuordnung: nicht geprüft (Taxonomiemodell nicht verfügbar)"
             )
             return
 
@@ -5968,7 +6227,7 @@ class MainWindow(QMainWindow):
                 "sind die übrigen Buchhaltungsfunktionen "
                 "vorübergehend gesperrt.\n\n"
                 "Sie können weiterhin Konten anlegen, bearbeiten, "
-                "aktivieren und deaktivieren.\n\n"
+                "löschen, aktivieren und deaktivieren.\n\n"
                 "Um die Änderungen vollständig wirksam zu machen "
                 "und alle Funktionen wieder freizugeben, klicken "
                 "Sie auf „Buchhaltung wechseln“ und öffnen "

@@ -81,6 +81,13 @@ from simpleob.taxonomy.e_bilanz_builder import EBilanzDocument
 from simpleob.taxonomy.entry_point import (
     TaxonomyEntryPoint,
 )
+from simpleob.taxonomy.errors import (
+    AmbiguousCalculationPathError,
+    CalculationPathNotFoundError,
+    TaxonomyConceptNotFoundError,
+    TaxonomyModelLoadError,
+    TaxonomyModelNotInstalledError,
+)
 from simpleob.taxonomy.fact import TaxonomyFact
 from simpleob.taxonomy.fiscal_requirement_reader import (
     FiscalRequirementReader,
@@ -105,6 +112,7 @@ from simpleob.taxonomy.hgb_gaap_ci_mapping import (
     create_hgb_gaap_ci_mapping,
 )
 from simpleob.taxonomy.mapper import TaxonomyMapper
+from simpleob.taxonomy.model import TaxonomyModel
 from simpleob.taxonomy.nil_fact import TaxonomyNilFact
 from simpleob.taxonomy.resolver import TaxonomyResolver
 from simpleob.taxonomy.taxonomy import (
@@ -189,15 +197,7 @@ class EBilanzService:
                 "derzeit ausschließlich Taxonomie 6.9."
             )
 
-        gaap_ci_path = (
-            self._resolver.gaap_ci_fiscal_entry_point(
-                version
-            )
-        )
-
-        gaap_ci_model = self._adapter.model(
-            gaap_ci_path
-        )
+        gaap_ci_model = self._gaap_ci_model_for(version)
 
         taxonomy_mapper = TaxonomyMapper(
             create_hgb_gaap_ci_mapping(
@@ -221,6 +221,17 @@ class EBilanzService:
         choices: list[tuple[str, str]] = []
 
         for concept_id in child_concept_ids:
+            try:
+                gaap_ci_model.calculation.unique_path_between(
+                    parent_concept.concept_id,
+                    concept_id,
+                )
+            except (
+                CalculationPathNotFoundError,
+                AmbiguousCalculationPathError,
+            ):
+                continue
+
             concept = gaap_ci_model.concepts.by_id(
                 concept_id
             )
@@ -232,13 +243,10 @@ class EBilanzService:
                 concept_id
             )
 
-            if label is None:
-                continue
-
             choices.append(
                 (
                     concept.name,
-                    label,
+                    label or concept.name,
                 )
             )
 
@@ -251,6 +259,71 @@ class EBilanzService:
                 ),
             )
         )
+
+    def validate_account_taxonomy_concept(
+        self,
+        *,
+        fiscal_year: FiscalYear,
+        position: FinancialStatementPosition,
+        concept_name: str,
+    ) -> tuple:
+        """Prüft eine explizite Kontenzuordnung wie der E-Bilanz-Build."""
+
+        version = taxonomy_version_for(fiscal_year)
+        if version is not TaxonomyVersion.V6_9:
+            raise ValueError(
+                "Die Konten-Taxonomiezuordnung unterstützt "
+                "derzeit ausschließlich Taxonomie 6.9."
+            )
+
+        model = self._gaap_ci_model_for(version)
+        mapper = TaxonomyMapper(
+            create_hgb_gaap_ci_mapping(
+                assets=self._assets,
+                liabilities=self._liabilities,
+                income_statement=self._income_statement,
+            ),
+            model,
+        )
+        parent = mapper.concept_for(position)
+        target = model.concepts.by_name(concept_name)
+        if target is None:
+            raise TaxonomyConceptNotFoundError(
+                f"Das Taxonomie-Concept „{concept_name}“ ist im geladenen "
+                "Modell nicht vorhanden."
+            )
+
+        return model.calculation.unique_path_between(
+            parent.concept_id,
+            target.concept_id,
+        )
+
+    def _gaap_ci_model_for(
+        self,
+        version: TaxonomyVersion,
+    ) -> TaxonomyModel:
+        try:
+            entry_point = self._resolver.gaap_ci_fiscal_entry_point(
+                version
+            )
+        except FileNotFoundError as exc:
+            raise TaxonomyModelNotInstalledError(
+                f"Taxonomie {version.value} ist nicht installiert. "
+                "Installieren Sie die Taxonomie über den E-Bilanz-Bereich."
+            ) from exc
+        except (OSError, ValueError) as exc:
+            raise TaxonomyModelLoadError(
+                f"Der Entry-Point der Taxonomie {version.value} kann nicht "
+                f"aufgelöst werden: {exc}"
+            ) from exc
+
+        try:
+            return self._adapter.model(entry_point)
+        except Exception as exc:
+            raise TaxonomyModelLoadError(
+                f"Das installierte Taxonomiemodell {version.value} kann nicht "
+                f"geladen werden: {exc}"
+            ) from exc
 
     def build(
         self,
@@ -488,35 +561,30 @@ class EBilanzService:
                 )
             )
 
-            calculation_paths = (
-                gaap_ci_model.calculation.paths_between(
+            try:
+                path = gaap_ci_model.calculation.unique_path_between(
                     parent_concept.concept_id,
                     target_concept.concept_id,
                 )
-            )
-
-            if not calculation_paths:
+            except CalculationPathNotFoundError as exc:
                 raise ValueError(
                     "account taxonomy concept is not a "
                     "calculation descendant of the mapped HGB concept: "
                     f"account={detail.account_number}, "
                     f"parent={parent_concept.name}, "
                     f"child={target_concept_name}"
-                )
-
-            if len(calculation_paths) != 1:
+                ) from exc
+            except AmbiguousCalculationPathError as exc:
                 raise ValueError(
                     "account taxonomy concept has ambiguous "
                     "calculation paths from the mapped HGB concept: "
                     f"account={detail.account_number}, "
                     f"parent={parent_concept.name}, "
                     f"child={target_concept_name}"
-                )
+                ) from exc
 
             cumulative_weight = Decimal("1")
             rollup_ancestors: list[tuple[str, Decimal]] = []
-            path = calculation_paths[0]
-
             for relation in path[:-1]:
                 cumulative_weight *= relation.weight
                 ancestor_concept = (

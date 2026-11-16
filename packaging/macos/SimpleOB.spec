@@ -40,6 +40,15 @@ CHART_TEMPLATE_DIR = SRC_ROOT / "simpleob/resources/chart_of_accounts"
 TAXONOMY_MAPPING_DIR = (
     SRC_ROOT / "simpleob/resources/e_bilanz/account_mappings"
 )
+TAXONOMY_6_9_ARCHIVE = (
+    PROJECT_ROOT / "german-gaap-taxonomy-v6.9-2025-04-01.zip"
+)
+if not TAXONOMY_6_9_ARCHIVE.is_file():
+    raise RuntimeError(
+        "Das lokale Taxonomie-6.9-Archiv fehlt: "
+        f"{TAXONOMY_6_9_ARCHIVE}"
+    )
+
 chart_template_datas = [
     (str(path), "simpleob/resources/chart_of_accounts")
     for path in sorted(CHART_TEMPLATE_DIR.iterdir())
@@ -55,6 +64,12 @@ taxonomy_mapping_datas = [
     )
     for path in sorted(TAXONOMY_MAPPING_DIR.rglob("*"))
     if path.is_file()
+]
+taxonomy_archive_datas = [
+    (
+        str(TAXONOMY_6_9_ARCHIVE),
+        "simpleob/resources/taxonomy",
+    ),
 ]
 
 required_eric_paths = (
@@ -129,6 +144,7 @@ a = Analysis(
     datas=[
         *chart_template_datas,
         *taxonomy_mapping_datas,
+        *taxonomy_archive_datas,
         (
             str(
                 SRC_ROOT

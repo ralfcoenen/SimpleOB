@@ -47,6 +47,10 @@ from simpleob.taxonomy.e_bilanz_builder import (
 from simpleob.taxonomy.entry_point import (
     TaxonomyEntryPoint,
 )
+from simpleob.taxonomy.errors import (
+    AmbiguousCalculationPathError,
+    CalculationPathNotFoundError,
+)
 from simpleob.taxonomy.gcd_company_data_mapper import (
     GcdCompanyDataMapper,
 )
@@ -489,8 +493,9 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
     gaap_ci_model.calculation.relations = (
         calculation_relation,
     )
-    gaap_ci_model.calculation.paths_between.return_value = (
-        (intermediate_relation, target_relation),
+    gaap_ci_model.calculation.unique_path_between.return_value = (
+        intermediate_relation,
+        target_relation,
     )
     gaap_ci_model.concepts.by_id.return_value = intermediate_concept
 
@@ -730,7 +735,7 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
         "bs.ass.currAss.receiv.trade.other"
     )
 
-    gaap_ci_model.calculation.paths_between.assert_called_once_with(
+    gaap_ci_model.calculation.unique_path_between.assert_called_once_with(
         parent_concept.concept_id,
         target_concept.concept_id,
     )
@@ -822,7 +827,7 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
 
     document_builder.build_xml.assert_called_once()
 
-def test_account_taxonomy_choices_include_calculation_descendants() -> None:
+def test_account_taxonomy_choices_include_only_uniquely_valid_descendants() -> None:
     fiscal_year = FiscalYear(
         start_date=date(2026, 1, 1),
         end_date=date(2026, 12, 31),
@@ -837,22 +842,26 @@ def test_account_taxonomy_choices_include_calculation_descendants() -> None:
     direct_child = Mock()
     direct_child.concept_id = "lease-fix"
     direct_child.name = "leaseFix"
-    deep_child = Mock()
-    deep_child.concept_id = "lease-fix-other"
-    deep_child.name = "leaseFix.other"
+    ambiguous_child = Mock()
+    ambiguous_child.concept_id = "ambiguous-child"
+    ambiguous_child.name = "ambiguousConcept"
     model = Mock()
     model.calculation.descendants_of.return_value = (
         direct_child.concept_id,
-        deep_child.concept_id,
+        ambiguous_child.concept_id,
     )
     model.concepts.by_id.side_effect = {
         direct_child.concept_id: direct_child,
-        deep_child.concept_id: deep_child,
+        ambiguous_child.concept_id: ambiguous_child,
     }.get
     model.label_for.side_effect = {
         direct_child.concept_id: "Miete unbewegliche Güter",
-        deep_child.concept_id: "Übrige Miete unbeweglicher Güter",
+        ambiguous_child.concept_id: "Mehrdeutiges Concept",
     }.get
+    model.calculation.unique_path_between.side_effect = [
+        (Mock(),),
+        AmbiguousCalculationPathError("multiple paths"),
+    ]
 
     resolver = Mock()
     resolver.gaap_ci_fiscal_entry_point.return_value = Path(
@@ -889,11 +898,11 @@ def test_account_taxonomy_choices_include_calculation_descendants() -> None:
 
     assert {name for name, _label in choices} == {
         "leaseFix",
-        "leaseFix.other",
     }
     model.calculation.descendants_of.assert_called_once_with(
         parent.concept_id
     )
+    assert model.calculation.unique_path_between.call_count == 2
 
 
 def test_e_bilanz_service_rejects_account_taxonomy_concept_with_wrong_parent(
@@ -1020,7 +1029,9 @@ def test_e_bilanz_service_rejects_account_taxonomy_concept_with_wrong_parent(
 
     gaap_ci_model.concepts.by_name.return_value = target_concept
     gaap_ci_model.calculation.relations = (relation,)
-    gaap_ci_model.calculation.paths_between.return_value = ()
+    gaap_ci_model.calculation.unique_path_between.side_effect = (
+        CalculationPathNotFoundError("kein Calculation-Pfad")
+    )
 
     taxonomy_mapper = Mock()
     taxonomy_mapper.concept_for.return_value = expected_parent
@@ -1109,7 +1120,7 @@ def test_e_bilanz_service_rejects_account_taxonomy_concept_with_wrong_parent(
     taxonomy_mapper.concept_for.assert_called_once_with(
         account_detail.position
     )
-    gaap_ci_model.calculation.paths_between.assert_called_once_with(
+    gaap_ci_model.calculation.unique_path_between.assert_called_once_with(
         expected_parent.concept_id,
         target_concept.concept_id,
     )

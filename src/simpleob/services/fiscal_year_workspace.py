@@ -8,6 +8,9 @@ from uuid import UUID
 
 from simpleob.accounting.account_balance import AccountBalance
 from simpleob.accounting.balance_sheet import BalanceSheet
+from simpleob.accounting.financial_statement_position import (
+    FinancialStatementPosition,
+)
 from simpleob.accounting.income_statement import IncomeStatement
 from simpleob.accounting.ledger import Ledger
 from simpleob.accounting.mapper import AccountMapper
@@ -366,6 +369,23 @@ class FiscalYearWorkspace:
             company_id=self._context.company.company_id,
             account=account,
             mapping_rule=mapping_rule,
+        )
+
+    def delete_accounts(
+        self,
+        *,
+        account_numbers: tuple[str, ...],
+    ) -> dict[str, tuple[str, ...]]:
+        """Löscht unbenutzte Mandantenkonten atomar."""
+
+        if self._chart_of_accounts_repository is None:
+            raise RuntimeError(
+                "Die Kontenrahmenverwaltung ist nicht konfiguriert."
+            )
+
+        return self._chart_of_accounts_repository.delete_accounts(
+            company_id=self._context.company.company_id,
+            account_numbers=account_numbers,
         )
 
 
@@ -1108,6 +1128,25 @@ class FiscalYearWorkspace:
 
         self._taxonomy_management_service.install_required_taxonomy(
             self._context.fiscal_year
+        )
+
+    def inspect_taxonomy_archive(self, source: Path):
+        """Prüft ein ausgewähltes Taxonomiearchiv ohne es zu installieren."""
+
+        return self._taxonomy_management_service.inspect_taxonomy_archive(
+            source
+        )
+
+    def taxonomy_6_9_installed(self) -> bool:
+        """Meldet, ob Taxonomie 6.9 bereits lokal vorhanden ist."""
+
+        return self._taxonomy_management_service.taxonomy_6_9_installed()
+
+    def install_taxonomy_from_archive(self, source: Path) -> Path:
+        """Installiert eine manuell ausgewählte Taxonomie-6.9-ZIP-Datei."""
+
+        return self._taxonomy_management_service.install_taxonomy_from_archive(
+            source
         )
 
     def validate_closing(
@@ -3422,6 +3461,23 @@ class FiscalYearWorkspace:
             )
         )
 
+    def load_all_account_taxonomy_concepts(
+        self,
+    ) -> dict[str, dict[str, str]]:
+        """Lädt alle gespeicherten Taxonomiezuordnungen des Mandanten."""
+
+        if self._chart_of_accounts_repository is None:
+            raise ValueError(
+                "Kontenrahmen-Repository ist nicht verfügbar."
+            )
+
+        return (
+            self._chart_of_accounts_repository
+            .load_all_account_taxonomy_concepts(
+                self._context.company.company_id
+            )
+        )
+
     def save_account_taxonomy_concept(
         self,
         *,
@@ -3449,6 +3505,44 @@ class FiscalYearWorkspace:
         chart_of_accounts: ChartOfAccountsTemplate,
     ) -> tuple[tuple[str, str], ...]:
         """Liefert zulässige Taxonomiezuordnungen eines Kontos."""
+
+        position = self._account_taxonomy_position(
+            account_number=account_number,
+            chart_of_accounts=chart_of_accounts,
+        )
+
+        return self._e_bilanz_service.account_taxonomy_choices(
+            fiscal_year=self._context.fiscal_year,
+            position=position,
+        )
+
+    def validate_account_taxonomy_concept(
+        self,
+        *,
+        account_number: str,
+        chart_of_accounts: ChartOfAccountsTemplate,
+        concept_name: str,
+    ) -> tuple:
+        """Prüft ein bestehendes Concept mit derselben Build-Regel."""
+
+        position = self._account_taxonomy_position(
+            account_number=account_number,
+            chart_of_accounts=chart_of_accounts,
+        )
+
+        return self._e_bilanz_service.validate_account_taxonomy_concept(
+            fiscal_year=self._context.fiscal_year,
+            position=position,
+            concept_name=concept_name,
+        )
+
+    @staticmethod
+    def _account_taxonomy_position(
+        *,
+        account_number: str,
+        chart_of_accounts: ChartOfAccountsTemplate,
+    ) -> FinancialStatementPosition:
+        """Liefert die eindeutige HGB-Position des Kontos."""
 
         mapping_rule = next(
             (
@@ -3491,10 +3585,7 @@ class FiscalYearWorkspace:
                 "vorhanden."
             )
 
-        return self._e_bilanz_service.account_taxonomy_choices(
-            fiscal_year=self._context.fiscal_year,
-            position=position,
-        )
+        return position
 
     def build_fixed_asset_schedule(self):
         """Erzeugt den Anlagenspiegel des geöffneten Geschäftsjahres."""

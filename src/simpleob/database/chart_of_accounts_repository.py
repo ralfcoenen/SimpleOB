@@ -11,11 +11,15 @@ from simpleob.accounting.financial_statement_position_provider import (
 )
 from simpleob.database.lock_error import DatabaseLockError
 from simpleob.database.models import (
+    Anlagegut,
+    Buchung,
+    Buchungszeile,
     KontenrahmenKonfiguration,
     Kontenrolle,
     KontenTaxonomieZuordnung,
     Konto,
     Mandant,
+    Wirtschaftsjahr,
 )
 from simpleob.domain.account import Account
 from simpleob.domain.account_mapping_rule import (
@@ -37,6 +41,24 @@ from simpleob.domain.vat_accounts import VatAccounts
 
 class ChartOfAccountsRepository:
     """Speichert und lädt den Kontenrahmen eines Mandanten."""
+
+    _CONFIGURATION_REFERENCE_LABELS = {
+        "opening_balance_account": "Eröffnungsbilanzkonto",
+        "income_summary_account": "GuV-Sammelkonto",
+        "profit_account": "Jahresüberschusskonto",
+        "loss_account": "Jahresfehlbetragskonto",
+        "profit_loss_carryforward_account": "Gewinn-/Verlustvortragskonto",
+        "statutory_reserve_account": "Gesetzliche Rücklage",
+        "other_revenue_reserves_account": "Andere Gewinnrücklagen",
+        "distribution_liability_account": "Ausschüttungsverbindlichkeit",
+        "depreciation_expense_account": "Abschreibungsaufwand",
+        "fixed_asset_disposal_gain_account": "Erträge aus Anlagenabgängen",
+        "fixed_asset_disposal_loss_account": "Aufwendungen aus Anlagenabgängen",
+        "input_tax_7": "Vorsteuerkonto 7 %",
+        "input_tax_19": "Vorsteuerkonto 19 %",
+        "output_tax_7": "Umsatzsteuerkonto 7 %",
+        "output_tax_19": "Umsatzsteuerkonto 19 %",
+    }
 
     def __init__(
         self,
@@ -360,6 +382,169 @@ class ChartOfAccountsRepository:
 
         if commit:
             self._session.commit()
+
+    def delete_accounts(
+        self,
+        *,
+        company_id: UUID,
+        account_numbers: tuple[str, ...],
+    ) -> dict[str, tuple[str, ...]]:
+        """Löscht unbenutzte Konten und ihre Taxonomiezuordnungen atomar.
+
+        Liefert Sperrgründe je Konto zurück. Wenn mindestens ein Konto
+        fachlich verwendet wird, bleibt die gesamte Auswahl unverändert.
+        """
+
+        if not isinstance(company_id, UUID):
+            raise TypeError("company_id must be a UUID")
+        if not isinstance(account_numbers, tuple) or not all(
+            isinstance(number, str) for number in account_numbers
+        ):
+            raise TypeError("account_numbers must be a tuple of strings")
+
+        numbers = tuple(dict.fromkeys(number.strip() for number in account_numbers))
+        if not numbers or any(not number for number in numbers):
+            raise ValueError("Mindestens eine gültige Kontonummer ist erforderlich.")
+
+        try:
+            company_model = self._lock_company(company_id)
+            accounts = (
+                self._session.query(Konto)
+                .filter(
+                    Konto.mandant_id == company_model.id,
+                    Konto.account_number.in_(numbers),
+                )
+                .all()
+            )
+            account_by_number = {
+                account.account_number: account for account in accounts
+            }
+            missing = set(numbers) - account_by_number.keys()
+            if missing:
+                raise ValueError(
+                    "Folgende Konten sind nicht vorhanden: "
+                    + ", ".join(sorted(missing))
+                )
+            total_accounts = (
+                self._session.query(Konto.id)
+                .filter(Konto.mandant_id == company_model.id)
+                .count()
+            )
+            if total_accounts - len(numbers) < 1:
+                raise ValueError(
+                    "Ein Kontenrahmen muss mindestens ein Konto enthalten."
+                )
+
+            dependencies: dict[str, set[str]] = {
+                number: set() for number in numbers
+            }
+            configuration = (
+                self._session.query(KontenrahmenKonfiguration)
+                .filter(
+                    KontenrahmenKonfiguration.mandant_id
+                    == company_model.id
+                )
+                .one_or_none()
+            )
+            if configuration is not None:
+                for field_name, label in self._CONFIGURATION_REFERENCE_LABELS.items():
+                    number = getattr(configuration, field_name)
+                    if number in dependencies:
+                        dependencies[number].add(label)
+
+            for role in (
+                self._session.query(Kontenrolle)
+                .filter(
+                    Kontenrolle.mandant_id == company_model.id,
+                    Kontenrolle.account_number.in_(numbers),
+                )
+                .all()
+            ):
+                dependencies[role.account_number].add(
+                    f"Kontenrolle {role.role}"
+                )
+
+            booking_rows = (
+                self._session.query(
+                    Buchungszeile.account_number,
+                    Wirtschaftsjahr.start_date,
+                    Wirtschaftsjahr.end_date,
+                )
+                .join(Buchung, Buchung.id == Buchungszeile.buchung_id)
+                .join(
+                    Wirtschaftsjahr,
+                    Wirtschaftsjahr.id == Buchung.wirtschaftsjahr_id,
+                )
+                .filter(
+                    Wirtschaftsjahr.mandant_id == company_model.id,
+                    Buchungszeile.account_number.in_(numbers),
+                )
+                .all()
+            )
+            for number, start_date, end_date in booking_rows:
+                dependencies[number].add(
+                    "Buchungen im Geschäftsjahr "
+                    f"{start_date.year}/{end_date.year}"
+                )
+
+            fixed_assets = (
+                self._session.query(Anlagegut)
+                .filter(
+                    Anlagegut.mandant_id == company_model.id,
+                    (
+                        Anlagegut.asset_account_number.in_(numbers)
+                        | Anlagegut.depreciation_expense_account_number.in_(
+                            numbers
+                        )
+                    ),
+                )
+                .all()
+            )
+            for asset in fixed_assets:
+                for field_name, label in (
+                    ("asset_account_number", "Anlagenkonto"),
+                    (
+                        "depreciation_expense_account_number",
+                        "Abschreibungskonto eines Anlageguts",
+                    ),
+                ):
+                    number = getattr(asset, field_name)
+                    if number in dependencies:
+                        dependencies[number].add(
+                            f"{label} {asset.asset_code}"
+                        )
+
+            blocked = {
+                number: tuple(sorted(reasons))
+                for number, reasons in dependencies.items()
+                if reasons
+            }
+            if blocked:
+                self._session.rollback()
+                return blocked
+
+            (
+                self._session.query(KontenTaxonomieZuordnung)
+                .filter(
+                    KontenTaxonomieZuordnung.mandant_id
+                    == company_model.id,
+                    KontenTaxonomieZuordnung.account_number.in_(numbers),
+                )
+                .delete(synchronize_session=False)
+            )
+            (
+                self._session.query(Konto)
+                .filter(
+                    Konto.mandant_id == company_model.id,
+                    Konto.account_number.in_(numbers),
+                )
+                .delete(synchronize_session=False)
+            )
+            self._session.commit()
+            return {}
+        except Exception:
+            self._session.rollback()
+            raise
 
     def load_for_company(
         self,

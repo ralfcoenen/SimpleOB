@@ -101,6 +101,10 @@ class ChartOfAccountsTemplateEditorDialog(QDialog):
             ]
             | None
         ) = None,
+        taxonomy_concept_validator: (
+            Callable[[FinancialStatementPosition, str], object]
+            | None
+        ) = None,
         assets: FinancialStatementPosition,
         liabilities: FinancialStatementPosition,
         income_statement: FinancialStatementPosition,
@@ -110,6 +114,7 @@ class ChartOfAccountsTemplateEditorDialog(QDialog):
         self._templates_directory = templates_directory
         self._prepare_bundle_for_save = prepare_bundle_for_save
         self._taxonomy_choices_provider = taxonomy_choices_provider
+        self._taxonomy_concept_validator = taxonomy_concept_validator
         self._assets = assets
         self._liabilities = liabilities
         self._income_statement = income_statement
@@ -155,7 +160,7 @@ class ChartOfAccountsTemplateEditorDialog(QDialog):
             QAbstractItemView.SelectionBehavior.SelectRows
         )
         self._table.setSelectionMode(
-            QAbstractItemView.SelectionMode.SingleSelection
+            QAbstractItemView.SelectionMode.ExtendedSelection
         )
         self._table.setEditTriggers(
             QAbstractItemView.EditTrigger.NoEditTriggers
@@ -364,6 +369,9 @@ class ChartOfAccountsTemplateEditorDialog(QDialog):
                 else None
             ),
             taxonomy_choices_provider=self._taxonomy_choices_provider,
+            taxonomy_concept_validator=(
+                self._taxonomy_concept_validator
+            ),
         )
 
     def _add_account(self) -> None:
@@ -493,7 +501,10 @@ class ChartOfAccountsTemplateEditorDialog(QDialog):
             self._confirmed_hgb_exceptions.remove(old_number)
             self._confirmed_hgb_exceptions.add(new_number)
 
-    def _references_for(self, account_number: str) -> tuple[str, ...]:
+    def _configuration_references_for(
+        self,
+        account_number: str,
+    ) -> tuple[str, ...]:
         references: list[str] = []
         if self._bundle.control_accounts is not None:
             for field in fields(self._bundle.control_accounts):
@@ -515,6 +526,12 @@ class ChartOfAccountsTemplateEditorDialog(QDialog):
                     references.append(
                         self._ROLE_LABELS.get(field.name, field.name)
                     )
+        return tuple(references)
+
+    def _references_for(self, account_number: str) -> tuple[str, ...]:
+        references = list(
+            self._configuration_references_for(account_number)
+        )
         if account_number in (self._bundle.taxonomy_mappings or {}):
             concept = self._bundle.taxonomy_mappings[account_number]
             references.append(f"E-Bilanz-Taxonomiezuordnung: {concept}")
@@ -566,61 +583,191 @@ class ChartOfAccountsTemplateEditorDialog(QDialog):
         )
 
     def _remove_account(self) -> None:
-        account = self._selected_account()
-        if account is None:
+        selected_rows = sorted(
+            {
+                index.row()
+                for index in self._table.selectionModel().selectedRows()
+                if not self._table.isRowHidden(index.row())
+            }
+        )
+        selected_accounts = tuple(
+            account
+            for row in selected_rows
+            if (account := self._account_for_table_row(row)) is not None
+        )
+        if not selected_accounts:
             QMessageBox.information(
                 self,
                 "Konto entfernen",
                 "Bitte wählen Sie zuerst ein Konto aus.",
             )
             return
-        references = self._references_for(account.account_number)
-        if references:
-            details = "\n".join(f"• {reference}" for reference in references)
+
+        numbers = {account.account_number for account in selected_accounts}
+        blocking_references = {
+            account.account_number: self._configuration_references_for(
+                account.account_number
+            )
+            for account in selected_accounts
+        }
+        blocking_references = {
+            number: references
+            for number, references in blocking_references.items()
+            if references
+        }
+        if blocking_references:
+            details = "\n".join(
+                f"• Konto {number}: {reference}"
+                for number, references in blocking_references.items()
+                for reference in references
+            )
             QMessageBox.warning(
                 self,
-                "Konto wird verwendet",
-                "Das Konto kann erst entfernt werden, wenn folgende "
+                (
+                    "Konten werden verwendet"
+                    if len(selected_accounts) > 1
+                    else "Konto wird verwendet"
+                ),
+                "Die Auswahl kann erst gelöscht werden, wenn folgende "
                 "Zuordnungen korrigiert wurden:\n\n"
                 f"{details}",
             )
             return
-        if len(self._bundle.chart.accounts) <= 1:
+
+        if len(self._bundle.chart.accounts) - len(numbers) < 1:
             QMessageBox.information(
                 self,
                 "Konto entfernen",
-                "Ein Kontenrahmen muss mindestens ein Konto enthalten.",
+                "Ein Kontenrahmen muss mindestens ein Konto enthalten. "
+                "Die ausgewählten Konten können daher nicht vollständig "
+                "gelöscht werden.",
             )
             return
-        answer = QMessageBox.question(
-            self,
-            "Konto entfernen",
-            f"Konto {account.account_number} – {account.name} "
-            "aus dieser Arbeitskopie entfernen?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
+
+        taxonomy_mappings = self._bundle.taxonomy_mappings
+        mappings_to_remove = numbers.intersection(taxonomy_mappings or {})
+        hgb_rules_to_remove = tuple(
+            rule
+            for rule in self._bundle.chart.account_mapping_rules
+            if rule.account_number in numbers
         )
-        if answer != QMessageBox.StandardButton.Yes:
+        if not self._confirm_account_removal(
+            selected_accounts=selected_accounts,
+            taxonomy_mapping_count=len(mappings_to_remove),
+            hgb_mapping_count=len(hgb_rules_to_remove),
+        ):
             return
-        number = account.account_number
-        self._bundle = replace(
-            self._bundle,
-            chart=ChartOfAccountsTemplate(
-                name=self._bundle.chart.name,
-                accounts=tuple(
-                    item
-                    for item in self._bundle.chart.accounts
-                    if item.account_number != number
-                ),
-                account_mapping_rules=tuple(
-                    rule
-                    for rule in self._bundle.chart.account_mapping_rules
-                    if rule.account_number != number
-                ),
+
+        updated_mappings = (
+            {
+                number: concept
+                for number, concept in taxonomy_mappings.items()
+                if number not in numbers
+            }
+            if taxonomy_mappings is not None
+            else None
+        )
+        updated_chart = ChartOfAccountsTemplate(
+            name=self._bundle.chart.name,
+            accounts=tuple(
+                account
+                for account in self._bundle.chart.accounts
+                if account.account_number not in numbers
+            ),
+            account_mapping_rules=tuple(
+                rule
+                for rule in self._bundle.chart.account_mapping_rules
+                if rule.account_number not in numbers
             ),
         )
-        self._confirmed_hgb_exceptions.discard(number)
+        self._bundle = replace(
+            self._bundle,
+            chart=updated_chart,
+            taxonomy_mappings=updated_mappings,
+        )
+        self._confirmed_hgb_exceptions.difference_update(numbers)
+        self._table.clearSelection()
+        self._table.setCurrentCell(-1, -1)
         self._refresh_table()
+
+    def _account_for_table_row(self, row: int) -> TemplateAccount | None:
+        account_number_item = self._table.item(row, 0)
+        if account_number_item is None:
+            return None
+        account_number = account_number_item.text()
+        return next(
+            (
+                account
+                for account in self._bundle.chart.accounts
+                if account.account_number == account_number
+            ),
+            None,
+        )
+
+    def _confirm_account_removal(
+        self,
+        *,
+        selected_accounts: tuple[TemplateAccount, ...],
+        taxonomy_mapping_count: int,
+        hgb_mapping_count: int,
+    ) -> bool:
+        """Fragt vor der Einzel- oder Mehrfachlöschung ausdrücklich nach."""
+
+        if len(selected_accounts) == 1:
+            account = selected_accounts[0]
+            details = []
+            if taxonomy_mapping_count:
+                details.append(
+                    "Die vorhandene E-Bilanz-Taxonomiezuordnung wird "
+                    "ebenfalls entfernt."
+                )
+            if hgb_mapping_count:
+                details.append(
+                    "Die zugehörige HGB-Zuordnung wird ebenfalls entfernt."
+                )
+            detail_text = " " + " ".join(details) if details else ""
+            answer = QMessageBox.question(
+                self,
+                "Konto entfernen",
+                f"Konto {account.account_number} – {account.name} "
+                "aus dieser Arbeitskopie entfernen?"
+                f"{detail_text}",
+                QMessageBox.StandardButton.Yes
+                | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            return answer == QMessageBox.StandardButton.Yes
+
+        count = len(selected_accounts)
+        details = [
+            f"Vorhandene E-Bilanz-Taxonomiezuordnungen werden ebenfalls "
+            f"entfernt ({taxonomy_mapping_count})."
+        ]
+        if hgb_mapping_count:
+            details.append(
+                "Zugehörige HGB-Zuordnungen werden ebenfalls entfernt "
+                f"({hgb_mapping_count})."
+            )
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Icon.Warning)
+        box.setWindowTitle("Konten löschen")
+        box.setText(
+            f"Sollen die {count} ausgewählten Konten aus dieser "
+            "Arbeitskopie gelöscht werden?"
+        )
+        box.setInformativeText("\n".join(details))
+        cancel_button = box.addButton(
+            "Abbrechen",
+            QMessageBox.ButtonRole.RejectRole,
+        )
+        delete_button = box.addButton(
+            "Konten löschen",
+            QMessageBox.ButtonRole.DestructiveRole,
+        )
+        box.setDefaultButton(cancel_button)
+        box.setEscapeButton(cancel_button)
+        box.exec()
+        return box.clickedButton() is delete_button
 
     def _apply(self) -> None:
         try:

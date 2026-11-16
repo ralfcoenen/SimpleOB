@@ -5,6 +5,10 @@ from dataclasses import dataclass
 from simpleob.taxonomy.calculation import (
     TaxonomyCalculationRelation,
 )
+from simpleob.taxonomy.errors import (
+    AmbiguousCalculationPathError,
+    CalculationPathNotFoundError,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -222,3 +226,33 @@ class TaxonomyCalculationSet:
             unique_paths[key]
             for key in sorted(unique_paths)
         )
+
+    def unique_path_between(
+        self,
+        parent_concept_id: str,
+        descendant_concept_id: str,
+    ) -> tuple[TaxonomyCalculationRelation, ...]:
+        """Liefert nur einen eindeutigen Calculation-Pfad.
+
+        Die E-Bilanz-Auswahl und der Erzeugungspfad verwenden dieselbe
+        Eindeutigkeitsregel: kein Pfad und mehrere Pfade sind ungültig.
+        """
+
+        paths = self.paths_between(
+            parent_concept_id,
+            descendant_concept_id,
+        )
+
+        if not paths:
+            raise CalculationPathNotFoundError(
+                "Zwischen der HGB-Position und dem Taxonomie-Concept besteht "
+                "kein Calculation-Pfad."
+            )
+
+        if len(paths) != 1:
+            raise AmbiguousCalculationPathError(
+                "Zwischen der HGB-Position und dem Taxonomie-Concept bestehen "
+                f"mehrere Calculation-Pfade ({len(paths)})."
+            )
+
+        return paths[0]
