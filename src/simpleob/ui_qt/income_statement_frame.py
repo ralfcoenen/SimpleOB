@@ -17,6 +17,12 @@ from simpleob.accounting.financial_statement_position import (
 from simpleob.accounting.income_statement import IncomeStatement
 from simpleob.accounting.statement_category import StatementCategory
 from simpleob.domain.money import ZERO
+from simpleob.domain.profit_appropriation_annual_data import (
+    ProfitAppropriationAnnualData,
+)
+from simpleob.services.profit_appropriation_presentation_service import (
+    ProfitAppropriationPresentationService,
+)
 
 
 class IncomeStatementFrame(QWidget):
@@ -66,6 +72,14 @@ class IncomeStatementFrame(QWidget):
         )
         layout.addWidget(self._result_label)
 
+        self._appropriation_label = QLabel()
+        self._appropriation_label.setWordWrap(True)
+        self._appropriation_label.setStyleSheet(
+            "font-size: 12px; margin-top: 6px;"
+        )
+        self._appropriation_label.hide()
+        layout.addWidget(self._appropriation_label)
+
     @staticmethod
     def _create_tree() -> QTreeWidget:
         """Erzeugt eine Baumansicht für eine GuV-Seite."""
@@ -89,6 +103,8 @@ class IncomeStatementFrame(QWidget):
         *,
         income_statement: IncomeStatement,
         net_income: Decimal,
+        appropriation_data: ProfitAppropriationAnnualData | None = None,
+        previous_carryforward: Decimal = ZERO,
     ) -> None:
         """Aktualisiert die GuV."""
 
@@ -119,6 +135,42 @@ class IncomeStatementFrame(QWidget):
             f"{description}: "
             f"{self._format_amount(net_income)} €"
         )
+
+        if appropriation_data is None:
+            self._appropriation_label.clear()
+            self._appropriation_label.hide()
+            return
+
+        balance_profit_loss = (
+            ProfitAppropriationPresentationService
+            .remaining_balance_profit_loss(
+                net_income=net_income,
+                previous_carryforward=previous_carryforward,
+                data=appropriation_data,
+            )
+        )
+        rows = [
+            "Ergebnisverwendung",
+            f"{description}: {self._format_amount(net_income)} €",
+            f"Gewinn-/Verlustvortrag aus Vorjahr: "
+            f"{self._format_amount(previous_carryforward)} €",
+            f"Zuführung gesetzliche Rücklage: "
+            f"−{self._format_amount(appropriation_data.statutory_reserve_addition)} €",
+            f"Zuführung andere Gewinnrücklagen: "
+            f"−{self._format_amount(appropriation_data.other_revenue_reserves_addition)} €",
+            f"Auflösung gesetzliche Rücklage: "
+            f"{self._format_amount(appropriation_data.statutory_reserve_release)} €",
+            f"Auflösung anderer Gewinnrücklagen: "
+            f"{self._format_amount(appropriation_data.other_revenue_reserves_release)} €",
+            f"Ausschüttung: "
+            f"−{self._format_amount(appropriation_data.distribution)} €",
+            f"Neuer Gewinn-/Verlustvortrag: "
+            f"{self._format_amount(appropriation_data.profit_loss_carryforward)} €",
+            f"Bilanzgewinn/Bilanzverlust: "
+            f"{self._format_amount(balance_profit_loss)} €",
+        ]
+        self._appropriation_label.setText("\n".join(rows))
+        self._appropriation_label.show()
 
     def _insert_position(
         self,

@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 from simpleob.amount_input import normalize_german_amount
 from simpleob.domain.account import Account
 from simpleob.domain.account_type import AccountType
+from simpleob.domain.entry_side import EntrySide
 from simpleob.domain.opening_balance import OpeningBalance
 from simpleob.domain.opening_balance_item import OpeningBalanceItem
 
@@ -116,23 +117,17 @@ class OpeningBalanceDialog(QDialog):
         account_layout.addWidget(self._account_combo)
         entry_layout.addLayout(account_layout, 1)
 
-        amount_layout = QVBoxLayout()
-        amount_layout.addWidget(QLabel("Anfangsbestand"))
+        debit_layout = QVBoxLayout()
+        debit_layout.addWidget(QLabel("Sollsaldo"))
+        self._debit_entry = self._create_amount_entry()
+        debit_layout.addWidget(self._debit_entry)
+        entry_layout.addLayout(debit_layout)
 
-        self._amount_entry = QLineEdit()
-        self._amount_entry.setAlignment(
-            Qt.AlignmentFlag.AlignRight
-        )
-        self._amount_entry.setMaximumWidth(180)
-        self._amount_entry.setPlaceholderText(
-            "0,00"
-        )
-        self._amount_entry.editingFinished.connect(
-            self._normalize_amount_entry
-        )
-        amount_layout.addWidget(self._amount_entry)
-
-        entry_layout.addLayout(amount_layout)
+        credit_layout = QVBoxLayout()
+        credit_layout.addWidget(QLabel("Habensaldo"))
+        self._credit_entry = self._create_amount_entry()
+        credit_layout.addWidget(self._credit_entry)
+        entry_layout.addLayout(credit_layout)
 
         add_button_layout = QVBoxLayout()
         add_button_layout.addWidget(QLabel(" "))
@@ -146,12 +141,13 @@ class OpeningBalanceDialog(QDialog):
         layout.addLayout(entry_layout)
 
         self._item_table = QTableWidget()
-        self._item_table.setColumnCount(3)
+        self._item_table.setColumnCount(4)
         self._item_table.setHorizontalHeaderLabels(
             (
                 "Konto",
                 "Bezeichnung",
-                "Anfangsbestand",
+                "Sollsaldo",
+                "Habensaldo",
             )
         )
         self._item_table.setEditTriggers(
@@ -173,10 +169,11 @@ class OpeningBalanceDialog(QDialog):
             1,
             QHeaderView.ResizeMode.Stretch,
         )
-        header.setSectionResizeMode(
-            2,
-            QHeaderView.ResizeMode.ResizeToContents,
-        )
+        for column in (2, 3):
+            header.setSectionResizeMode(
+                column,
+                QHeaderView.ResizeMode.ResizeToContents,
+            )
 
         layout.addWidget(self._item_table, 1)
 
@@ -184,19 +181,19 @@ class OpeningBalanceDialog(QDialog):
         remove_button.clicked.connect(self._remove_item)
         layout.addWidget(remove_button)
 
-        self._assets_label = QLabel("Aktiva: 0,00 €")
-        self._assets_label.setAlignment(
+        self._debit_total_label = QLabel("Soll: 0,00 €")
+        self._debit_total_label.setAlignment(
             Qt.AlignmentFlag.AlignRight
         )
-        layout.addWidget(self._assets_label)
+        layout.addWidget(self._debit_total_label)
 
-        self._liabilities_label = QLabel(
-            "Passiva: 0,00 €"
+        self._credit_total_label = QLabel(
+            "Haben: 0,00 €"
         )
-        self._liabilities_label.setAlignment(
+        self._credit_total_label.setAlignment(
             Qt.AlignmentFlag.AlignRight
         )
-        layout.addWidget(self._liabilities_label)
+        layout.addWidget(self._credit_total_label)
 
         self._difference_label = QLabel(
             "Differenz: 0,00 €"
@@ -251,8 +248,11 @@ class OpeningBalanceDialog(QDialog):
             return
 
         try:
-            amount = self._parse_amount(
-                self._amount_entry.text()
+            debit_amount = self._parse_amount(
+                self._debit_entry.text()
+            )
+            credit_amount = self._parse_amount(
+                self._credit_entry.text()
             )
         except ValueError as exc:
             QMessageBox.critical(
@@ -262,17 +262,44 @@ class OpeningBalanceDialog(QDialog):
             )
             return
 
-        if amount == Decimal("0.00"):
+        if (
+            debit_amount > Decimal("0.00")
+            and credit_amount > Decimal("0.00")
+        ):
             QMessageBox.critical(
                 self,
                 "Eröffnungsbilanz",
-                "Der Anfangsbestand muss größer als 0,00 € sein.",
+                "Geben Sie für ein Konto entweder einen Sollsaldo "
+                "oder einen Habensaldo ein.",
             )
             return
+
+        if (
+            debit_amount == Decimal("0.00")
+            and credit_amount == Decimal("0.00")
+        ):
+            QMessageBox.critical(
+                self,
+                "Eröffnungsbilanz",
+                "Geben Sie einen Soll- oder Habensaldo größer als 0,00 € ein.",
+            )
+            return
+
+        side = (
+            EntrySide.DEBIT
+            if debit_amount > Decimal("0.00")
+            else EntrySide.CREDIT
+        )
+        amount = (
+            debit_amount
+            if side is EntrySide.DEBIT
+            else credit_amount
+        )
 
         item = OpeningBalanceItem(
             account=account,
             amount=amount,
+            side=side,
         )
         self._items.append(item)
 
@@ -281,13 +308,21 @@ class OpeningBalanceDialog(QDialog):
 
         account_item = QTableWidgetItem(account.number)
         name_item = QTableWidgetItem(account.name)
-        amount_item = QTableWidgetItem(
+        debit_item = QTableWidgetItem(
             self._format_amount(amount)
+            if side is EntrySide.DEBIT
+            else ""
         )
-        amount_item.setTextAlignment(
-            Qt.AlignmentFlag.AlignRight
-            | Qt.AlignmentFlag.AlignVCenter
+        credit_item = QTableWidgetItem(
+            self._format_amount(amount)
+            if side is EntrySide.CREDIT
+            else ""
         )
+        for amount_item in (debit_item, credit_item):
+            amount_item.setTextAlignment(
+                Qt.AlignmentFlag.AlignRight
+                | Qt.AlignmentFlag.AlignVCenter
+            )
 
         self._item_table.setItem(
             row,
@@ -302,11 +337,17 @@ class OpeningBalanceDialog(QDialog):
         self._item_table.setItem(
             row,
             2,
-            amount_item,
+            debit_item,
+        )
+        self._item_table.setItem(
+            row,
+            3,
+            credit_item,
         )
 
         self._account_combo.setCurrentIndex(0)
-        self._amount_entry.clear()
+        self._debit_entry.clear()
+        self._credit_entry.clear()
 
         self._update_totals()
 
@@ -339,25 +380,23 @@ class OpeningBalanceDialog(QDialog):
         self._update_totals()
 
     def _update_totals(self) -> None:
-        """Berechnet Aktiva, Passiva und Differenz neu."""
+        """Berechnet Soll-, Haben- und Differenzsumme neu."""
 
         opening_balance = OpeningBalance(
             items=tuple(self._items),
         )
 
-        total_assets = opening_balance.total_assets
-        total_liabilities = (
-            opening_balance.total_liabilities_and_equity
-        )
-        difference = total_assets - total_liabilities
+        total_debits = opening_balance.total_debits
+        total_credits = opening_balance.total_credits
+        difference = total_debits - total_credits
 
-        self._assets_label.setText(
-            "Aktiva: "
-            f"{self._format_amount(total_assets)} €"
+        self._debit_total_label.setText(
+            "Soll: "
+            f"{self._format_amount(total_debits)} €"
         )
-        self._liabilities_label.setText(
-            "Passiva: "
-            f"{self._format_amount(total_liabilities)} €"
+        self._credit_total_label.setText(
+            "Haben: "
+            f"{self._format_amount(total_credits)} €"
         )
         self._difference_label.setText(
             "Differenz: "
@@ -369,10 +408,10 @@ class OpeningBalanceDialog(QDialog):
             and opening_balance.is_balanced
         )
 
-    def _normalize_amount_entry(self) -> None:
+    def _normalize_amount_entry(self, entry: QLineEdit) -> None:
         """Normalisiert den eingegebenen Anfangsbestand."""
 
-        value = self._amount_entry.text().strip()
+        value = entry.text().strip()
 
         if not value:
             return
@@ -384,9 +423,19 @@ class OpeningBalanceDialog(QDialog):
         except ValueError:
             return
 
-        self._amount_entry.setText(
-            normalized
+        entry.setText(normalized)
+
+    def _create_amount_entry(self) -> QLineEdit:
+        entry = QLineEdit()
+        entry.setAlignment(Qt.AlignmentFlag.AlignRight)
+        entry.setMaximumWidth(150)
+        entry.setPlaceholderText("0,00")
+        entry.editingFinished.connect(
+            lambda current_entry=entry: self._normalize_amount_entry(
+                current_entry
+            )
         )
+        return entry
 
     @staticmethod
     def _parse_amount(

@@ -59,6 +59,23 @@ def test_profit_appropriation_is_consistent_for_loss_with_reserve_release() -> N
     assert result.errors == ()
 
 
+def test_result_can_remain_as_balance_profit_without_new_carryforward() -> None:
+    result = ProfitAppropriationService().validate(
+        net_income=Decimal("10000.00"),
+        previous_profit_loss_carryforward=Decimal("-4000.00"),
+        data=ProfitAppropriationAnnualData(
+            statutory_reserve_addition=Decimal("1500.00"),
+            other_revenue_reserves_addition=Decimal("0.00"),
+            statutory_reserve_release=Decimal("0.00"),
+            other_revenue_reserves_release=Decimal("0.00"),
+            distribution=Decimal("0.00"),
+            profit_loss_carryforward=Decimal("0.00"),
+        ),
+    )
+    assert result.is_consistent
+    assert result.errors == ()
+
+
 def test_previous_profit_loss_carryforward_is_zero_when_account_is_missing() -> None:
     service = ProfitAppropriationService()
 

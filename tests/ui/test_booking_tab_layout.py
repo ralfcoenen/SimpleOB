@@ -37,6 +37,7 @@ def _assert_label_close_to_field(frame: QWidget, field: QWidget) -> None:
 def _booking_window(*, enable_invoice_actions: bool = False) -> MainWindow:
     window = MainWindow.__new__(MainWindow)
     QMainWindow.__init__(window)
+    window._account_editing_mode = False
     window._booking_tab = QWidget(window)
     for attribute in (
         "_open_item_payment_service",

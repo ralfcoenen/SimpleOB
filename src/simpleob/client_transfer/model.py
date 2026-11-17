@@ -733,6 +733,7 @@ class ClientTransferFiscalYear:
     opening_source: (
         ClientTransferFiscalYearReference | None
     )
+    balance_sheet_presentation: str = "A"
     bookings: tuple[ClientTransferBooking, ...] = ()
 
     def __post_init__(self) -> None:
@@ -765,6 +766,20 @@ class ClientTransferFiscalYear:
             self,
             "status",
             status,
+        )
+
+        presentation = _validate_required_text(
+            self.balance_sheet_presentation,
+            field_name="balance_sheet_presentation",
+        )
+        if presentation not in {"A", "B"}:
+            raise ValueError(
+                "balance_sheet_presentation must be A or B"
+            )
+        object.__setattr__(
+            self,
+            "balance_sheet_presentation",
+            presentation,
         )
 
         if (

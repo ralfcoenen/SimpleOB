@@ -516,6 +516,10 @@ def _fiscal_year_from_dict(
             data.get("status"),
             field_name="fiscal_year.status",
         ),
+        balance_sheet_presentation=_require_string(
+            data.get("balance_sheet_presentation", "A"),
+            field_name="fiscal_year.balance_sheet_presentation",
+        ),
         opening_source=(
             None
             if opening_source_value is None

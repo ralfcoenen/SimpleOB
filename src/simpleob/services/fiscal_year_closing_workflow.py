@@ -18,6 +18,9 @@ from simpleob.database.booking_repository import BookingRepository
 from simpleob.database.company_repository import CompanyRepository
 from simpleob.domain.account_type import AccountType
 from simpleob.domain.accounting_account_roles import AccountingAccountRoles
+from simpleob.domain.balance_sheet_presentation import (
+    BalanceSheetPresentation,
+)
 from simpleob.domain.booking import Booking
 from simpleob.domain.booking_type import BookingType
 from simpleob.domain.chart_of_accounts_template import (
@@ -78,6 +81,21 @@ class FiscalYearClosingWorkflow:
         self._vat_reconciliation_service = (
             vat_reconciliation_service or VatReconciliationService()
         )
+
+    def update_accounting_context(
+        self,
+        *,
+        closing_service: ClosingService,
+        statement_builder: FinancialStatementBuilder,
+        income_statement_position: FinancialStatementPosition,
+        account_types: dict[str, AccountType],
+    ) -> None:
+        """Übernimmt einen neu geladenen Kontenrahmenkontext."""
+
+        self._closing_service = closing_service
+        self._statement_builder = statement_builder
+        self._income_statement_position = income_statement_position
+        self._account_types = account_types
 
     def post_vat_reconciliation(
         self,
@@ -166,6 +184,9 @@ class FiscalYearClosingWorkflow:
         ledger: Ledger,
         chart_of_accounts: ChartOfAccountsTemplate,
         closing_date: date,
+        balance_sheet_presentation: BalanceSheetPresentation = (
+            BalanceSheetPresentation.BEFORE_APPROPRIATION
+        ),
     ) -> ClosingResult:
         """Schließt ein Geschäftsjahr atomar ab."""
 
@@ -207,6 +228,9 @@ class FiscalYearClosingWorkflow:
                 company_id,
                 fiscal_year,
                 commit=False,
+                balance_sheet_presentation=(
+                    balance_sheet_presentation
+                ),
             )
 
             self._session.commit()

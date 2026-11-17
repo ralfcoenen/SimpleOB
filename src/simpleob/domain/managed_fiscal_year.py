@@ -2,6 +2,9 @@
 
 from dataclasses import dataclass
 
+from simpleob.domain.balance_sheet_presentation import (
+    BalanceSheetPresentation,
+)
 from simpleob.domain.fiscal_year import FiscalYear
 from simpleob.domain.fiscal_year_status import FiscalYearStatus
 
@@ -13,6 +16,9 @@ class ManagedFiscalYear:
     fiscal_year: FiscalYear
     status: FiscalYearStatus
     opening_source: FiscalYear | None = None
+    balance_sheet_presentation: BalanceSheetPresentation = (
+        BalanceSheetPresentation.BEFORE_APPROPRIATION
+    )
 
     def __post_init__(self) -> None:
         if not isinstance(
@@ -40,6 +46,15 @@ class ManagedFiscalYear:
         ):
             raise TypeError(
                 "opening_source must be a FiscalYear or None"
+            )
+
+        if not isinstance(
+            self.balance_sheet_presentation,
+            BalanceSheetPresentation,
+        ):
+            raise TypeError(
+                "balance_sheet_presentation must be a "
+                "BalanceSheetPresentation"
             )
 
     @property

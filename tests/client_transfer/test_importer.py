@@ -78,6 +78,9 @@ from simpleob.database.shareholder_repository import (
 from simpleob.database.tax_depreciation_adjustment_repository import (
     TaxDepreciationAdjustmentRepository,
 )
+from simpleob.domain.balance_sheet_presentation import (
+    BalanceSheetPresentation,
+)
 from simpleob.domain.booking_type import BookingType
 from simpleob.domain.company import Company
 from simpleob.domain.depreciation_kind import DepreciationKind
@@ -920,6 +923,7 @@ def test_importer_restores_booking_and_reversal() -> None:
                     start_date=first_fiscal_year.start_date,
                     end_date=first_fiscal_year.end_date,
                     status=first_fiscal_year.status,
+                    balance_sheet_presentation="B",
                     opening_source=(
                         first_fiscal_year.opening_source
                     ),
@@ -1086,6 +1090,9 @@ def test_importer_restores_booking_and_reversal() -> None:
 
     assert managed_fiscal_years[0].status is (
         FiscalYearStatus.CLOSED
+    )
+    assert managed_fiscal_years[0].balance_sheet_presentation is (
+        BalanceSheetPresentation.AFTER_APPROPRIATION
     )
 
 

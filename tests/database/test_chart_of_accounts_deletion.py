@@ -4,6 +4,7 @@ from datetime import date
 from decimal import Decimal
 from uuid import uuid4
 
+import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -236,6 +237,66 @@ def test_blocks_account_booked_in_any_fiscal_year_and_aborts_whole_batch():
             .count()
             == 2
         )
+    finally:
+        session.close()
+        engine.dispose()
+
+
+def test_account_type_change_is_blocked_for_account_booked_in_closed_year():
+    engine, session, company, mandant = _repository_context()
+    try:
+        fiscal_year = Wirtschaftsjahr(
+            mandant_id=mandant.id,
+            start_date=date(2021, 1, 1),
+            end_date=date(2021, 12, 31),
+            status="CLOSED",
+        )
+        session.add(fiscal_year)
+        session.flush()
+        booking = Buchung(
+            booking_id=str(uuid4()),
+            wirtschaftsjahr_id=fiscal_year.id,
+            booking_date=date(2021, 6, 30),
+            description="Vorjahresbuchung",
+        )
+        session.add(booking)
+        session.flush()
+        session.add(
+            Buchungszeile(
+                buchung_id=booking.id,
+                position=1,
+                account_number="7000",
+                side="DEBIT",
+                amount=Decimal("10.00"),
+            )
+        )
+        session.commit()
+
+        repository = ChartOfAccountsRepository(session)
+        account = Account(
+            TemplateAccount("7000", "Konto 7000", AccountType.LIABILITY)
+        )
+
+        assert repository.account_has_bookings(
+            company_id=company.company_id,
+            account_number="7000",
+        )
+        with pytest.raises(ValueError, match="Kontotyp kann nicht geändert"):
+            repository.update_account(
+                company_id=company.company_id,
+                account=account,
+                mapping_rule=None,
+            )
+
+        stored = (
+            session.query(Konto)
+            .filter(
+                Konto.mandant_id == mandant.id,
+                Konto.account_number == "7000",
+            )
+            .one()
+        )
+        assert stored.account_type == AccountType.ASSET.name
     finally:
         session.close()
         engine.dispose()

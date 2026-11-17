@@ -12,6 +12,9 @@ from simpleob.database.models import (
     Mandant,
     Wirtschaftsjahr,
 )
+from simpleob.domain.balance_sheet_presentation import (
+    BalanceSheetPresentation,
+)
 from simpleob.domain.company import Company
 from simpleob.domain.company_master_data import (
     CompanyMasterData,
@@ -261,6 +264,11 @@ class CompanyRepository:
                     if model.opening_source is not None
                     else None
                 ),
+                balance_sheet_presentation=(
+                    BalanceSheetPresentation(
+                        model.balance_sheet_presentation
+                    )
+                ),
             )
             for model in models
         )
@@ -499,6 +507,9 @@ class CompanyRepository:
         fiscal_year: FiscalYear,
         *,
         commit: bool = True,
+        balance_sheet_presentation: BalanceSheetPresentation = (
+            BalanceSheetPresentation.BEFORE_APPROPRIATION
+        ),
     ) -> None:
         """Schließt ein Geschäftsjahr ab."""
 
@@ -519,6 +530,9 @@ class CompanyRepository:
         )
 
         fiscal_year_model.status = FiscalYearStatus.CLOSED.value
+        fiscal_year_model.balance_sheet_presentation = (
+            balance_sheet_presentation.value
+        )
 
         if commit:
             self._session.commit()

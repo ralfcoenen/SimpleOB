@@ -39,6 +39,11 @@ from simpleob.ui_qt.account_configuration_dialog import (
     AccountConfigurationDialog,
 )
 from simpleob.ui_qt.account_editor_dialog import AccountEditorDialog
+from simpleob.ui_qt.account_table_helpers import (
+    AccountNumberTableWidgetItem,
+    select_account_row,
+    set_default_account_sort,
+)
 
 
 class ChartOfAccountsTemplateEditorDialog(QDialog):
@@ -165,7 +170,7 @@ class ChartOfAccountsTemplateEditorDialog(QDialog):
         self._table.setEditTriggers(
             QAbstractItemView.EditTrigger.NoEditTriggers
         )
-        self._table.setSortingEnabled(False)
+        set_default_account_sort(self._table)
         self._table.setHorizontalScrollBarPolicy(
             Qt.ScrollBarPolicy.ScrollBarAsNeeded
         )
@@ -275,6 +280,9 @@ class ChartOfAccountsTemplateEditorDialog(QDialog):
         self._bundle = candidate
 
     def _refresh_table(self) -> None:
+        sort_column = self._table.horizontalHeader().sortIndicatorSection()
+        sort_order = self._table.horizontalHeader().sortIndicatorOrder()
+        self._table.setSortingEnabled(False)
         self._table.setRowCount(len(self._bundle.chart.accounts))
         rules = {
             rule.account_number: rule
@@ -295,10 +303,16 @@ class ChartOfAccountsTemplateEditorDialog(QDialog):
                 taxonomy_mapping,
             )
             for column, value in enumerate(values):
-                item = QTableWidgetItem(value)
+                item = (
+                    AccountNumberTableWidgetItem(value)
+                    if column == 0
+                    else QTableWidgetItem(value)
+                )
                 if column == 4 and value:
                     item.setToolTip(value)
                 self._table.setItem(row, column, item)
+        self._table.sortItems(sort_column, sort_order)
+        self._table.setSortingEnabled(True)
         self._filter_rows(self._search_entry.text())
 
     @staticmethod
@@ -379,7 +393,14 @@ class ChartOfAccountsTemplateEditorDialog(QDialog):
         dialog.exec()
         if dialog.result is None:
             return
-        self._store_edited_account(old_number=None, result=dialog.result)
+        account_number = dialog.result.account.number
+        if self._store_edited_account(
+            old_number=None,
+            result=dialog.result,
+        ):
+            if not select_account_row(self._table, account_number):
+                self._search_entry.clear()
+                select_account_row(self._table, account_number)
 
     def _edit_account(self) -> None:
         account = self._selected_account()
@@ -411,7 +432,7 @@ class ChartOfAccountsTemplateEditorDialog(QDialog):
             return
         self._store_edited_account(old_number=old_number, result=dialog.result)
 
-    def _store_edited_account(self, *, old_number: str | None, result) -> None:
+    def _store_edited_account(self, *, old_number: str | None, result) -> bool:
         new_number = result.account.number
         accounts = list(self._bundle.chart.accounts)
         if any(
@@ -424,7 +445,7 @@ class ChartOfAccountsTemplateEditorDialog(QDialog):
                 "Kontonummer bereits vorhanden",
                 f"Die Kontonummer {new_number} ist bereits vergeben.",
             )
-            return
+            return False
 
         references: tuple[str, ...] = ()
         if old_number is not None and old_number != new_number:
@@ -445,7 +466,7 @@ class ChartOfAccountsTemplateEditorDialog(QDialog):
                     QMessageBox.StandardButton.No,
                 )
                 if answer != QMessageBox.StandardButton.Yes:
-                    return
+                    return False
 
         if old_number is None:
             accounts.append(result.account.template)
@@ -495,6 +516,7 @@ class ChartOfAccountsTemplateEditorDialog(QDialog):
                 taxonomy_mappings=mappings,
             )
         self._refresh_table()
+        return True
 
     def _move_hgb_exception(self, old_number: str, new_number: str) -> None:
         if old_number in self._confirmed_hgb_exceptions:
@@ -802,15 +824,18 @@ class ChartOfAccountsTemplateEditorDialog(QDialog):
             )
             return
 
-        name, accepted = QInputDialog.getText(
-            self,
-            "Kontenrahmen als Vorlage speichern",
-            "Name der eigenen Vorlage:",
-            QLineEdit.EchoMode.Normal,
-            self._bundle.chart.name,
-        )
-        if not accepted:
+        name_dialog = QInputDialog(self)
+        name_dialog.setWindowTitle("Kontenrahmen als Vorlage speichern")
+        name_dialog.setLabelText("Name der eigenen Vorlage:")
+        name_dialog.setInputMode(QInputDialog.InputMode.TextInput)
+        name_dialog.setTextValue(self._bundle.chart.name)
+        name_entry = name_dialog.findChild(QLineEdit)
+        if name_entry is not None:
+            name_entry.setMinimumWidth(440)
+        name_dialog.resize(500, name_dialog.sizeHint().height())
+        if name_dialog.exec() != QDialog.DialogCode.Accepted:
             return
+        name = name_dialog.textValue()
 
         bundle = self._bundle
         if (

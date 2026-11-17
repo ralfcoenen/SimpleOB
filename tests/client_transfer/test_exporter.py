@@ -17,6 +17,9 @@ from simpleob.client_transfer.serialization import (
     client_transfer_to_json,
 )
 from simpleob.domain.account_type import AccountType
+from simpleob.domain.balance_sheet_presentation import (
+    BalanceSheetPresentation,
+)
 from simpleob.domain.depreciation_kind import DepreciationKind
 from simpleob.domain.depreciation_source import DepreciationSource
 from simpleob.domain.entry_side import EntrySide
@@ -409,6 +412,9 @@ def test_exporter_builds_complete_transfer() -> None:
         ManagedFiscalYear(
             fiscal_year=fiscal_year,
             status=FiscalYearStatus.CLOSED,
+            balance_sheet_presentation=(
+                BalanceSheetPresentation.AFTER_APPROPRIATION
+            ),
         ),
     )
 
@@ -657,6 +663,7 @@ def test_exporter_builds_complete_transfer() -> None:
         30,
     )
     assert exported_fiscal_year.status == "CLOSED"
+    assert exported_fiscal_year.balance_sheet_presentation == "B"
 
     assert len(exported_fiscal_year.bookings) == 1
 

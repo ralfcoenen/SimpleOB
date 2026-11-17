@@ -30,6 +30,9 @@ from simpleob.accounting.income_statement import IncomeStatement
 from simpleob.domain.bvv_evaluation import BvvEvaluation
 from simpleob.domain.entry_side import EntrySide
 from simpleob.domain.money import ZERO
+from simpleob.domain.profit_appropriation_annual_data import (
+    ProfitAppropriationAnnualData,
+)
 from simpleob.reporting.account_activity_report import (
     AccountActivityReport,
 )
@@ -40,6 +43,12 @@ from simpleob.services.e_bilanz_preparation_service import (
 )
 from simpleob.services.fixed_asset_schedule_service import (
     FixedAssetSchedulePosition,
+)
+from simpleob.services.profit_appropriation_presentation_service import (
+    ProfitAppropriationPresentationService,
+)
+from simpleob.services.uncovered_equity_deficit_presentation_service import (
+    UncoveredEquityDeficitPresentationService,
 )
 
 
@@ -112,6 +121,8 @@ class PdfReportingService:
         company_name: str,
         fiscal_year_name: str,
         target: Path,
+        appropriation_data: ProfitAppropriationAnnualData | None = None,
+        previous_carryforward: Decimal = ZERO,
     ) -> Path:
         """Exportiert eine Gewinn- und Verlustrechnung."""
 
@@ -141,6 +152,65 @@ class PdfReportingService:
                 self._format_amount(net_income),
             ]
         )
+
+        if appropriation_data is not None:
+            remaining = (
+                ProfitAppropriationPresentationService
+                .remaining_balance_profit_loss(
+                    net_income=net_income,
+                    previous_carryforward=previous_carryforward,
+                    data=appropriation_data,
+                )
+            )
+            rows.extend(
+                (
+                    ["", ""],
+                    ["Ergebnisverwendung", ""],
+                    [result_name, self._format_amount(net_income)],
+                    [
+                        "Gewinn-/Verlustvortrag aus Vorjahr",
+                        self._format_amount(previous_carryforward),
+                    ],
+                    [
+                        "Zuführung gesetzliche Rücklage",
+                        self._format_amount(
+                            -appropriation_data.statutory_reserve_addition
+                        ),
+                    ],
+                    [
+                        "Zuführung andere Gewinnrücklagen",
+                        self._format_amount(
+                            -appropriation_data.other_revenue_reserves_addition
+                        ),
+                    ],
+                    [
+                        "Auflösung gesetzliche Rücklage",
+                        self._format_amount(
+                            appropriation_data.statutory_reserve_release
+                        ),
+                    ],
+                    [
+                        "Auflösung anderer Gewinnrücklagen",
+                        self._format_amount(
+                            appropriation_data.other_revenue_reserves_release
+                        ),
+                    ],
+                    [
+                        "Ausschüttung",
+                        self._format_amount(-appropriation_data.distribution),
+                    ],
+                    [
+                        "Neuer Gewinn-/Verlustvortrag",
+                        self._format_amount(
+                            appropriation_data.profit_loss_carryforward
+                        ),
+                    ],
+                    [
+                        "Bilanzgewinn/Bilanzverlust",
+                        self._format_amount(remaining),
+                    ],
+                )
+            )
 
         return self._build_pdf(
             target=target,
@@ -676,6 +746,10 @@ class PdfReportingService:
     ) -> Path:
         """Exportiert die aufbereiteten E-Bilanz-Abschlusswerte als PDF."""
 
+        balance_sheet = UncoveredEquityDeficitPresentationService.apply(
+            preparation.balance_sheet
+        )
+
         target = Path(target)
 
         if target.suffix.lower() != ".pdf":
@@ -790,15 +864,15 @@ class PdfReportingService:
 
         self._append_balance_sheet_rows(
             rows=balance_rows,
-            position=preparation.balance_sheet.assets,
-            balance_sheet=preparation.balance_sheet,
+            position=balance_sheet.assets,
+            balance_sheet=balance_sheet,
             side="assets",
         )
 
         self._append_balance_sheet_rows(
             rows=balance_rows,
-            position=preparation.balance_sheet.liabilities,
-            balance_sheet=preparation.balance_sheet,
+            position=balance_sheet.liabilities,
+            balance_sheet=balance_sheet,
             side="liabilities",
         )
 
@@ -806,13 +880,13 @@ class PdfReportingService:
             [
                 "Summe",
                 self._format_amount(
-                    preparation.balance_sheet.amount_for(
-                        preparation.balance_sheet.assets
+                    balance_sheet.amount_for(
+                        balance_sheet.assets
                     )
                 ),
                 self._format_amount(
-                    preparation.balance_sheet.amount_for(
-                        preparation.balance_sheet.liabilities
+                    balance_sheet.amount_for(
+                        balance_sheet.liabilities
                     )
                 ),
             ]
@@ -1453,7 +1527,7 @@ class PdfReportingService:
             position
         )
 
-        if amount == ZERO:
+        if not balance_sheet.has_nonzero_amount_in_subtree(position):
             return
 
         label = (

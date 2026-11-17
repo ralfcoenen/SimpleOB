@@ -16,6 +16,9 @@ from simpleob.accounting.income_statement import IncomeStatement
 from simpleob.domain.accounting_account_roles import (
     AccountingAccountRoles,
 )
+from simpleob.domain.balance_sheet_presentation import (
+    BalanceSheetPresentation,
+)
 from simpleob.domain.company import Company
 from simpleob.domain.company_master_data import (
     CompanyMasterData,
@@ -660,6 +663,7 @@ def test_e_bilanz_service_orchestrates_builder() -> None:
     balance_sheet_builder.assert_called_once_with(
         balance_sheet=prepared_balance_sheet,
         income_statement=income_statement_root,
+        presentation=BalanceSheetPresentation.BEFORE_APPROPRIATION,
     )
 
     income_statement_builder.assert_called_once_with(

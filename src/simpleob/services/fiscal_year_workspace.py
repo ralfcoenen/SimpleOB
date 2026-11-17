@@ -8,6 +8,9 @@ from uuid import UUID
 
 from simpleob.accounting.account_balance import AccountBalance
 from simpleob.accounting.balance_sheet import BalanceSheet
+from simpleob.accounting.financial_statement_builder import (
+    FinancialStatementBuilder,
+)
 from simpleob.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
@@ -49,11 +52,15 @@ from simpleob.domain.account import Account
 from simpleob.domain.account_mapping_rule import (
     AccountMappingRule,
 )
+from simpleob.domain.account_type import AccountType
 from simpleob.domain.accounting_account_roles import (
     AccountingAccountRoles,
 )
 from simpleob.domain.accounting_control_accounts import (
     AccountingControlAccounts,
+)
+from simpleob.domain.balance_sheet_presentation import (
+    BalanceSheetPresentation,
 )
 from simpleob.domain.booking import Booking
 from simpleob.domain.booking_line import BookingLine
@@ -129,6 +136,7 @@ from simpleob.services.closing_consistency_service import (
     ClosingConsistencyService,
 )
 from simpleob.services.closing_result import ClosingResult
+from simpleob.services.closing_service import ClosingService
 from simpleob.services.depreciation_service import (
     DepreciationService,
 )
@@ -164,6 +172,9 @@ from simpleob.services.profit_appropriation_posting_service import (
 )
 from simpleob.services.profit_appropriation_posting_workflow import (
     ProfitAppropriationPostingWorkflow,
+)
+from simpleob.services.profit_appropriation_presentation_service import (
+    ProfitAppropriationPresentationService,
 )
 from simpleob.services.profit_appropriation_service import (
     ProfitAppropriationService,
@@ -369,6 +380,43 @@ class FiscalYearWorkspace:
             company_id=self._context.company.company_id,
             account=account,
             mapping_rule=mapping_rule,
+        )
+
+    def save_account_with_taxonomy_mapping(
+        self,
+        *,
+        account: Account,
+        mapping_rule: AccountMappingRule | None,
+        taxonomy_concept_name: str | None,
+        is_new: bool,
+    ) -> None:
+        """Speichert Konto-, HGB- und Taxonomiedaten gemeinsam."""
+
+        if self._chart_of_accounts_repository is None:
+            raise RuntimeError(
+                "Die Kontenrahmenverwaltung ist nicht konfiguriert."
+            )
+
+        self._chart_of_accounts_repository.save_account_with_taxonomy_mapping(
+            company_id=self._context.company.company_id,
+            account=account,
+            mapping_rule=mapping_rule,
+            taxonomy_version="6.9",
+            taxonomy_concept_name=taxonomy_concept_name,
+            is_new=is_new,
+        )
+
+    def account_has_bookings(self, *, account_number: str) -> bool:
+        """Prüft, ob ein Konto in einem Geschäftsjahr bebucht wurde."""
+
+        if self._chart_of_accounts_repository is None:
+            raise RuntimeError(
+                "Die Kontenrahmenverwaltung ist nicht konfiguriert."
+            )
+
+        return self._chart_of_accounts_repository.account_has_bookings(
+            company_id=self._context.company.company_id,
+            account_number=account_number,
         )
 
     def delete_accounts(
@@ -2886,6 +2934,9 @@ class FiscalYearWorkspace:
         *,
         income_statement: IncomeStatement,
         chart_of_accounts: ChartOfAccountsTemplate,
+        balance_sheet_presentation: BalanceSheetPresentation = (
+            BalanceSheetPresentation.BEFORE_APPROPRIATION
+        ),
     ) -> ClosingResult:
         """Schließt das aktuelle Geschäftsjahr persistent ab."""
 
@@ -2896,6 +2947,9 @@ class FiscalYearWorkspace:
             ledger=self._ledger,
             chart_of_accounts=chart_of_accounts,
             closing_date=self._context.fiscal_year.end_date,
+            balance_sheet_presentation=(
+                balance_sheet_presentation
+            ),
         )
 
         self.reload()
@@ -2930,6 +2984,42 @@ class FiscalYearWorkspace:
         self._journal = journal
         self._ledger = ledger
         self._pre_closing_ledger = pre_closing_ledger
+
+    def activate_chart_context(
+        self,
+        *,
+        closing_service: ClosingService,
+        statement_builder: FinancialStatementBuilder,
+        income_statement_position: FinancialStatementPosition,
+        account_types: dict[str, AccountType],
+        account_mapper: AccountMapper,
+        accounts: tuple[Account, ...],
+        income_summary_account_number: str,
+    ) -> None:
+        """Lädt das Hauptbuch neu und tauscht Kontenrahmen-Caches aus."""
+
+        # Erst vollständig aus der Datenbank rekonstruieren. Bei einem Fehler
+        # bleiben sowohl die bisherige Ledger-Ansicht als auch die Services
+        # unverändert und der Aufrufer kann die Aktivierung wiederholen.
+        self.reload()
+
+        self._closing_workflow.update_accounting_context(
+            closing_service=closing_service,
+            statement_builder=statement_builder,
+            income_statement_position=income_statement_position,
+            account_types=account_types,
+        )
+        self._e_bilanz_preparation_service.update_accounting_context(
+            statement_builder=statement_builder,
+            closing_service=closing_service,
+            account_types=account_types,
+            income_summary_account_number=income_summary_account_number,
+        )
+        self._e_bilanz_account_detail_service.update_accounting_context(
+            account_mapper=account_mapper,
+            accounts=accounts,
+        )
+        self._validated_e_bilanz_document = None
 
     def load_company_master_data(
         self,
@@ -2973,6 +3063,7 @@ class FiscalYearWorkspace:
         self,
         *,
         income_statement: IncomeStatement,
+        chart_of_accounts: ChartOfAccountsTemplate | None = None,
     ) -> EBilanzPreparationResult:
         """Bereitet die HGB-Werte des abgeschlossenen Geschäftsjahres auf."""
 
@@ -2981,9 +3072,162 @@ class FiscalYearWorkspace:
                 "Die E-Bilanz kann erst nach dem Jahresabschluss vorbereitet werden."
             )
 
-        return self._e_bilanz_preparation_service.prepare(
+        preparation = self._e_bilanz_preparation_service.prepare(
             income_statement=income_statement,
             closed_ledger=self._ledger,
+        )
+
+        presentation = (
+            self.managed_fiscal_year.balance_sheet_presentation
+        )
+        if presentation is BalanceSheetPresentation.BEFORE_APPROPRIATION:
+            return preparation
+
+        if chart_of_accounts is None:
+            raise RuntimeError(
+                "Der Kontenrahmen ist für Bilanzvariante B nicht verfügbar."
+            )
+        balance_sheet = self.apply_balance_sheet_presentation(
+            balance_sheet=preparation.balance_sheet,
+            net_income=preparation.net_income,
+            chart_of_accounts=chart_of_accounts,
+            presentation=presentation,
+        )
+        balance_amounts = dict(balance_sheet.amounts)
+        return replace(
+            preparation,
+            balance_sheet=balance_sheet,
+            balance_sheet_amounts=balance_amounts,
+            amounts={
+                **preparation.income_statement_amounts,
+                **balance_amounts,
+            },
+            balance_sheet_presentation=presentation,
+        )
+
+    def apply_balance_sheet_presentation(
+        self,
+        *,
+        balance_sheet: BalanceSheet,
+        net_income: Decimal,
+        chart_of_accounts: ChartOfAccountsTemplate,
+        presentation: BalanceSheetPresentation | None = None,
+    ) -> BalanceSheet:
+        """Wendet die gespeicherte B-Darstellung mit Doppelzählungsschutz an."""
+
+        selected_presentation = (
+            presentation
+            if presentation is not None
+            else self.managed_fiscal_year.balance_sheet_presentation
+        )
+        if selected_presentation is BalanceSheetPresentation.BEFORE_APPROPRIATION:
+            return balance_sheet
+
+        data = self.load_profit_appropriation_annual_data()
+        if data is None:
+            raise ValueError(
+                "Für Bilanzvariante B fehlen gespeicherte "
+                "Ergebnisverwendungsdaten."
+            )
+        control_accounts, _vat_accounts, _roles = (
+            self.load_account_configuration()
+        )
+        protected_position_codes = {
+            "HGB.266.PASSIVA.A.III.1",
+            "HGB.266.PASSIVA.A.III",
+            "HGB.266.PASSIVA.A.III.4",
+            "HGB.266.PASSIVA.A.IV",
+            "HGB.266.PASSIVA.A.V",
+        }
+        protected_accounts = {
+            control_accounts.statutory_reserve_account,
+            control_accounts.other_revenue_reserves_account,
+            control_accounts.profit_loss_carryforward_account,
+        }
+        if data.distribution:
+            protected_accounts.add(
+                control_accounts.distribution_liability_account
+            )
+            distribution_rule = next(
+                (
+                    rule
+                    for rule in chart_of_accounts.account_mapping_rules
+                    if rule.account_number
+                    == control_accounts.distribution_liability_account
+                ),
+                None,
+            )
+            if (
+                distribution_rule is not None
+                and distribution_rule.credit_position is not None
+            ):
+                protected_position_codes.add(
+                    distribution_rule.credit_position.code
+                )
+        protected_accounts.update(
+            rule.account_number
+            for rule in chart_of_accounts.account_mapping_rules
+            if any(
+                position is not None
+                and position.code in protected_position_codes
+                for position in (
+                    rule.debit_position,
+                    rule.credit_position,
+                )
+            )
+        )
+        registered_posting_ids: set[UUID] = set()
+        if self._profit_appropriation_posting_repository is not None:
+            prior_year_postings = (
+                self._profit_appropriation_posting_repository
+                .list_for_posting_fiscal_year(
+                    company_id=self._context.company.company_id,
+                    fiscal_year=self._context.fiscal_year,
+                )
+            )
+            for posting in prior_year_postings:
+                if (
+                    posting.source_fiscal_year_end
+                    >= self._context.fiscal_year.start_date
+                    or self._booking_repository.is_reversed(
+                        posting.booking_id
+                    )
+                ):
+                    continue
+                registered_posting_ids.add(posting.booking_id)
+                registered_posting_ids.update(
+                    booking.booking_id
+                    for booking in self._journal.bookings
+                    if booking.reversal_of_booking_id
+                    == posting.booking_id
+                )
+        touched = sorted(
+            {
+                line.account_number
+                for booking in self._journal.bookings
+                if booking.booking_id not in registered_posting_ids
+                if booking.booking_type
+                not in (BookingType.OPENING, BookingType.CLOSING)
+                for line in booking.lines
+                if line.account_number in protected_accounts
+            }
+        )
+        if touched:
+            raise ValueError(
+                "Bilanzvariante B kann nicht sicher berechnet werden: "
+                "Im Geschäftsjahr gibt es bereits Buchungen auf den für "
+                "die Ergebnisverwendung verwendeten Konten "
+                f"{', '.join(touched)}. Damit lässt sich eine "
+                "Doppelberücksichtigung nicht zuverlässig ausschließen."
+            )
+
+        return ProfitAppropriationPresentationService.apply(
+            balance_sheet=balance_sheet,
+            data=data,
+            net_income=net_income,
+            previous_carryforward=self.previous_profit_loss_carryforward(),
+            chart_of_accounts=chart_of_accounts,
+            control_accounts=control_accounts,
         )
 
     def _effective_profit_appropriation_postings(
@@ -3516,6 +3760,32 @@ class FiscalYearWorkspace:
             position=position,
         )
 
+    def account_taxonomy_choices_for_position(
+        self,
+        *,
+        position: FinancialStatementPosition,
+    ) -> tuple[tuple[str, str], ...]:
+        """Liefert Taxonomiepositionen zu einer noch nicht gespeicherten HGB-Position."""
+
+        return self._e_bilanz_service.account_taxonomy_choices(
+            fiscal_year=self._context.fiscal_year,
+            position=position,
+        )
+
+    def validate_account_taxonomy_concept_for_position(
+        self,
+        *,
+        position: FinancialStatementPosition,
+        concept_name: str,
+    ) -> tuple:
+        """Prüft ein Concept zu einer im Editor ausgewählten HGB-Position."""
+
+        return self._e_bilanz_service.validate_account_taxonomy_concept(
+            fiscal_year=self._context.fiscal_year,
+            position=position,
+            concept_name=concept_name,
+        )
+
     def validate_account_taxonomy_concept(
         self,
         *,
@@ -3723,6 +3993,9 @@ class FiscalYearWorkspace:
             ),
             previous_profit_loss_carryforward=(
                 previous_profit_loss_carryforward
+            ),
+            balance_sheet_presentation=(
+                preparation.balance_sheet_presentation
             ),
         )
 

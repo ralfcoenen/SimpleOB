@@ -8,6 +8,9 @@ from simpleob.accounting.balance_sheet import BalanceSheet
 from simpleob.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
+from simpleob.domain.balance_sheet_presentation import (
+    BalanceSheetPresentation,
+)
 from simpleob.domain.money import ZERO
 from simpleob.eric.bilanz_generation.fact_plan_resolver import (
     FactPlanPath,
@@ -28,6 +31,9 @@ class GaapCi69BalanceSheetValueBuilder:
         *,
         balance_sheet: BalanceSheet,
         income_statement: FinancialStatementPosition,
+        presentation: BalanceSheetPresentation = (
+            BalanceSheetPresentation.BEFORE_APPROPRIATION
+        ),
     ) -> dict[FactPlanPath, FactPlanValue]:
         """Erzeugt GAAP-CI-Werte aus den vorhandenen HGB-Bilanzwerten."""
 
@@ -61,6 +67,7 @@ class GaapCi69BalanceSheetValueBuilder:
                 mappings=mappings,
                 position=position,
                 amount=amount,
+                presentation=presentation,
             )
 
         return values
@@ -72,8 +79,17 @@ class GaapCi69BalanceSheetValueBuilder:
         mappings: TaxonomyMappingSet,
         position: FinancialStatementPosition,
         amount: Decimal,
+        presentation: BalanceSheetPresentation,
     ) -> None:
         if amount == ZERO:
+            return
+
+        if (
+            presentation
+            is BalanceSheetPresentation.AFTER_APPROPRIATION
+            and position.code == "HGB.266.PASSIVA.A.V"
+        ):
+            values[("bs.eqLiab.equity.profitLoss",)] = amount
             return
 
         mapping = mappings.for_position(position)

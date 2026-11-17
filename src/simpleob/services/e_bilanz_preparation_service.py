@@ -14,6 +14,9 @@ from simpleob.accounting.financial_statement_position import (
 from simpleob.accounting.income_statement import IncomeStatement
 from simpleob.accounting.ledger import Ledger
 from simpleob.domain.account_type import AccountType
+from simpleob.domain.balance_sheet_presentation import (
+    BalanceSheetPresentation,
+)
 from simpleob.domain.money import ZERO
 from simpleob.services.closing_result import ClosingResult
 from simpleob.services.closing_service import ClosingService
@@ -41,6 +44,9 @@ class EBilanzPreparationResult:
         FinancialStatementPosition,
         Decimal,
     ]
+    balance_sheet_presentation: BalanceSheetPresentation = (
+        BalanceSheetPresentation.BEFORE_APPROPRIATION
+    )
 
 
 class EBilanzPreparationService:
@@ -64,6 +70,21 @@ class EBilanzPreparationService:
         self._income_summary_account_number = (
             income_summary_account_number
         )
+
+    def update_accounting_context(
+        self,
+        *,
+        statement_builder: FinancialStatementBuilder,
+        closing_service: ClosingService,
+        account_types: Mapping[str, AccountType],
+        income_summary_account_number: str,
+    ) -> None:
+        """Übernimmt die aktuellen Kontenrahmenabhängigkeiten."""
+
+        self._statement_builder = statement_builder
+        self._closing_service = closing_service
+        self._account_types = account_types
+        self._income_summary_account_number = income_summary_account_number
 
     def prepare(
         self,

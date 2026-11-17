@@ -2,11 +2,11 @@
 
 from datetime import date
 
-from simpleob.domain.account_type import AccountType
 from simpleob.domain.booking import Booking
 from simpleob.domain.booking_line import BookingLine
 from simpleob.domain.booking_type import BookingType
 from simpleob.domain.entry_side import EntrySide
+from simpleob.domain.money import ZERO
 from simpleob.domain.opening_balance import OpeningBalance
 
 
@@ -38,7 +38,16 @@ class OpeningBalanceService:
         bookings: list[Booking] = []
 
         for item in opening_balance.items:
-            if item.account.account_type is AccountType.ASSET:
+            if item.account.number == self._opening_balance_account_number:
+                raise ValueError(
+                    "Das Eröffnungsbilanzkonto darf nicht als "
+                    "Anfangssaldo erfasst werden."
+                )
+
+            if item.amount == ZERO:
+                continue
+
+            if item.side is EntrySide.DEBIT:
                 debit_account = item.account.number
                 credit_account = self._opening_balance_account_number
 

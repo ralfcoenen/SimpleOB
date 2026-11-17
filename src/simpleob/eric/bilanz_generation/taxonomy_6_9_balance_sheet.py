@@ -9,6 +9,7 @@ BALANCE_SHEET_CONCEPTS = (
     "bs.ass.fixAss.tan.otherEquipm",
     "bs.eqLiab",
     "bs.eqLiab.equity",
+    "bs.eqLiab.equity.deficitNotCoveredByCapital",
     "bs.eqLiab.equity.netIncome",
     "bs.eqLiab.equity.retainedEarnings",
     "bs.eqLiab.equity.subscribed",

@@ -8,6 +8,9 @@ from simpleob.accounting.balance_sheet import BalanceSheet
 from simpleob.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
+from simpleob.domain.balance_sheet_presentation import (
+    BalanceSheetPresentation,
+)
 from simpleob.eric.bilanz_generation.gaap_ci_6_9_balance_sheet_values import (
     GaapCi69BalanceSheetValueBuilder,
 )
@@ -16,6 +19,9 @@ from simpleob.hgb.balance_sheet_structure import (
 )
 from simpleob.hgb.income_statement_structure import (
     create_hgb_income_statement_structure,
+)
+from simpleob.services.uncovered_equity_deficit_presentation_service import (
+    UncoveredEquityDeficitPresentationService,
 )
 
 
@@ -190,3 +196,138 @@ def test_rejects_invalid_income_statement() -> None:
             balance_sheet=balance_sheet,
             income_statement=object(),
         )
+
+
+def test_variant_b_maps_balance_profit_to_taxonomy_profit_loss() -> None:
+    balance_sheet, income_statement = _balance_sheet()
+
+    values = GaapCi69BalanceSheetValueBuilder.build(
+        balance_sheet=balance_sheet,
+        income_statement=income_statement,
+        presentation=BalanceSheetPresentation.AFTER_APPROPRIATION,
+    )
+
+    assert values[("bs.eqLiab.equity.profitLoss",)] == Decimal("5000.00")
+    assert ("bs.eqLiab.equity.netIncome",) not in values
+
+
+def test_uncovered_equity_deficit_maps_both_taxonomy_facts() -> None:
+    assets, liabilities = create_hgb_balance_sheet_structure()
+    income_statement = create_hgb_income_statement_structure()
+    positions = {
+        position.code: position
+        for position in _walk(assets) + _walk(liabilities)
+    }
+    raw = BalanceSheet(
+        assets=assets,
+        liabilities=liabilities,
+        amounts={
+            assets: Decimal("2000.00"),
+            positions["HGB.266.AKTIVA.B.IV"]: Decimal("2000.00"),
+            liabilities: Decimal("2000.00"),
+            positions["HGB.266.PASSIVA.A"]: Decimal("-5000.00"),
+            positions["HGB.266.PASSIVA.A.I"]: Decimal("1000.00"),
+            positions["HGB.266.PASSIVA.A.IV"]: Decimal("-6000.00"),
+            positions["HGB.266.PASSIVA.C"]: Decimal("7000.00"),
+            positions["HGB.266.PASSIVA.C.4"]: Decimal("7000.00"),
+        },
+    )
+
+    presented = UncoveredEquityDeficitPresentationService.apply(raw)
+    values = GaapCi69BalanceSheetValueBuilder.build(
+        balance_sheet=presented,
+        income_statement=income_statement,
+    )
+
+    assert values[("bs.ass.deficitNotCoveredByCapital",)] == Decimal("5000.00")
+    assert values[("bs.eqLiab.equity.deficitNotCoveredByCapital",)] == Decimal("5000.00")
+    assert values[("bs.eqLiab",)] == Decimal("7000.00")
+    assert values[("bs.ass",)] == Decimal("7000.00")
+    assert presented.amount_for(positions["HGB.266.PASSIVA.A"]) == Decimal("0.00")
+    assert raw.amount_for(positions["HGB.266.PASSIVA.A"]) == Decimal("-5000.00")
+    assert not raw.uncovered_equity_deficit_applied
+
+
+def test_deficit_mapping_preserves_variant_b_balance_profit() -> None:
+    assets, liabilities = create_hgb_balance_sheet_structure()
+    income_statement = create_hgb_income_statement_structure()
+    positions = {
+        position.code: position
+        for position in _walk(assets) + _walk(liabilities)
+    }
+    raw = BalanceSheet(
+        assets=assets,
+        liabilities=liabilities,
+        amounts={
+            assets: Decimal("2000.00"),
+            positions["HGB.266.AKTIVA.B.IV"]: Decimal("2000.00"),
+            liabilities: Decimal("2000.00"),
+            positions["HGB.266.PASSIVA.A"]: Decimal("-5000.00"),
+            positions["HGB.266.PASSIVA.A.I"]: Decimal("1000.00"),
+            positions["HGB.266.PASSIVA.A.IV"]: Decimal("-7000.00"),
+            positions["HGB.266.PASSIVA.A.V"]: Decimal("1000.00"),
+            positions["HGB.266.PASSIVA.C"]: Decimal("7000.00"),
+            positions["HGB.266.PASSIVA.C.4"]: Decimal("7000.00"),
+        },
+    )
+
+    presented = UncoveredEquityDeficitPresentationService.apply(raw)
+    values = GaapCi69BalanceSheetValueBuilder.build(
+        balance_sheet=presented,
+        income_statement=income_statement,
+        presentation=BalanceSheetPresentation.AFTER_APPROPRIATION,
+    )
+
+    assert values[("bs.eqLiab.equity.profitLoss",)] == Decimal("1000.00")
+    assert ("bs.eqLiab.equity.netIncome",) not in values
+    assert values[("bs.eqLiab.equity.deficitNotCoveredByCapital",)] == Decimal("5000.00")
+
+
+@pytest.mark.parametrize(
+    ("equity", "expected_deficit"),
+    (
+        (Decimal("0.00"), Decimal("0.00")),
+        (Decimal("500.00"), Decimal("0.00")),
+        (Decimal("-500.00"), Decimal("500.00")),
+        (Decimal("-5000.00"), Decimal("5000.00")),
+        (Decimal("-100.00"), Decimal("100.00")),
+    ),
+)
+def test_deficit_is_only_presented_for_negative_equity(
+    equity: Decimal,
+    expected_deficit: Decimal,
+) -> None:
+    assets, liabilities = create_hgb_balance_sheet_structure()
+    income_statement = create_hgb_income_statement_structure()
+    positions = {
+        position.code: position
+        for position in _walk(assets) + _walk(liabilities)
+    }
+    balance_sheet = BalanceSheet(
+        assets=assets,
+        liabilities=liabilities,
+        amounts={
+            assets: Decimal("1000.00"),
+            positions["HGB.266.AKTIVA.B.IV"]: Decimal("1000.00"),
+            liabilities: Decimal("1000.00"),
+            positions["HGB.266.PASSIVA.A"]: equity,
+            positions["HGB.266.PASSIVA.A.I"]: equity,
+            positions["HGB.266.PASSIVA.C"]: Decimal("1000.00") - equity,
+            positions["HGB.266.PASSIVA.C.4"]: Decimal("1000.00") - equity,
+        },
+    )
+
+    presented = UncoveredEquityDeficitPresentationService.apply(
+        balance_sheet
+    )
+    values = GaapCi69BalanceSheetValueBuilder.build(
+        balance_sheet=presented,
+        income_statement=income_statement,
+    )
+
+    if expected_deficit:
+        assert values[("bs.ass.deficitNotCoveredByCapital",)] == expected_deficit
+        assert values[("bs.eqLiab.equity.deficitNotCoveredByCapital",)] == expected_deficit
+    else:
+        assert ("bs.ass.deficitNotCoveredByCapital",) not in values
+        assert ("bs.eqLiab.equity.deficitNotCoveredByCapital",) not in values

@@ -735,6 +735,70 @@ class VatBookingFrame(QWidget):
                 "Buchungen sind nicht mehr möglich."
             )
 
+    def update_accounts(
+        self,
+        *,
+        accounts: tuple[Account, ...],
+        vat_accounts: VatAccounts,
+    ) -> None:
+        """Aktualisiert Kontenlisten und erhält laufende Formulareingaben."""
+
+        old_accounts_by_display_name = self._accounts_by_display_name
+        old_accounts_by_number = self._accounts_by_number
+        self._accounts = accounts
+        self._vat_accounts = vat_accounts
+        self._accounts_by_display_name = {
+            self._account_display_name(account): account
+            for account in accounts
+        }
+        self._accounts_by_number = {
+            account.number: account for account in accounts
+        }
+        self._account_display_names = tuple(self._accounts_by_display_name)
+
+        self._replace_account_choices(
+            self._counter_account_box,
+            old_accounts_by_display_name=old_accounts_by_display_name,
+            old_accounts_by_number=old_accounts_by_number,
+        )
+        for row in self._position_rows:
+            account_box = row["account_box"]
+            if isinstance(account_box, QComboBox):
+                self._replace_account_choices(
+                    account_box,
+                    old_accounts_by_display_name=(
+                        old_accounts_by_display_name
+                    ),
+                    old_accounts_by_number=old_accounts_by_number,
+                )
+
+        self._update_invoice_fields()
+        self._on_form_changed()
+
+    def _replace_account_choices(
+        self,
+        combo: QComboBox,
+        *,
+        old_accounts_by_display_name: dict[str, Account],
+        old_accounts_by_number: dict[str, Account],
+    ) -> None:
+        """Ersetzt Kontenvorschläge und lässt den eingegebenen Wert stehen."""
+
+        current_text = combo.currentText()
+        account = old_accounts_by_display_name.get(current_text)
+        if account is None:
+            account = old_accounts_by_number.get(current_text.strip())
+        replacement = self._accounts_by_number.get(
+            account.number if account is not None else ""
+        )
+        if replacement is not None:
+            current_text = self._account_display_name(replacement)
+        combo.blockSignals(True)
+        combo.clear()
+        combo.addItems(self._account_display_names)
+        combo.setEditText(current_text)
+        combo.blockSignals(False)
+
     def _on_form_changed(
         self,
         *_args: object,

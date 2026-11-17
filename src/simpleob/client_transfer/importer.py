@@ -58,6 +58,9 @@ from simpleob.domain.accounting_account_roles import (
 from simpleob.domain.accounting_control_accounts import (
     AccountingControlAccounts,
 )
+from simpleob.domain.balance_sheet_presentation import (
+    BalanceSheetPresentation,
+)
 from simpleob.domain.booking import Booking
 from simpleob.domain.booking_line import BookingLine
 from simpleob.domain.booking_type import BookingType
@@ -820,6 +823,11 @@ class ClientTransferImporter:
                     ),
                 ),
                 commit=False,
+                balance_sheet_presentation=(
+                    BalanceSheetPresentation(
+                        transfer_fiscal_year.balance_sheet_presentation
+                    )
+                ),
             )
 
     def _save_fixed_asset_depreciations(

@@ -2,6 +2,11 @@ from simpleob.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
 
+NON_COVERED_EQUITY_DEFICIT_CODE = "HGB.268.3"
+NON_COVERED_EQUITY_OFFSET_CODE = (
+    "HGB.PRESENTATION.NON_COVERED_EQUITY_OFFSET"
+)
+
 
 def _create_fixed_assets() -> FinancialStatementPosition:
     self_created_intangibles = FinancialStatementPosition(
@@ -292,6 +297,14 @@ def _create_equity() -> FinancialStatementPosition:
         name="Jahresüberschuss/Jahresfehlbetrag",
     )
 
+    non_covered_equity_offset = FinancialStatementPosition(
+        code=NON_COVERED_EQUITY_OFFSET_CODE,
+        name=(
+            "Ausgleich des nicht durch Eigenkapital "
+            "gedeckten Fehlbetrags"
+        ),
+    )
+
     return FinancialStatementPosition(
         code="HGB.266.PASSIVA.A",
         name="Eigenkapital",
@@ -301,6 +314,7 @@ def _create_equity() -> FinancialStatementPosition:
             retained_earnings,
             profit_or_loss_carried_forward,
             net_income_or_loss,
+            non_covered_equity_offset,
         ),
     )
 
@@ -438,6 +452,11 @@ def _create_assets() -> FinancialStatementPosition:
         name="Aktiver Unterschiedsbetrag aus der Vermögensverrechnung",
     )
 
+    non_covered_equity_deficit = FinancialStatementPosition(
+        code=NON_COVERED_EQUITY_DEFICIT_CODE,
+        name="Nicht durch Eigenkapital gedeckter Fehlbetrag",
+    )
+
     return FinancialStatementPosition(
         code="HGB.266.AKTIVA",
         name="Aktiva",
@@ -447,6 +466,7 @@ def _create_assets() -> FinancialStatementPosition:
             prepaid_expenses,
             deferred_tax_assets,
             asset_difference_from_offsetting,
+            non_covered_equity_deficit,
         ),
     )
 

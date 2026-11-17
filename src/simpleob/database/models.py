@@ -446,6 +446,13 @@ class Wirtschaftsjahr(Base):
         default="OPEN",
     )
 
+    balance_sheet_presentation: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+        default="A",
+        server_default="A",
+    )
+
     mandant: Mapped[Mandant] = relationship(
         back_populates="wirtschaftsjahre",
     )

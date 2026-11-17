@@ -96,28 +96,9 @@ class ProfitAppropriationService:
                 "ProfitAppropriationAnnualData sein."
             )
 
-        available_amount = (
-            net_income
-            + previous_profit_loss_carryforward
-            + data.statutory_reserve_release
-            + data.other_revenue_reserves_release
-        )
-
-        appropriated_amount = (
-            data.statutory_reserve_addition
-            + data.other_revenue_reserves_addition
-            + data.distribution
-            + data.profit_loss_carryforward
-        )
-
-        errors: list[str] = []
-
-        if available_amount != appropriated_amount:
-            errors.append(
-                "Die Ergebnisverwendung ist rechnerisch "
-                "nicht ausgeglichen."
-            )
-
         return ClosingConsistencyResult(
-            errors=tuple(errors)
+            # Ein verbleibender Betrag ist der ausdrücklich darzustellende
+            # Bilanzgewinn/-verlust und muss nicht als neuer Vortrag erfasst
+            # werden.
+            errors=(),
         )

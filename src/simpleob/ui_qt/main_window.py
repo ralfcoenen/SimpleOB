@@ -40,6 +40,9 @@ from simpleob.accounting.balance_sheet import BalanceSheet
 from simpleob.accounting.financial_statement_builder import (
     FinancialStatementBuilder,
 )
+from simpleob.accounting.financial_statement_context import (
+    create_financial_statement_context,
+)
 from simpleob.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
@@ -61,6 +64,9 @@ from simpleob.database.lock_error import DatabaseLockError
 from simpleob.date_input import GermanDateEdit
 from simpleob.domain.account import Account
 from simpleob.domain.account_type import AccountType
+from simpleob.domain.balance_sheet_presentation import (
+    BalanceSheetPresentation,
+)
 from simpleob.domain.booking_type import BookingType
 from simpleob.domain.chart_of_accounts_template import (
     ChartOfAccountsTemplate,
@@ -111,18 +117,23 @@ from simpleob.services.pdf_reporting_service import PdfReportingService
 from simpleob.services.receivable_invoice_posting_service import (
     ReceivableInvoicePostingService,
 )
+from simpleob.services.uncovered_equity_deficit_presentation_service import (
+    UncoveredEquityDeficitPresentationService,
+)
 from simpleob.ui_qt.account_configuration_dialog import (
     AccountConfigurationDialog,
 )
 from simpleob.ui_qt.account_editor_dialog import AccountEditorDialog
+from simpleob.ui_qt.account_table_helpers import (
+    AccountNumberTableWidgetItem,
+    select_account_row,
+    set_default_account_sort,
+)
 from simpleob.ui_qt.balance_sheet_frame import BalanceSheetFrame
 from simpleob.ui_qt.booking_frame import BookingFrame
 from simpleob.ui_qt.closing_frame import ClosingFrame
 from simpleob.ui_qt.company_master_data_dialog import (
     CompanyMasterDataDialog,
-)
-from simpleob.ui_qt.e_bilanz_account_mapping_dialog import (
-    EBilanzAccountMappingDialog,
 )
 from simpleob.ui_qt.e_bilanz_frame import EBilanzFrame
 from simpleob.ui_qt.elster_data_supplier_dialog import (
@@ -284,6 +295,7 @@ class MainWindow(QMainWindow):
         self._eric_data_supplier = eric_data_supplier
         self._current_income_statement: IncomeStatement | None = None
         self._current_closing_result: ClosingResult | None = None
+        self._current_raw_balance_sheet: BalanceSheet | None = None
         self._current_balance_sheet: BalanceSheet | None = None
         self._current_closing_balances = ()
 
@@ -800,6 +812,7 @@ class MainWindow(QMainWindow):
         try:
             preparation = self._workspace.prepare_e_bilanz(
                 income_statement=self._current_income_statement,
+                chart_of_accounts=self._chart_of_accounts,
             )
             evaluation = self._workspace.build_bvv_evaluation(
                 preparation=preparation,
@@ -960,6 +973,7 @@ class MainWindow(QMainWindow):
         try:
             preparation = self._workspace.prepare_e_bilanz(
                 income_statement=self._current_income_statement,
+                chart_of_accounts=self._chart_of_accounts,
             )
         except ValueError as exc:
             QMessageBox.critical(
@@ -1685,6 +1699,7 @@ class MainWindow(QMainWindow):
         try:
             preparation = self._workspace.prepare_e_bilanz(
                 income_statement=self._current_income_statement,
+                chart_of_accounts=self._chart_of_accounts,
             )
             evaluation = self._workspace.build_bvv_evaluation(
                 preparation=preparation,
@@ -2060,24 +2075,14 @@ class MainWindow(QMainWindow):
         )
         button_layout.addWidget(self._delete_account_button)
 
-        self._e_bilanz_mapping_button = QPushButton(
-            "E-Bilanz-Zuordnung"
+        self._activate_chart_button = QPushButton(
+            "Kontenrahmen aktivieren"
         )
-        self._e_bilanz_mapping_button.clicked.connect(
-            self._open_e_bilanz_account_mapping
+        self._activate_chart_button.setEnabled(False)
+        self._activate_chart_button.clicked.connect(
+            self._activate_chart_changes
         )
-
-        button_layout.addWidget(
-            self._e_bilanz_mapping_button
-        )
-
-        self._e_bilanz_mapping_label = QLabel(
-            "Zuordnung: –"
-        )
-        button_layout.addWidget(
-            self._e_bilanz_mapping_label,
-            1,
-        )
+        button_layout.addWidget(self._activate_chart_button)
 
         button_layout.addStretch()
 
@@ -2111,10 +2116,6 @@ class MainWindow(QMainWindow):
             QAbstractItemView.SelectionMode.ExtendedSelection
         )
         self._account_table.setAlternatingRowColors(True)
-        self._account_table.itemSelectionChanged.connect(
-            self._refresh_e_bilanz_mapping_label
-        )
-
         header = self._account_table.horizontalHeader()
         header.setSectionResizeMode(
             0,
@@ -2140,6 +2141,8 @@ class MainWindow(QMainWindow):
             5,
             QHeaderView.ResizeMode.ResizeToContents,
         )
+
+        set_default_account_sort(self._account_table)
 
         layout.addWidget(self._account_table)
 
@@ -2380,7 +2383,7 @@ class MainWindow(QMainWindow):
     def _update_editing_state(self) -> None:
         """Aktualisiert den Bearbeitungszustand des Geschäftsjahres."""
 
-        enabled = self._workspace.is_open
+        enabled = self._workspace.is_open and not self._account_editing_mode
 
         self._booking_frame.set_enabled(enabled)
         self._vat_booking_frame.set_enabled(enabled)
@@ -2532,7 +2535,12 @@ class MainWindow(QMainWindow):
     ) -> None:
         """Verbucht und speichert eine Buchung."""
 
-        if self._workspace.is_closed:
+        if (
+            self._workspace.is_closed
+            and self._workspace.managed_fiscal_year
+            .balance_sheet_presentation
+            is BalanceSheetPresentation.AFTER_APPROPRIATION
+        ):
             return
 
         if not self._confirm_op_control_account_booking(booking):
@@ -4592,7 +4600,10 @@ class MainWindow(QMainWindow):
 
         managed_fiscal_year = self._workspace.managed_fiscal_year
 
-        if managed_fiscal_year.status is not FiscalYearStatus.CLOSED:
+        if managed_fiscal_year.status not in (
+            FiscalYearStatus.OPEN,
+            FiscalYearStatus.CLOSED,
+        ):
             return
 
         if self._current_closing_result is None:
@@ -4684,6 +4695,7 @@ class MainWindow(QMainWindow):
             return
 
         self._invalidate_built_e_bilanz()
+        self._refresh_balance_sheet()
         self._refresh_closing()
 
         QMessageBox.information(
@@ -4846,7 +4858,7 @@ class MainWindow(QMainWindow):
         if (
             self._current_income_statement is None
             or self._current_closing_result is None
-            or self._current_balance_sheet is None
+            or self._current_raw_balance_sheet is None
         ):
             return
 
@@ -4877,7 +4889,7 @@ class MainWindow(QMainWindow):
             return
 
         result = self._workspace.validate_closing(
-            balance_sheet=self._current_balance_sheet,
+            balance_sheet=self._current_raw_balance_sheet,
             income_statement=self._current_income_statement,
             closing_result=self._current_closing_result,
             balances=self._current_closing_balances,
@@ -5020,10 +5032,75 @@ class MainWindow(QMainWindow):
         if answer != QMessageBox.StandardButton.Yes:
             return
 
+        presentation_box = QMessageBox(self)
+        presentation_box.setWindowTitle("Bilanzdarstellung")
+        presentation_box.setText(
+            "Welche Bilanzdarstellung soll für dieses Geschäftsjahr "
+            "festgeschrieben werden?"
+        )
+        presentation_box.setInformativeText(
+            "Variante A zeigt die Bilanz vor Ergebnisverwendung. "
+            "Variante B berücksichtigt die erfasste Ergebnisverwendung."
+        )
+        variant_a = presentation_box.addButton(
+            "Variante A – vor Ergebnisverwendung",
+            QMessageBox.ButtonRole.AcceptRole,
+        )
+        variant_b = presentation_box.addButton(
+            "Variante B – nach Ergebnisverwendung",
+            QMessageBox.ButtonRole.AcceptRole,
+        )
+        cancel_presentation = presentation_box.addButton(
+            "Abbrechen",
+            QMessageBox.ButtonRole.RejectRole,
+        )
+        presentation_box.setDefaultButton(variant_a)
+        presentation_box.exec()
+        if presentation_box.clickedButton() is cancel_presentation:
+            return
+        if presentation_box.clickedButton() not in (variant_a, variant_b):
+            return
+        balance_sheet_presentation = (
+            BalanceSheetPresentation.AFTER_APPROPRIATION
+            if presentation_box.clickedButton() is variant_b
+            else BalanceSheetPresentation.BEFORE_APPROPRIATION
+        )
+        if (
+            balance_sheet_presentation
+            is BalanceSheetPresentation.AFTER_APPROPRIATION
+        ):
+            if self._current_raw_balance_sheet is None:
+                QMessageBox.warning(
+                    self,
+                    "Bilanzdarstellung",
+                    "Variante B kann ohne eine ausgeglichene Bilanz "
+                    "nicht geprüft werden.",
+                )
+                return
+            try:
+                self._workspace.apply_balance_sheet_presentation(
+                    balance_sheet=self._current_raw_balance_sheet,
+                    net_income=self._closing_service.calculate_net_income(
+                        income_statement=self._current_income_statement
+                    ),
+                    chart_of_accounts=self._chart_of_accounts,
+                    presentation=balance_sheet_presentation,
+                )
+            except (ValueError, RuntimeError) as exc:
+                QMessageBox.warning(
+                    self,
+                    "Bilanzdarstellung",
+                    str(exc),
+                )
+                return
+
         try:
             result = self._workspace.close_fiscal_year(
                 income_statement=self._current_income_statement,
                 chart_of_accounts=self._chart_of_accounts,
+                balance_sheet_presentation=(
+                    balance_sheet_presentation
+                ),
             )
         except (ValueError, DatabaseLockError) as exc:
             QMessageBox.critical(
@@ -5121,7 +5198,7 @@ class MainWindow(QMainWindow):
 
         can_edit_resolution = (
             managed_fiscal_year.status
-            is FiscalYearStatus.CLOSED
+            in (FiscalYearStatus.OPEN, FiscalYearStatus.CLOSED)
             and not resolution_locked
         )
 
@@ -5147,6 +5224,7 @@ class MainWindow(QMainWindow):
     def _refresh_balance_sheet(self) -> None:
         """Erzeugt und aktualisiert GuV und laufende Bilanz."""
 
+        self._current_raw_balance_sheet = None
         self._current_balance_sheet = None
 
         balance_sheet_account_types = (
@@ -5211,9 +5289,26 @@ class MainWindow(QMainWindow):
             income_statement=income_statement,
         )
 
+        appropriation_data = None
+        previous_carryforward = ZERO
+        appropriation_data = None
+        previous_carryforward = ZERO
+        try:
+            appropriation_data = (
+                self._workspace.load_profit_appropriation_annual_data()
+            )
+            if appropriation_data is not None:
+                previous_carryforward = (
+                    self._workspace.previous_profit_loss_carryforward()
+                )
+        except (RuntimeError, ValueError):
+            appropriation_data = None
+
         self._income_statement_frame.update_income_statement(
             income_statement=income_statement,
             net_income=net_income,
+            appropriation_data=appropriation_data,
+            previous_carryforward=previous_carryforward,
         )
 
         closing_result = ClosingResult(
@@ -5260,12 +5355,34 @@ class MainWindow(QMainWindow):
             )
             return
 
-        balance_sheet = BalanceSheet(
+        raw_balance_sheet = BalanceSheet(
             assets=self._assets,
             liabilities=self._liabilities,
             amounts=amounts,
         )
 
+        if self._workspace.is_closed:
+            try:
+                preparation = self._workspace.prepare_e_bilanz(
+                    income_statement=income_statement,
+                    chart_of_accounts=self._chart_of_accounts,
+                )
+                raw_balance_sheet = preparation.balance_sheet
+            except (ValueError, RuntimeError) as exc:
+                self._balance_sheet_frame.show_mapping_error(str(exc))
+                return
+
+        try:
+            balance_sheet = (
+                UncoveredEquityDeficitPresentationService.apply(
+                    raw_balance_sheet
+                )
+            )
+        except ValueError as exc:
+            self._balance_sheet_frame.show_mapping_error(str(exc))
+            return
+
+        self._current_raw_balance_sheet = raw_balance_sheet
         self._current_balance_sheet = balance_sheet
 
         self._balance_sheet_frame.update_balance_sheet(
@@ -5344,6 +5461,19 @@ class MainWindow(QMainWindow):
             return
 
         try:
+            appropriation_data = (
+                self._workspace.load_profit_appropriation_annual_data()
+            )
+            previous_carryforward = (
+                self._workspace.previous_profit_loss_carryforward()
+                if appropriation_data is not None
+                else ZERO
+            )
+        except (RuntimeError, ValueError):
+            appropriation_data = None
+            previous_carryforward = ZERO
+
+        try:
             exported_path = (
                 self._pdf_reporting_service.export_income_statement(
                     income_statement=(
@@ -5357,6 +5487,8 @@ class MainWindow(QMainWindow):
                         self._context.fiscal_year.display_name
                     ),
                     target=Path(filename),
+                    appropriation_data=appropriation_data,
+                    previous_carryforward=previous_carryforward,
                 )
             )
         except OSError as exc:
@@ -5385,6 +5517,23 @@ class MainWindow(QMainWindow):
             assets=self._assets,
             liabilities=self._liabilities,
             income_statement=self._income_statement,
+            taxonomy_mapping_enabled=True,
+            taxonomy_choices_provider=(
+                lambda position: (
+                    self._workspace.account_taxonomy_choices_for_position(
+                        position=position
+                    )
+                )
+            ),
+            taxonomy_concept_validator=(
+                lambda position, concept_name: (
+                    self._workspace
+                    .validate_account_taxonomy_concept_for_position(
+                        position=position,
+                        concept_name=concept_name,
+                    )
+                )
+            ),
         )
 
         dialog.exec()
@@ -5393,11 +5542,13 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            self._workspace.add_account(
+            self._workspace.save_account_with_taxonomy_mapping(
                 account=dialog.result.account,
                 mapping_rule=dialog.result.mapping_rule,
+                taxonomy_concept_name=dialog.result.taxonomy_concept_name,
+                is_new=True,
             )
-        except ValueError as exc:
+        except (ValueError, RuntimeError, DatabaseLockError) as exc:
             QMessageBox.critical(
                 self,
                 "Konto kann nicht angelegt werden",
@@ -5413,6 +5564,10 @@ class MainWindow(QMainWindow):
         ) = self._reload_chart_of_accounts()
 
         self._refresh_accounts()
+        select_account_row(
+            self._account_table,
+            dialog.result.account.number,
+        )
 
         QMessageBox.information(
             self,
@@ -5423,153 +5578,6 @@ class MainWindow(QMainWindow):
                 "öffnen Sie sie erneut, damit der geänderte "
                 "Kontenrahmen vollständig wirksam wird."
             ),
-        )
-
-    def _open_e_bilanz_account_mapping(self) -> None:
-        """Bearbeitet die E-Bilanz-Zuordnung des ausgewählten Kontos."""
-
-        selected_rows = (
-            self._account_table.selectionModel().selectedRows()
-        )
-
-        if not selected_rows:
-            QMessageBox.information(
-                self,
-                "E-Bilanz-Zuordnung",
-                "Bitte wählen Sie zuerst ein Konto aus.",
-            )
-            return
-
-        if len(selected_rows) > 1:
-            QMessageBox.information(
-                self,
-                "E-Bilanz-Zuordnung",
-                "Bitte wählen Sie für die Zuordnung genau ein Konto aus.",
-            )
-            return
-
-        row = selected_rows[0].row()
-
-        account_number_item = self._account_table.item(
-            row,
-            0,
-        )
-
-        if account_number_item is None:
-            return
-
-        account_number = account_number_item.text()
-
-        account = next(
-            (
-                item
-                for item in self._accounts
-                if item.number == account_number
-            ),
-            None,
-        )
-
-        if account is None:
-            QMessageBox.critical(
-                self,
-                "E-Bilanz-Zuordnung",
-                "Das ausgewählte Konto wurde nicht gefunden.",
-            )
-            return
-
-        try:
-            mappings = self._workspace.load_account_taxonomy_concepts()
-        except (ValueError, DatabaseLockError) as exc:
-            QMessageBox.critical(
-                self,
-                "E-Bilanz-Zuordnung",
-                str(exc),
-            )
-            return
-
-        current_concept_name = mappings.get(account_number)
-        choices: tuple[tuple[str, str], ...] = ()
-        validation_error: str | None = None
-        try:
-            choices = self._workspace.account_taxonomy_choices(
-                account_number=account_number,
-                chart_of_accounts=self._chart_of_accounts,
-            )
-        except (OSError, RuntimeError, ValueError) as exc:
-            validation_error = str(exc)
-
-        if (
-            current_concept_name is not None
-            and validation_error is None
-            and current_concept_name
-            not in {concept for concept, _label in choices}
-        ):
-            try:
-                self._workspace.validate_account_taxonomy_concept(
-                    account_number=account_number,
-                    chart_of_accounts=self._chart_of_accounts,
-                    concept_name=current_concept_name,
-                )
-            except (OSError, RuntimeError, ValueError) as exc:
-                validation_error = str(exc)
-
-        if not choices and current_concept_name is None:
-            QMessageBox.information(
-                self,
-                "E-Bilanz-Zuordnung",
-                validation_error
-                or (
-                    "Für die HGB-Zuordnung dieses Kontos stehen keine "
-                    "eindeutigen E-Bilanz-Taxonomiepositionen zur Auswahl."
-                ),
-            )
-            return
-
-        dialog = EBilanzAccountMappingDialog(
-            self,
-            account_number=account.number,
-            account_name=account.name,
-            choices=choices,
-            current_concept_name=current_concept_name,
-            current_concept_error=validation_error,
-        )
-
-        dialog.exec()
-
-        if not dialog.saved:
-            return
-
-        if dialog.result == current_concept_name:
-            return
-
-        try:
-            self._workspace.save_account_taxonomy_concept(
-                account_number=account_number,
-                concept_name=dialog.result,
-            )
-        except ValueError as exc:
-            QMessageBox.critical(
-                self,
-                "E-Bilanz-Zuordnung",
-                str(exc),
-            )
-            return
-
-        if dialog.result is None:
-            message = (
-                "Die E-Bilanz-Zuordnung wurde entfernt."
-            )
-        else:
-            message = (
-                "Die E-Bilanz-Zuordnung wurde gespeichert."
-            )
-
-        self._refresh_accounts()
-
-        QMessageBox.information(
-            self,
-            "E-Bilanz-Zuordnung",
-            message,
         )
 
     def _open_edit_account(self) -> None:
@@ -5618,18 +5626,6 @@ class MainWindow(QMainWindow):
             *self._vat_accounts.account_numbers,
         }
 
-        if account_number in technical_account_numbers:
-            QMessageBox.information(
-                self,
-                "Konto bearbeiten",
-                (
-                    "Dieses Konto ist als technisches "
-                    "Steuerungskonto konfiguriert und kann "
-                    "hier nicht bearbeitet werden."
-                ),
-            )
-            return
-
         account = next(
             (
                 item
@@ -5644,6 +5640,23 @@ class MainWindow(QMainWindow):
                 self,
                 "Konto bearbeiten",
                 "Das ausgewählte Konto wurde nicht gefunden.",
+            )
+            return
+
+        try:
+            taxonomy_concept_name = (
+                self._workspace.load_account_taxonomy_concepts().get(
+                    account_number
+                )
+            )
+            account_type_locked = self._workspace.account_has_bookings(
+                account_number=account_number
+            )
+        except (ValueError, RuntimeError, DatabaseLockError) as exc:
+            QMessageBox.critical(
+                self,
+                "Konto bearbeiten",
+                str(exc),
             )
             return
 
@@ -5664,6 +5677,28 @@ class MainWindow(QMainWindow):
             income_statement=self._income_statement,
             account=account,
             mapping_rule=mapping_rule,
+            taxonomy_mapping_enabled=True,
+            taxonomy_concept_name=taxonomy_concept_name,
+            taxonomy_choices_provider=(
+                lambda position: (
+                    self._workspace.account_taxonomy_choices_for_position(
+                        position=position
+                    )
+                )
+            ),
+            taxonomy_concept_validator=(
+                lambda position, concept_name: (
+                    self._workspace
+                    .validate_account_taxonomy_concept_for_position(
+                        position=position,
+                        concept_name=concept_name,
+                    )
+                )
+            ),
+            protect_technical_fields=(
+                account_number in technical_account_numbers
+            ),
+            account_type_locked=account_type_locked,
         )
 
         dialog.exec()
@@ -5672,11 +5707,13 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            self._workspace.update_account(
+            self._workspace.save_account_with_taxonomy_mapping(
                 account=dialog.result.account,
                 mapping_rule=dialog.result.mapping_rule,
+                taxonomy_concept_name=dialog.result.taxonomy_concept_name,
+                is_new=False,
             )
-        except ValueError as exc:
+        except (ValueError, RuntimeError, DatabaseLockError) as exc:
             QMessageBox.critical(
                 self,
                 "Konto kann nicht geändert werden",
@@ -5692,6 +5729,10 @@ class MainWindow(QMainWindow):
         ) = self._reload_chart_of_accounts()
 
         self._refresh_accounts()
+        select_account_row(
+            self._account_table,
+            account_number,
+        )
 
         QMessageBox.information(
             self,
@@ -6113,72 +6154,8 @@ class MainWindow(QMainWindow):
             "Die Kontenkonfiguration wurde gespeichert.",
         )
 
-    def _refresh_e_bilanz_mapping_label(self) -> None:
-        """Zeigt die E-Bilanz-Zuordnung des ausgewählten Kontos."""
-
-        selected_rows = (
-            self._account_table.selectionModel().selectedRows()
-        )
-
-        if not selected_rows:
-            self._e_bilanz_mapping_label.setText(
-                "Zuordnung: –"
-            )
-            return
-
-        row = selected_rows[0].row()
-
-        account_number_item = self._account_table.item(
-            row,
-            0,
-        )
-
-        if account_number_item is None:
-            self._e_bilanz_mapping_label.setText(
-                "Zuordnung: –"
-            )
-            return
-
-        account_number = account_number_item.text()
-
-        mappings = (
-            self._workspace.load_account_taxonomy_concepts()
-        )
-        concept_name = mappings.get(account_number)
-
-        if concept_name is None:
-            self._e_bilanz_mapping_label.setText(
-                "Zuordnung: keine spezielle Zuordnung"
-            )
-            return
-
-        try:
-            choices = self._workspace.account_taxonomy_choices(
-                account_number=account_number,
-                chart_of_accounts=self._chart_of_accounts,
-            )
-        except (OSError, RuntimeError, ValueError):
-            self._e_bilanz_mapping_label.setText(
-                "Zuordnung: nicht geprüft (Taxonomiemodell nicht verfügbar)"
-            )
-            return
-
-        label_by_concept = {
-            choice_concept_name: label
-            for choice_concept_name, label in choices
-        }
-
-        label = label_by_concept.get(
-            concept_name,
-            concept_name,
-        )
-
-        self._e_bilanz_mapping_label.setText(
-            f"Zuordnung: {label}"
-        )
-
     def _activate_account_editing_mode(self) -> None:
-        """Sperrt die Buchhaltung bis zum erneuten Öffnen."""
+        """Markiert gespeicherte Kontenänderungen als noch nicht aktiviert."""
 
         if self._account_editing_mode:
             return
@@ -6193,6 +6170,11 @@ class MainWindow(QMainWindow):
             )
 
         self._notebook.setCurrentWidget(self._accounts_tab)
+        self._activate_chart_button.setEnabled(True)
+
+        self._booking_frame.set_enabled(False)
+        self._vat_booking_frame.set_enabled(False)
+        self._booking_mode_box.setEnabled(False)
 
         # Mandantenbezogene Verwaltungsfunktionen sperren.
         self._company_master_data_button.setEnabled(False)
@@ -6206,15 +6188,12 @@ class MainWindow(QMainWindow):
         self._elster_certificate_action.setEnabled(False)
         self._elster_data_supplier_action.setEnabled(False)
 
-        # E-Bilanz-Zuordnungen sperren.
-        self._e_bilanz_mapping_button.setEnabled(False)
-
         # Buchhaltung wechseln bleibt verfügbar.
         self._return_to_start_button.setEnabled(True)
 
         self.statusBar().showMessage(
-            "Kontenrahmen geändert – bitte Buchhaltung "
-            "schließen und erneut öffnen."
+            "Kontenrahmenänderungen gespeichert. Bitte „Kontenrahmen "
+            "aktivieren“ wählen, bevor Sie weiterarbeiten."
         )
 
         QMessageBox.information(
@@ -6223,20 +6202,239 @@ class MainWindow(QMainWindow):
             (
                 "Die Änderung am Kontenrahmen wurde gespeichert.\n\n"
                 "Damit keine Buchungen oder Auswertungen mit einem "
-                "teilweise aktualisierten Kontenrahmen erfolgen, "
-                "sind die übrigen Buchhaltungsfunktionen "
-                "vorübergehend gesperrt.\n\n"
-                "Sie können weiterhin Konten anlegen, bearbeiten, "
-                "löschen, aktivieren und deaktivieren.\n\n"
-                "Um die Änderungen vollständig wirksam zu machen "
-                "und alle Funktionen wieder freizugeben, klicken "
-                "Sie auf „Buchhaltung wechseln“ und öffnen "
-                "Sie den Mandanten erneut."
+                "veralteten Kontenrahmendaten erfolgen, bleiben die "
+                "Buchhaltungsfunktionen bis zur Aktivierung gesperrt.\n\n"
+                "Klicken Sie auf „Kontenrahmen aktivieren“, um die "
+                "Änderungen in der laufenden Buchhaltung zu übernehmen. "
+                "Mandant und Geschäftsjahr bleiben dabei geöffnet."
             ),
         )
 
+    def _activate_chart_changes(self) -> None:
+        """Lädt Kontenrahmen und abhängige Komponenten neu in die Sitzung."""
+
+        if not self._account_editing_mode:
+            return
+
+        selected_account_number = self._selected_account_number()
+        current_tab = self._notebook.currentWidget()
+
+        try:
+            chart_of_accounts, accounts = self._reload_chart_of_accounts()
+            control_accounts, vat_accounts, _account_roles = (
+                self._workspace.load_account_configuration()
+            )
+            financial_context = create_financial_statement_context(
+                assets=self._assets,
+                liabilities=self._liabilities,
+                income_statement=self._income_statement,
+                chart_of_accounts=chart_of_accounts,
+                accounts=accounts,
+            )
+            closing_accounts = ClosingAccounts(
+                income_summary_account=(
+                    control_accounts.income_summary_account
+                ),
+                profit_account=control_accounts.profit_account,
+                loss_account=control_accounts.loss_account,
+            )
+            closing_service = ClosingService(
+                closing_accounts=closing_accounts,
+            )
+
+            self._workspace.activate_chart_context(
+                closing_service=closing_service,
+                statement_builder=financial_context.statement_builder,
+                income_statement_position=financial_context.income_statement,
+                account_types=financial_context.account_types,
+                account_mapper=financial_context.account_mapper,
+                accounts=financial_context.accounts,
+                income_summary_account_number=(
+                    control_accounts.income_summary_account
+                ),
+            )
+
+            self._chart_of_accounts = chart_of_accounts
+            self._accounts = accounts
+            self._financial_statement_builder = (
+                financial_context.statement_builder
+            )
+            self._account_types = financial_context.account_types
+            self._account_mapper = financial_context.account_mapper
+            self._closing_accounts = closing_accounts
+            self._closing_service = closing_service
+            self._opening_balance_account_number = (
+                control_accounts.opening_balance_account
+            )
+            self._opening_balance_service = OpeningBalanceService(
+                opening_balance_account_number=(
+                    self._opening_balance_account_number
+                ),
+            )
+            self._depreciation_expense_account_number = (
+                control_accounts.depreciation_expense_account
+            )
+            self._vat_accounts = vat_accounts
+
+            contribution_account_numbers = frozenset(
+                rule.account_number
+                for rule in chart_of_accounts.account_mapping_rules
+                if (
+                    rule.credit_position is not None
+                    and rule.credit_position.code
+                    in {
+                        "HGB.266.PASSIVA.A.I",
+                        "HGB.266.PASSIVA.A.II",
+                    }
+                )
+            )
+            technical_account_numbers = {
+                control_accounts.opening_balance_account,
+                control_accounts.income_summary_account,
+                control_accounts.profit_account,
+                control_accounts.loss_account,
+            }
+            manual_bookable_accounts = tuple(
+                account
+                for account in accounts
+                if account.is_active
+                and account.number not in technical_account_numbers
+            )
+            vat_blocked_account_numbers = {
+                *technical_account_numbers,
+                *vat_accounts.account_numbers,
+            }
+            vat_bookable_accounts = tuple(
+                account
+                for account in accounts
+                if account.is_active
+                and account.number not in vat_blocked_account_numbers
+            )
+            self._booking_frame.update_accounts(
+                accounts=manual_bookable_accounts,
+                equity_contribution_account_numbers=(
+                    contribution_account_numbers
+                ),
+            )
+            self._vat_booking_frame.update_accounts(
+                accounts=vat_bookable_accounts,
+                vat_accounts=vat_accounts,
+            )
+            self._reports_widget.update_accounts(
+                accounts=accounts,
+                opening_balance_account_number=(
+                    self._opening_balance_account_number
+                ),
+            )
+
+            self._current_income_statement = None
+            self._current_closing_result = None
+            self._current_raw_balance_sheet = None
+            self._current_balance_sheet = None
+            self._current_closing_balances = ()
+            self._current_e_bilanz_preparation = None
+            self._current_e_bilanz_document = None
+            self._current_e_bilanz_arelle_valid = False
+
+            self._refresh_accounts()
+            self._refresh_journal()
+            self._refresh_balance_sheet()
+            self._refresh_closing()
+            self._refresh_e_bilanz_availability()
+            if self._company_master_data.supports_e_bilanz:
+                self._refresh_taxonomy_status()
+                self._refresh_bvv_evaluation()
+                self._refresh_e_bilanz()
+
+            if selected_account_number is not None:
+                select_account_row(
+                    self._account_table,
+                    selected_account_number,
+                )
+
+            self._account_editing_mode = False
+            self._activate_chart_button.setEnabled(False)
+            for index in range(self._notebook.count()):
+                widget = self._notebook.widget(index)
+                self._notebook.setTabEnabled(
+                    index,
+                    widget is not self._e_bilanz_tab
+                    or self._company_master_data.supports_e_bilanz,
+                )
+            self._company_master_data_button.setEnabled(True)
+            self._kr_settings_button.setEnabled(True)
+            self._shareholders_button.setEnabled(True)
+            self._account_configuration_button.setEnabled(True)
+            self._export_company_button.setEnabled(
+                self._export_client_transfer is not None
+            )
+            self._elster_certificate_action.setEnabled(True)
+            self._elster_data_supplier_action.setEnabled(True)
+            self._return_to_start_button.setEnabled(True)
+            self._notebook.setCurrentWidget(
+                current_tab
+                if current_tab is not None
+                and self._notebook.isTabEnabled(
+                    self._notebook.indexOf(current_tab)
+                )
+                else self._accounts_tab
+            )
+            self._update_editing_state()
+            self.statusBar().showMessage(
+                "Der Kontenrahmen wurde für die laufende Buchhaltung aktiviert."
+            )
+        except Exception as exc:
+            # Geschäftsbereiche bleiben gesperrt, bis ein vollständiger
+            # erneuter Versuch erfolgreich abgeschlossen wurde.
+            self._account_editing_mode = True
+            self._activate_chart_button.setEnabled(True)
+            for index in range(self._notebook.count()):
+                self._notebook.setTabEnabled(
+                    index,
+                    self._notebook.widget(index) is self._accounts_tab,
+                )
+            self._notebook.setCurrentWidget(self._accounts_tab)
+            self._booking_frame.set_enabled(False)
+            self._vat_booking_frame.set_enabled(False)
+            self._booking_mode_box.setEnabled(False)
+            self._opening_balance_button.setEnabled(False)
+            self._company_master_data_button.setEnabled(False)
+            self._kr_settings_button.setEnabled(False)
+            self._shareholders_button.setEnabled(False)
+            self._account_configuration_button.setEnabled(False)
+            self._export_company_button.setEnabled(False)
+            self._elster_certificate_action.setEnabled(False)
+            self._elster_data_supplier_action.setEnabled(False)
+            QMessageBox.critical(
+                self,
+                "Kontenrahmen konnte nicht aktiviert werden",
+                "Die aktualisierten Kontenrahmendaten konnten nicht "
+                "vollständig übernommen werden. Buchungen und Auswertungen "
+                "bleiben gesperrt. Sie können die Aktivierung erneut "
+                f"versuchen.\n\n{exc}",
+            )
+
+    def _selected_account_number(self) -> str | None:
+        """Liefert die Kontonummer der aktuellen Tabellenzeile."""
+
+        selected_rows = self._account_table.selectionModel().selectedRows()
+        row = (
+            selected_rows[0].row()
+            if selected_rows
+            else self._account_table.currentRow()
+        )
+        if row < 0:
+            return None
+        item = self._account_table.item(row, 0)
+        return item.text() if item is not None else None
+
     def _refresh_accounts(self) -> None:
         """Aktualisiert die Kontenübersicht."""
+
+        header = self._account_table.horizontalHeader()
+        sort_column = header.sortIndicatorSection()
+        sort_order = header.sortIndicatorOrder()
+        self._account_table.setSortingEnabled(False)
 
         account_taxonomy_concepts = (
             self._workspace.load_account_taxonomy_concepts()
@@ -6286,7 +6484,11 @@ class MainWindow(QMainWindow):
             )
 
             for column, value in enumerate(values):
-                item = QTableWidgetItem(str(value))
+                item = (
+                    AccountNumberTableWidgetItem(str(value))
+                    if column == 0
+                    else QTableWidgetItem(str(value))
+                )
 
                 if column in (2, 3, 4):
                     item.setTextAlignment(
@@ -6304,8 +6506,9 @@ class MainWindow(QMainWindow):
                     item,
                 )
 
+        self._account_table.sortItems(sort_column, sort_order)
+        self._account_table.setSortingEnabled(True)
         self._account_table.resizeRowsToContents()
-        self._refresh_e_bilanz_mapping_label()
 
     @staticmethod
     def _format_amount(amount: object) -> str:

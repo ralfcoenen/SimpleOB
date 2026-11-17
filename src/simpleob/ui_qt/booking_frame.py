@@ -272,6 +272,61 @@ class BookingFrame(QWidget):
                 "Buchungen sind nicht mehr möglich."
             )
 
+    def update_accounts(
+        self,
+        *,
+        accounts: tuple[Account, ...],
+        equity_contribution_account_numbers: frozenset[str],
+    ) -> None:
+        """Aktualisiert die Kontenauswahl, ohne Eingaben zu verwerfen."""
+
+        old_accounts_by_display_name = self._accounts_by_display_name
+        old_accounts_by_number = {
+            account.number: account for account in self._accounts
+        }
+        self._accounts = accounts
+        self._accounts_by_display_name = {
+            self._account_display_name(account): account
+            for account in accounts
+        }
+        self._account_display_names = tuple(self._accounts_by_display_name)
+        self._equity_contribution_account_numbers = (
+            equity_contribution_account_numbers
+        )
+
+        for row in self._rows:
+            old_text = row.account_entry.text()
+            old_account = old_accounts_by_display_name.get(old_text)
+            if old_account is None:
+                old_account = old_accounts_by_number.get(old_text.strip())
+            completer = QCompleter(
+                self._account_display_names,
+                row.account_entry,
+            )
+            completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+            completer.setFilterMode(Qt.MatchFlag.MatchContains)
+            completer.setCompletionMode(
+                QCompleter.CompletionMode.PopupCompletion
+            )
+            completer.setMaxVisibleItems(12)
+            row.account_entry.setCompleter(completer)
+            row.completer = completer
+            current_account = next(
+                (
+                    account
+                    for account in accounts
+                    if old_account is not None
+                    and account.number == old_account.number
+                ),
+                None,
+            )
+            row.account_entry.setText(
+                current_account.number
+                if current_account is not None
+                else old_text
+            )
+            self._on_account_changed(row)
+
     def _append_empty_row(self) -> None:
         """Fügt am Tabellenende eine leere Buchungszeile hinzu."""
 

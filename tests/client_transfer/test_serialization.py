@@ -113,6 +113,7 @@ def _build_transfer() -> ClientTransfer:
                     end_date=date(2026, 12, 31),
                     status="OPEN",
                     opening_source=None,
+                    balance_sheet_presentation="B",
                     bookings=(
                         ClientTransferBooking(
                             booking_id=BOOKING_ID,
@@ -153,6 +154,20 @@ def test_legacy_transfer_without_kr_settings_remains_readable() -> None:
     restored = client_transfer_from_json(json.dumps(data))
 
     assert restored.client.kr_settings is None
+
+
+def test_legacy_transfer_without_balance_presentation_defaults_to_a() -> None:
+    data = client_transfer_to_dict(_build_transfer())
+    data["client"]["fiscal_years"][0].pop(
+        "balance_sheet_presentation"
+    )
+
+    restored = client_transfer_from_json(json.dumps(data))
+
+    assert (
+        restored.client.fiscal_years[0].balance_sheet_presentation
+        == "A"
+    )
 
 
 def test_kr_settings_are_serialized_with_calendar_years() -> None:

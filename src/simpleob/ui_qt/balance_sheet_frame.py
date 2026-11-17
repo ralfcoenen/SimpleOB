@@ -15,7 +15,6 @@ from simpleob.accounting.balance_sheet import BalanceSheet
 from simpleob.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
-from simpleob.domain.money import ZERO
 
 
 class BalanceSheetFrame(QWidget):
@@ -162,7 +161,7 @@ class BalanceSheetFrame(QWidget):
             position
         )
 
-        if amount == ZERO:
+        if not balance_sheet.has_nonzero_amount_in_subtree(position):
             return
 
         item = QTreeWidgetItem(

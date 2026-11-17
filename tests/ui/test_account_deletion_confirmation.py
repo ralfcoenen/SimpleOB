@@ -7,7 +7,6 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QTableWidget,
-    QTableWidgetItem,
 )
 
 from simpleob.domain.account import Account
@@ -17,6 +16,10 @@ from simpleob.domain.chart_of_accounts_template import (
 )
 from simpleob.domain.template_account import TemplateAccount
 from simpleob.ui_qt import main_window as main_window_module
+from simpleob.ui_qt.account_table_helpers import (
+    AccountNumberTableWidgetItem,
+    set_default_account_sort,
+)
 from simpleob.ui_qt.main_window import MainWindow
 
 
@@ -87,8 +90,14 @@ def test_cancel_is_default_and_keeps_multi_selection_unchanged(monkeypatch):
     window._account_table.setSelectionMode(
         QAbstractItemView.SelectionMode.ExtendedSelection
     )
-    for row, number in enumerate(("7000", "7001", "7002")):
-        window._account_table.setItem(row, 0, QTableWidgetItem(number))
+    numbers = ("100", "20", "3")
+    for row, number in enumerate(numbers):
+        window._account_table.setItem(
+            row,
+            0,
+            AccountNumberTableWidgetItem(number),
+        )
+    set_default_account_sort(window._account_table)
     selection = window._account_table.selectionModel()
     for row in (0, 1):
         selection.select(
@@ -102,7 +111,7 @@ def test_cancel_is_default_and_keeps_multi_selection_unchanged(monkeypatch):
                 number, f"Konto {number}", AccountType.ASSET
             )
         )
-        for number in ("7000", "7001", "7002")
+        for number in numbers
     )
     window._chart_of_accounts = ChartOfAccountsTemplate(
         "Test", tuple(account.template for account in window._accounts)
@@ -121,5 +130,120 @@ def test_cancel_is_default_and_keeps_multi_selection_unchanged(monkeypatch):
     assert "2 ausgewählten Konten" in prompt.text
     assert "Taxonomie- und HGB-Zuordnungen" in prompt.informative_text
     assert not window._workspace.deleted
+    assert {
+        window._account_table.item(index.row(), 0).text()
+        for index in window._account_table.selectionModel().selectedRows()
+    } == {"3", "20"}
+    window.close()
+    app.processEvents()
+
+
+def test_confirmed_multi_delete_uses_selected_accounts_after_sort(monkeypatch):
+    app = QApplication.instance() or QApplication([])
+
+    class Workspace:
+        is_closed = False
+
+        def __init__(self):
+            self.deleted = None
+
+        @staticmethod
+        def load_all_account_taxonomy_concepts():
+            return {}
+
+        def delete_accounts(self, *, account_numbers):
+            self.deleted = account_numbers
+            return {}
+
+    class Button:
+        def __init__(self, label):
+            self.label = label
+
+    class ConfirmingMessageBox:
+        Icon = QMessageBox.Icon
+        ButtonRole = QMessageBox.ButtonRole
+
+        def __init__(self, _parent=None):
+            self.buttons = []
+
+        def setIcon(self, _icon):
+            pass
+
+        def setWindowTitle(self, _title):
+            pass
+
+        def setText(self, _text):
+            pass
+
+        def setInformativeText(self, _text):
+            pass
+
+        def addButton(self, label, _role):
+            button = Button(label)
+            self.buttons.append(button)
+            return button
+
+        def setDefaultButton(self, _button):
+            pass
+
+        def setEscapeButton(self, _button):
+            pass
+
+        def exec(self):
+            return 0
+
+        def clickedButton(self):
+            return self.buttons[-1]
+
+    monkeypatch.setattr(main_window_module, "QMessageBox", ConfirmingMessageBox)
+    window = MainWindow.__new__(MainWindow)
+    QMainWindow.__init__(window)
+    window._account_table = QTableWidget(3, 1, window)
+    window._account_table.setSelectionBehavior(
+        QAbstractItemView.SelectionBehavior.SelectRows
+    )
+    window._account_table.setSelectionMode(
+        QAbstractItemView.SelectionMode.ExtendedSelection
+    )
+    numbers = ("100", "20", "3")
+    for row, number in enumerate(numbers):
+        window._account_table.setItem(
+            row,
+            0,
+            AccountNumberTableWidgetItem(number),
+        )
+    set_default_account_sort(window._account_table)
+    selection = window._account_table.selectionModel()
+    for row in (0, 1):
+        selection.select(
+            window._account_table.model().index(row, 0),
+            QItemSelectionModel.SelectionFlag.Select
+            | QItemSelectionModel.SelectionFlag.Rows,
+        )
+    window._accounts = tuple(
+        Account(
+            template=TemplateAccount(
+                number,
+                f"Konto {number}",
+                AccountType.ASSET,
+            )
+        )
+        for number in numbers
+    )
+    window._chart_of_accounts = ChartOfAccountsTemplate(
+        "Test",
+        tuple(account.template for account in window._accounts),
+    )
+    window._workspace = Workspace()
+    window._activate_account_editing_mode = lambda: None
+    window._reload_chart_of_accounts = lambda: (
+        window._chart_of_accounts,
+        window._accounts,
+    )
+    window._refresh_accounts = lambda: None
+
+    MainWindow._delete_selected_accounts(window)
+
+    assert window._workspace.deleted == ("3", "20")
     window.close()
     app.processEvents()

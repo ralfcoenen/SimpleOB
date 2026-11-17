@@ -23,6 +23,9 @@ from simpleob.domain.accounting_account_roles import (
 from simpleob.domain.accounting_control_accounts import (
     AccountingControlAccounts,
 )
+from simpleob.domain.balance_sheet_presentation import (
+    BalanceSheetPresentation,
+)
 from simpleob.domain.booking import Booking
 from simpleob.domain.booking_line import BookingLine
 from simpleob.domain.booking_type import BookingType
@@ -174,6 +177,67 @@ def test_reconstructs_empty_workspace(
     booking_repository.list_for_fiscal_year.assert_called_once_with(
         company_id=context.company.company_id,
         fiscal_year=context.fiscal_year,
+    )
+
+
+def test_activation_reloads_ledger_before_updating_chart_services(
+    context: ApplicationContext,
+) -> None:
+    booking_repository = Mock()
+    company_repository = Mock()
+    posting_service = Mock()
+    closing_workflow = Mock()
+    e_bilanz_preparation_service = Mock()
+    e_bilanz_account_detail_service = Mock()
+    booking_repository.list_for_fiscal_year.return_value = ()
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=company_repository,
+        posting_service=posting_service,
+        closing_workflow=closing_workflow,
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=e_bilanz_preparation_service,
+        e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=e_bilanz_account_detail_service,
+        taxonomy_management_service=Mock(),
+        e_bilanz_export_service=Mock(),
+    )
+
+    closing_service = Mock()
+    statement_builder = Mock()
+    income_position = Mock()
+    account_mapper = Mock()
+    account_types = {"1210": "asset"}
+    accounts = ()
+
+    workspace.activate_chart_context(
+        closing_service=closing_service,
+        statement_builder=statement_builder,
+        income_statement_position=income_position,
+        account_types=account_types,
+        account_mapper=account_mapper,
+        accounts=accounts,
+        income_summary_account_number="9998",
+    )
+
+    assert booking_repository.list_for_fiscal_year.call_count == 2
+    closing_workflow.update_accounting_context.assert_called_once_with(
+        closing_service=closing_service,
+        statement_builder=statement_builder,
+        income_statement_position=income_position,
+        account_types=account_types,
+    )
+    e_bilanz_preparation_service.update_accounting_context.assert_called_once_with(
+        statement_builder=statement_builder,
+        closing_service=closing_service,
+        account_types=account_types,
+        income_summary_account_number="9998",
+    )
+    e_bilanz_account_detail_service.update_accounting_context.assert_called_once_with(
+        account_mapper=account_mapper,
+        accounts=accounts,
     )
 
 
@@ -2792,6 +2856,9 @@ def test_close_fiscal_year_uses_workflow_and_reloads_closed_bookings(
         ledger=ANY,
         chart_of_accounts=chart_of_accounts,
         closing_date=context.fiscal_year.end_date,
+        balance_sheet_presentation=(
+            BalanceSheetPresentation.BEFORE_APPROPRIATION
+        ),
     )
 
     assert len(workspace.journal) == 2
@@ -3122,6 +3189,97 @@ def test_rejects_e_bilanz_preparation_for_open_fiscal_year(
             ),
         )
 
+
+def test_variant_b_refuses_to_reapply_reserves_after_manual_posting(
+    context: ApplicationContext,
+) -> None:
+    booking_repository = Mock()
+    company_repository = Mock()
+    chart_repository = Mock()
+    appropriation_repository = Mock()
+    controls = AccountingControlAccounts(
+        opening_balance_account="9000",
+        income_summary_account="8990",
+        profit_account="8020",
+        loss_account="8021",
+        profit_loss_carryforward_account="2970",
+        statutory_reserve_account="2930",
+        other_revenue_reserves_account="2960",
+        distribution_liability_account="3500",
+        depreciation_expense_account="6200",
+        fixed_asset_disposal_gain_account="8820",
+        fixed_asset_disposal_loss_account="6890",
+    )
+    appropriation_repository.get_for_fiscal_year.return_value = (
+        ProfitAppropriationAnnualData(
+            statutory_reserve_addition=Decimal("100.00"),
+            other_revenue_reserves_addition=Decimal("0.00"),
+            statutory_reserve_release=Decimal("0.00"),
+            other_revenue_reserves_release=Decimal("0.00"),
+            distribution=Decimal("0.00"),
+            profit_loss_carryforward=Decimal("0.00"),
+        )
+    )
+    chart_repository.load_control_accounts.return_value = controls
+    chart_repository.load_vat_accounts.return_value = Mock(spec=VatAccounts)
+    chart_repository.load_account_roles.return_value = Mock(
+        spec=AccountingAccountRoles
+    )
+    company_repository.get_managed_fiscal_years.return_value = (
+        ManagedFiscalYear(
+            fiscal_year=context.fiscal_year,
+            status=FiscalYearStatus.CLOSED,
+            opening_source=None,
+            balance_sheet_presentation=(
+                BalanceSheetPresentation.AFTER_APPROPRIATION
+            ),
+        ),
+    )
+    booking_repository.list_for_fiscal_year.return_value = (
+        Booking(
+            booking_date=context.fiscal_year.start_date,
+            lines=(
+                BookingLine(
+                    account_number="1200",
+                    side=EntrySide.DEBIT,
+                    amount=Decimal("100.00"),
+                ),
+                BookingLine(
+                    account_number="2930",
+                    side=EntrySide.CREDIT,
+                    amount=Decimal("100.00"),
+                ),
+            ),
+        ),
+    )
+
+    workspace = FiscalYearWorkspace(
+        context=context,
+        booking_repository=booking_repository,
+        company_repository=company_repository,
+        profit_appropriation_annual_data_repository=(
+            appropriation_repository
+        ),
+        chart_of_accounts_repository=chart_repository,
+        posting_service=PostingService(),
+        closing_workflow=Mock(),
+        closing_consistency_service=Mock(),
+        e_bilanz_preparation_service=Mock(),
+        e_bilanz_service=Mock(),
+        e_bilanz_account_detail_service=Mock(),
+        taxonomy_management_service=Mock(),
+        e_bilanz_export_service=Mock(),
+    )
+
+    chart = Mock(spec=ChartOfAccountsTemplate)
+    chart.account_mapping_rules = ()
+    with pytest.raises(ValueError, match="Doppelberücksichtigung"):
+        workspace.apply_balance_sheet_presentation(
+            balance_sheet=Mock(spec=BalanceSheet),
+            net_income=Decimal("500.00"),
+            chart_of_accounts=chart,
+        )
+
 def test_builds_e_bilanz_from_prepared_data(
     context: ApplicationContext,
 ) -> None:
@@ -3203,6 +3361,9 @@ def test_builds_e_bilanz_from_prepared_data(
     )
 
     preparation = Mock()
+    preparation.balance_sheet_presentation = (
+        BalanceSheetPresentation.BEFORE_APPROPRIATION
+    )
     preparation.amounts = {
         Mock(): Decimal("100.00"),
     }
@@ -3343,6 +3504,9 @@ def test_builds_e_bilanz_from_prepared_data(
         withdrawal_distribution=Decimal("0.00"),
         profit_appropriation_data=None,
         previous_profit_loss_carryforward=Decimal("0.00"),
+        balance_sheet_presentation=(
+            BalanceSheetPresentation.BEFORE_APPROPRIATION
+        ),
     )
 
 def test_build_e_bilanz_passes_profit_appropriation_data(

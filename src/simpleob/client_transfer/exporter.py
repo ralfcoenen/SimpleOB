@@ -564,6 +564,9 @@ class ClientTransferExporter:
             start_date=fiscal_year.start_date,
             end_date=fiscal_year.end_date,
             status=managed_fiscal_year.status.value,
+            balance_sheet_presentation=(
+                managed_fiscal_year.balance_sheet_presentation.value
+            ),
             opening_source=(
                 ClientTransferFiscalYearReference(
                     start_date=(

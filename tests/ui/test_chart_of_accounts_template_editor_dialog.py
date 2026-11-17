@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
     QDialog,
+    QLineEdit,
     QMessageBox,
 )
 
@@ -362,6 +363,8 @@ def test_editor_adds_account_to_working_copy(monkeypatch):
         "simpleob.ui_qt.chart_of_accounts_template_editor_dialog.AccountEditorDialog",
         AcceptedEditor,
     )
+    dialog._table.sortItems(1, Qt.SortOrder.DescendingOrder)
+    dialog._search_entry.setText("Bank")
     dialog._add_account()
 
     assert {item.account_number for item in dialog._bundle.chart.accounts} == {
@@ -369,6 +372,37 @@ def test_editor_adds_account_to_working_copy(monkeypatch):
         "7001",
     }
     assert dialog._bundle.chart.get("7001").name == "Neues Konto"
+    assert dialog._search_entry.text() == ""
+    selected_rows = dialog._table.selectionModel().selectedRows()
+    assert len(selected_rows) == 1
+    assert dialog._table.item(selected_rows[0].row(), 0).text() == "7001"
+    assert not dialog._table.isRowHidden(selected_rows[0].row())
+    dialog.close()
+
+
+def test_template_account_table_sorts_numeric_numbers_and_keeps_multiselect():
+    _app()
+    bundle = _single_account_bundle()
+    chart = replace(
+        bundle.chart,
+        accounts=(
+            TemplateAccount("100", "Hundert", AccountType.ASSET),
+            TemplateAccount("20", "Zwanzig", AccountType.ASSET),
+            TemplateAccount("3", "Drei", AccountType.ASSET),
+        ),
+        account_mapping_rules=(),
+    )
+    dialog = _editor(replace(bundle, chart=chart))
+
+    assert dialog._table.isSortingEnabled()
+    assert [
+        dialog._table.item(row, 0).text()
+        for row in range(dialog._table.rowCount())
+    ] == ["3", "20", "100"]
+    assert dialog._table.selectionMode() == (
+        QAbstractItemView.SelectionMode.ExtendedSelection
+    )
+    dialog.close()
 
 
 def test_renumber_requires_confirmation_and_moves_all_references(monkeypatch):
@@ -1263,9 +1297,16 @@ def test_save_as_template_does_not_close_or_accept_editor(monkeypatch, tmp_path)
         lambda: accepted_calls.append(True),
     )
     messages = []
+    input_dialogs = []
+
+    def accept_template_name(input_dialog):
+        input_dialogs.append(input_dialog)
+        input_dialog.setTextValue("Meine Vorlage")
+        return QDialog.DialogCode.Accepted
+
     monkeypatch.setattr(
-        "simpleob.ui_qt.chart_of_accounts_template_editor_dialog.QInputDialog.getText",
-        lambda *_args: ("Meine Vorlage", True),
+        "simpleob.ui_qt.chart_of_accounts_template_editor_dialog.QInputDialog.exec",
+        accept_template_name,
     )
     monkeypatch.setattr(
         "simpleob.ui_qt.chart_of_accounts_template_editor_dialog.QMessageBox.information",
@@ -1278,6 +1319,7 @@ def test_save_as_template_does_not_close_or_accept_editor(monkeypatch, tmp_path)
     assert save_calls[0][0] is bundle_before_save
     assert dialog.result is None
     assert accepted_calls == []
+    assert input_dialogs[0].findChild(QLineEdit).minimumWidth() >= 440
     assert messages
     dialog.close()
 
@@ -1309,9 +1351,13 @@ def test_save_as_template_can_complete_missing_configuration(monkeypatch, tmp_pa
             or tmp_path / "templates/Ready/Ready.csv"
         ),
     )
+    def accept_ready_name(input_dialog):
+        input_dialog.setTextValue("Ready")
+        return QDialog.DialogCode.Accepted
+
     monkeypatch.setattr(
-        "simpleob.ui_qt.chart_of_accounts_template_editor_dialog.QInputDialog.getText",
-        lambda *_args: ("Ready", True),
+        "simpleob.ui_qt.chart_of_accounts_template_editor_dialog.QInputDialog.exec",
+        accept_ready_name,
     )
     monkeypatch.setattr(
         "simpleob.ui_qt.chart_of_accounts_template_editor_dialog.QMessageBox.information",
@@ -1360,6 +1406,78 @@ def test_new_company_lists_own_templates_as_individual_charts(tmp_path):
     )
     assert not dialog._is_standard_chart(chart_path)
     dialog.close()
+
+
+def test_custom_csv_picker_uses_template_directory_and_shows_full_path(
+    monkeypatch,
+    tmp_path,
+):
+    _app()
+    template_directory = tmp_path / "eigene" / "Kontenrahmen-Vorlagen"
+    template_directory.mkdir(parents=True)
+    selected_path = (
+        tmp_path
+        / "sehr-langer-verzeichnisname"
+        / "noch-ein-verzeichnis"
+        / "mein-sehr-langer-kontenrahmen.csv"
+    )
+    calls = []
+    monkeypatch.setattr(
+        "simpleob.ui_qt.new_company_dialog.QFileDialog.getOpenFileName",
+        lambda *args: (calls.append(args) or (str(selected_path), "CSV")),
+    )
+    dialog = NewCompanyDialog(
+        None,
+        repository=object(),
+        template_directory=template_directory,
+    )
+
+    dialog._select_custom_chart()
+
+    assert calls[0][2] == str(template_directory)
+    assert dialog._template_directory == template_directory
+    assert dialog._custom_chart_label.isReadOnly()
+    assert dialog._custom_chart_label.text() == str(selected_path)
+    assert dialog._custom_chart_label.toolTip() == str(selected_path)
+
+    saved_to = []
+    monkeypatch.setattr(
+        dialog._chart_importer,
+        "load",
+        lambda _path: _single_account_bundle(),
+    )
+
+    class AcceptedTemplateEditor:
+        def __init__(self, _parent, *, bundle, templates_directory, **_kwargs):
+            saved_to.append(templates_directory)
+            self.result = bundle
+
+        @staticmethod
+        def exec():
+            return QDialog.DialogCode.Accepted
+
+    monkeypatch.setattr(
+        "simpleob.ui_qt.new_company_dialog.ChartOfAccountsTemplateEditorDialog",
+        AcceptedTemplateEditor,
+    )
+    dialog._edit_chart_template()
+    assert saved_to == [template_directory]
+
+    missing_template_directory = tmp_path / "not-yet-created"
+    fallback_calls = []
+    monkeypatch.setattr(
+        "simpleob.ui_qt.new_company_dialog.QFileDialog.getOpenFileName",
+        lambda *args: (fallback_calls.append(args) or ("", "CSV")),
+    )
+    fallback_dialog = NewCompanyDialog(
+        None,
+        repository=object(),
+        template_directory=missing_template_directory,
+    )
+    fallback_dialog._select_custom_chart()
+    assert fallback_calls[0][2] == str(fallback_dialog._chart_directory)
+    dialog.close()
+    fallback_dialog.close()
 
 
 def test_new_company_shows_invalid_chart_import_as_gui_error(tmp_path, monkeypatch):

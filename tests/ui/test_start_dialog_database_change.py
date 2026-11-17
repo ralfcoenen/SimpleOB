@@ -94,6 +94,22 @@ def test_cancelled_selection_does_not_save(
     reject.assert_not_called()
 
 
+def test_start_dialog_title_uses_central_application_version(
+    monkeypatch,
+    dialog,
+):
+    monkeypatch.setattr(module, "get_application_version", lambda: "9.8.7")
+    repository = MagicMock()
+    repository.list_companies.return_value = ()
+    versioned_dialog = StartDialog(
+        repository=repository,
+        config=dialog._config,
+    )
+
+    assert versioned_dialog.windowTitle() == "SimpleOB 9.8.7 – Start"
+    versioned_dialog.close()
+
+
 def test_unchanged_database_does_not_save(
     monkeypatch,
     dialog,

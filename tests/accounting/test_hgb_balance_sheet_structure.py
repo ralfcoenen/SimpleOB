@@ -61,6 +61,10 @@ def test_hgb_assets_contain_all_main_sections() -> None:
             "HGB.266.AKTIVA.E",
             "Aktiver Unterschiedsbetrag aus der Vermögensverrechnung",
         ),
+        (
+            "HGB.268.3",
+            "Nicht durch Eigenkapital gedeckter Fehlbetrag",
+        ),
     )
     
 def test_hgb_liabilities_start_with_equity() -> None:
@@ -103,6 +107,11 @@ def test_equity_contains_all_hgb_positions() -> None:
         (
             "HGB.266.PASSIVA.A.V",
             "Jahresüberschuss/Jahresfehlbetrag",
+        ),
+        (
+            "HGB.PRESENTATION.NON_COVERED_EQUITY_OFFSET",
+            "Ausgleich des nicht durch Eigenkapital "
+            "gedeckten Fehlbetrags",
         ),
     )
 

@@ -93,6 +93,7 @@ _CONCEPT_NAMES_BY_POSITION_CODE = {
     "HGB.266.AKTIVA.C": "bs.ass.prepaidExp",
     "HGB.266.AKTIVA.D": "bs.ass.defTax",
     "HGB.266.AKTIVA.E": "bs.ass.SurplusFromOffsetting",
+    "HGB.268.3": "bs.ass.deficitNotCoveredByCapital",
 
     # Bilanz – Passiva
     "HGB.266.PASSIVA": "bs.eqLiab",
@@ -123,6 +124,9 @@ _CONCEPT_NAMES_BY_POSITION_CODE = {
     ),
     "HGB.266.PASSIVA.A.V": (
         "bs.eqLiab.equity.netIncome"
+    ),
+    "HGB.PRESENTATION.NON_COVERED_EQUITY_OFFSET": (
+        "bs.eqLiab.equity.deficitNotCoveredByCapital"
     ),
     "HGB.266.PASSIVA.B": "bs.eqLiab.accruals",
     "HGB.266.PASSIVA.B.1": (

@@ -32,6 +32,7 @@ from simpleob.core.config import (
     save_database_configuration,
 )
 from simpleob.core.context import ApplicationContext
+from simpleob.core.version import get_application_version
 from simpleob.database.booking_repository import BookingRepository
 from simpleob.database.company_repository import CompanyRepository
 from simpleob.domain.booking_type import BookingType
@@ -102,7 +103,7 @@ class StartDialog(QDialog):
             FiscalYear,
         ] = {}
 
-        window_title = "SimpleOB – Buchhaltung öffnen"
+        window_title = f"SimpleOB {get_application_version()} – Start"
 
         database_url = make_url(self._config.database_url)
 

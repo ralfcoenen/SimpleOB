@@ -199,8 +199,8 @@ class NewCompanyDialog(QDialog):
         self._edit_chart_button = QPushButton("Kontenrahmen bearbeiten …")
         self._edit_chart_button.clicked.connect(self._edit_chart_template)
         form_layout.addRow("", self._edit_chart_button)
-        self._custom_chart_label = QLabel()
-        self._custom_chart_label.setWordWrap(True)
+        self._custom_chart_label = QLineEdit()
+        self._custom_chart_label.setReadOnly(True)
         form_layout.addRow("Eigene Datei", self._custom_chart_label)
         self._save_template_configuration_box = QCheckBox(
             "Zuordnungen neben der CSV als wiederverwendbare Vorlage speichern"
@@ -562,6 +562,7 @@ class NewCompanyDialog(QDialog):
     def _on_chart_selection_changed(self, _index: int) -> None:
         self._custom_chart_path = None
         self._custom_chart_label.clear()
+        self._custom_chart_label.setToolTip("")
         self._save_template_configuration_box.setChecked(False)
         self._save_template_configuration_box.setEnabled(False)
         self._edited_chart_bundle = None
@@ -572,10 +573,15 @@ class NewCompanyDialog(QDialog):
         )
 
     def _select_custom_chart(self) -> None:
+        initial_directory = (
+            self._template_directory
+            if self._template_directory.is_dir()
+            else self._chart_directory
+        )
         filename, _ = QFileDialog.getOpenFileName(
             self,
             "Kontenrahmen-CSV auswählen",
-            "",
+            str(initial_directory),
             "Kontenrahmen-CSV (*.csv)",
         )
         if not filename:
@@ -583,6 +589,7 @@ class NewCompanyDialog(QDialog):
         self._chart_box.setCurrentIndex(-1)
         self._custom_chart_path = Path(filename)
         self._custom_chart_label.setText(str(self._custom_chart_path))
+        self._custom_chart_label.setToolTip(str(self._custom_chart_path))
         self._edited_chart_bundle = None
         self._edited_chart_source_path = None
         self._bundle_was_edited = False

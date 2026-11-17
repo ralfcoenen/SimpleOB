@@ -29,6 +29,20 @@ class EBilanzAccountDetailService:
             for account in accounts
         }
 
+    def update_accounting_context(
+        self,
+        *,
+        account_mapper: AccountMapper,
+        accounts: tuple[Account, ...],
+    ) -> None:
+        """Übernimmt aktuelle Konten und HGB-Zuordnungen."""
+
+        self._account_mapper = account_mapper
+        self._accounts = {account.number: account for account in accounts}
+        self._account_types = {
+            account.number: account.account_type for account in accounts
+        }
+
     def build(
         self,
         *,

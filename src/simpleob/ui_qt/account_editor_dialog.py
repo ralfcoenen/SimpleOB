@@ -81,6 +81,9 @@ class AccountEditorDialog(QDialog):
             Callable[[FinancialStatementPosition, str], object]
             | None
         ) = None,
+        taxonomy_mapping_enabled: bool | None = None,
+        protect_technical_fields: bool = False,
+        account_type_locked: bool = False,
     ) -> None:
         super().__init__(parent)
 
@@ -94,10 +97,24 @@ class AccountEditorDialog(QDialog):
         self._original_taxonomy_concept_name = taxonomy_concept_name
         self._taxonomy_choices_provider = taxonomy_choices_provider
         self._taxonomy_concept_validator = taxonomy_concept_validator
+        self._taxonomy_mapping_enabled = (
+            template_mode
+            or taxonomy_mapping_enabled is True
+            or taxonomy_concept_name is not None
+            or taxonomy_choices_provider is not None
+        )
+        self._protect_technical_fields = protect_technical_fields
+        self._account_type_locked = account_type_locked
         self._updating_taxonomy_choices = False
         self._taxonomy_selection_touched = False
         self._taxonomy_choice_error: str | None = None
         self._is_edit_mode = account is not None
+        self._original_debit_position = (
+            mapping_rule.debit_position if mapping_rule is not None else None
+        )
+        self._original_credit_position = (
+            mapping_rule.credit_position if mapping_rule is not None else None
+        )
 
         self.result: AccountEditorResult | None = None
 
@@ -116,7 +133,10 @@ class AccountEditorDialog(QDialog):
             if self._is_edit_mode
             else "SimpleOB – Neues Konto"
         )
-        self.setFixedSize(850, 560 if template_mode else 430)
+        self.setFixedSize(
+            850,
+            600 if self._taxonomy_mapping_enabled else 430,
+        )
 
         self._create_ui()
         self._update_mapping_choices()
@@ -126,7 +146,7 @@ class AccountEditorDialog(QDialog):
             self._name_entry.setFocus()
         else:
             self._account_number_entry.setFocus()
-        if self._template_mode:
+        if self._taxonomy_position_box is not None:
             self._update_taxonomy_choices()
 
     def _create_ui(self) -> None:
@@ -169,6 +189,12 @@ class AccountEditorDialog(QDialog):
         self._account_type_box.addItems(
             tuple(self._ACCOUNT_TYPE_LABELS)
         )
+        self._account_type_box.setEnabled(
+            not (
+                self._account_type_locked
+                or self._protect_technical_fields
+            )
+        )
         self._account_type_box.currentTextChanged.connect(
             self._on_account_type_changed
         )
@@ -201,7 +227,7 @@ class AccountEditorDialog(QDialog):
 
         self._taxonomy_position_box: QComboBox | None = None
         self._taxonomy_status_label: QLabel | None = None
-        if self._template_mode:
+        if self._taxonomy_mapping_enabled:
             self._taxonomy_position_box = QComboBox()
             self._taxonomy_position_box.addItem(
                 "Keine explizite Zuordnung",
@@ -259,12 +285,30 @@ class AccountEditorDialog(QDialog):
                 self._is_active_box,
             )
 
+        if self._protect_technical_fields:
+            self._debit_position_box.setEnabled(False)
+            self._credit_position_box.setEnabled(False)
+            self._is_active_box.setEnabled(False)
+
         layout.addLayout(form)
 
         explanation = QLabel(
-            "Die HGB-Struktur ist fest vorgegeben. "
-            "Hier wird nur die Zuordnung des Kontos "
-            "zu einer vorhandenen HGB-Position festgelegt."
+            (
+                "Technisches Steuerungskonto: Kontotyp, HGB-Zuordnung und "
+                "Aktivstatus sind geschützt. Bezeichnung und E-Bilanz-"
+                "Zuordnung können bearbeitet werden."
+                if self._protect_technical_fields
+                else (
+                    "Der Kontotyp kann wegen vorhandener Buchungen nicht "
+                    "geändert werden."
+                    if self._account_type_locked
+                    else (
+                        "Die HGB-Struktur ist fest vorgegeben. Hier wird nur "
+                        "die Zuordnung des Kontos zu einer vorhandenen HGB-"
+                        "Position festgelegt."
+                    )
+                )
+            )
         )
         explanation.setWordWrap(True)
         layout.addWidget(explanation)
@@ -300,7 +344,7 @@ class AccountEditorDialog(QDialog):
         self._update_mapping_choices()
 
     def _on_hgb_position_changed(self, _text: str) -> None:
-        if self._template_mode:
+        if self._taxonomy_position_box is not None:
             self._update_taxonomy_choices()
 
     def _on_taxonomy_selection_changed(self, _index: int) -> None:
@@ -472,23 +516,16 @@ class AccountEditorDialog(QDialog):
         return str(exc)
 
     def _hgb_mapping_changed(self) -> bool:
-        if self._mapping_rule is None:
-            return False
         return (
             self._debit_positions.get(
                 self._debit_position_box.currentText()
             )
-            != self._mapping_rule.debit_position
+            != self._original_debit_position
             or self._credit_positions.get(
                 self._credit_position_box.currentText()
             )
-            != self._mapping_rule.credit_position
+            != self._original_credit_position
         )
-
-        if self._taxonomy_status_label is not None:
-            self._taxonomy_status_label.setText(
-                self._taxonomy_choice_error or ""
-            )
 
     def _on_hgb_mapping_requirement_changed(
         self,
@@ -576,6 +613,10 @@ class AccountEditorDialog(QDialog):
             self._set_credit_positions(())
 
             self._debit_position_box.setEnabled(True)
+            self._credit_position_box.setEnabled(False)
+
+        if self._protect_technical_fields:
+            self._debit_position_box.setEnabled(False)
             self._credit_position_box.setEnabled(False)
 
     def _set_debit_positions(
@@ -877,19 +918,25 @@ class AccountEditorDialog(QDialog):
 
         self._update_mapping_choices()
 
-        if self._mapping_rule is None:
-            return
-
-        if self._mapping_rule.debit_position is not None:
+        if (
+            self._mapping_rule is not None
+            and self._mapping_rule.debit_position is not None
+        ):
             self._debit_position_box.setCurrentText(
                 self._position_display_name(
                     self._mapping_rule.debit_position
                 )
             )
 
-        if self._mapping_rule.credit_position is not None:
+        if (
+            self._mapping_rule is not None
+            and self._mapping_rule.credit_position is not None
+        ):
             self._credit_position_box.setCurrentText(
                 self._position_display_name(
                     self._mapping_rule.credit_position
                 )
             )
+
+        if self._taxonomy_position_box is not None:
+            self._update_taxonomy_choices()

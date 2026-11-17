@@ -4,6 +4,7 @@ from decimal import Decimal
 from simpleob.accounting.ledger import Ledger
 from simpleob.domain.account import Account
 from simpleob.domain.account_type import AccountType
+from simpleob.domain.entry_side import EntrySide
 from simpleob.domain.journal import Journal
 from simpleob.domain.opening_balance import OpeningBalance
 from simpleob.domain.opening_balance_item import OpeningBalanceItem
@@ -50,14 +51,17 @@ def test_posts_opening_balance_to_journal_and_ledger() -> None:
             OpeningBalanceItem(
                 account=bank,
                 amount=Decimal("25000.00"),
+                side=EntrySide.DEBIT,
             ),
             OpeningBalanceItem(
                 account=liabilities,
                 amount=Decimal("8000.00"),
+                side=EntrySide.CREDIT,
             ),
             OpeningBalanceItem(
                 account=equity,
                 amount=Decimal("17000.00"),
+                side=EntrySide.CREDIT,
             ),
         ),
     )

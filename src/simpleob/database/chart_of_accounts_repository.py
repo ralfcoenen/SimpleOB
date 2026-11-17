@@ -356,6 +356,18 @@ class ChartOfAccountsRepository:
                 "Das Konto ist nicht vorhanden."
             )
 
+        if (
+            model.account_type != account.account_type.name
+            and self.account_has_bookings(
+                company_id=company_id,
+                account_number=account.number,
+            )
+        ):
+            raise ValueError(
+                "Der Kontotyp kann nicht geändert werden, weil das Konto "
+                "in Buchungen eines Geschäftsjahres verwendet wird."
+            )
+
         model.name = account.name
         model.account_type = account.account_type.name
         model.is_active = account.is_active
@@ -382,6 +394,62 @@ class ChartOfAccountsRepository:
 
         if commit:
             self._session.commit()
+
+    def account_has_bookings(
+        self,
+        *,
+        company_id: UUID,
+        account_number: str,
+    ) -> bool:
+        """Prüft Buchungsreferenzen in allen Geschäftsjahren des Mandanten."""
+
+        company_model = self._lock_company(company_id)
+        return (
+            self._session.query(Buchungszeile.id)
+            .join(Buchung, Buchung.id == Buchungszeile.buchung_id)
+            .join(
+                Wirtschaftsjahr,
+                Wirtschaftsjahr.id == Buchung.wirtschaftsjahr_id,
+            )
+            .filter(
+                Wirtschaftsjahr.mandant_id == company_model.id,
+                Buchungszeile.account_number == account_number,
+            )
+            .first()
+            is not None
+        )
+
+    def save_account_with_taxonomy_mapping(
+        self,
+        *,
+        company_id: UUID,
+        account: Account,
+        mapping_rule: AccountMappingRule | None,
+        taxonomy_version: str,
+        taxonomy_concept_name: str | None,
+        is_new: bool,
+    ) -> None:
+        """Speichert Konto, HGB-Regel und Taxonomiezuordnung atomar."""
+
+        try:
+            save_account = self.add_account if is_new else self.update_account
+            save_account(
+                company_id=company_id,
+                account=account,
+                mapping_rule=mapping_rule,
+                commit=False,
+            )
+            self.save_single_account_taxonomy_concept(
+                company_id=company_id,
+                taxonomy_version=taxonomy_version,
+                account_number=account.number,
+                concept_name=taxonomy_concept_name,
+                commit=False,
+            )
+            self._session.commit()
+        except Exception:
+            self._session.rollback()
+            raise
 
     def delete_accounts(
         self,
@@ -1146,6 +1214,7 @@ class ChartOfAccountsRepository:
         taxonomy_version: str,
         account_number: str,
         concept_name: str | None,
+        commit: bool = True,
     ) -> None:
         """Speichert oder entfernt die Taxonomiezuordnung eines einzelnen Kontos."""
 
@@ -1222,7 +1291,8 @@ class ChartOfAccountsRepository:
             else:
                 existing_mapping.concept_name = concept_name
 
-            self._session.commit()
+            if commit:
+                self._session.commit()
 
         except Exception:
             self._session.rollback()

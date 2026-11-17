@@ -9,7 +9,7 @@ from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.exc import IntegrityError
 
 BASELINE_REVISION = "7392d6cc6892"
-HEAD_REVISION = "b7d41a8f2c60"
+HEAD_REVISION = "2c862af39901"
 
 
 def _alembic_config(
@@ -752,6 +752,46 @@ def test_paid_invoice_cancellation_schema_backfills_and_checks_origins(
         } >= {"ix_guthaben_op_refund_open_item"}
         assert _current_revision(database_path) == HEAD_REVISION
         assert _foreign_key_check(database_path) == []
+    finally:
+        engine.dispose()
+
+
+def test_balance_sheet_presentation_migration_defaults_existing_years_to_a(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    database_path = tmp_path / "balance-presentation.db"
+    monkeypatch.setenv(
+        "OPENBILANZ_DATABASE_URL",
+        f"sqlite:///{database_path}",
+    )
+    config = _alembic_config(database_path)
+    command.upgrade(config, "f65c37865e28")
+
+    engine = create_engine(f"sqlite:///{database_path}")
+    try:
+        with engine.begin() as connection:
+            connection.exec_driver_sql(
+                "INSERT INTO mandanten (id, company_id, name) "
+                "VALUES (1, 'legacy', 'Legacy')"
+            )
+            connection.exec_driver_sql(
+                "INSERT INTO wirtschaftsjahre "
+                "(id, mandant_id, start_date, end_date, status) "
+                "VALUES (1, 1, '2025-01-01', '2025-12-31', 'CLOSED')"
+            )
+    finally:
+        engine.dispose()
+
+    command.upgrade(config, "head")
+    engine = create_engine(f"sqlite:///{database_path}")
+    try:
+        with engine.connect() as connection:
+            value = connection.exec_driver_sql(
+                "SELECT balance_sheet_presentation "
+                "FROM wirtschaftsjahre WHERE id = 1"
+            ).scalar_one()
+        assert value == "A"
     finally:
         engine.dispose()
 

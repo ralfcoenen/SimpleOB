@@ -13,6 +13,9 @@ from simpleob.accounting.financial_statement_position import (
 )
 from simpleob.accounting.income_statement import IncomeStatement
 from simpleob.domain.accounting_account_roles import AccountingAccountRoles
+from simpleob.domain.balance_sheet_presentation import (
+    BalanceSheetPresentation,
+)
 from simpleob.domain.company_master_data import (
     CompanyMasterData,
 )
@@ -69,6 +72,9 @@ from simpleob.services.closing_service import ClosingService
 from simpleob.services.fixed_asset_schedule_service import (
     FixedAssetSchedulePosition,
 )
+from simpleob.services.uncovered_equity_deficit_presentation_service import (
+    UncoveredEquityDeficitPresentationService,
+)
 from simpleob.taxonomy.account_balance_builder import AccountBalanceBuilder
 from simpleob.taxonomy.arelle_adapter import (
     ArelleAdapter,
@@ -112,6 +118,8 @@ from simpleob.taxonomy.hgb_gaap_ci_mapping import (
     create_hgb_gaap_ci_mapping,
 )
 from simpleob.taxonomy.mapper import TaxonomyMapper
+from simpleob.taxonomy.mapping import TaxonomyMappingRule
+from simpleob.taxonomy.mapping_set import TaxonomyMappingSet
 from simpleob.taxonomy.model import TaxonomyModel
 from simpleob.taxonomy.nil_fact import TaxonomyNilFact
 from simpleob.taxonomy.resolver import TaxonomyResolver
@@ -367,6 +375,9 @@ class EBilanzService:
             ProfitAppropriationAnnualData | None
         ) = None,
         previous_profit_loss_carryforward: Decimal = Decimal("0.00"),
+        balance_sheet_presentation: BalanceSheetPresentation = (
+            BalanceSheetPresentation.BEFORE_APPROPRIATION
+        ),
     ) -> EBilanzDocument:
         """Erzeugt die E-Bilanz-XBRL-Instanz über den Taxonomie-6.9-FactPlan."""
 
@@ -465,14 +476,64 @@ class EBilanzService:
                 ),
             )
 
-        balance_sheet_values = (
+        raw_balance_sheet_values = (
             GaapCi69BalanceSheetValueBuilder.build(
                 balance_sheet=balance_sheet,
                 income_statement=(
                     income_statement.income_statement
                 ),
+                presentation=balance_sheet_presentation,
             )
         )
+        # Die BVV-Berechnung verwendet weiterhin den Rohwert der HGB-Bilanz.
+        # Der Fact-Builder lässt Nullbeträge aus; für genau null Eigenkapital
+        # wird deshalb der HGB-Baum als Fallback verwendet.
+        current_hgb_equity = raw_balance_sheet_values.get(
+            ("bs.eqLiab.equity",)
+        )
+        if (
+            current_hgb_equity is None
+            and isinstance(
+                balance_sheet.liabilities,
+                FinancialStatementPosition,
+            )
+            and isinstance(
+                balance_sheet.liabilities.children,
+                tuple,
+            )
+        ):
+            hgb_equity_position = next(
+                (
+                    position
+                    for position in balance_sheet.liabilities.children
+                    if position.code == "HGB.266.PASSIVA.A"
+                ),
+                None,
+            )
+            if hgb_equity_position is not None:
+                current_hgb_equity = balance_sheet.amount_for(
+                    hgb_equity_position
+                )
+
+        presented_balance_sheet = (
+            UncoveredEquityDeficitPresentationService.apply(
+                balance_sheet
+            )
+        )
+        balance_sheet_values = raw_balance_sheet_values
+        if presented_balance_sheet is not balance_sheet:
+            balance_sheet_values = (
+                GaapCi69BalanceSheetValueBuilder.build(
+                    balance_sheet=presented_balance_sheet,
+                    income_statement=(
+                        income_statement.income_statement
+                    ),
+                    presentation=balance_sheet_presentation,
+                )
+            )
+            # Auch wenn das ausgewiesene Eigenkapital null beträgt, bleibt
+            # der steuerlich relevante Summen-Fact ausdrücklich vorhanden.
+            balance_sheet_values[("bs.eqLiab.equity",)] = Decimal("0.00")
 
         mapped_tangible_depreciation = (
             self._mapped_tangible_depreciation(
@@ -511,12 +572,31 @@ class EBilanzService:
                 )
             )
 
+        hgb_gaap_ci_mapping = create_hgb_gaap_ci_mapping(
+            assets=self._assets,
+            liabilities=self._liabilities,
+            income_statement=self._income_statement,
+        )
+        if (
+            balance_sheet_presentation
+            is BalanceSheetPresentation.AFTER_APPROPRIATION
+        ):
+            hgb_gaap_ci_mapping = TaxonomyMappingSet(
+                rules=tuple(
+                    TaxonomyMappingRule(
+                        position=rule.position,
+                        concept_name=(
+                            "bs.eqLiab.equity.profitLoss"
+                            if rule.position.code
+                            == "HGB.266.PASSIVA.A.V"
+                            else rule.concept_name
+                        ),
+                    )
+                    for rule in hgb_gaap_ci_mapping.rules
+                )
+            )
         taxonomy_mapper = TaxonomyMapper(
-            create_hgb_gaap_ci_mapping(
-                assets=self._assets,
-                liabilities=self._liabilities,
-                income_statement=self._income_statement,
-            ),
+            hgb_gaap_ci_mapping,
             gaap_ci_model,
         )
 
@@ -776,12 +856,6 @@ class EBilanzService:
                 "Für den Betriebsvermögensvergleich fehlt "
                 "das HGB-Vorjahreseigenkapital."
             )
-
-        current_hgb_equity = (
-            balance_sheet_values.get(
-                ("bs.eqLiab.equity",)
-            )
-        )
 
         if current_hgb_equity is None:
             raise ValueError(

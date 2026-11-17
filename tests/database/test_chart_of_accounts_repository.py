@@ -22,6 +22,7 @@ from simpleob.database.company_repository import (
     CompanyRepository,
 )
 from simpleob.database.database import Base
+from simpleob.database.models import Konto
 from simpleob.domain.account import Account
 from simpleob.domain.account_mapping_rule import (
     AccountMappingRule,
@@ -828,6 +829,73 @@ def test_adds_account_to_existing_chart_of_accounts() -> None:
         .debit_position
         == position
     )
+
+
+def test_saves_account_hgb_and_taxonomy_mapping_atomically(monkeypatch):
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine)
+    company = Company(company_id=uuid4(), name="Atomare Kontenzuordnung UG")
+    first = FinancialStatementPosition(
+        "HGB.266.AKTIVA.B.IV", "Bank"
+    )
+    second = FinancialStatementPosition(
+        "HGB.266.AKTIVA.B.II.4", "Forderungen"
+    )
+    account = Account(
+        TemplateAccount("1210", "Forderungen", AccountType.ASSET)
+    )
+    original_rule = AccountMappingRule("1210", first, None)
+    changed_rule = AccountMappingRule("1210", second, None)
+
+    with Session() as session:
+        CompanyRepository(session).add(company)
+        repository = ChartOfAccountsRepository(session)
+        repository.save_account_with_taxonomy_mapping(
+            company_id=company.company_id,
+            account=account,
+            mapping_rule=original_rule,
+            taxonomy_version="6.9",
+            taxonomy_concept_name="concept.original",
+            is_new=True,
+        )
+        changed_account = Account(
+            TemplateAccount(
+                "1210", "Geänderte Forderungen", AccountType.ASSET
+            )
+        )
+
+        def fail_taxonomy_save(**_kwargs):
+            raise RuntimeError("Testfehler beim Taxonomie-Speichern")
+
+        monkeypatch.setattr(
+            repository,
+            "save_single_account_taxonomy_concept",
+            fail_taxonomy_save,
+        )
+        with pytest.raises(RuntimeError, match="Testfehler"):
+            repository.save_account_with_taxonomy_mapping(
+                company_id=company.company_id,
+                account=changed_account,
+                mapping_rule=changed_rule,
+                taxonomy_version="6.9",
+                taxonomy_concept_name="concept.changed",
+                is_new=False,
+            )
+
+        stored = (
+            session.query(Konto)
+            .filter(Konto.account_number == "1210")
+            .one()
+        )
+        assert stored.name == "Forderungen"
+        assert stored.debit_position_code == first.code
+        assert repository.load_account_taxonomy_concepts(
+            company.company_id,
+            taxonomy_version="6.9",
+        ) == {"1210": "concept.original"}
+
+    engine.dispose()
 
 def test_updates_existing_account() -> None:
     """Ein vorhandenes Konto kann geändert werden."""

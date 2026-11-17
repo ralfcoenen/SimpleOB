@@ -65,6 +65,44 @@ class ReportsWidget(QWidget):
 
         self._create_ui()
 
+    def update_accounts(
+        self,
+        *,
+        accounts: tuple[Account, ...],
+        opening_balance_account_number: str,
+    ) -> None:
+        """Aktualisiert Kontennamen und Kontenauswahl der Auswertungen."""
+
+        selected_numbers = set(self._selected_account_activity_numbers())
+        self._accounts = accounts
+        self._account_names = {
+            account.number: account.name for account in accounts
+        }
+        self._opening_balance_account_number = opening_balance_account_number
+
+        account_list = self._account_activity_account_list
+        account_list.clear()
+        for account in sorted(
+            (account for account in accounts if account.is_active),
+            key=lambda account: account.number,
+        ):
+            item = QListWidgetItem(str(account))
+            item.setData(Qt.ItemDataRole.UserRole, account.number)
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            item.setCheckState(
+                Qt.CheckState.Checked
+                if account.number in selected_numbers
+                else Qt.CheckState.Unchecked
+            )
+            account_list.addItem(item)
+
+        if self._current_trial_balance_report is not None:
+            self._refresh_trial_balance()
+        if self._current_account_activity_reports:
+            self._refresh_account_activity()
+        if self._current_journal_report is not None:
+            self._refresh_journal()
+
     def _create_ui(self) -> None:
         """Erzeugt den Arbeitsbereich Auswertungen."""
 
