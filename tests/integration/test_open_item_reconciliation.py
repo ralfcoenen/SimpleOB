@@ -110,6 +110,7 @@ def _environment():
         ("3300", "Verbindlichkeiten", AccountType.LIABILITY),
         ("2400", "Kundenguthaben", AccountType.LIABILITY),
         ("1300", "Lieferantenguthaben", AccountType.ASSET),
+        ("3095", "Rückstellungen", AccountType.LIABILITY),
         ("8400", "Erlöse", AccountType.REVENUE),
         ("6100", "Aufwand", AccountType.EXPENSE),
         ("1576", "Vorsteuer", AccountType.ASSET),
@@ -190,6 +191,72 @@ def _open_id(session, invoice):
                 .filter_by(invoice_id=str(invoice.invoice_id)).scalar())
 
 
+def _raw_ledger_booking(
+    session,
+    *,
+    booking_date,
+    lines,
+    booking_type="REGULAR",
+    reversal_of_booking_id=None,
+):
+    year = session.query(Wirtschaftsjahr).filter_by(start_date=FY25.start_date).one()
+    booking = Buchung(
+        booking_id=str(uuid4()),
+        wirtschaftsjahr_id=year.id,
+        booking_date=booking_date,
+        voucher_no=f"TEST-{uuid4().hex[:8]}",
+        description="Testbuchung",
+        booking_type=booking_type,
+        reversal_of_booking_id=reversal_of_booking_id,
+    )
+    session.add(booking)
+    session.flush()
+    session.add_all(
+        Buchungszeile(
+            buchung_id=booking.id,
+            position=position,
+            account_number=account,
+            side=side,
+            amount=Decimal(amount),
+        )
+        for position, (account, side, amount) in enumerate(lines, start=1)
+    )
+    session.flush()
+    return booking
+
+
+def _supplier_reconciliation(session, company, as_of_date):
+    report = OpenItemReconciliationRepository(session).reconcile(
+        company_id=company.company_id, as_of_date=as_of_date
+    )
+    return next(row for row in report.rows if row.role == "SUPPLIER_PAYABLES")
+
+
+def _sample_reversal_pair(session, *, reversal_date=date(2025, 12, 31)):
+    original = _raw_ledger_booking(
+        session,
+        booking_date=date(2025, 2, 28),
+        lines=(
+            ("3095", "DEBIT", "500.00"),
+            ("3095", "DEBIT", "686.37"),
+            ("3300", "CREDIT", "1186.37"),
+        ),
+    )
+    reversal = _raw_ledger_booking(
+        session,
+        booking_date=reversal_date,
+        booking_type="REVERSAL",
+        reversal_of_booking_id=original.booking_id,
+        lines=(
+            ("3300", "DEBIT", "1186.37"),
+            ("3095", "CREDIT", "500.00"),
+            ("3095", "CREDIT", "686.37"),
+        ),
+    )
+    session.commit()
+    return original, reversal
+
+
 def test_reconciles_unpaid_invoice_and_historical_partial_payment_cutoff():
     engine, session, company, partner, invoices, _payables, payments, _credits, _offsets, _corrections = _environment()
     try:
@@ -252,6 +319,242 @@ def test_unlinked_manual_control_account_movement_is_reported_without_mutation()
             before_counts[0] + 1, before_counts[1]
         )
         assert session.query(RechnungsOPZahlungsereignis).count() == 0
+    finally:
+        session.close()
+        engine.dispose()
+
+
+def test_linked_exact_reversal_pair_is_unexplained_only_from_reversal_date():
+    engine, session, company, *_ = _environment()
+    try:
+        _original, _reversal = _sample_reversal_pair(session)
+
+        before_original = _supplier_reconciliation(
+            session, company, date(2025, 2, 27)
+        )
+        on_original_date = _supplier_reconciliation(
+            session, company, date(2025, 2, 28)
+        )
+        before_reversal = _supplier_reconciliation(
+            session, company, date(2025, 12, 30)
+        )
+        on_reversal_date = _supplier_reconciliation(
+            session, company, date(2025, 12, 31)
+        )
+
+        assert before_original.unexplained_movements == ()
+        assert before_original.difference == Decimal("0.00")
+        assert len(on_original_date.unexplained_movements) == 1
+        assert on_original_date.difference == Decimal("1186.37")
+        assert len(before_reversal.unexplained_movements) == 1
+        assert before_reversal.difference == Decimal("1186.37")
+        assert on_reversal_date.unexplained_movements == ()
+        assert on_reversal_date.ledger_balance == Decimal("0.00")
+        assert on_reversal_date.open_item_balance == Decimal("0.00")
+        assert on_reversal_date.difference == Decimal("0.00")
+        assert on_reversal_date.status == "ABGESTIMMT"
+        assert session.query(Buchung).count() == 2
+    finally:
+        session.close()
+        engine.dispose()
+
+
+def test_equal_unlinked_counterbooking_does_not_resolve_manual_movements():
+    engine, session, company, *_ = _environment()
+    try:
+        _raw_ledger_booking(
+            session,
+            booking_date=date(2025, 2, 28),
+            lines=(("6100", "DEBIT", "25.00"), ("3300", "CREDIT", "25.00")),
+        )
+        _raw_ledger_booking(
+            session,
+            booking_date=date(2025, 12, 31),
+            lines=(("3300", "DEBIT", "25.00"), ("6100", "CREDIT", "25.00")),
+        )
+        session.commit()
+
+        row = _supplier_reconciliation(session, company, date(2025, 12, 31))
+
+        assert row.difference == Decimal("0.00")
+        assert row.status == "UNGEKLAERTE_BEWEGUNG"
+        assert len(row.unexplained_movements) == 2
+    finally:
+        session.close()
+        engine.dispose()
+
+
+@pytest.mark.parametrize(
+    "reversal_lines",
+    (
+        (("3300", "DEBIT", "1000.00"), ("6100", "CREDIT", "1000.00")),
+        (("3300", "CREDIT", "1186.37"), ("6100", "DEBIT", "1186.37")),
+        (("3300", "DEBIT", "1186.37"), ("6100", "CREDIT", "1185.37"),
+         ("8400", "CREDIT", "1.00")),
+    ),
+    ids=("incomplete", "wrong-sides", "control-line-matches-but-other-lines-do-not"),
+)
+def test_linked_reversal_with_incomplete_or_wrong_lines_stays_unexplained(
+    reversal_lines,
+):
+    engine, session, company, *_ = _environment()
+    try:
+        original = _raw_ledger_booking(
+            session,
+            booking_date=date(2025, 2, 28),
+            lines=(("6100", "DEBIT", "1186.37"), ("3300", "CREDIT", "1186.37")),
+        )
+        _raw_ledger_booking(
+            session,
+            booking_date=date(2025, 12, 31),
+            booking_type="REVERSAL",
+            reversal_of_booking_id=original.booking_id,
+            lines=reversal_lines,
+        )
+        session.commit()
+
+        row = _supplier_reconciliation(session, company, date(2025, 12, 31))
+
+        assert row.status == "UNGEKLAERTE_BEWEGUNG"
+        assert len(row.unexplained_movements) == 2
+    finally:
+        session.close()
+        engine.dispose()
+
+
+def test_ambiguous_multiple_reversal_references_stay_unexplained():
+    engine, session, company, *_ = _environment()
+    try:
+        _sample_reversal_pair(session)
+        # Add a second exact reversal reference to make the relationship ambiguous.
+        original = session.query(Buchung).filter_by(booking_type="REGULAR").one()
+        _raw_ledger_booking(
+            session,
+            booking_date=date(2025, 12, 31),
+            booking_type="REVERSAL",
+            reversal_of_booking_id=original.booking_id,
+            lines=(("3300", "DEBIT", "1186.37"), ("3095", "CREDIT", "500.00"),
+                   ("3095", "CREDIT", "686.37")),
+        )
+        session.commit()
+
+        row = _supplier_reconciliation(session, company, date(2025, 12, 31))
+
+        assert row.status == "UNGEKLAERTE_BEWEGUNG"
+        assert len(row.unexplained_movements) == 3
+    finally:
+        session.close()
+        engine.dispose()
+
+
+def test_future_conflicting_reversal_does_not_change_an_earlier_cutoff():
+    engine, session, company, *_ = _environment()
+    try:
+        original, _first_reversal = _sample_reversal_pair(
+            session, reversal_date=date(2025, 12, 30)
+        )
+        _raw_ledger_booking(
+            session,
+            booking_date=date(2025, 12, 31),
+            booking_type="REVERSAL",
+            reversal_of_booking_id=original.booking_id,
+            lines=(
+                ("3300", "DEBIT", "1186.37"),
+                ("3095", "CREDIT", "500.00"),
+                ("3095", "CREDIT", "686.37"),
+            ),
+        )
+        session.commit()
+
+        before_conflict = _supplier_reconciliation(
+            session, company, date(2025, 12, 30)
+        )
+        on_conflict_date = _supplier_reconciliation(
+            session, company, date(2025, 12, 31)
+        )
+
+        assert before_conflict.status == "ABGESTIMMT"
+        assert before_conflict.unexplained_movements == ()
+        assert on_conflict_date.status == "UNGEKLAERTE_BEWEGUNG"
+        assert len(on_conflict_date.unexplained_movements) == 3
+    finally:
+        session.close()
+        engine.dispose()
+
+
+def test_resolved_reversal_does_not_hide_a_real_difference_or_other_movement():
+    engine, session, company, partner, invoices, _payables, payments, *_ = _environment()
+    try:
+        invoice = _invoice(
+            invoices, company, partner,
+            year=FY25, booking_date=date(2025, 4, 1), number="AR-25-1",
+        )
+        payment = payments.post_payment(
+            company_id=company.company_id,
+            fiscal_year=FY25,
+            partner_id=partner.partner_id,
+            open_item_id=_open_id(session, invoice),
+            direction=PaymentDirection.CUSTOMER_RECEIPT,
+            amount=Decimal("20.00"),
+            payment_date=date(2025, 4, 10),
+            booking_date=date(2025, 4, 10),
+            cash_bank_account_number="1000",
+        )
+        payment_receivable_line = (
+            session.query(Buchungszeile)
+            .join(Buchung, Buchungszeile.buchung_id == Buchung.id)
+            .filter(
+                Buchung.booking_id == str(payment.booking_id),
+                Buchungszeile.account_number == "1200",
+            )
+            .one()
+        )
+        payment_receivable_line.amount = Decimal("21.00")
+        _sample_reversal_pair(session)
+        _raw_ledger_booking(
+            session,
+            booking_date=date(2025, 12, 31),
+            lines=(("3300", "DEBIT", "5.00"), ("6100", "CREDIT", "5.00")),
+        )
+        session.commit()
+
+        report = OpenItemReconciliationRepository(session).reconcile(
+            company_id=company.company_id, as_of_date=date(2025, 12, 31)
+        )
+        rows = {row.role: row for row in report.rows}
+
+        assert rows["CUSTOMER_RECEIVABLES"].difference == Decimal("-1.00")
+        assert rows["CUSTOMER_RECEIVABLES"].status == "ABWEICHUNG"
+        assert rows["SUPPLIER_PAYABLES"].difference == Decimal("-5.00")
+        assert rows["SUPPLIER_PAYABLES"].status == "UNGEKLAERTE_BEWEGUNG"
+        assert len(rows["SUPPLIER_PAYABLES"].unexplained_movements) == 1
+    finally:
+        session.close()
+        engine.dispose()
+
+
+def test_linked_exact_counterbooking_with_regular_type_is_not_a_reversal():
+    engine, session, company, *_ = _environment()
+    try:
+        original = _raw_ledger_booking(
+            session,
+            booking_date=date(2025, 2, 28),
+            lines=(("6100", "DEBIT", "20.00"), ("3300", "CREDIT", "20.00")),
+        )
+        _raw_ledger_booking(
+            session,
+            booking_date=date(2025, 12, 31),
+            booking_type="REGULAR",
+            reversal_of_booking_id=original.booking_id,
+            lines=(("3300", "DEBIT", "20.00"), ("6100", "CREDIT", "20.00")),
+        )
+        session.commit()
+
+        row = _supplier_reconciliation(session, company, date(2025, 12, 31))
+
+        assert row.difference == Decimal("0.00")
+        assert row.status == "UNGEKLAERTE_BEWEGUNG"
+        assert len(row.unexplained_movements) == 2
     finally:
         session.close()
         engine.dispose()

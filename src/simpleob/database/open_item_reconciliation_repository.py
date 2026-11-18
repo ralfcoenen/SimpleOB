@@ -1,6 +1,6 @@
 """Lesende Stichtagsberechnung für Sammelkonto-Abstimmungen."""
 
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import date
 from decimal import Decimal
 from uuid import UUID
@@ -32,6 +32,7 @@ from simpleob.database.models import (
     Zahlungszuordnungskorrektur,
     Zahlungszuordnungskorrekturereignis,
 )
+from simpleob.domain.booking_type import BookingType
 from simpleob.domain.open_item_reconciliation import (
     OpenItemReconciliationReport,
     OpenItemReconciliationRow,
@@ -320,6 +321,15 @@ class OpenItemReconciliationRepository:
         if balance_year is not None:
             line_query = line_query.filter(Wirtschaftsjahr.id == balance_year.id)
         line_rows = line_query.all()
+        resolved_reversal_booking_ids = (
+            self._fully_reversed_booking_ids(
+                company_id=company.id,
+                fiscal_year_id=balance_year.id,
+                as_of_date=as_of_date,
+            )
+            if balance_year is not None
+            else set()
+        )
         unknown_by_account: dict[str, list[UnexplainedControlMovement]] = defaultdict(list)
         unresolved_by_account: dict[str, list[UnresolvedCorrectionTiming]] = defaultdict(list)
         unresolved_by_role: dict[str, list[UnresolvedCorrectionTiming]] = defaultdict(list)
@@ -331,7 +341,10 @@ class OpenItemReconciliationRepository:
             normal_side = next(item[3] for item in _ROLES if item[0] == role)
             signed = line.amount if line.side == normal_side else -line.amount
             ledger_by_account[line.account_number] += signed
-            if booking.booking_id not in known_booking_ids:
+            if (
+                booking.booking_id not in known_booking_ids
+                and booking.booking_id not in resolved_reversal_booking_ids
+            ):
                 unknown_by_account[line.account_number].append(
                     UnexplainedControlMovement(
                         booking_id=booking.booking_id,
@@ -437,6 +450,75 @@ class OpenItemReconciliationRepository:
                     unresolved_correction_timings=unresolved,
                 ))
         return OpenItemReconciliationReport(company_id, as_of_date, tuple(rows))
+
+    def _fully_reversed_booking_ids(
+        self,
+        *,
+        company_id: int,
+        fiscal_year_id: int,
+        as_of_date: date,
+    ) -> set[str]:
+        """Return IDs in exact, unambiguous reversal pairs effective by date."""
+        bookings = (
+            self._session.query(Buchung)
+            .join(Wirtschaftsjahr, Buchung.wirtschaftsjahr_id == Wirtschaftsjahr.id)
+            .filter(
+                Wirtschaftsjahr.id == fiscal_year_id,
+                Wirtschaftsjahr.mandant_id == company_id,
+            )
+            .all()
+        )
+        by_id = {booking.booking_id: booking for booking in bookings}
+        references_by_original: dict[str, list[Buchung]] = defaultdict(list)
+        for booking in bookings:
+            if (
+                booking.reversal_of_booking_id is not None
+                and booking.booking_date <= as_of_date
+            ):
+                references_by_original[booking.reversal_of_booking_id].append(booking)
+
+        resolved: set[str] = set()
+        for original_id, reversals in references_by_original.items():
+            if len(reversals) != 1:
+                continue
+            original = by_id.get(original_id)
+            reversal = reversals[0]
+            if (
+                original is None
+                or original.booking_type != BookingType.REGULAR.value
+                or original.reversal_of_booking_id is not None
+                or reversal.booking_type != BookingType.REVERSAL.value
+                or original.booking_date > as_of_date
+                or reversal.booking_date > as_of_date
+                or reversal.booking_date < original.booking_date
+                or reversal.reversal_of_booking_id == reversal.booking_id
+                or references_by_original.get(reversal.booking_id)
+                or any(
+                    line.side not in {"DEBIT", "CREDIT"}
+                    for line in (*original.zeilen, *reversal.zeilen)
+                )
+            ):
+                continue
+
+            original_lines = Counter(
+                (line.account_number, self._opposite_side(line.side), line.amount)
+                for line in original.zeilen
+            )
+            reversal_lines = Counter(
+                (line.account_number, line.side, line.amount)
+                for line in reversal.zeilen
+            )
+            if original_lines and original_lines == reversal_lines:
+                resolved.update((original.booking_id, reversal.booking_id))
+        return resolved
+
+    @staticmethod
+    def _opposite_side(side: str) -> str:
+        if side == "DEBIT":
+            return "CREDIT"
+        if side == "CREDIT":
+            return "DEBIT"
+        return ""
 
     def _source_account(self, mandant_id: int, booking_id: str, side: str,
                         account_type: str, amount: Decimal) -> str | None:
