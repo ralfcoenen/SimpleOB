@@ -122,6 +122,10 @@ class VatBookingFrame(QWidget):
 
         self._position_rows: list[dict[str, object]] = []
         self._last_kr_warning_key: tuple[object, ...] | None = None
+        self._last_tax_rates_by_invoice_type = {
+            _INPUT_INVOICE: "19 %",
+            _OUTPUT_INVOICE: "19 %",
+        }
 
         self._create_ui()
 
@@ -164,6 +168,16 @@ class VatBookingFrame(QWidget):
         header_row.addSpacing(12)
         header_row.addWidget(self._booking_date_label)
         header_row.addWidget(self._booking_date_entry)
+        self._copy_invoice_number_button = QPushButton(
+            "Nr. in Buchungstext"
+        )
+        self._copy_invoice_number_button.setToolTip(
+            "Rechnungsnummer in den Buchungstext übernehmen"
+        )
+        self._copy_invoice_number_button.clicked.connect(
+            self._copy_invoice_number_to_description
+        )
+        header_row.addWidget(self._copy_invoice_number_button)
         header_row.addStretch()
         form.addLayout(header_row)
 
@@ -508,8 +522,52 @@ class VatBookingFrame(QWidget):
     def _on_invoice_type_changed(self, *_args: object) -> None:
         self._last_kr_warning_key = None
         self._on_account.setChecked(False)
+        preferred_tax_rate = self._last_tax_rates_by_invoice_type[
+            self._tax_rate_category_for_invoice_type(
+                self._invoice_type_box.currentText()
+            )
+        ]
+        for row in self._position_rows:
+            row["tax_rate_box"].setCurrentText(preferred_tax_rate)
         self._refresh_customer_list()
         self._update_invoice_fields()
+
+    def _remember_tax_rate(self, tax_rate: str) -> None:
+        """Merkt den zuletzt gewählten Satz für die Rechnungsart."""
+
+        if tax_rate not in _TAX_RATES:
+            return
+        category = self._tax_rate_category_for_invoice_type(
+            self._invoice_type_box.currentText()
+        )
+        self._last_tax_rates_by_invoice_type[category] = tax_rate
+
+    @staticmethod
+    def _tax_rate_category_for_invoice_type(invoice_type: str) -> str:
+        """Ordnet Gutschriften der passenden Eingangs-/Ausgangsart zu."""
+
+        if invoice_type in (_INPUT_INVOICE, _SUPPLIER_CREDIT_NOTE):
+            return _INPUT_INVOICE
+        return _OUTPUT_INVOICE
+
+    def _copy_invoice_number_to_description(self) -> None:
+        """Ergänzt den Buchungstext um die eingegebene Rechnungsnummer."""
+
+        invoice_number = self._voucher_no_entry.text().strip()
+        if not invoice_number:
+            return
+
+        description = self._description_entry.text()
+        if not description.strip():
+            self._description_entry.setText(invoice_number)
+            return
+
+        if invoice_number.casefold() in description.casefold():
+            return
+
+        self._description_entry.setText(
+            f"{description.rstrip()} {invoice_number}"
+        )
 
     def _manage_partners(self) -> None:
         if self._partner_repository is None or self._company_id is None:
@@ -606,7 +664,11 @@ class VatBookingFrame(QWidget):
             _TAX_RATES
         )
         tax_rate_box.setCurrentText(
-            "19 %"
+            self._last_tax_rates_by_invoice_type[
+                self._tax_rate_category_for_invoice_type(
+                    self._invoice_type_box.currentText()
+                )
+            ]
         )
         tax_rate_box.setMinimumWidth(80)
         tax_rate_box.setMaximumWidth(100)
@@ -647,6 +709,9 @@ class VatBookingFrame(QWidget):
         )
         tax_rate_box.currentTextChanged.connect(
             self._on_form_changed
+        )
+        tax_rate_box.currentTextChanged.connect(
+            self._remember_tax_rate
         )
 
         self._update_remove_button()
@@ -1199,7 +1264,11 @@ class VatBookingFrame(QWidget):
         row["account_box"].setCurrentIndex(-1)
         row["amount_entry"].clear()
         row["tax_rate_box"].setCurrentText(
-            "19 %"
+            self._last_tax_rates_by_invoice_type[
+                self._tax_rate_category_for_invoice_type(
+                    self._invoice_type_box.currentText()
+                )
+            ]
         )
 
     def _check_kr_invoice_threshold(self, amount_entry: QLineEdit) -> None:
