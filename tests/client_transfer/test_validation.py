@@ -15,6 +15,7 @@ from simpleob.client_transfer.model import (
     ClientTransferBooking,
     ClientTransferBookingLine,
     ClientTransferBookingLineReference,
+    ClientTransferBusinessPartner,
     ClientTransferClient,
     ClientTransferControlAccounts,
     ClientTransferEquityContribution,
@@ -25,6 +26,7 @@ from simpleob.client_transfer.model import (
     ClientTransferFixedAssetMovement,
     ClientTransferFormat,
     ClientTransferMasterData,
+    ClientTransferPersonAccount,
     ClientTransferProfitAppropriationAnnualData,
     ClientTransferProfitAppropriationPosting,
     ClientTransferTaxonomyMapping,
@@ -127,6 +129,71 @@ def test_valid_transfer_references_are_accepted() -> None:
     transfer = _build_transfer()
 
     validate_client_transfer_references(transfer)
+
+
+def _transfer_with_person_account(*, include_partner=True, hgb_mapping=None):
+    transfer = _build_transfer()
+    partner_id = UUID("11111111-1111-1111-1111-111111111111")
+    accounts = transfer.client.accounts + (
+        ClientTransferAccount(
+            account_number="10000",
+            name="Kunde GmbH",
+            account_type="ASSET",
+            is_active=True,
+            debit_position_code=hgb_mapping,
+        ),
+    )
+    return replace(
+        transfer,
+        client=replace(
+            transfer.client,
+            accounts=accounts,
+            business_partners=(
+                (
+                    ClientTransferBusinessPartner(
+                        partner_id=partner_id,
+                        name="Kunde GmbH",
+                        is_customer=True,
+                        is_supplier=False,
+                        is_active=True,
+                    ),
+                )
+                if include_partner
+                else ()
+            ),
+            person_accounts=(
+                ClientTransferPersonAccount(
+                    account_number="10000",
+                    partner_id=partner_id,
+                    role="DEBITOR",
+                ),
+            ),
+        ),
+    )
+
+
+def test_person_account_without_partner_is_rejected() -> None:
+    with pytest.raises(ValueError, match="unbekannten Geschäftspartner"):
+        validate_client_transfer_references(
+            _transfer_with_person_account(include_partner=False)
+        )
+
+
+def test_person_account_with_hgb_mapping_is_rejected() -> None:
+    with pytest.raises(ValueError, match="keine individuellen HGB-Zuordnungen"):
+        validate_client_transfer_references(
+            _transfer_with_person_account(hgb_mapping="HGB.266.AKTIVA.B.II.1")
+        )
+
+
+def test_partner_without_person_account_is_rejected() -> None:
+    transfer = _transfer_with_person_account()
+    transfer = replace(
+        transfer,
+        client=replace(transfer.client, person_accounts=()),
+    )
+    with pytest.raises(ValueError, match="mindestens einem Personenkonto"):
+        validate_client_transfer_references(transfer)
 
 
 def test_unknown_booking_account_is_rejected() -> None:

@@ -30,6 +30,7 @@ CLIENT_TABLE_NAMES = frozenset(
         "zahlungszuordnungskorrekturen",
         "zahlungszuordnungskorrekturereignisse",
         "konten",
+        "personenkonto_zuordnungen",
         "konten_taxonomie_zuordnungen",
         "kontenrahmen_konfiguration",
         "kontenrollen",
@@ -183,6 +184,9 @@ class ClientDeletionRepository:
                 statements = [
                     select(table).where(table.c.company_id == str(company_id))
                 ]
+            elif table.name == "personenkonto_zuordnungen":
+                tenant_ids = [row["id"] for row in captured["mandanten"]]
+                statements = [select(table).where(table.c.mandant_id.in_(tenant_ids))]
             else:
                 parents = [fk for fk in table.foreign_keys if fk.column.table != table]
                 statements = (
@@ -204,6 +208,10 @@ class ClientDeletionRepository:
         # Ein Datensatz darf nicht über einen Pfad dem Ziel und über einen
         # anderen Pfad einem fremden Mandanten (oder keinem Elternsatz) gehören.
         for table in self.tables:
+            if table.name == "personenkonto_zuordnungen":
+                # Its tenant is bound by two composite FKs; checking each FK
+                # column separately would falsely treat account numbers as global.
+                continue
             for row in captured[table.name]:
                 for fk in table.foreign_keys:
                     value = row[fk.parent.name]
@@ -292,6 +300,17 @@ class ClientDeletionRepository:
         result = {}
         for table in Base.metadata.sorted_tables:
             converted = []
+            if table.name == "personenkonto_zuordnungen":
+                converted = [
+                    (
+                        ("account_number", row["account_number"]),
+                        ("partner_id", row["partner_id"]),
+                        ("role", row["role"]),
+                    )
+                    for row in captured[table.name]
+                ]
+                result[table.name] = sorted(converted, key=repr)
+                continue
             fk_columns = {
                 fk.parent.name: fk.column.table.name for fk in table.foreign_keys
             }
@@ -335,6 +354,14 @@ class ClientDeletionRepository:
 
     def check_deleted(self, captured: CapturedClient) -> None:
         for table in self.tables:
+            if table.name == "personenkonto_zuordnungen":
+                tenant_ids = [row["id"] for row in captured["mandanten"]]
+                remaining = self.connection.execute(
+                    select(table.c.id).where(table.c.mandant_id.in_(tenant_ids))
+                ).first()
+                if remaining is not None:
+                    raise ValueError("Personenkontenzuordnungen wurden nicht vollständig gelöscht.")
+                continue
             checks = [(table.c.id, captured[table.name], "id")]
             for fk in table.foreign_keys:
                 checks.append(

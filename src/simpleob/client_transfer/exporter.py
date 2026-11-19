@@ -12,6 +12,7 @@ from simpleob.client_transfer.model import (
     ClientTransferApplication,
     ClientTransferBooking,
     ClientTransferBookingLine,
+    ClientTransferBusinessPartner,
     ClientTransferBookingLineReference,
     ClientTransferClient,
     ClientTransferControlAccounts,
@@ -25,6 +26,7 @@ from simpleob.client_transfer.model import (
     ClientTransferKrAnnualTurnover,
     ClientTransferKrSettings,
     ClientTransferMasterData,
+    ClientTransferPersonAccount,
     ClientTransferProfitAppropriationAnnualData,
     ClientTransferProfitAppropriationPosting,
     ClientTransferShareholder,
@@ -69,6 +71,7 @@ from simpleob.database.shareholder_repository import (
 from simpleob.database.tax_depreciation_adjustment_repository import (
     TaxDepreciationAdjustmentRepository,
 )
+from simpleob.database.person_account_repository import PersonAccountRepository
 from simpleob.domain.kr_settings import KrSettings
 
 
@@ -101,6 +104,7 @@ class ClientTransferExporter:
             ProfitAppropriationPostingRepository
         ),
         equity_contribution_repository: EquityContributionRepository,
+        person_account_repository: PersonAccountRepository | None = None,
     ) -> None:
         self._company_repository = company_repository
         self._chart_of_accounts_repository = (
@@ -127,6 +131,7 @@ class ClientTransferExporter:
         self._equity_contribution_repository = (
             equity_contribution_repository
         )
+        self._person_account_repository = person_account_repository
 
     def export(
         self,
@@ -170,6 +175,47 @@ class ClientTransferExporter:
             )
 
         chart_of_accounts, accounts = loaded_chart
+
+        person_account_numbers = getattr(
+            chart_of_accounts, "person_account_numbers", frozenset()
+        )
+        if person_account_numbers and self._person_account_repository is None:
+            raise ValueError(
+                "Der Personenkonto-Export benötigt das Personenkonten-Repository."
+            )
+
+        loaded_person_accounts = (
+            self._person_account_repository.list_for_company(company_id=company_id)
+            if self._person_account_repository is not None
+            else ()
+        )
+        if {
+            person_account.account.number for person_account in loaded_person_accounts
+        } != set(person_account_numbers):
+            raise ValueError(
+                "Personenkontenplan und gespeicherte Personenkontenzuordnungen stimmen nicht überein."
+            )
+        partners_by_id = {
+            item.partner.partner_id: item.partner for item in loaded_person_accounts
+        }
+        transfer_partners = tuple(
+            ClientTransferBusinessPartner(
+                partner_id=partner.partner_id,
+                name=partner.name,
+                is_customer=partner.is_customer,
+                is_supplier=partner.is_supplier,
+                is_active=partner.is_active,
+            )
+            for partner in sorted(partners_by_id.values(), key=lambda item: str(item.partner_id))
+        )
+        transfer_person_accounts = tuple(
+            ClientTransferPersonAccount(
+                account_number=item.account.number,
+                partner_id=item.partner.partner_id,
+                role=item.role.value,
+            )
+            for item in loaded_person_accounts
+        )
 
         mapping_rules = {
             rule.account_number: rule
@@ -416,6 +462,8 @@ class ClientTransferExporter:
                         for item in kr_settings.external_turnovers
                     ),
                 ),
+                business_partners=transfer_partners,
+                person_accounts=transfer_person_accounts,
                 accounts=transfer_accounts,
                 control_accounts=(
                     ClientTransferControlAccounts(

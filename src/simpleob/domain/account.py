@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from simpleob.domain.account_type import AccountType
+from simpleob.domain.person_account_role import PersonAccountRole
 from simpleob.domain.template_account import TemplateAccount
 
 
@@ -8,6 +9,7 @@ from simpleob.domain.template_account import TemplateAccount
 class Account:
     template: TemplateAccount
     is_active: bool = True
+    person_account_role: PersonAccountRole | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.template, TemplateAccount):
@@ -15,6 +17,10 @@ class Account:
 
         if not isinstance(self.is_active, bool):
             raise TypeError("is_active must be a bool")
+        if self.person_account_role is not None and not isinstance(
+            self.person_account_role, PersonAccountRole
+        ):
+            raise TypeError("person_account_role must be a PersonAccountRole or None")
 
     @property
     def number(self) -> str:

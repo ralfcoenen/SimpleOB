@@ -209,6 +209,11 @@ class FiscalYearClosingWorkflow:
                     "die transaktionale Neuberechnung erforderlich."
                 )
 
+            if self._statement_builder is not None:
+                self._statement_builder.ensure_person_account_balances_supported(
+                    ledger.balances()
+                )
+
             result = self._closing_service.close(
                 income_statement=income_statement,
                 ledger=ledger,

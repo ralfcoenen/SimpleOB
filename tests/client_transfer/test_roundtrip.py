@@ -5,6 +5,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from uuid import UUID
 
+import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
@@ -34,6 +35,7 @@ from simpleob.client_transfer.model import (
     ClientTransferBooking,
     ClientTransferBookingLine,
     ClientTransferBookingLineReference,
+    ClientTransferBusinessPartner,
     ClientTransferClient,
     ClientTransferControlAccounts,
     ClientTransferEquityContribution,
@@ -46,6 +48,7 @@ from simpleob.client_transfer.model import (
     ClientTransferKrAnnualTurnover,
     ClientTransferKrSettings,
     ClientTransferMasterData,
+    ClientTransferPersonAccount,
     ClientTransferProfitAppropriationAnnualData,
     ClientTransferProfitAppropriationPosting,
     ClientTransferShareholder,
@@ -63,9 +66,11 @@ from simpleob.database.company_repository import (
     CompanyRepository,
 )
 from simpleob.database.database import Base
+from simpleob.database.models import Geschaeftspartner, Konto, Mandant, PersonenkontoZuordnung
 from simpleob.database.equity_contribution_repository import (
     EquityContributionRepository,
 )
+from simpleob.database.person_account_repository import PersonAccountRepository
 from simpleob.database.fixed_asset_depreciation_repository import (
     FixedAssetDepreciationRepository,
 )
@@ -202,6 +207,7 @@ def _build_repositories(
                 session
             )
         ),
+        "person_account_repository": PersonAccountRepository(session),
     }
 
 
@@ -256,6 +262,9 @@ def _build_importer(
                 "equity_contribution_repository"
             ]
         ),
+        person_account_repository=(
+            repositories["person_account_repository"]
+        ),
     )
 
 
@@ -309,6 +318,9 @@ def _build_exporter(
             repositories[
                 "equity_contribution_repository"
             ]
+        ),
+        person_account_repository=(
+            repositories["person_account_repository"]
         ),
     )
 
@@ -835,11 +847,154 @@ def test_client_transfer_archive_roundtrip_preserves_client_data(
     )
 
 
+@pytest.mark.parametrize(
+    ("roles", "statuses"),
+    [
+        (("DEBITOR",), (False,)),
+        (("KREDITOR",), (True,)),
+        (("DEBITOR", "KREDITOR"), (False, True)),
+    ],
+)
+def test_person_account_transfer_roundtrip_preserves_partner_links_and_status(
+    roles, statuses
+) -> None:
+    partner_id = UUID("22222222-2222-2222-2222-222222222222")
+    source = _build_rich_transfer()
+    added_accounts = []
+    person_accounts = []
+    for role, is_active in zip(roles, statuses):
+        number = "10000" if role == "DEBITOR" else "70000"
+        added_accounts.append(
+            ClientTransferAccount(
+                account_number=number,
+                name="Transferpartner GmbH",
+                account_type="ASSET" if role == "DEBITOR" else "LIABILITY",
+                is_active=is_active,
+            )
+        )
+        person_accounts.append(
+            ClientTransferPersonAccount(
+                account_number=number,
+                partner_id=partner_id,
+                role=role,
+            )
+        )
+    transferred = replace(
+        source,
+        client=replace(
+            source.client,
+            accounts=source.client.accounts + tuple(added_accounts),
+            business_partners=(
+                ClientTransferBusinessPartner(
+                    partner_id=partner_id,
+                    name="Transferpartner GmbH",
+                    is_customer="DEBITOR" in roles,
+                    is_supplier="KREDITOR" in roles,
+                    is_active=False,
+                ),
+            ),
+            person_accounts=tuple(person_accounts),
+        ),
+    )
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+
+    exported = _import_and_export(engine=engine, transfer=transferred)
+
+    assert exported.format.version == 2
+    assert exported.client.person_accounts == tuple(person_accounts)
+    assert exported.client.business_partners == transferred.client.business_partners
+    assert next(
+        account for account in exported.client.accounts
+        if account.account_number == "1200"
+    ).debit_position_code == "HGB.266.AKTIVA.B.IV"
+    exported_accounts_by_number = {
+        account.account_number: account for account in exported.client.accounts
+    }
+    for source_account in added_accounts:
+        exported_account = exported_accounts_by_number[source_account.account_number]
+        assert exported_account.account_number == source_account.account_number
+        assert exported_account.name == source_account.name
+        assert exported_account.is_active == source_account.is_active
+        assert exported_account.debit_position_code is None
+        assert exported_account.credit_position_code is None
+    engine.dispose()
+
+
+def test_person_account_import_failure_rolls_back_partner_account_and_link(
+    monkeypatch,
+) -> None:
+    partner_id = UUID("22222222-2222-2222-2222-222222222222")
+    source = _build_rich_transfer()
+    transfer = replace(
+        source,
+        client=replace(
+            source.client,
+            accounts=source.client.accounts
+            + (
+                ClientTransferAccount(
+                    account_number="10000",
+                    name="Rollback GmbH",
+                    account_type="ASSET",
+                    is_active=True,
+                ),
+            ),
+            business_partners=(
+                ClientTransferBusinessPartner(
+                    partner_id=partner_id,
+                    name="Rollback GmbH",
+                    is_customer=True,
+                    is_supplier=False,
+                    is_active=True,
+                ),
+            ),
+            person_accounts=(
+                ClientTransferPersonAccount(
+                    account_number="10000",
+                    partner_id=partner_id,
+                    role="DEBITOR",
+                ),
+            ),
+        ),
+    )
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    with Session(engine) as session:
+        repositories = _build_repositories(session)
+        person_repository = repositories["person_account_repository"]
+        original_import = person_repository.import_transfer_records
+
+        def fail_after_person_records(**kwargs):
+            original_import(**kwargs)
+            raise RuntimeError("simulierter später Importfehler")
+
+        monkeypatch.setattr(
+            person_repository, "import_transfer_records", fail_after_person_records
+        )
+        importer = _build_importer(repositories)
+        with pytest.raises(RuntimeError, match="simulierter später Importfehler"):
+            importer.import_transfer(
+                transfer=transfer,
+                position_provider=_build_position_provider(),
+            )
+        assert session.query(Mandant).count() == 0
+        assert session.query(Konto).count() == 0
+        assert session.query(Geschaeftspartner).count() == 0
+        assert session.query(PersonenkontoZuordnung).count() == 0
+    engine.dispose()
+
+
 def test_import_of_legacy_transfer_defaults_kr_settings() -> None:
     source_transfer = _build_rich_transfer()
     legacy_transfer = replace(
         source_transfer,
-        client=replace(source_transfer.client, kr_settings=None),
+        format=ClientTransferFormat(version=1),
+        client=replace(
+            source_transfer.client,
+            kr_settings=None,
+            business_partners=(),
+            person_accounts=(),
+        ),
     )
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)

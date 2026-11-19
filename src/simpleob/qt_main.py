@@ -34,6 +34,7 @@ from simpleob.core.eric_privacy_acknowledgement import (
 from simpleob.core.product import ERIC_MANUFACTURER_ID
 from simpleob.database.booking_repository import BookingRepository
 from simpleob.database.business_partner_repository import BusinessPartnerRepository
+from simpleob.database.person_account_repository import PersonAccountRepository
 from simpleob.database.chart_of_accounts_repository import (
     ChartOfAccountsRepository,
 )
@@ -88,6 +89,7 @@ from simpleob.database.shareholder_repository import ShareholderRepository
 from simpleob.database.tax_depreciation_adjustment_repository import (
     TaxDepreciationAdjustmentRepository,
 )
+from simpleob.database.person_account_repository import PersonAccountRepository
 from simpleob.eric.elster_bilanz_payload_service import (
     ElsterBilanzPayloadService,
 )
@@ -746,6 +748,7 @@ def main() -> None:
 
         booking_repository = BookingRepository(session)
         business_partner_repository = BusinessPartnerRepository(session)
+        person_account_repository = PersonAccountRepository(session)
         receivable_invoice_repository = ReceivableInvoiceRepository(session)
         receivable_invoice_posting_service = ReceivableInvoicePostingService(
             booking_repository=booking_repository,
@@ -877,6 +880,7 @@ def main() -> None:
             equity_contribution_repository=(
                 equity_contribution_repository
             ),
+            person_account_repository=PersonAccountRepository(session),
         )
 
         client_transfer_exporter = ClientTransferExporter(
@@ -905,6 +909,7 @@ def main() -> None:
             equity_contribution_repository=(
                 equity_contribution_repository
             ),
+            person_account_repository=PersonAccountRepository(session),
         )
 
         fixed_asset_schedule_service = FixedAssetScheduleService(
@@ -1330,6 +1335,7 @@ def main() -> None:
                 ),
                 application_config=config,
                 business_partner_repository=business_partner_repository,
+                person_account_repository=person_account_repository,
                 receivable_invoice_posting_service=receivable_invoice_posting_service,
                 payable_invoice_posting_service=payable_invoice_posting_service,
                 credit_note_posting_service=credit_note_posting_service,

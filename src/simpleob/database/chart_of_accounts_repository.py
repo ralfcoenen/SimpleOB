@@ -18,6 +18,7 @@ from simpleob.database.models import (
     Kontenrolle,
     KontenTaxonomieZuordnung,
     Konto,
+    PersonenkontoZuordnung,
     Mandant,
     Wirtschaftsjahr,
 )
@@ -26,6 +27,7 @@ from simpleob.domain.account_mapping_rule import (
     AccountMappingRule,
 )
 from simpleob.domain.account_type import AccountType
+from simpleob.domain.person_account_role import PersonAccountRole
 from simpleob.domain.accounting_account_roles import (
     AccountingAccountRoles,
 )
@@ -110,6 +112,14 @@ class ChartOfAccountsRepository:
         if company_model is None:
             raise ValueError(
                 "Das Unternehmen ist nicht vorhanden."
+            )
+
+        if self._session.query(PersonenkontoZuordnung.id).filter(
+            PersonenkontoZuordnung.mandant_id == company_model.id
+        ).first() is not None:
+            raise ValueError(
+                "Der Kontenrahmen kann nicht vollständig ersetzt werden, "
+                "solange dauerhaft zugeordnete Personenkonten vorhanden sind."
             )
 
         account_by_number = {
@@ -356,6 +366,20 @@ class ChartOfAccountsRepository:
                 "Das Konto ist nicht vorhanden."
             )
 
+        person_account = (
+            self._session.query(PersonenkontoZuordnung.id)
+            .filter(
+                PersonenkontoZuordnung.mandant_id == company_model.id,
+                PersonenkontoZuordnung.account_number == account.number,
+            )
+            .first()
+        )
+        if person_account is not None:
+            raise ValueError(
+                "Personenkonten müssen über die Personenkontenverwaltung "
+                "bearbeitet werden."
+            )
+
         if (
             model.account_type != account.account_type.name
             and self.account_has_bookings(
@@ -506,6 +530,17 @@ class ChartOfAccountsRepository:
             dependencies: dict[str, set[str]] = {
                 number: set() for number in numbers
             }
+            for person_account in (
+                self._session.query(PersonenkontoZuordnung)
+                .filter(
+                    PersonenkontoZuordnung.mandant_id == company_model.id,
+                    PersonenkontoZuordnung.account_number.in_(numbers),
+                )
+                .all()
+            ):
+                dependencies[person_account.account_number].add(
+                    "dauerhafte Personenkonto-Zuordnung"
+                )
             configuration = (
                 self._session.query(KontenrahmenKonfiguration)
                 .filter(
@@ -651,6 +686,13 @@ class ChartOfAccountsRepository:
             .all()
         )
 
+        person_roles = {
+            row.account_number: PersonAccountRole(row.role)
+            for row in self._session.query(PersonenkontoZuordnung)
+            .filter(PersonenkontoZuordnung.mandant_id == company_model.id)
+            .all()
+        }
+
         if not models:
             return None
 
@@ -689,6 +731,7 @@ class ChartOfAccountsRepository:
                 Account(
                     template=template_account,
                     is_active=model.is_active,
+                    person_account_role=person_roles.get(model.account_number),
                 )
             )
 
@@ -739,6 +782,7 @@ class ChartOfAccountsRepository:
                 account_mapping_rules=tuple(
                     mapping_rules
                 ),
+                person_account_roles=tuple(sorted(person_roles.items())),
             )
         )
 

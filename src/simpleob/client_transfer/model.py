@@ -6,7 +6,8 @@ from decimal import Decimal, InvalidOperation
 from uuid import UUID
 
 CLIENT_TRANSFER_FORMAT_NAME = "SimpleOB Client Transfer"
-CLIENT_TRANSFER_FORMAT_VERSION = 1
+CLIENT_TRANSFER_FORMAT_VERSION = 2
+LEGACY_CLIENT_TRANSFER_FORMAT_VERSION = 1
 
 
 def _validate_required_text(
@@ -104,7 +105,10 @@ class ClientTransferFormat:
                 "Unbekanntes Mandantentransferformat."
             )
 
-        if self.version != CLIENT_TRANSFER_FORMAT_VERSION:
+        if self.version not in (
+            LEGACY_CLIENT_TRANSFER_FORMAT_VERSION,
+            CLIENT_TRANSFER_FORMAT_VERSION,
+        ):
             raise ValueError(
                 "Nicht unterstützte Version des "
                 "Mandantentransferformats."
@@ -322,6 +326,55 @@ class ClientTransferAccount:
                 field_name="credit_position_code",
             ),
         )
+
+
+@dataclass(frozen=True, slots=True)
+class ClientTransferBusinessPartner:
+    """Portable Stammdaten eines Personenkonto-Geschäftspartners."""
+
+    partner_id: UUID
+    name: str
+    is_customer: bool
+    is_supplier: bool
+    is_active: bool
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.partner_id, UUID):
+            raise TypeError("partner_id must be a UUID")
+        object.__setattr__(
+            self,
+            "name",
+            _validate_required_text(self.name, field_name="partner.name"),
+        )
+        for field_name in ("is_customer", "is_supplier", "is_active"):
+            if not isinstance(getattr(self, field_name), bool):
+                raise TypeError(f"{field_name} must be a bool")
+        if not self.is_customer and not self.is_supplier:
+            raise ValueError("Ein Geschäftspartner muss Kunde oder Lieferant sein.")
+
+
+@dataclass(frozen=True, slots=True)
+class ClientTransferPersonAccount:
+    """Portable Rollenverknüpfung zwischen Konto und Geschäftspartner."""
+
+    account_number: str
+    partner_id: UUID
+    role: str
+
+    def __post_init__(self) -> None:
+        number = _validate_account_number(
+            self.account_number, field_name="person_account.account_number"
+        )
+        if len(number) != 5 or not number.isascii():
+            raise ValueError("Personenkonten müssen genau fünf ASCII-Ziffern haben.")
+        if not isinstance(self.partner_id, UUID):
+            raise TypeError("partner_id must be a UUID")
+        if self.role not in ("DEBITOR", "KREDITOR"):
+            raise ValueError("Unbekannte Personenkontenrolle.")
+        lower, upper = (10000, 69999) if self.role == "DEBITOR" else (70000, 99999)
+        if not lower <= int(number) <= upper:
+            raise ValueError("Personenkontonummer liegt außerhalb des Rollen-Nummernkreises.")
+        object.__setattr__(self, "account_number", number)
 
 
 @dataclass(frozen=True, slots=True)
@@ -1540,6 +1593,8 @@ class ClientTransferClient:
     ] = ()
 
     kr_settings: ClientTransferKrSettings | None = None
+    business_partners: tuple[ClientTransferBusinessPartner, ...] = ()
+    person_accounts: tuple[ClientTransferPersonAccount, ...] = ()
 
     def __post_init__(self) -> None:
         if not isinstance(self.company_id, UUID):
@@ -1561,6 +1616,16 @@ class ClientTransferClient:
             ClientTransferKrSettings,
         ):
             raise TypeError("kr_settings must be ClientTransferKrSettings or None")
+
+        for field_name, expected_type in (
+            ("business_partners", ClientTransferBusinessPartner),
+            ("person_accounts", ClientTransferPersonAccount),
+        ):
+            values = getattr(self, field_name)
+            if not isinstance(values, tuple) or not all(
+                isinstance(value, expected_type) for value in values
+            ):
+                raise TypeError(f"{field_name} must contain valid transfer records")
 
         if not isinstance(self.accounts, tuple):
             raise TypeError(

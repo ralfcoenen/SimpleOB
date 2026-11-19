@@ -47,6 +47,7 @@ from simpleob.database.shareholder_repository import (
 from simpleob.database.tax_depreciation_adjustment_repository import (
     TaxDepreciationAdjustmentRepository,
 )
+from simpleob.database.person_account_repository import PersonAccountRepository
 from simpleob.domain.account import Account
 from simpleob.domain.account_mapping_rule import (
     AccountMappingRule,
@@ -61,6 +62,7 @@ from simpleob.domain.accounting_control_accounts import (
 from simpleob.domain.balance_sheet_presentation import (
     BalanceSheetPresentation,
 )
+from simpleob.domain.business_partner import BusinessPartner
 from simpleob.domain.booking import Booking
 from simpleob.domain.booking_line import BookingLine
 from simpleob.domain.booking_type import BookingType
@@ -98,6 +100,7 @@ from simpleob.domain.profit_appropriation_posting import (
 from simpleob.domain.profit_appropriation_posting_type import (
     ProfitAppropriationPostingType,
 )
+from simpleob.domain.person_account_role import PersonAccountRole
 from simpleob.domain.shareholder import Shareholder
 from simpleob.domain.template_account import TemplateAccount
 from simpleob.domain.vat_accounts import VatAccounts
@@ -130,6 +133,7 @@ class ClientTransferImporter:
             ProfitAppropriationPostingRepository
         ),
         equity_contribution_repository: EquityContributionRepository,
+        person_account_repository: PersonAccountRepository | None = None,
     ) -> None:
         self._company_repository = company_repository
         self._chart_of_accounts_repository = (
@@ -160,6 +164,7 @@ class ClientTransferImporter:
         self._equity_contribution_repository = (
             equity_contribution_repository
         )
+        self._person_account_repository = person_account_repository
 
     def import_transfer(
         self,
@@ -177,6 +182,11 @@ class ClientTransferImporter:
         validate_client_transfer_references(
             transfer
         )
+
+        if transfer.client.person_accounts and self._person_account_repository is None:
+            raise ValueError(
+                "Der Personenkonto-Import benötigt das Personenkonten-Repository."
+            )
 
         self._validate_supported_scope(
             transfer=transfer
@@ -246,6 +256,34 @@ class ClientTransferImporter:
                     company_id=company_id,
                     account=account,
                     mapping_rule=mapping_rule,
+                    commit=False,
+                )
+
+            if transfer.client.person_accounts:
+                assert self._person_account_repository is not None
+                partners = tuple(
+                    BusinessPartner(
+                        company_id=company_id,
+                        partner_id=partner.partner_id,
+                        name=partner.name,
+                        is_customer=partner.is_customer,
+                        is_supplier=partner.is_supplier,
+                        is_active=partner.is_active,
+                    )
+                    for partner in transfer.client.business_partners
+                )
+                person_accounts = tuple(
+                    (
+                        person_account.account_number,
+                        person_account.partner_id,
+                        PersonAccountRole(person_account.role),
+                    )
+                    for person_account in transfer.client.person_accounts
+                )
+                self._person_account_repository.import_transfer_records(
+                    company_id=company_id,
+                    partners=partners,
+                    person_accounts=person_accounts,
                     commit=False,
                 )
 

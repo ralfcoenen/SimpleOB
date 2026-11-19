@@ -46,6 +46,7 @@ from simpleob.database.shareholder_repository import ShareholderRepository
 from simpleob.database.tax_depreciation_adjustment_repository import (
     TaxDepreciationAdjustmentRepository,
 )
+from simpleob.database.person_account_repository import PersonAccountRepository
 
 
 class ClientDeletionCommitUnknown(RuntimeError):
@@ -82,6 +83,7 @@ def _transfer_repositories(session: Session) -> dict:
             session
         ),
         "equity_contribution_repository": EquityContributionRepository(session),
+        "person_account_repository": PersonAccountRepository(session),
     }
 
 

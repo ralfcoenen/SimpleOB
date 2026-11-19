@@ -616,6 +616,48 @@ class Geschaeftspartner(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False)
 
 
+class PersonenkontoZuordnung(Base):
+    """Dauerhafte Zuordnung eines Personenkontos zu Partner und Rolle."""
+
+    __tablename__ = "personenkonto_zuordnungen"
+    __table_args__ = (
+        UniqueConstraint(
+            "mandant_id", "account_number",
+            name="uq_personenkonto_mandant_konto",
+        ),
+        UniqueConstraint(
+            "mandant_id", "partner_id", "role",
+            name="uq_personenkonto_mandant_partner_rolle",
+        ),
+        ForeignKeyConstraint(
+            ["mandant_id", "account_number"],
+            ["konten.mandant_id", "konten.account_number"],
+            name="fk_personenkonto_mandant_konto",
+        ),
+        ForeignKeyConstraint(
+            ["mandant_id", "partner_id"],
+            ["geschaeftspartner.mandant_id", "geschaeftspartner.partner_id"],
+            name="fk_personenkonto_mandant_partner",
+        ),
+        CheckConstraint(
+            "role IN ('DEBITOR', 'KREDITOR')",
+            name="ck_personenkonto_rolle",
+        ),
+        CheckConstraint(
+            "length(account_number) = 5 AND "
+            "((role = 'DEBITOR' AND CAST(account_number AS INTEGER) BETWEEN 10000 AND 69999) "
+            "OR (role = 'KREDITOR' AND CAST(account_number AS INTEGER) BETWEEN 70000 AND 99999))",
+            name="ck_personenkonto_nummernkreis",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    mandant_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    account_number: Mapped[str] = mapped_column(String(5), nullable=False)
+    partner_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    role: Mapped[str] = mapped_column(String(8), nullable=False)
+
+
 class Ausgangsrechnung(Base):
     """Gebuchte Ausgangsrechnung mit eindeutigem Hauptbuchbezug."""
 

@@ -27,6 +27,8 @@ def validate_client_transfer_references(
 
     client = transfer.client
 
+    _validate_person_account_references(transfer)
+
     account_numbers = {
         account.account_number
         for account in client.accounts
@@ -260,13 +262,58 @@ def _require_fiscal_year(
         reference.start_date,
         reference.end_date,
     )
-
     if key not in fiscal_year_keys:
         raise ValueError(
             f"{reference_name} references unknown "
             "fiscal year"
         )
 
+
+def _validate_person_account_references(transfer: ClientTransfer) -> None:
+    client = transfer.client
+    if transfer.format.version == 1:
+        if client.business_partners or client.person_accounts:
+            raise ValueError("Transferformat Version 1 darf keine Personenkonten enthalten.")
+        return
+
+    accounts = {account.account_number: account for account in client.accounts}
+    if len({partner.partner_id for partner in client.business_partners}) != len(
+        client.business_partners
+    ):
+        raise ValueError("Transfer enthält doppelte Geschäftspartner-IDs.")
+    partners = {partner.partner_id: partner for partner in client.business_partners}
+    links_by_number = {}
+    roles_by_partner = set()
+    referenced_partners = set()
+    for person_account in client.person_accounts:
+        number = person_account.account_number
+        partner = partners.get(person_account.partner_id)
+        account = accounts.get(number)
+        if partner is None:
+            raise ValueError("Personenkonto verweist auf einen unbekannten Geschäftspartner.")
+        if account is None:
+            raise ValueError("Personenkonto verweist auf ein unbekanntes Konto.")
+        if number in links_by_number:
+            raise ValueError("Personenkonto-Kontonummern müssen eindeutig sein.")
+        role_key = (person_account.partner_id, person_account.role)
+        if role_key in roles_by_partner:
+            raise ValueError("Ein Geschäftspartner darf je Rolle nur ein Personenkonto besitzen.")
+        expected_type = "ASSET" if person_account.role == "DEBITOR" else "LIABILITY"
+        if account.account_type != expected_type:
+            raise ValueError("Personenkontorolle und Kontotyp stimmen nicht überein.")
+        if account.name != partner.name:
+            raise ValueError("Kontoname und Geschäftspartnername stimmen nicht überein.")
+        if account.debit_position_code is not None or account.credit_position_code is not None:
+            raise ValueError("Personenkonten dürfen keine individuellen HGB-Zuordnungen besitzen.")
+        if person_account.role == "DEBITOR" and not partner.is_customer:
+            raise ValueError("Debitorenzuordnung erfordert einen als Kunde markierten Partner.")
+        if person_account.role == "KREDITOR" and not partner.is_supplier:
+            raise ValueError("Kreditorenzuordnung erfordert einen als Lieferant markierten Partner.")
+        links_by_number[number] = person_account
+        roles_by_partner.add(role_key)
+        referenced_partners.add(person_account.partner_id)
+    if referenced_partners != set(partners):
+        raise ValueError("Jeder transferierte Geschäftspartner muss mindestens einem Personenkonto zugeordnet sein.")
 
 def _require_fiscal_year_end(
     fiscal_year_end: date,

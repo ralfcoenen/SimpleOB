@@ -4,7 +4,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from simpleob.database.models import Geschaeftspartner, Mandant
+from simpleob.database.models import Geschaeftspartner, Mandant, PersonenkontoZuordnung
 from simpleob.domain.business_partner import BusinessPartner
 
 
@@ -69,6 +69,48 @@ class BusinessPartnerRepository:
             .one_or_none()
         )
         return self._to_domain(company_id, model) if model else None
+
+    def update(
+        self,
+        partner: BusinessPartner,
+        *,
+        commit: bool = True,
+    ) -> None:
+        """Aktualisiert Stammdaten eines bestehenden Partners."""
+        if not isinstance(partner, BusinessPartner):
+            raise TypeError("partner must be a BusinessPartner")
+        company = self._find_company(partner.company_id)
+        if company is None:
+            raise ValueError("Das Unternehmen ist nicht vorhanden.")
+        model = (
+            self._session.query(Geschaeftspartner)
+            .filter(
+                Geschaeftspartner.mandant_id == company.id,
+                Geschaeftspartner.partner_id == str(partner.partner_id),
+            )
+            .one_or_none()
+        )
+        if model is None:
+            raise ValueError("Der Geschäftspartner ist nicht vorhanden.")
+        if (
+            self._session.query(PersonenkontoZuordnung.id)
+            .filter(
+                PersonenkontoZuordnung.mandant_id == company.id,
+                PersonenkontoZuordnung.partner_id == str(partner.partner_id),
+            )
+            .first()
+            is not None
+        ):
+            raise ValueError(
+                "Dieser Geschäftspartner wird durch Personenkonten verwaltet. "
+                "Bitte ändern Sie die Stammdaten über das Personenkonto."
+            )
+        model.name = partner.name
+        model.is_customer = partner.is_customer
+        model.is_supplier = partner.is_supplier
+        model.is_active = partner.is_active
+        if commit:
+            self._session.commit()
 
     def list_for_company(
         self,

@@ -7,6 +7,7 @@ from uuid import UUID
 import pytest
 
 from simpleob.client_transfer.model import (
+    CLIENT_TRANSFER_FORMAT_VERSION,
     ClientTransfer,
     ClientTransferAccount,
     ClientTransferAccountRoles,
@@ -230,7 +231,7 @@ def test_transfer_json_is_valid_json() -> None:
     assert data["format"]["name"] == (
         "SimpleOB Client Transfer"
     )
-    assert data["format"]["version"] == 1
+    assert data["format"]["version"] == CLIENT_TRANSFER_FORMAT_VERSION
 
 
 def test_invalid_json_is_rejected() -> None:
@@ -245,7 +246,7 @@ def test_unsupported_format_version_is_rejected() -> None:
     transfer = _build_transfer()
     data = client_transfer_to_dict(transfer)
 
-    data["format"]["version"] = 2
+    data["format"]["version"] = 3
 
     text = json.dumps(data)
 
@@ -257,6 +258,19 @@ def test_unsupported_format_version_is_rejected() -> None:
         ),
     ):
         client_transfer_from_json(text)
+
+
+def test_version_one_transfer_without_person_accounts_remains_readable() -> None:
+    data = client_transfer_to_dict(_build_transfer())
+    data["format"]["version"] = 1
+    data["client"].pop("business_partners", None)
+    data["client"].pop("person_accounts", None)
+
+    transfer = client_transfer_from_json(json.dumps(data))
+
+    assert transfer.format.version == 1
+    assert transfer.client.business_partners == ()
+    assert transfer.client.person_accounts == ()
 
 
 def test_complete_transfer_json_roundtrip() -> None:

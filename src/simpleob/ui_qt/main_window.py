@@ -60,6 +60,7 @@ from simpleob.core.config import (
 )
 from simpleob.core.context import ApplicationContext
 from simpleob.database.business_partner_repository import BusinessPartnerRepository
+from simpleob.database.person_account_repository import PersonAccountRepository
 from simpleob.database.lock_error import DatabaseLockError
 from simpleob.date_input import GermanDateEdit
 from simpleob.domain.account import Account
@@ -74,7 +75,11 @@ from simpleob.domain.chart_of_accounts_template import (
 from simpleob.domain.credit_note import CreditNoteKind
 from simpleob.domain.elster_data_supplier import ElsterDataSupplier
 from simpleob.domain.entry_side import EntrySide
-from simpleob.domain.errors import UnknownAccountError
+from simpleob.domain.errors import (
+    UnknownAccountError,
+    UnsupportedPersonAccountBalanceError,
+)
+from simpleob.domain.person_account_role import PersonAccountRole
 from simpleob.domain.fiscal_year_status import FiscalYearStatus
 from simpleob.domain.vat_accounts import VatAccounts
 from simpleob.eric.elster_bilanz_transmission_service import (
@@ -167,6 +172,7 @@ from simpleob.ui_qt.open_item_overview_widget import OpenItemOverviewWidget
 from simpleob.ui_qt.open_item_payment_dialog import OpenItemPaymentDialog
 from simpleob.ui_qt.open_item_reconciliation_widget import OpenItemReconciliationWidget
 from simpleob.ui_qt.opening_balance_dialog import OpeningBalanceDialog
+from simpleob.ui_qt.person_account_dialog import PersonAccountDialog
 from simpleob.ui_qt.payment_allocation_correction_dialog import (
     PaymentAllocationCorrectionDialog,
 )
@@ -225,6 +231,7 @@ class MainWindow(QMainWindow):
         eric_data_supplier: ElsterDataSupplier | None = None,
         application_config: ApplicationConfig | None = None,
         business_partner_repository: BusinessPartnerRepository | None = None,
+        person_account_repository: PersonAccountRepository | None = None,
         receivable_invoice_posting_service: ReceivableInvoicePostingService | None = None,
         payable_invoice_posting_service: PayableInvoicePostingService | None = None,
         credit_note_posting_service: CreditNotePostingService | None = None,
@@ -275,6 +282,7 @@ class MainWindow(QMainWindow):
         )
         self._application_config = application_config
         self._business_partner_repository = business_partner_repository
+        self._person_account_repository = person_account_repository
         self._receivable_invoice_posting_service = receivable_invoice_posting_service
         self._payable_invoice_posting_service = payable_invoice_posting_service
         self._credit_note_posting_service = credit_note_posting_service
@@ -2052,6 +2060,24 @@ class MainWindow(QMainWindow):
             self._new_account_button
         )
 
+        self._new_debtor_button = QPushButton("Neuer Debitor")
+        self._new_debtor_button.clicked.connect(
+            lambda: self._open_new_person_account(PersonAccountRole.DEBITOR)
+        )
+        self._new_debtor_button.setEnabled(
+            self._workspace.is_open and self._person_account_repository is not None
+        )
+        button_layout.addWidget(self._new_debtor_button)
+
+        self._new_creditor_button = QPushButton("Neuer Kreditor")
+        self._new_creditor_button.clicked.connect(
+            lambda: self._open_new_person_account(PersonAccountRole.KREDITOR)
+        )
+        self._new_creditor_button.setEnabled(
+            self._workspace.is_open and self._person_account_repository is not None
+        )
+        button_layout.addWidget(self._new_creditor_button)
+
         self._edit_account_button = QPushButton(
             "Konto bearbeiten"
         )
@@ -2094,11 +2120,12 @@ class MainWindow(QMainWindow):
         layout.addWidget(self._journal_status)
 
         self._account_table = QTableWidget()
-        self._account_table.setColumnCount(6)
+        self._account_table.setColumnCount(7)
         self._account_table.setHorizontalHeaderLabels(
             (
                 "Konto",
                 "Bezeichnung",
+                "Rolle",
                 "Soll",
                 "Haben",
                 "Saldo",
@@ -2139,6 +2166,10 @@ class MainWindow(QMainWindow):
         )
         header.setSectionResizeMode(
             5,
+            QHeaderView.ResizeMode.ResizeToContents,
+        )
+        header.setSectionResizeMode(
+            6,
             QHeaderView.ResizeMode.ResizeToContents,
         )
 
@@ -2388,6 +2419,13 @@ class MainWindow(QMainWindow):
         self._booking_frame.set_enabled(enabled)
         self._vat_booking_frame.set_enabled(enabled)
         self._booking_mode_box.setEnabled(enabled)
+        if hasattr(self, "_new_debtor_button"):
+            self._new_debtor_button.setEnabled(
+                enabled and self._person_account_repository is not None
+            )
+            self._new_creditor_button.setEnabled(
+                enabled and self._person_account_repository is not None
+            )
         self._opening_balance_button.setEnabled(enabled)
         self._payment_button.setEnabled(
             enabled and self._open_item_payment_service is not None
@@ -5342,6 +5380,10 @@ class MainWindow(QMainWindow):
         except ValueError as exc:
             message = str(exc)
 
+            if isinstance(exc, UnsupportedPersonAccountBalanceError):
+                self._balance_sheet_frame.show_mapping_error(message)
+                return
+
             if (
                 "no debit position defined for account"
                 not in message
@@ -5580,6 +5622,23 @@ class MainWindow(QMainWindow):
             ),
         )
 
+    def _open_new_person_account(self, role: PersonAccountRole) -> None:
+        repository = self._person_account_repository
+        if repository is None or not self._workspace.is_open:
+            return
+        dialog = PersonAccountDialog(
+            self,
+            company_id=self._context.company.company_id,
+            role=role,
+            repository=repository,
+        )
+        if dialog.exec() != QDialog.DialogCode.Accepted or dialog.saved is None:
+            return
+        self._activate_account_editing_mode()
+        self._chart_of_accounts, self._accounts = self._reload_chart_of_accounts()
+        self._refresh_accounts()
+        select_account_row(self._account_table, dialog.saved.account_number)
+
     def _open_edit_account(self) -> None:
         """Öffnet den Dialog zum Bearbeiten des ausgewählten Kontos."""
 
@@ -5641,6 +5700,38 @@ class MainWindow(QMainWindow):
                 "Konto bearbeiten",
                 "Das ausgewählte Konto wurde nicht gefunden.",
             )
+            return
+
+        if getattr(account, "person_account_role", None) is not None:
+            repository = self._person_account_repository
+            person_account = (
+                repository.get(
+                    company_id=self._context.company.company_id,
+                    account_number=account.number,
+                )
+                if repository is not None
+                else None
+            )
+            if repository is None or person_account is None:
+                QMessageBox.critical(
+                    self,
+                    "Personenkonto",
+                    "Die Personenkonto-Stammdaten konnten nicht geladen werden.",
+                )
+                return
+            dialog = PersonAccountDialog(
+                self,
+                company_id=self._context.company.company_id,
+                role=person_account.role,
+                repository=repository,
+                existing=person_account,
+            )
+            if dialog.exec() != QDialog.DialogCode.Accepted or dialog.saved is None:
+                return
+            self._activate_account_editing_mode()
+            self._chart_of_accounts, self._accounts = self._reload_chart_of_accounts()
+            self._refresh_accounts()
+            select_account_row(self._account_table, account.number)
             return
 
         try:
@@ -6477,6 +6568,15 @@ class MainWindow(QMainWindow):
             values = (
                 account.number,
                 account.name,
+                (
+                    (
+                        "Debitor"
+                        if account.person_account_role is PersonAccountRole.DEBITOR
+                        else "Kreditor"
+                    ) + (" (inaktiv)" if not account.is_active else "")
+                    if account.person_account_role is not None
+                    else ""
+                ),
                 self._format_amount(debit),
                 self._format_amount(credit),
                 balance,
@@ -6490,12 +6590,12 @@ class MainWindow(QMainWindow):
                     else QTableWidgetItem(str(value))
                 )
 
-                if column in (2, 3, 4):
+                if column in (3, 4, 5):
                     item.setTextAlignment(
                         Qt.AlignmentFlag.AlignRight
                         | Qt.AlignmentFlag.AlignVCenter
                     )
-                elif column == 5:
+                elif column == 6:
                     item.setTextAlignment(
                         Qt.AlignmentFlag.AlignCenter
                     )

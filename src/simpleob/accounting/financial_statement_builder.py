@@ -23,7 +23,12 @@ class FinancialStatementBuilder:
     ) -> dict[FinancialStatementPosition, Decimal]:
         amounts: dict[FinancialStatementPosition, Decimal] = {}
 
+        if balances:
+            self.ensure_person_account_balances_supported(balances)
+
         for balance in balances:
+            if balance.balance == ZERO:
+                continue
             position, amount = self._mapper.map_balance(
                 balance
             )
@@ -46,6 +51,13 @@ class FinancialStatementBuilder:
             self._aggregate_position(root_position, amounts)
 
         return amounts
+
+    def ensure_person_account_balances_supported(
+        self,
+        balances: tuple[AccountBalance, ...],
+    ) -> None:
+        """Bricht HGB-Auswertungen bei nicht integrierten Personensalden ab."""
+        self._mapper.ensure_person_account_balances_supported(balances)
 
     def _aggregate_position(
         self,

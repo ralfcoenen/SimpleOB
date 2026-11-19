@@ -138,7 +138,7 @@ def test_client_transfer_format_rejects_unknown_version() -> None:
         match="Nicht unterstützte Version",
     ):
         ClientTransferFormat(
-            version=2
+            version=3
         )
 
 

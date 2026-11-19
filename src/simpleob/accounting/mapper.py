@@ -9,6 +9,7 @@ from simpleob.domain.chart_of_accounts_template import (
     ChartOfAccountsTemplate,
 )
 from simpleob.domain.money import ZERO
+from simpleob.domain.errors import UnsupportedPersonAccountBalanceError
 
 
 class AccountMapper:
@@ -23,6 +24,12 @@ class AccountMapper:
         balance: AccountBalance,
     ) -> tuple[FinancialStatementPosition, Decimal]:
         """Liefert Abschlussposition und vorzeichenbehafteten Betrag."""
+
+        if self._chart_of_accounts.is_person_account(balance.account_number):
+            raise UnsupportedPersonAccountBalanceError(
+                "Die Bilanzintegration von Personenkonten ist noch nicht unterstützt. "
+                f"Personenkonto {balance.account_number} weist einen Saldo auf."
+            )
 
         for rule in self._chart_of_accounts.account_mapping_rules:
             if rule.account_number != balance.account_number:
@@ -94,3 +101,17 @@ class AccountMapper:
         )
 
         return position
+
+    def ensure_person_account_balances_supported(
+        self,
+        balances: tuple[AccountBalance, ...],
+    ) -> None:
+        for balance in balances:
+            if (
+                self._chart_of_accounts.is_person_account(balance.account_number)
+                and balance.balance != ZERO
+            ):
+                raise UnsupportedPersonAccountBalanceError(
+                    "Die Bilanzintegration von Personenkonten ist noch nicht unterstützt. "
+                    f"Personenkonto {balance.account_number} weist einen Saldo auf."
+                )

@@ -21,3 +21,7 @@ class DomainError(Exception):
 
 class UnknownAccountError(DomainError):
     """Eine Buchung verwendet ein unbekanntes Konto."""
+
+
+class UnsupportedPersonAccountBalanceError(ValueError):
+    """Personenkontensalden sind in dieser HGB-Auswertung noch nicht integriert."""

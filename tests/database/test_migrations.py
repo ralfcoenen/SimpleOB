@@ -9,7 +9,7 @@ from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.exc import IntegrityError
 
 BASELINE_REVISION = "7392d6cc6892"
-HEAD_REVISION = "2c862af39901"
+HEAD_REVISION = "2f8c41d7a6b3"
 
 
 def _alembic_config(
@@ -139,6 +139,18 @@ def test_migrations_upgrade_from_baseline_to_head(
         }
 
         assert "reversal_of_booking_id" in booking_columns
+        assert "personenkonto_zuordnungen" in inspector.get_table_names()
+        person_account_columns = {
+            column["name"]
+            for column in inspector.get_columns("personenkonto_zuordnungen")
+        }
+        assert person_account_columns == {
+            "id", "mandant_id", "account_number", "partner_id", "role"
+        }
+        assert "geschaeftspartner" in inspector.get_table_names()
+        assert "buchungszeilen" in inspector.get_table_names()
+        assert "forderungs_ops" in inspector.get_table_names()
+        assert "verbindlichkeits_ops" in inspector.get_table_names()
 
         columns_after = {
             column["name"]

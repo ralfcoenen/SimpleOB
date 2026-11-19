@@ -16,6 +16,7 @@ from simpleob.client_transfer.model import (
     ClientTransferBooking,
     ClientTransferBookingLine,
     ClientTransferBookingLineReference,
+    ClientTransferBusinessPartner,
     ClientTransferClient,
     ClientTransferControlAccounts,
     ClientTransferEquityContribution,
@@ -28,6 +29,7 @@ from simpleob.client_transfer.model import (
     ClientTransferKrAnnualTurnover,
     ClientTransferKrSettings,
     ClientTransferMasterData,
+    ClientTransferPersonAccount,
     ClientTransferProfitAppropriationAnnualData,
     ClientTransferProfitAppropriationPosting,
     ClientTransferShareholder,
@@ -983,6 +985,24 @@ def _client_from_dict(
                 )
             )
         ),
+        business_partners=tuple(
+            _business_partner_from_dict(
+                _require_object(item, field_name="client.business_partners item")
+            )
+            for item in _require_list(
+                data.get("business_partners", []),
+                field_name="client.business_partners",
+            )
+        ),
+        person_accounts=tuple(
+            _person_account_from_dict(
+                _require_object(item, field_name="client.person_accounts item")
+            )
+            for item in _require_list(
+                data.get("person_accounts", []),
+                field_name="client.person_accounts",
+            )
+        ),
         taxonomy_mappings=tuple(
             _taxonomy_mapping_from_dict(
                 _require_object(
@@ -1087,6 +1107,26 @@ def _client_from_dict(
                 field_name="client.fiscal_years",
             )
         ),
+    )
+
+
+def _business_partner_from_dict(data: JsonObject) -> ClientTransferBusinessPartner:
+    return ClientTransferBusinessPartner(
+        partner_id=_parse_uuid(data.get("partner_id"), field_name="partner.partner_id"),
+        name=_require_string(data.get("name"), field_name="partner.name"),
+        is_customer=_require_bool(data.get("is_customer"), field_name="partner.is_customer"),
+        is_supplier=_require_bool(data.get("is_supplier"), field_name="partner.is_supplier"),
+        is_active=_require_bool(data.get("is_active"), field_name="partner.is_active"),
+    )
+
+
+def _person_account_from_dict(data: JsonObject) -> ClientTransferPersonAccount:
+    return ClientTransferPersonAccount(
+        account_number=_require_string(
+            data.get("account_number"), field_name="person_account.account_number"
+        ),
+        partner_id=_parse_uuid(data.get("partner_id"), field_name="person_account.partner_id"),
+        role=_require_string(data.get("role"), field_name="person_account.role"),
     )
 
 

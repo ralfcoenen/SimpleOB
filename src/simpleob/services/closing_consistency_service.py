@@ -9,6 +9,7 @@ from simpleob.domain.closing_consistency_result import (
     ClosingConsistencyResult,
 )
 from simpleob.domain.money import ZERO
+from simpleob.domain.errors import UnsupportedPersonAccountBalanceError
 from simpleob.services.closing_result import ClosingResult
 from simpleob.services.closing_service import ClosingService
 
@@ -137,10 +138,14 @@ class ClosingConsistencyService:
                 mapper.position_for(
                     balance
                 )
+            except UnsupportedPersonAccountBalanceError as exc:
+                errors.append(
+                    str(exc)
+                )
             except ValueError:
                 errors.append(
-                    f"Konto {balance.account_number} "
-                    "ist keiner Abschlussposition zugeordnet."
+                    f"Konto {balance.account_number} ist keiner "
+                    "Abschlussposition zugeordnet."
                 )
 
         return ClosingConsistencyResult(

@@ -13,6 +13,8 @@ from simpleob.client_transfer.archive import read_client_transfer_archive
 from simpleob.client_transfer.importer import ClientTransferImporter
 from simpleob.database.client_deletion_repository import ClientDeletionRepository
 from simpleob.database.database import Base
+from simpleob.database.person_account_repository import PersonAccountRepository
+from simpleob.domain.person_account_role import PersonAccountRole
 from simpleob.services import client_deletion_service as module
 from simpleob.services.client_deletion_service import (
     ClientDeletionService,
@@ -510,3 +512,57 @@ def test_canonical_covers_every_actual_fk_target_with_reassigned_ids(populated):
     assert ClientDeletionRepository.canonical(captured) == (
         ClientDeletionRepository.canonical(reassigned)
     )
+
+
+def test_client_delete_backup_roundtrips_person_accounts_without_touching_other_tenant(
+    populated, tmp_path
+):
+    engine, transfer, other, service = populated
+    with Session(engine) as session:
+        repository = PersonAccountRepository(session)
+        source_person = repository.create(
+            company_id=transfer.client.company_id,
+            role=PersonAccountRole.DEBITOR,
+            name="Sicherungsdebitor",
+            account_number="10000",
+        )
+        other_person = repository.create(
+            company_id=other.client.company_id,
+            role=PersonAccountRole.DEBITOR,
+            name="Anderer Mandant",
+            account_number="10000",
+        )
+
+    path = tmp_path / "personenkonto-backup.simpleob"
+    service.delete(
+        company_id=transfer.client.company_id,
+        expected_name=transfer.client.master_data.name,
+        backup_path=path,
+    )
+    archived = read_client_transfer_archive(path)
+    assert archived.client.person_accounts[0].account_number == "10000"
+    assert archived.client.person_accounts[0].partner_id == source_person.partner.partner_id
+    assert archived.client.business_partners[0].name == "Sicherungsdebitor"
+    with Session(engine) as source_session:
+        still_present = PersonAccountRepository(source_session).get(
+            company_id=other.client.company_id,
+            account_number="10000",
+        )
+        assert still_present is not None
+        assert still_present.partner.partner_id == other_person.partner.partner_id
+
+    restored_engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(restored_engine)
+    with Session(restored_engine) as session:
+        ClientTransferImporter(**_transfer_repositories(session)).import_transfer(
+            transfer=archived,
+            position_provider=_build_position_provider(),
+        )
+        restored = PersonAccountRepository(session).get(
+            company_id=transfer.client.company_id,
+            account_number="10000",
+        )
+        assert restored is not None
+        assert restored.partner.partner_id == source_person.partner.partner_id
+        assert restored.partner.name == "Sicherungsdebitor"
+    restored_engine.dispose()
