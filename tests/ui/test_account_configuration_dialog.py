@@ -90,13 +90,26 @@ def _account_item(dialog, account_number: str):
     raise AssertionError(f"Konto {account_number} fehlt in der Liste")
 
 
-def test_dialog_shows_all_eleven_roles_and_full_account_labels():
+def test_dialog_shows_only_seven_active_roles_and_full_account_labels():
     dialog = _dialog()
     _show_roles_tab(dialog)
 
-    assert dialog._role_list.count() == 11
+    assert dialog._role_list.count() == 7
     assert dialog._role_list.item(0).text() == "Kasse"
-    assert dialog._role_list.item(10).text() == "Umsatzsteuerverbindlichkeiten Vorjahr"
+    assert dialog._role_list.item(6).text() == "Umsatzsteuerverbindlichkeiten Vorjahr"
+    roles = {
+        dialog._role_list.item(index).data(Qt.ItemDataRole.UserRole)
+        for index in range(dialog._role_list.count())
+    }
+    assert roles == {
+        "cash_accounts",
+        "bank_accounts",
+        "general_rate_sales_accounts",
+        "vat_advance_payments",
+        "vat_current_year",
+        "vat_prior_year_receivables",
+        "vat_prior_year_payables",
+    }
     item = _account_item(dialog, "1800")
     assert item.text() == "1800 – Bankkonto mit einer besonders langen Bezeichnung"
     assert dialog._role_account_list.width() > dialog._role_list.width()
@@ -105,7 +118,7 @@ def test_dialog_shows_all_eleven_roles_and_full_account_labels():
 def test_vat_role_lists_filter_to_the_required_account_type():
     dialog = _dialog()
     _show_roles_tab(dialog)
-    dialog._role_list.setCurrentRow(8)
+    dialog._role_list.setCurrentRow(4)
 
     assert _account_item(dialog, "3840")
     assert all(
@@ -133,7 +146,30 @@ def test_switching_roles_preserves_multiple_unsaved_assignments_until_save():
     assert dialog.result[2].general_rate_sales_accounts == frozenset(
         {"4000", "4001"}
     )
+    assert dialog.result[2].customer_receivables == frozenset({"1100"})
+    assert dialog.result[2].supplier_payables == frozenset({"1600"})
+    assert dialog.result[2].customer_credit_balances == frozenset({"1610"})
+    assert dialog.result[2].supplier_credit_balances == frozenset({"1400"})
     assert dialog.result is not None
+
+
+def test_hidden_op_assignments_are_preserved_and_reserve_their_accounts():
+    dialog = _dialog()
+    _show_roles_tab(dialog)
+
+    customer_receivable = _account_item(dialog, "1100")
+    assert not customer_receivable.flags() & Qt.ItemFlag.ItemIsEnabled
+    assert "Kundenforderungen" in customer_receivable.toolTip()
+
+    _account_item(dialog, "1001").setCheckState(Qt.CheckState.Checked)
+    dialog._save()
+
+    assert dialog.result is not None
+    assert dialog.result[2].customer_receivables == frozenset({"1100"})
+    assert dialog.result[2].supplier_payables == frozenset({"1600"})
+    assert dialog.result[2].customer_credit_balances == frozenset({"1610"})
+    assert dialog.result[2].supplier_credit_balances == frozenset({"1400"})
+    assert dialog.result[2].cash_accounts == frozenset({"1000", "1001"})
 
 
 def test_account_assigned_to_another_role_cannot_be_selected_twice():

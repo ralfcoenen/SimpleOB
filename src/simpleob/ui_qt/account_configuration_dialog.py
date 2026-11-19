@@ -63,7 +63,7 @@ class AccountConfigurationDialog(QDialog):
             bank_accounts=frozenset(),
             general_rate_sales_accounts=frozenset(),
         )
-        self._role_definitions = (
+        self._all_role_definitions = (
             ("Kasse", "cash_accounts"),
             ("Bank", "bank_accounts"),
             ("Umsatzerlöse allgemeiner Steuersatz", "general_rate_sales_accounts"),
@@ -76,9 +76,20 @@ class AccountConfigurationDialog(QDialog):
             ("Umsatzsteuerforderungen Vorjahr", "vat_prior_year_receivables"),
             ("Umsatzsteuerverbindlichkeiten Vorjahr", "vat_prior_year_payables"),
         )
+        hidden_legacy_roles = {
+            "customer_receivables",
+            "supplier_payables",
+            "customer_credit_balances",
+            "supplier_credit_balances",
+        }
+        self._role_definitions = tuple(
+            definition
+            for definition in self._all_role_definitions
+            if definition[1] not in hidden_legacy_roles
+        )
         self._role_assignments = {
             field_name: set(getattr(self._account_roles, field_name))
-            for _label, field_name in self._role_definitions
+            for _label, field_name in self._all_role_definitions
         }
         self._current_role_key: str | None = None
 
@@ -389,7 +400,7 @@ class AccountConfigurationDialog(QDialog):
             assigned_here = self._role_assignments[self._current_role_key]
             assigned_elsewhere = {
                 account_number: label
-                for label, field_name in self._role_definitions
+                for label, field_name in self._all_role_definitions
                 if field_name != self._current_role_key
                 for account_number in self._role_assignments[field_name]
             }

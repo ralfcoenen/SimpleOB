@@ -289,13 +289,30 @@ def _referenced_bundle():
     )
 
 
-def _configuration_test_bundle(*, opening_balance_account="7000"):
+def _configuration_test_bundle(
+    *, opening_balance_account="7000", include_op_roles=False
+):
     bundle = _referenced_bundle()
     accounts = (
         *bundle.chart.accounts,
         TemplateAccount("7005", "Weiteres Eigenkapital", AccountType.EQUITY),
         TemplateAccount("7006", "Weiteres Aktivkonto", AccountType.ASSET),
     )
+    account_roles = bundle.account_roles
+    if include_op_roles:
+        accounts += (
+            TemplateAccount("7007", "Kundenforderungen", AccountType.ASSET),
+            TemplateAccount("7008", "Lieferantenverbindlichkeiten", AccountType.LIABILITY),
+            TemplateAccount("7009", "Kundenguthaben", AccountType.LIABILITY),
+            TemplateAccount("7010", "Lieferantenguthaben", AccountType.ASSET),
+        )
+        account_roles = replace(
+            account_roles,
+            customer_receivables=frozenset({"7007"}),
+            supplier_payables=frozenset({"7008"}),
+            customer_credit_balances=frozenset({"7009"}),
+            supplier_credit_balances=frozenset({"7010"}),
+        )
     controls = replace(
         bundle.control_accounts,
         opening_balance_account=opening_balance_account,
@@ -304,6 +321,7 @@ def _configuration_test_bundle(*, opening_balance_account="7000"):
         bundle,
         chart=replace(bundle.chart, accounts=accounts),
         control_accounts=controls,
+        account_roles=account_roles,
     )
 
 
@@ -1172,7 +1190,7 @@ def test_configuration_button_opens_with_existing_values_and_accepts_changes(
 ):
     _app()
     editor = _editor(
-        _configuration_test_bundle(),
+        _configuration_test_bundle(include_op_roles=True),
         templates_directory=tmp_path / "templates",
     )
 
@@ -1181,6 +1199,22 @@ def test_configuration_button_opens_with_existing_values_and_accepts_changes(
         assert config._input_tax_7_box.currentData() == "7004"
         assert config._output_tax_19_box.currentData() == "7001"
         assert config._role_assignments["cash_accounts"] == {"7004"}
+        assert config._role_assignments["customer_receivables"] == {"7007"}
+        assert config._role_assignments["supplier_payables"] == {"7008"}
+        assert config._role_assignments["customer_credit_balances"] == {"7009"}
+        assert config._role_assignments["supplier_credit_balances"] == {"7010"}
+        visible_roles = {
+            config._role_list.item(index).data(Qt.ItemDataRole.UserRole)
+            for index in range(config._role_list.count())
+        }
+        assert visible_roles.isdisjoint(
+            {
+                "customer_receivables",
+                "supplier_payables",
+                "customer_credit_balances",
+                "supplier_credit_balances",
+            }
+        )
 
         config._select_account(config._opening_balance_box, "7005")
         config._select_account(config._input_tax_19_box, "7006")
@@ -1204,6 +1238,10 @@ def test_configuration_button_opens_with_existing_values_and_accepts_changes(
     assert editor._bundle.control_accounts.opening_balance_account == "7005"
     assert editor._bundle.vat_accounts.input_tax_19 == "7006"
     assert editor._bundle.account_roles.cash_accounts == frozenset({"7006"})
+    assert editor._bundle.account_roles.customer_receivables == frozenset({"7007"})
+    assert editor._bundle.account_roles.supplier_payables == frozenset({"7008"})
+    assert editor._bundle.account_roles.customer_credit_balances == frozenset({"7009"})
+    assert editor._bundle.account_roles.supplier_credit_balances == frozenset({"7010"})
 
     saved_csv = editor._bundle_importer.save_template(
         editor._bundle,
