@@ -1,4 +1,5 @@
 from simpleob.domain.booking import Booking
+from simpleob.domain.booking_type import BookingType
 from simpleob.domain.chart_of_accounts import ChartOfAccounts
 from simpleob.domain.errors import UnknownAccountError
 
@@ -16,9 +17,19 @@ class BookingValidator:
         """
         for line in booking.lines:
             try:
-                self._chart_of_accounts.account(line.account_number)
+                account = self._chart_of_accounts.account(line.account_number)
             except KeyError as error:
                 raise UnknownAccountError(
                     f"unknown account: {line.account_number}"
                 ) from error
+
+            if (
+                booking.booking_type is BookingType.REGULAR
+                and account.person_account_role is not None
+                and not account.is_active
+            ):
+                raise ValueError(
+                    "Neue reguläre Buchungen auf inaktive Personenkonten "
+                    f"sind nicht zulässig: {account.number}."
+                )
                 

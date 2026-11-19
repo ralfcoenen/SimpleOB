@@ -15,7 +15,9 @@ from simpleob.database.models import (
     Eingangsrechnung,
     GuthabenOPRueckerstattung,
     Gutschrift,
+    Konto,
     Mandant,
+    PersonenkontoZuordnung,
     Wirtschaftsjahr,
 )
 from simpleob.domain.booking import Booking
@@ -78,6 +80,12 @@ class BookingRepository:
             raise ValueError(
                 "Das Buchungsdatum liegt außerhalb "
                 "des Geschäftsjahres."
+            )
+
+        if booking.booking_type is BookingType.REGULAR:
+            self._ensure_active_person_accounts(
+                mandant_id=fiscal_year_model.mandant_id,
+                booking=booking,
             )
 
         existing_booking = (
@@ -175,6 +183,43 @@ class BookingRepository:
 
         if commit:
             self._session.commit()
+
+    def _ensure_active_person_accounts(
+        self,
+        *,
+        mandant_id: int,
+        booking: Booking,
+    ) -> None:
+        """Sperrt neue reguläre Buchungen auf inaktive Personenkonten.
+
+        Eröffnungsbuchungen und Stornierungen verwenden einen eigenen
+        Buchungstyp und bleiben absichtlich von dieser Prüfung ausgenommen.
+        """
+
+        account_numbers = {
+            line.account_number for line in booking.lines
+        }
+        inactive = (
+            self._session.query(Konto.account_number)
+            .join(
+                PersonenkontoZuordnung,
+                (PersonenkontoZuordnung.mandant_id == Konto.mandant_id)
+                & (PersonenkontoZuordnung.account_number == Konto.account_number),
+            )
+            .filter(
+                Konto.mandant_id == mandant_id,
+                Konto.account_number.in_(account_numbers),
+                Konto.is_active.is_(False),
+            )
+            .order_by(Konto.account_number)
+            .all()
+        )
+        if inactive:
+            numbers = ", ".join(row[0] for row in inactive)
+            raise ValueError(
+                "Neue reguläre Buchungen auf inaktive Personenkonten sind "
+                f"nicht zulässig: {numbers}."
+            )
 
     def ensure_not_open_item_source_booking(
         self,

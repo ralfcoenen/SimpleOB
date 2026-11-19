@@ -105,6 +105,7 @@ from simpleob.domain.fixed_asset_status import (
 )
 from simpleob.domain.journal import Journal
 from simpleob.domain.managed_fiscal_year import ManagedFiscalYear
+from simpleob.domain.person_account import PersonAccount
 from simpleob.domain.profit_appropriation_annual_data import (
     ProfitAppropriationAnnualData,
 )
@@ -129,6 +130,10 @@ from simpleob.reporting.account_activity_report import (
     AccountActivityReport,
 )
 from simpleob.reporting.journal_report import JournalReport
+from simpleob.reporting.person_account_report import (
+    PersonAccountStatement,
+    PersonAccountSummary,
+)
 from simpleob.reporting.trial_balance_report import (
     TrialBalanceReport,
 )
@@ -1169,6 +1174,46 @@ class FiscalYearWorkspace:
             journal=self._journal,
             start_date=start_date,
             end_date=end_date,
+        )
+
+    def build_person_account_summary(
+        self,
+        *,
+        person_accounts: tuple[PersonAccount, ...],
+        start_date: date,
+        end_date: date,
+        opening_balance_account_number: str,
+    ) -> PersonAccountSummary:
+        """Erzeugt eine Personenkontenübersicht des geöffneten Mandantenjahrs."""
+
+        return self._reporting_service.person_account_summary(
+            ledger=self._pre_closing_ledger,
+            journal=self._journal,
+            fiscal_year=self._context.fiscal_year,
+            company_id=self._context.company.company_id,
+            person_accounts=person_accounts,
+            start_date=start_date,
+            end_date=end_date,
+            opening_balance_account_number=opening_balance_account_number,
+        )
+
+    def build_person_account_statement(
+        self,
+        *,
+        person_account: PersonAccount,
+        start_date: date,
+        end_date: date,
+    ) -> PersonAccountStatement:
+        """Erzeugt ein Personenkontoblatt für das geöffnete Geschäftsjahr."""
+
+        return self._reporting_service.person_account_statement(
+            journal=self._journal,
+            fiscal_year=self._context.fiscal_year,
+            company_id=self._context.company.company_id,
+            person_account=person_account,
+            start_date=start_date,
+            end_date=end_date,
+            has_opening_source=self.managed_fiscal_year.has_opening_source,
         )
 
     def install_required_taxonomy(self) -> None:

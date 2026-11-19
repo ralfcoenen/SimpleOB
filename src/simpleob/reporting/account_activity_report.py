@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
+from uuid import UUID
 
 
 @dataclass(frozen=True, slots=True)
@@ -16,6 +17,8 @@ class AccountActivityReportLine:
     debit: Decimal
     credit: Decimal
     running_balance: Decimal
+    booking_id: UUID
+    is_opening: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,4 +27,5 @@ class AccountActivityReport:
 
     account_number: str
     lines: tuple[AccountActivityReportLine, ...]
+    opening_balance: Decimal
     ending_balance: Decimal

@@ -2023,6 +2023,13 @@ class MainWindow(QMainWindow):
             context=self._context,
             workspace=self._workspace,
             accounts=self._accounts,
+            person_accounts=(
+                self._person_account_repository.list_for_company(
+                    company_id=self._context.company.company_id
+                )
+                if self._person_account_repository is not None
+                else ()
+            ),
             opening_balance_account_number=(
                 self._opening_balance_account_number
             ),
@@ -5645,6 +5652,7 @@ class MainWindow(QMainWindow):
             return
         self._activate_account_editing_mode()
         self._chart_of_accounts, self._accounts = self._reload_chart_of_accounts()
+        self._refresh_person_account_reports()
         self._refresh_accounts()
         select_account_row(self._account_table, dialog.saved.account_number)
 
@@ -5739,6 +5747,7 @@ class MainWindow(QMainWindow):
                 return
             self._activate_account_editing_mode()
             self._chart_of_accounts, self._accounts = self._reload_chart_of_accounts()
+            self._refresh_person_account_reports()
             self._refresh_accounts()
             select_account_row(self._account_table, account.number)
             return
@@ -6422,6 +6431,13 @@ class MainWindow(QMainWindow):
             )
             self._reports_widget.update_accounts(
                 accounts=accounts,
+                person_accounts=(
+                    getattr(self, "_person_account_repository", None).list_for_company(
+                        company_id=self._context.company.company_id
+                    )
+                    if getattr(self, "_person_account_repository", None) is not None
+                    else ()
+                ),
                 opening_balance_account_number=(
                     self._opening_balance_account_number
                 ),
@@ -6618,6 +6634,22 @@ class MainWindow(QMainWindow):
         self._account_table.sortItems(sort_column, sort_order)
         self._account_table.setSortingEnabled(True)
         self._account_table.resizeRowsToContents()
+
+    def _refresh_person_account_reports(self) -> None:
+        repository = getattr(self, "_person_account_repository", None)
+        self._reports_widget.update_accounts(
+            accounts=self._accounts,
+            person_accounts=(
+                repository.list_for_company(
+                    company_id=self._context.company.company_id
+                )
+                if repository is not None
+                else ()
+            ),
+            opening_balance_account_number=(
+                self._opening_balance_account_number
+            ),
+        )
 
     @staticmethod
     def _format_amount(amount: object) -> str:

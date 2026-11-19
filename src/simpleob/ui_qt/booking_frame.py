@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
 from simpleob.amount_input import normalize_german_amount
 from simpleob.date_input import GermanDateEdit
 from simpleob.domain.account import Account
+from simpleob.domain.account_display import account_display_name, account_name_with_role
 from simpleob.domain.booking import Booking
 from simpleob.domain.booking_line import BookingLine
 from simpleob.domain.entry_side import EntrySide
@@ -526,7 +527,7 @@ class BookingFrame(QWidget):
         )
 
         row.name_item.setText(
-            account.name
+            account_name_with_role(account)
             if account is not None
             else ""
         )
@@ -550,9 +551,7 @@ class BookingFrame(QWidget):
         row.account_entry.setText(
             account.number
         )
-        row.name_item.setText(
-            account.name
-        )
+        row.name_item.setText(account_name_with_role(account))
 
         self._update_contribution_checkbox(row)
 
@@ -609,9 +608,7 @@ class BookingFrame(QWidget):
                             row.account_entry.setText(
                                 account.number
                             )
-                            row.name_item.setText(
-                                account.name
-                            )
+                            row.name_item.setText(account_name_with_role(account))
 
                             self._ensure_trailing_empty_row()
                             self._on_form_changed()
@@ -647,9 +644,7 @@ class BookingFrame(QWidget):
                     row.account_entry.setText(
                         account.number
                     )
-                    row.name_item.setText(
-                        account.name
-                    )
+                    row.name_item.setText(account_name_with_role(account))
 
                     self._ensure_trailing_empty_row()
                     self._on_form_changed()
@@ -1138,7 +1133,7 @@ class BookingFrame(QWidget):
     ) -> str:
         """Liefert die lesbare Kontendarstellung."""
 
-        return f"{account.number} – {account.name}"
+        return account_display_name(account)
 
     @staticmethod
     def _parse_amount(

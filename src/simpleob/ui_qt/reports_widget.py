@@ -23,9 +23,12 @@ from PySide6.QtWidgets import (
 from simpleob.core.context import ApplicationContext
 from simpleob.date_input import GermanDateEdit
 from simpleob.domain.account import Account
+from simpleob.domain.account_display import account_display_name
 from simpleob.domain.entry_side import EntrySide
+from simpleob.domain.person_account import PersonAccount
 from simpleob.services.fiscal_year_workspace import FiscalYearWorkspace
 from simpleob.services.pdf_reporting_service import PdfReportingService
+from simpleob.ui_qt.person_account_reports_widget import PersonAccountReportsWidget
 
 
 class ReportsWidget(QWidget):
@@ -40,6 +43,7 @@ class ReportsWidget(QWidget):
         opening_balance_account_number: str,
         pdf_reporting_service: PdfReportingService,
         parent: QWidget | None = None,
+        person_accounts: tuple[PersonAccount, ...] = (),
     ) -> None:
         super().__init__(parent)
 
@@ -50,6 +54,7 @@ class ReportsWidget(QWidget):
             opening_balance_account_number
         )
         self._pdf_reporting_service = pdf_reporting_service
+        self._person_accounts = person_accounts
 
         self._current_trial_balance_report = None
         self._current_account_activity_reports = ()
@@ -70,6 +75,7 @@ class ReportsWidget(QWidget):
         *,
         accounts: tuple[Account, ...],
         opening_balance_account_number: str,
+        person_accounts: tuple[PersonAccount, ...] | None = None,
     ) -> None:
         """Aktualisiert Kontennamen und Kontenauswahl der Auswertungen."""
 
@@ -82,11 +88,8 @@ class ReportsWidget(QWidget):
 
         account_list = self._account_activity_account_list
         account_list.clear()
-        for account in sorted(
-            (account for account in accounts if account.is_active),
-            key=lambda account: account.number,
-        ):
-            item = QListWidgetItem(str(account))
+        for account in sorted(accounts, key=lambda account: account.number):
+            item = QListWidgetItem(account_display_name(account))
             item.setData(Qt.ItemDataRole.UserRole, account.number)
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
             item.setCheckState(
@@ -95,6 +98,13 @@ class ReportsWidget(QWidget):
                 else Qt.CheckState.Unchecked
             )
             account_list.addItem(item)
+
+        if person_accounts is not None:
+            self._person_accounts = person_accounts
+            self._person_accounts_tab.update_person_accounts(
+                person_accounts,
+                opening_balance_account_number=opening_balance_account_number,
+            )
 
         if self._current_trial_balance_report is not None:
             self._refresh_trial_balance()
@@ -114,6 +124,13 @@ class ReportsWidget(QWidget):
         self._trial_balance_tab = QWidget()
         self._account_activity_tab = QWidget()
         self._journal_tab = QWidget()
+        self._person_accounts_tab = PersonAccountReportsWidget(
+            context=self._context,
+            workspace=self._workspace,
+            person_accounts=self._person_accounts,
+            opening_balance_account_number=self._opening_balance_account_number,
+            parent=notebook,
+        )
 
         notebook.addTab(
             self._trial_balance_tab,
@@ -126,6 +143,10 @@ class ReportsWidget(QWidget):
         notebook.addTab(
             self._journal_tab,
             "Journal",
+        )
+        notebook.addTab(
+            self._person_accounts_tab,
+            "Personenkonten",
         )
 
         self._create_trial_balance_tab()
@@ -349,15 +370,8 @@ class ReportsWidget(QWidget):
         self._account_activity_account_list = QListWidget()
         self._account_activity_account_list.setMaximumHeight(180)
 
-        for account in sorted(
-            (
-                account
-                for account in self._accounts
-                if account.is_active
-            ),
-            key=lambda account: account.number,
-        ):
-            item = QListWidgetItem(str(account))
+        for account in sorted(self._accounts, key=lambda account: account.number):
+            item = QListWidgetItem(account_display_name(account))
             item.setData(
                 Qt.ItemDataRole.UserRole,
                 account.number,

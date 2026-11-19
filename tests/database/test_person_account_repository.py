@@ -18,6 +18,7 @@ from simpleob.accounting.hgb_financial_statement_position_provider import (
 from simpleob.accounting.ledger import Ledger
 from simpleob.accounting.mapper import AccountMapper
 from simpleob.accounting.trial_balance import TrialBalance
+from simpleob.database.booking_repository import BookingRepository
 from simpleob.database.business_partner_repository import BusinessPartnerRepository
 from simpleob.database.chart_of_accounts_repository import ChartOfAccountsRepository
 from simpleob.database.company_repository import CompanyRepository
@@ -32,12 +33,14 @@ from simpleob.database.person_account_repository import PersonAccountRepository
 from simpleob.domain.account_type import AccountType
 from simpleob.domain.booking import Booking
 from simpleob.domain.booking_line import BookingLine
+from simpleob.domain.booking_type import BookingType
 from simpleob.domain.booking_validator import BookingValidator
 from simpleob.domain.business_partner import BusinessPartner
 from simpleob.domain.chart_of_accounts import ChartOfAccounts
 from simpleob.domain.company import Company
 from simpleob.domain.entry_side import EntrySide
 from simpleob.domain.errors import InvalidPersonAccountClassificationError
+from simpleob.domain.fiscal_year import FiscalYear
 from simpleob.domain.journal import Journal
 from simpleob.domain.person_account_role import PersonAccountRole
 from simpleob.services.posting_service import PostingService
@@ -347,6 +350,105 @@ def test_update_syncs_both_account_names_and_status_and_cannot_delete(database_s
     )
     assert repository.get(company_id=company.company_id, account_number="10001").account.is_active
     assert creditor.account_number == "70001"
+
+
+def test_inactive_person_account_blocks_new_regular_booking_but_allows_opening_and_reversal(
+    database_session,
+):
+    session, company = database_session
+    fiscal_year = FiscalYear(date(2026, 1, 1), date(2026, 12, 31))
+    CompanyRepository(session).add_fiscal_year(company.company_id, fiscal_year)
+    repository = PersonAccountRepository(session)
+    person_account = repository.create(
+        company_id=company.company_id,
+        role=PersonAccountRole.DEBITOR,
+        name="Inaktiver Kunde",
+        account_number="10003",
+    )
+    booking_repository = BookingRepository(session)
+    original = Booking(
+        booking_date=date(2026, 2, 1),
+        description="Vor Deaktivierung",
+        lines=(
+            BookingLine("10003", EntrySide.DEBIT, Decimal("10.00")),
+            BookingLine("9000", EntrySide.CREDIT, Decimal("10.00")),
+        ),
+    )
+    booking_repository.add(
+        company_id=company.company_id,
+        fiscal_year=fiscal_year,
+        booking=original,
+    )
+    repository.update(
+        company_id=company.company_id,
+        account_number=person_account.account_number,
+        name="Inaktiver Kunde",
+        is_active=False,
+    )
+
+    inactive_booking = Booking(
+        booking_date=date(2026, 3, 1),
+        description="Nicht zulässig",
+        lines=(
+            BookingLine("10003", EntrySide.DEBIT, Decimal("5.00")),
+            BookingLine("9000", EntrySide.CREDIT, Decimal("5.00")),
+        ),
+    )
+    with pytest.raises(ValueError, match="inaktive Personenkonten"):
+        booking_repository.add(
+            company_id=company.company_id,
+            fiscal_year=fiscal_year,
+            booking=inactive_booking,
+        )
+
+    opening = Booking(
+        booking_date=fiscal_year.start_date,
+        booking_type=BookingType.OPENING,
+        description="Notwendiger Vortrag",
+        lines=(
+            BookingLine("10003", EntrySide.DEBIT, Decimal("10.00")),
+            BookingLine("9000", EntrySide.CREDIT, Decimal("10.00")),
+        ),
+    )
+    booking_repository.add(
+        company_id=company.company_id,
+        fiscal_year=fiscal_year,
+        booking=opening,
+    )
+    reversal = Booking(
+        booking_date=date(2026, 4, 1),
+        booking_type=BookingType.REVERSAL,
+        reversal_of_booking_id=original.booking_id,
+        description="Storno trotz Deaktivierung",
+        lines=(
+            BookingLine("10003", EntrySide.CREDIT, Decimal("10.00")),
+            BookingLine("9000", EntrySide.DEBIT, Decimal("10.00")),
+        ),
+    )
+    booking_repository.add(
+        company_id=company.company_id,
+        fiscal_year=fiscal_year,
+        booking=reversal,
+    )
+    repository.update(
+        company_id=company.company_id,
+        account_number=person_account.account_number,
+        name="Inaktiver Kunde",
+        is_active=True,
+    )
+    reactivated_booking = Booking(
+        booking_date=date(2026, 5, 1),
+        description="Nach Reaktivierung",
+        lines=(
+            BookingLine("10003", EntrySide.DEBIT, Decimal("2.00")),
+            BookingLine("9000", EntrySide.CREDIT, Decimal("2.00")),
+        ),
+    )
+    booking_repository.add(
+        company_id=company.company_id,
+        fiscal_year=fiscal_year,
+        booking=reactivated_booking,
+    )
 
 
 def test_failed_creation_rolls_back_partner_and_account(database_session, monkeypatch):

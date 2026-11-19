@@ -27,6 +27,7 @@ from simpleob.amount_input import format_german_amount, normalize_german_amount
 from simpleob.database.business_partner_repository import BusinessPartnerRepository
 from simpleob.date_input import GermanDateEdit
 from simpleob.domain.account import Account
+from simpleob.domain.account_display import account_display_name
 from simpleob.domain.account_type import AccountType
 from simpleob.domain.booking import Booking
 from simpleob.domain.credit_note import (
@@ -1385,7 +1386,7 @@ class VatBookingFrame(QWidget):
     ) -> str:
         """Liefert die Anzeige eines Kontos."""
 
-        return str(account)
+        return account_display_name(account)
 
     def _normalize_amount_entry(
         self,
