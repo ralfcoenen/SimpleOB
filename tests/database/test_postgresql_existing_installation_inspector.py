@@ -156,6 +156,29 @@ def test_different_table_and_sequence_owners_are_inconsistent():
     assert any("unterschiedliche Eigentümer" in item for item in blockers)
 
 
+def test_legacy_open_item_owner_is_checked_for_outdated_schema():
+    """Legacy-OP-Tabellen müssen der ermittelten Migrationsrolle gehören."""
+    table_owners, sequence_owners = _owners()
+    table_owners = (*table_owners, PostgreSQLObjectOwner(
+        "ausgangsrechnungen", "table", "legacy_owner"
+    ))
+    assessment = PostgreSQLExistingInstallationInspector._classify(
+        database=_database(),
+        schema_owner="migrator",
+        server_version_num=160000,
+        table_owners=table_owners,
+        sequence_owners=sequence_owners,
+        expected_tables=set(models.Base.metadata.tables) | {"alembic_version"},
+        default_privileges=_defaults(),
+        role_privileges=(_role_privileges(),),
+        schema_status=PostgreSQLSchemaStatus.OUTDATED,
+    )
+
+    assert assessment[0] == PostgreSQLOwnershipAssessment.INCONSISTENT_OWNERSHIP
+    assert assessment[1] is None
+    assert any("unterschiedliche Eigentümer" in item for item in assessment[2])
+
+
 def test_separated_roles_require_runtime_and_future_object_privileges():
     assessment, migration_role, blockers, _ = _classify()
 

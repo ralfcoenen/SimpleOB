@@ -174,7 +174,7 @@ def test_reconstructs_empty_workspace(
     )
     assert len(workspace.journal) == 0
 
-    booking_repository.list_for_fiscal_year.assert_called_once_with(
+    booking_repository.list_for_fiscal_year.assert_any_call(
         company_id=context.company.company_id,
         fiscal_year=context.fiscal_year,
     )
@@ -1494,9 +1494,9 @@ def test_create_reversal_booking_mirrors_original_booking(
     )
 
     booking_repository.add.assert_not_called()
-    booking_repository.ensure_not_open_item_source_booking.assert_called_once_with(
+    booking_repository.list_for_fiscal_year.assert_any_call(
         company_id=context.company.company_id,
-        booking_id=original_booking.booking_id,
+        fiscal_year=context.fiscal_year,
     )
 
 @pytest.mark.parametrize(

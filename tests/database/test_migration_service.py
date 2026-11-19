@@ -18,7 +18,8 @@ from simpleob.database.migration_service import (
 
 BASELINE_REVISION = "7392d6cc6892"
 PRE_CORRECTION_BOOKING_DATE_REVISION = "7d0c4a28b9f1"
-HEAD_REVISION = "2f8c41d7a6b3"
+PRE_OPEN_ITEM_CLEANUP_REVISION = "2f8c41d7a6b3"
+HEAD_REVISION = "a9c6e3b17d42"
 
 
 def _application_config(
@@ -141,7 +142,7 @@ def test_correction_booking_date_migration_backfills_only_linked_bookings(
             "'legacy row', NULL)"
         )
 
-    command.upgrade(config, "head")
+    command.upgrade(config, PRE_OPEN_ITEM_CLEANUP_REVISION)
     with sqlite3.connect(database_file) as connection:
         values = dict(connection.execute(
             "SELECT correction_id, booking_date "

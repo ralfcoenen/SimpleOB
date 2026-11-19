@@ -89,6 +89,26 @@ class PostgreSQLExistingInstallationInspector:
 
     _TABLE_PRIVILEGES = ("SELECT", "INSERT", "UPDATE", "DELETE")
     _SEQUENCE_PRIVILEGES = ("USAGE", "SELECT")
+    _LEGACY_OPEN_ITEM_TABLES = frozenset(
+        {
+            "zahlungszuordnungskorrekturereignisse",
+            "zahlungszuordnungskorrekturen",
+            "rechnungs_op_zahlungsereignisse",
+            "rechnungs_op_verrechnungsereignisse",
+            "guthaben_op_ereignisse",
+            "guthaben_op_rueckerstattungsruecknahmen",
+            "guthaben_op_rueckerstattungen",
+            "op_guthabenverrechnungen",
+            "zahlungen",
+            "guthaben_ops",
+            "rechnungs_op_stornos",
+            "forderungs_ops",
+            "verbindlichkeits_ops",
+            "gutschriften",
+            "ausgangsrechnungen",
+            "eingangsrechnungen",
+        }
+    )
 
     def __init__(
         self,
@@ -164,11 +184,27 @@ class PostgreSQLExistingInstallationInspector:
             )
         ).all()
 
+        migration_inspection = DatabaseMigrationService(
+            application_config=self._application_config,
+            credentials=self._credentials,
+        ).inspect_postgresql_schema_on_connection(connection)
         expected_tables = set(models.Base.metadata.tables) | {"alembic_version"}
+        # The removed ORM models cannot identify their PostgreSQL owners. During
+        # an upgrade from an older revision, include the legacy relations so the
+        # migration role is checked against the objects the DROP migration needs.
+        inspect_legacy_open_item_tables = (
+            migration_inspection.status == PostgreSQLSchemaStatus.OUTDATED
+        )
+        ownership_tables = expected_tables | (
+            self._LEGACY_OPEN_ITEM_TABLES
+            if inspect_legacy_open_item_tables
+            else set()
+        )
         table_owners = tuple(
             PostgreSQLObjectOwner(row.object_name, "table", row.object_owner)
             for row in relation_rows
-            if row.relation_kind in {"r", "p"} and row.object_name in expected_tables
+            if row.relation_kind in {"r", "p"}
+            and row.object_name in ownership_tables
         )
         sequence_owners = tuple(
             PostgreSQLObjectOwner(
@@ -179,17 +215,12 @@ class PostgreSQLExistingInstallationInspector:
             )
             for row in relation_rows
             if row.relation_kind == "S"
-            and row.owning_table in models.Base.metadata.tables
+            and row.owning_table in ownership_tables
         )
         alembic_owner = next(
             (item.owner for item in table_owners if item.name == "alembic_version"),
             None,
         )
-
-        migration_inspection = DatabaseMigrationService(
-            application_config=self._application_config,
-            credentials=self._credentials,
-        ).inspect_postgresql_schema_on_connection(connection)
 
         default_privileges = self._read_default_privileges(connection)
         candidate_roles = {

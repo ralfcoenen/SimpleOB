@@ -9,7 +9,26 @@ from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.exc import IntegrityError
 
 BASELINE_REVISION = "7392d6cc6892"
-HEAD_REVISION = "2f8c41d7a6b3"
+PRE_OPEN_ITEM_CLEANUP_REVISION = "2f8c41d7a6b3"
+HEAD_REVISION = "a9c6e3b17d42"
+OPEN_ITEM_TABLES = {
+    "zahlungszuordnungskorrekturereignisse",
+    "zahlungszuordnungskorrekturen",
+    "rechnungs_op_zahlungsereignisse",
+    "rechnungs_op_verrechnungsereignisse",
+    "guthaben_op_ereignisse",
+    "guthaben_op_rueckerstattungsruecknahmen",
+    "guthaben_op_rueckerstattungen",
+    "op_guthabenverrechnungen",
+    "zahlungen",
+    "guthaben_ops",
+    "rechnungs_op_stornos",
+    "forderungs_ops",
+    "verbindlichkeits_ops",
+    "gutschriften",
+    "ausgangsrechnungen",
+    "eingangsrechnungen",
+}
 
 
 def _alembic_config(
@@ -149,8 +168,7 @@ def test_migrations_upgrade_from_baseline_to_head(
         }
         assert "geschaeftspartner" in inspector.get_table_names()
         assert "buchungszeilen" in inspector.get_table_names()
-        assert "forderungs_ops" in inspector.get_table_names()
-        assert "verbindlichkeits_ops" in inspector.get_table_names()
+        assert not OPEN_ITEM_TABLES.intersection(inspector.get_table_names())
 
         columns_after = {
             column["name"]
@@ -415,7 +433,7 @@ def test_account_taxonomy_mapping_migration_preserves_existing_table(
     assert _foreign_key_check(database_path) == []
 
 
-def test_migrations_downgrade_from_head_to_baseline(
+def test_historical_migrations_downgrade_from_pre_cleanup_head_to_baseline(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
@@ -433,15 +451,9 @@ def test_migrations_downgrade_from_head_to_baseline(
         database_path
     )
 
-    command.upgrade(
-        config,
-        "head",
-    )
+    command.upgrade(config, PRE_OPEN_ITEM_CLEANUP_REVISION)
 
-    command.downgrade(
-        config,
-        BASELINE_REVISION,
-    )
+    command.downgrade(config, BASELINE_REVISION)
 
     engine = create_engine(
         database_url
@@ -491,6 +503,152 @@ def test_migrations_downgrade_from_head_to_baseline(
         == BASELINE_REVISION
     )
     assert _foreign_key_check(database_path) == []
+
+
+def test_open_item_cleanup_downgrade_is_explicitly_refused(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """Der irreversible OP-Drop täuscht keine Wiederherstellung vor."""
+    database_path = tmp_path / "irreversible-open-item-drop.db"
+    monkeypatch.setenv("OPENBILANZ_DATABASE_URL", f"sqlite:///{database_path}")
+    config = _alembic_config(database_path)
+    command.upgrade(config, "head")
+
+    with pytest.raises(RuntimeError, match="OP-Tabellenmigration ist irreversibel"):
+        command.downgrade(config, PRE_OPEN_ITEM_CLEANUP_REVISION)
+
+    assert _current_revision(database_path) == HEAD_REVISION
+
+
+def test_model_metadata_excludes_all_open_item_tables() -> None:
+    from simpleob.database.models import Base
+
+    assert not OPEN_ITEM_TABLES.intersection(Base.metadata.tables)
+
+
+def test_open_item_cleanup_preserves_ledger_and_person_accounts(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """Der Bestandsupgrade entfernt OP-Metadaten und erhält Hauptbuchdaten."""
+    database_path = tmp_path / "open-item-cleanup-upgrade.db"
+    database_url = f"sqlite:///{database_path}"
+    monkeypatch.setenv("OPENBILANZ_DATABASE_URL", database_url)
+    config = _alembic_config(database_path)
+    command.upgrade(config, PRE_OPEN_ITEM_CLEANUP_REVISION)
+
+    engine = create_engine(database_url)
+
+    @event.listens_for(engine, "connect")
+    def _enable_foreign_keys(connection, _record) -> None:
+        connection.execute("PRAGMA foreign_keys=ON")
+
+    try:
+        with engine.begin() as connection:
+            connection.execute(text(
+                "INSERT INTO mandanten (id, company_id, name) "
+                "VALUES (1, 'company-1', 'Migrationsmandant')"
+            ))
+            connection.execute(text(
+                "INSERT INTO konten "
+                "(id, mandant_id, account_number, name, account_type, is_active) "
+                "VALUES (1, 1, '10000', 'Debitor Partner', 'ASSET', 1), "
+                "(2, 1, '8400', 'Erlöse', 'REVENUE', 1)"
+            ))
+            connection.execute(text(
+                "INSERT INTO geschaeftspartner "
+                "(id, partner_id, mandant_id, name, is_customer, is_supplier, is_active) "
+                "VALUES (1, 'partner-1', 1, 'Partner GmbH', 1, 0, 1)"
+            ))
+            connection.execute(text(
+                "INSERT INTO personenkonto_zuordnungen "
+                "(id, mandant_id, account_number, partner_id, role) "
+                "VALUES (1, 1, '10000', 'partner-1', 'DEBITOR')"
+            ))
+            connection.execute(text(
+                "INSERT INTO wirtschaftsjahre "
+                "(id, mandant_id, start_date, end_date, status) "
+                "VALUES (1, 1, '2026-01-01', '2026-12-31', 'OPEN')"
+            ))
+            connection.execute(text(
+                "INSERT INTO buchungen "
+                "(id, booking_id, wirtschaftsjahr_id, booking_date, description, "
+                "booking_type, reversal_of_booking_id) VALUES "
+                "(1, 'booking-1', 1, '2026-03-01', 'Rechnung', 'REGULAR', NULL), "
+                "(2, 'booking-2', 1, '2026-03-02', 'Storno', 'REVERSAL', 'booking-1'), "
+                "(3, 'booking-3', 1, '2026-03-03', 'Teilzahlung', 'REGULAR', NULL)"
+            ))
+            connection.execute(text(
+                "INSERT INTO buchungszeilen "
+                "(buchung_id, position, account_number, side, amount) VALUES "
+                "(1, 0, '10000', 'DEBIT', 119.00), "
+                "(1, 1, '8400', 'CREDIT', 119.00), "
+                "(2, 0, '10000', 'CREDIT', 119.00), "
+                "(2, 1, '8400', 'DEBIT', 119.00), "
+                "(3, 0, '1200', 'DEBIT', 19.00), "
+                "(3, 1, '10000', 'CREDIT', 19.00)"
+            ))
+            connection.execute(text(
+                "INSERT INTO ausgangsrechnungen "
+                "(invoice_id, mandant_id, partner_id, invoice_number, invoice_date, "
+                "due_date, gross_amount, booking_id) VALUES "
+                "('invoice-1', 1, 'partner-1', 'AR-1', '2026-03-01', "
+                "'2026-03-31', 119.00, 'booking-1')"
+            ))
+            connection.execute(text(
+                "INSERT INTO forderungs_ops (open_item_id, invoice_id, amount) "
+                "VALUES ('open-item-1', 'invoice-1', 119.00)"
+            ))
+            before = connection.execute(text(
+                "SELECT booking_id, booking_type, reversal_of_booking_id "
+                "FROM buchungen ORDER BY id"
+            )).all()
+            before_lines = connection.execute(text(
+                "SELECT b.booking_id, l.position, l.account_number, l.side, l.amount "
+                "FROM buchungszeilen l JOIN buchungen b ON b.id=l.buchung_id "
+                "ORDER BY b.id, l.position"
+            )).all()
+            before_person_account = connection.execute(text(
+                "SELECT mandant_id, account_number, partner_id, role "
+                "FROM personenkonto_zuordnungen"
+            )).one()
+            before_net = connection.execute(text(
+                "SELECT SUM(CASE WHEN side='DEBIT' THEN amount ELSE -amount END) "
+                "FROM buchungszeilen WHERE account_number='10000'"
+            )).scalar_one()
+    finally:
+        engine.dispose()
+
+    command.upgrade(config, HEAD_REVISION)
+    engine = create_engine(database_url)
+    try:
+        table_names = set(inspect(engine).get_table_names())
+        assert not OPEN_ITEM_TABLES.intersection(table_names)
+        with engine.connect() as connection:
+            assert connection.execute(text(
+                "SELECT booking_id, booking_type, reversal_of_booking_id "
+                "FROM buchungen ORDER BY id"
+            )).all() == before
+            assert connection.execute(text(
+                "SELECT b.booking_id, l.position, l.account_number, l.side, l.amount "
+                "FROM buchungszeilen l JOIN buchungen b ON b.id=l.buchung_id "
+                "ORDER BY b.id, l.position"
+            )).all() == before_lines
+            assert connection.execute(text(
+                "SELECT mandant_id, account_number, partner_id, role "
+                "FROM personenkonto_zuordnungen"
+            )).one() == before_person_account
+            assert connection.execute(text(
+                "SELECT SUM(CASE WHEN side='DEBIT' THEN amount ELSE -amount END) "
+                "FROM buchungszeilen WHERE account_number='10000'"
+            )).scalar_one() == before_net
+            assert connection.execute(text(
+                "SELECT COUNT(*) FROM konten"
+            )).scalar_one() == 2
+        assert _foreign_key_check(database_path) == []
+    finally:
+        engine.dispose()
 
 
 def test_paid_invoice_cancellation_schema_backfills_and_checks_origins(
@@ -588,7 +746,7 @@ def test_paid_invoice_cancellation_schema_backfills_and_checks_origins(
     finally:
         engine.dispose()
 
-    command.upgrade(config, HEAD_REVISION)
+    command.upgrade(config, PRE_OPEN_ITEM_CLEANUP_REVISION)
     engine = create_engine(database_url)
 
     @event.listens_for(engine, "connect")
@@ -762,7 +920,7 @@ def test_paid_invoice_cancellation_schema_backfills_and_checks_origins(
                 "guthaben_op_rueckerstattungen"
             )
         } >= {"ix_guthaben_op_refund_open_item"}
-        assert _current_revision(database_path) == HEAD_REVISION
+        assert _current_revision(database_path) == PRE_OPEN_ITEM_CLEANUP_REVISION
         assert _foreign_key_check(database_path) == []
     finally:
         engine.dispose()
@@ -878,7 +1036,7 @@ def test_credit_refund_reversal_migration_preserves_refunds_and_constraints(
     finally:
         engine.dispose()
 
-    command.upgrade(config, HEAD_REVISION)
+    command.upgrade(config, PRE_OPEN_ITEM_CLEANUP_REVISION)
     engine = create_engine(database_url)
 
     @event.listens_for(engine, "connect")
@@ -969,13 +1127,13 @@ def test_credit_refund_reversal_migration_preserves_refunds_and_constraints(
         assert {
             item["name"] for item in inspector.get_check_constraints(table)
         } == {"ck_guthaben_op_ruecknahme_grund_nichtleer"}
-        assert _current_revision(database_path) == HEAD_REVISION
+        assert _current_revision(database_path) == PRE_OPEN_ITEM_CLEANUP_REVISION
         assert _foreign_key_check(database_path) == []
     finally:
         engine.dispose()
 
 
-def test_paid_invoice_cancellation_migration_downgrade_and_reupgrade(
+def test_paid_invoice_cancellation_migration_before_cleanup_downgrade_and_reupgrade(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
@@ -987,7 +1145,7 @@ def test_paid_invoice_cancellation_migration_downgrade_and_reupgrade(
     config = _alembic_config(database_path)
 
     command.upgrade(config, "d4a2f19c7b60")
-    command.upgrade(config, HEAD_REVISION)
+    command.upgrade(config, PRE_OPEN_ITEM_CLEANUP_REVISION)
     command.downgrade(config, "d4a2f19c7b60")
     assert _current_revision(database_path) == "d4a2f19c7b60"
 
@@ -1008,8 +1166,8 @@ def test_paid_invoice_cancellation_migration_downgrade_and_reupgrade(
     finally:
         engine.dispose()
 
-    command.upgrade(config, HEAD_REVISION)
-    assert _current_revision(database_path) == HEAD_REVISION
+    command.upgrade(config, PRE_OPEN_ITEM_CLEANUP_REVISION)
+    assert _current_revision(database_path) == PRE_OPEN_ITEM_CLEANUP_REVISION
     assert _foreign_key_check(database_path) == []
 
 
