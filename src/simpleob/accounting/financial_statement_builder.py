@@ -56,7 +56,7 @@ class FinancialStatementBuilder:
         self,
         balances: tuple[AccountBalance, ...],
     ) -> None:
-        """Bricht HGB-Auswertungen bei nicht integrierten Personensalden ab."""
+        """Validiert Personenkontenklassifikationen und deren HGB-Zuordnung."""
         self._mapper.ensure_person_account_balances_supported(balances)
 
     def _aggregate_position(

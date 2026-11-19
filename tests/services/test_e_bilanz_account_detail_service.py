@@ -7,8 +7,12 @@ from simpleob.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
 from simpleob.accounting.ledger import Ledger
+from simpleob.accounting.mapper import AccountMapper
 from simpleob.domain.account import Account
+from simpleob.domain.account_mapping_rule import AccountMappingRule
 from simpleob.domain.account_type import AccountType
+from simpleob.domain.chart_of_accounts_template import ChartOfAccountsTemplate
+from simpleob.domain.person_account_role import PersonAccountRole
 from simpleob.domain.template_account import TemplateAccount
 from simpleob.services.e_bilanz_account_detail_service import (
     EBilanzAccountDetailService,
@@ -98,6 +102,40 @@ def test_ignores_zero_balance_accounts() -> None:
 
     assert service.build(ledger=ledger) == ()
     assert mapper.received_balances == []
+
+
+def test_person_account_detail_uses_role_mapped_hgb_position():
+    ledger = Ledger()
+    ledger.post("10000", "1200", Decimal("135.79"))
+
+    chart = ChartOfAccountsTemplate(
+        "Test",
+        (
+            TemplateAccount("10000", "Kunde Beispiel", AccountType.ASSET),
+            TemplateAccount("1200", "Bank", AccountType.ASSET),
+        ),
+        account_mapping_rules=(
+            AccountMappingRule("1200", _position(), _position()),
+        ),
+        person_account_roles=(("10000", PersonAccountRole.DEBITOR),),
+    )
+    service = EBilanzAccountDetailService(
+        account_mapper=AccountMapper(chart),
+        accounts=(
+            _account("10000", "Kunde Beispiel"),
+            _account("1200", "Bank"),
+        ),
+    )
+
+    details = service.build(ledger=ledger)
+    debtor_detail = next(
+        detail for detail in details if detail.account_number == "10000"
+    )
+
+    assert debtor_detail.position.code == "HGB.266.AKTIVA.B.II.1"
+    assert debtor_detail.account_number == "10000"
+    assert debtor_detail.account_description == "Kunde Beispiel"
+    assert debtor_detail.balance == Decimal("135.79")
 
 
 def test_rejects_missing_account_description() -> None:

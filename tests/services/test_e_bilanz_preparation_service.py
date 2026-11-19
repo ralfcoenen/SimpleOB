@@ -9,9 +9,20 @@ from simpleob.accounting.financial_statement_builder import (
 from simpleob.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
+from simpleob.accounting.hgb_financial_statement_position_provider import (
+    HgbFinancialStatementPositionProvider,
+)
 from simpleob.accounting.income_statement import IncomeStatement
 from simpleob.accounting.ledger import Ledger
+from simpleob.accounting.mapper import AccountMapper
 from simpleob.domain.account_type import AccountType
+from simpleob.domain.chart_of_accounts_template import ChartOfAccountsTemplate
+from simpleob.domain.person_account_role import PersonAccountRole
+from simpleob.domain.template_account import TemplateAccount
+from simpleob.hgb.balance_sheet_structure import create_hgb_balance_sheet_structure
+from simpleob.hgb.income_statement_structure import (
+    create_hgb_income_statement_structure,
+)
 from simpleob.services.closing_service import ClosingService
 from simpleob.services.e_bilanz_preparation_service import (
     EBilanzPreparationService,
@@ -231,3 +242,47 @@ def test_excludes_income_summary_account_from_balance_sheet(
     } == {
         "1200",
     }
+
+
+def test_real_preparation_adds_person_accounts_to_existing_hgb_positions():
+    assets, liabilities = create_hgb_balance_sheet_structure()
+    income_statement_root = create_hgb_income_statement_structure()
+    provider = HgbFinancialStatementPositionProvider((assets, liabilities))
+    chart = ChartOfAccountsTemplate(
+        "Personenkonten",
+        (
+            TemplateAccount("10000", "Kunde", AccountType.ASSET),
+            TemplateAccount("70000", "Lieferant", AccountType.LIABILITY),
+        ),
+        person_account_roles=(
+            ("10000", PersonAccountRole.DEBITOR),
+            ("70000", PersonAccountRole.KREDITOR),
+        ),
+    )
+    ledger = Ledger()
+    ledger.post("10000", "70000", Decimal("123.45"))
+    service = EBilanzPreparationService(
+        statement_builder=FinancialStatementBuilder(AccountMapper(chart)),
+        closing_service=ClosingService(),
+        account_types={
+            "10000": AccountType.ASSET,
+            "70000": AccountType.LIABILITY,
+        },
+        assets=assets,
+        liabilities=liabilities,
+        income_summary_account_number="8990",
+    )
+
+    result = service.prepare(
+        income_statement=IncomeStatement(
+            income_statement=income_statement_root,
+            amounts={},
+        ),
+        closed_ledger=ledger,
+    )
+
+    receivables = provider.get("HGB.266.AKTIVA.B.II.1")
+    payables = provider.get("HGB.266.PASSIVA.C.4")
+    assert result.balance_sheet_amounts[receivables] == Decimal("123.45")
+    assert result.balance_sheet_amounts[payables] == Decimal("123.45")
+    assert result.balance_sheet.is_balanced()

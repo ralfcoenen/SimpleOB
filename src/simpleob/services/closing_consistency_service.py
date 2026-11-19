@@ -8,8 +8,11 @@ from simpleob.accounting.trial_balance import TrialBalance
 from simpleob.domain.closing_consistency_result import (
     ClosingConsistencyResult,
 )
+from simpleob.domain.errors import (
+    InvalidPersonAccountClassificationError,
+    UnsupportedPersonAccountBalanceError,
+)
 from simpleob.domain.money import ZERO
-from simpleob.domain.errors import UnsupportedPersonAccountBalanceError
 from simpleob.services.closing_result import ClosingResult
 from simpleob.services.closing_service import ClosingService
 
@@ -138,6 +141,8 @@ class ClosingConsistencyService:
                 mapper.position_for(
                     balance
                 )
+            except InvalidPersonAccountClassificationError as exc:
+                errors.append(str(exc))
             except UnsupportedPersonAccountBalanceError as exc:
                 errors.append(
                     str(exc)

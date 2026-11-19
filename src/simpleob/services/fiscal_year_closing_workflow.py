@@ -14,6 +14,7 @@ from simpleob.accounting.financial_statement_position import (
 )
 from simpleob.accounting.income_statement import IncomeStatement
 from simpleob.accounting.ledger import Ledger
+from simpleob.accounting.mapper import AccountMapper
 from simpleob.database.booking_repository import BookingRepository
 from simpleob.database.company_repository import CompanyRepository
 from simpleob.domain.account_type import AccountType
@@ -209,10 +210,15 @@ class FiscalYearClosingWorkflow:
                     "die transaktionale Neuberechnung erforderlich."
                 )
 
-            if self._statement_builder is not None:
-                self._statement_builder.ensure_person_account_balances_supported(
-                    ledger.balances()
-                )
+            statement_builder = FinancialStatementBuilder(
+                AccountMapper(chart_of_accounts)
+            )
+            # Vor dem Abschluss jeden vorhandenen Saldo auf seine HGB-Position
+            # prüfen. So werden Personenkonten integriert und zugleich weiterhin
+            # fehlende oder widersprüchliche Zuordnungen abgefangen.
+            statement_builder.build(
+                balances=ledger.balances()
+            )
 
             result = self._closing_service.close(
                 income_statement=income_statement,

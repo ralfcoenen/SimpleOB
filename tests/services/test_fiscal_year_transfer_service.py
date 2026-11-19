@@ -7,6 +7,7 @@ import pytest
 
 from simpleob.accounting.financial_statement_position import FinancialStatementPosition
 from simpleob.accounting.ledger import Ledger
+from simpleob.accounting.mapper import AccountMapper
 from simpleob.domain.account_mapping_rule import AccountMappingRule
 from simpleob.domain.account_type import AccountType
 from simpleob.domain.accounting_account_roles import AccountingAccountRoles
@@ -15,6 +16,7 @@ from simpleob.domain.booking_line import BookingLine
 from simpleob.domain.chart_of_accounts_template import ChartOfAccountsTemplate
 from simpleob.domain.entry_side import EntrySide
 from simpleob.domain.journal import Journal
+from simpleob.domain.person_account_role import PersonAccountRole
 from simpleob.domain.template_account import TemplateAccount
 from simpleob.services.fiscal_year_transfer_service import (
     FiscalYearTransferService,
@@ -240,6 +242,101 @@ def test_creates_opening_bookings_for_credit_balances() -> None:
             amount=Decimal("17000.00"),
         ),
     )
+
+
+def test_transfers_all_person_account_balance_directions_to_same_accounts():
+    ledger = Ledger()
+    for account_number, side, amount in (
+        ("10000", EntrySide.DEBIT, Decimal("100.01")),
+        ("10001", EntrySide.CREDIT, Decimal("20.02")),
+        ("70000", EntrySide.CREDIT, Decimal("30.03")),
+        ("70001", EntrySide.DEBIT, Decimal("10.04")),
+    ):
+        if side is EntrySide.DEBIT:
+            ledger.post(account_number, "9999", amount)
+        else:
+            ledger.post("9999", account_number, amount)
+
+    account_types = {
+        "10000": AccountType.ASSET,
+        "10001": AccountType.ASSET,
+        "70000": AccountType.LIABILITY,
+        "70001": AccountType.LIABILITY,
+        "9999": AccountType.EQUITY,
+        "9000": AccountType.EQUITY,
+    }
+    service = FiscalYearTransferService(
+        opening_balance_account_number="9000",
+        profit_account_number="8020",
+        loss_account_number="8021",
+        profit_loss_carryforward_account_number="2970",
+    )
+
+    transfers = service.create_opening_bookings(
+        ledger=ledger,
+        account_types=account_types,
+        opening_date=date(2027, 1, 1),
+    )
+
+    person_transfers = {
+        booking.description.removeprefix("Saldovortrag Konto "): booking
+        for booking in transfers
+        if booking.description.startswith("Saldovortrag Konto ")
+        and booking.description.removeprefix("Saldovortrag Konto ")
+        in {"10000", "10001", "70000", "70001"}
+    }
+    assert set(person_transfers) == {"10000", "10001", "70000", "70001"}
+    for account_number, side, amount in (
+        ("10000", EntrySide.DEBIT, Decimal("100.01")),
+        ("10001", EntrySide.CREDIT, Decimal("20.02")),
+        ("70000", EntrySide.CREDIT, Decimal("30.03")),
+        ("70001", EntrySide.DEBIT, Decimal("10.04")),
+    ):
+        person_line = next(
+            line
+            for line in person_transfers[account_number].lines
+            if line.account_number == account_number
+        )
+        assert person_line.side is side
+        assert person_line.amount == amount
+
+    chart = ChartOfAccountsTemplate(
+        "Personenkonten",
+        tuple(
+            TemplateAccount(
+                number,
+                number,
+                account_types[number],
+            )
+            for number in ("10000", "10001", "70000", "70001")
+        ),
+        person_account_roles=(
+            ("10000", PersonAccountRole.DEBITOR),
+            ("10001", PersonAccountRole.DEBITOR),
+            ("70000", PersonAccountRole.KREDITOR),
+            ("70001", PersonAccountRole.KREDITOR),
+        ),
+    )
+    mapper = AccountMapper(chart)
+    next_year_ledger = Ledger()
+    next_year_posting_service = PostingService()
+    for transfer_booking in transfers:
+        next_year_posting_service.post_booking(
+            booking=transfer_booking,
+            ledger=next_year_ledger,
+        )
+    expected_positions = {
+        "10000": "HGB.266.AKTIVA.B.II.1",
+        "10001": "HGB.266.PASSIVA.C.4",
+        "70000": "HGB.266.PASSIVA.C.4",
+        "70001": "HGB.266.AKTIVA.B.II.1",
+    }
+    for account_number, expected_code in expected_positions.items():
+        position, amount = mapper.map_balance(
+            next_year_ledger.get_account(account_number)
+        )
+        assert position.code == expected_code
+        assert amount > Decimal("0.00")
 
 
 def _vat_transfer_configuration(*, missing_mapping: str | None = None):

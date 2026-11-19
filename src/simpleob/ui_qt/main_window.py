@@ -60,8 +60,8 @@ from simpleob.core.config import (
 )
 from simpleob.core.context import ApplicationContext
 from simpleob.database.business_partner_repository import BusinessPartnerRepository
-from simpleob.database.person_account_repository import PersonAccountRepository
 from simpleob.database.lock_error import DatabaseLockError
+from simpleob.database.person_account_repository import PersonAccountRepository
 from simpleob.date_input import GermanDateEdit
 from simpleob.domain.account import Account
 from simpleob.domain.account_type import AccountType
@@ -76,11 +76,12 @@ from simpleob.domain.credit_note import CreditNoteKind
 from simpleob.domain.elster_data_supplier import ElsterDataSupplier
 from simpleob.domain.entry_side import EntrySide
 from simpleob.domain.errors import (
+    InvalidPersonAccountClassificationError,
     UnknownAccountError,
     UnsupportedPersonAccountBalanceError,
 )
-from simpleob.domain.person_account_role import PersonAccountRole
 from simpleob.domain.fiscal_year_status import FiscalYearStatus
+from simpleob.domain.person_account_role import PersonAccountRole
 from simpleob.domain.vat_accounts import VatAccounts
 from simpleob.eric.elster_bilanz_transmission_service import (
     ElsterBilanzTransmissionService,
@@ -172,10 +173,10 @@ from simpleob.ui_qt.open_item_overview_widget import OpenItemOverviewWidget
 from simpleob.ui_qt.open_item_payment_dialog import OpenItemPaymentDialog
 from simpleob.ui_qt.open_item_reconciliation_widget import OpenItemReconciliationWidget
 from simpleob.ui_qt.opening_balance_dialog import OpeningBalanceDialog
-from simpleob.ui_qt.person_account_dialog import PersonAccountDialog
 from simpleob.ui_qt.payment_allocation_correction_dialog import (
     PaymentAllocationCorrectionDialog,
 )
+from simpleob.ui_qt.person_account_dialog import PersonAccountDialog
 from simpleob.ui_qt.profit_appropriation_dialog import (
     ProfitAppropriationDialog,
 )
@@ -5380,7 +5381,13 @@ class MainWindow(QMainWindow):
         except ValueError as exc:
             message = str(exc)
 
-            if isinstance(exc, UnsupportedPersonAccountBalanceError):
+            if isinstance(
+                exc,
+                (
+                    InvalidPersonAccountClassificationError,
+                    UnsupportedPersonAccountBalanceError,
+                ),
+            ):
                 self._balance_sheet_frame.show_mapping_error(message)
                 return
 
@@ -5388,6 +5395,8 @@ class MainWindow(QMainWindow):
                 "no debit position defined for account"
                 not in message
                 and "no credit position defined for account"
+                not in message
+                and "ist keiner HGB-Abschlussposition zugeordnet"
                 not in message
             ):
                 raise

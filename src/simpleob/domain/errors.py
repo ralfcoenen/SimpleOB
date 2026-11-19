@@ -25,3 +25,7 @@ class UnknownAccountError(DomainError):
 
 class UnsupportedPersonAccountBalanceError(ValueError):
     """Personenkontensalden sind in dieser HGB-Auswertung noch nicht integriert."""
+
+
+class InvalidPersonAccountClassificationError(ValueError):
+    """Die Klassifikation oder Stammdaten eines Personenkontos sind widersprüchlich."""

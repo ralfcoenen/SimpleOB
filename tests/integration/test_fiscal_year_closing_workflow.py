@@ -30,11 +30,14 @@ from simpleob.domain.accounting_account_roles import AccountingAccountRoles
 from simpleob.domain.booking import Booking
 from simpleob.domain.booking_line import BookingLine
 from simpleob.domain.booking_type import BookingType
+from simpleob.domain.chart_of_accounts_template import ChartOfAccountsTemplate
 from simpleob.domain.company import Company
 from simpleob.domain.entry_side import EntrySide
 from simpleob.domain.fiscal_year import FiscalYear
 from simpleob.domain.fiscal_year_status import FiscalYearStatus
 from simpleob.domain.journal import Journal
+from simpleob.domain.person_account_role import PersonAccountRole
+from simpleob.domain.template_account import TemplateAccount
 from simpleob.domain.vat_accounts import VatAccounts
 from simpleob.hgb.balance_sheet_structure import (
     create_hgb_balance_sheet_structure,
@@ -268,6 +271,151 @@ def test_closes_fiscal_year_and_persists_closing_bookings() -> None:
     assert "Abschluss des Erlöskontos 8400" in descriptions
     assert "Abschluss des Aufwandskontos 4980" in descriptions
     assert "Abschluss des GuV-Kontos" in descriptions
+
+
+def test_closing_workflow_accepts_classified_person_account_balances():
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine)
+    company = Company(company_id=uuid4(), name="Personenkonten UG")
+    fiscal_year = FiscalYear(
+        start_date=date(2026, 1, 1),
+        end_date=date(2026, 12, 31),
+    )
+    assets, liabilities = create_hgb_balance_sheet_structure()
+    income_statement_root = create_hgb_income_statement_structure()
+    provider = HgbFinancialStatementPositionProvider(
+        (assets, liabilities, income_statement_root)
+    )
+    csv_file = (
+        Path(__file__).resolve().parents[2]
+        / "src"
+        / "simpleob"
+        / "resources"
+        / "chart_of_accounts"
+        / "openbilanz_standard.csv"
+    )
+    standard_chart = CsvChartOfAccountsImporter(
+        position_provider=provider,
+    ).load(csv_file)
+    chart = ChartOfAccountsTemplate(
+        name=standard_chart.name,
+        accounts=standard_chart.accounts
+        + (
+            TemplateAccount(
+                "10000", "Kunde Beispiel", AccountType.ASSET
+            ),
+        ),
+        account_mapping_rules=standard_chart.account_mapping_rules,
+        person_account_roles=(("10000", PersonAccountRole.DEBITOR),),
+    )
+    account_types = {
+        account.account_number: account.account_type
+        for account in chart.accounts
+    }
+    booking = Booking(
+        booking_date=date(2026, 6, 1),
+        description="Ausgangsrechnung",
+        lines=(
+            BookingLine("10000", EntrySide.DEBIT, Decimal("120.00")),
+            BookingLine("8400", EntrySide.CREDIT, Decimal("120.00")),
+        ),
+    )
+    income_statement = IncomeStatement(
+        income_statement=income_statement_root,
+        amounts={},
+    )
+    closing_service = ClosingService(
+        closing_accounts=ClosingAccounts(
+            income_summary_account="8990",
+            profit_account="8020",
+            loss_account="8021",
+        )
+    )
+
+    with Session() as session:
+        company_repository = CompanyRepository(session)
+        booking_repository = BookingRepository(session)
+        company_repository.add(company)
+        company_repository.add_fiscal_year(company.company_id, fiscal_year)
+        booking_repository.add(
+            company_id=company.company_id,
+            fiscal_year=fiscal_year,
+            booking=booking,
+        )
+        workflow = FiscalYearClosingWorkflow(
+            session=session,
+            booking_repository=booking_repository,
+            company_repository=company_repository,
+            closing_service=closing_service,
+            posting_service=PostingService(),
+            statement_builder=FinancialStatementBuilder(
+                AccountMapper(chart)
+            ),
+            income_statement_position=income_statement_root,
+            account_types=account_types,
+        )
+
+        result = workflow.close(
+            company_id=company.company_id,
+            fiscal_year=fiscal_year,
+            income_statement=income_statement,
+            ledger=Ledger(),
+            chart_of_accounts=chart,
+            closing_date=date(2026, 12, 31),
+        )
+
+    assert result.net_income == Decimal("120.00")
+    assert any(
+        closing_booking.description == "Abschluss des Erlöskontos 8400"
+        for closing_booking in result.bookings
+    )
+
+
+def test_closing_workflow_blocks_unclassified_five_digit_account():
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine)
+    company = Company(company_id=uuid4(), name="Unzugeordnet UG")
+    fiscal_year = FiscalYear(
+        start_date=date(2026, 1, 1),
+        end_date=date(2026, 12, 31),
+    )
+    income_statement_root = create_hgb_income_statement_structure()
+    chart = ChartOfAccountsTemplate(
+        "Testkontenrahmen",
+        (TemplateAccount("10000", "Unzugeordnet", AccountType.ASSET),),
+    )
+    ledger = Ledger()
+    ledger.get_or_create_account("10000").add_debit(Decimal("50.00"))
+
+    with Session() as session:
+        company_repository = CompanyRepository(session)
+        booking_repository = BookingRepository(session)
+        company_repository.add(company)
+        company_repository.add_fiscal_year(company.company_id, fiscal_year)
+        workflow = FiscalYearClosingWorkflow(
+            session=session,
+            booking_repository=booking_repository,
+            company_repository=company_repository,
+            closing_service=ClosingService(),
+        )
+
+        with pytest.raises(
+            ValueError,
+            match="keine gültige Personenkontenzuordnung",
+        ):
+            workflow.close(
+                company_id=company.company_id,
+                fiscal_year=fiscal_year,
+                income_statement=IncomeStatement(
+                    income_statement=income_statement_root,
+                    amounts={},
+                ),
+                ledger=ledger,
+                chart_of_accounts=chart,
+                closing_date=date(2026, 12, 31),
+            )
 
 def test_rolls_back_when_closing_booking_cannot_be_persisted() -> None:
     """Ein fehlgeschlagener Abschluss wird vollständig zurückgerollt."""
