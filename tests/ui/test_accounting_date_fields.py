@@ -9,7 +9,6 @@ from simpleob.date_input import GermanDateEdit
 from simpleob.domain.company import Company
 from simpleob.domain.fiscal_year import FiscalYear
 from simpleob.domain.fixed_asset import FixedAsset
-from simpleob.domain.vat_accounts import VatAccounts
 from simpleob.ui_qt.booking_frame import BookingFrame
 from simpleob.ui_qt.fixed_asset_disposal_dialog import FixedAssetDisposalDialog
 from simpleob.ui_qt.main_window import MainWindow
@@ -17,7 +16,6 @@ from simpleob.ui_qt.new_company_dialog import NewCompanyDialog
 from simpleob.ui_qt.new_fiscal_year_dialog import NewFiscalYearDialog
 from simpleob.ui_qt.new_fixed_asset_dialog import NewFixedAssetDialog
 from simpleob.ui_qt.reports_widget import ReportsWidget
-from simpleob.ui_qt.vat_booking_frame import VatBookingFrame
 
 
 def _app():
@@ -44,11 +42,6 @@ def test_accounting_and_fixed_asset_forms_use_central_date_fields():
         accounts=(),
         equity_contribution_account_numbers=frozenset(),
         on_booking_created=lambda *_args: None,
-    )
-    vat_frame = VatBookingFrame(
-        accounts=(),
-        vat_accounts=VatAccounts("1576", "1571", "1776", "1771"),
-        on_booking_created=lambda _booking: None,
     )
     reports = ReportsWidget(
         context=SimpleNamespace(fiscal_year=fiscal_year),
@@ -82,8 +75,6 @@ def test_accounting_and_fixed_asset_forms_use_central_date_fields():
         year_dialog._start_date_entry,
         year_dialog._end_date_entry,
         booking_frame._booking_date_entry,
-        vat_frame._booking_date_entry,
-        vat_frame._due_date_entry,
         reports._trial_balance_start_date,
         reports._trial_balance_end_date,
         reports._account_activity_start_date,
@@ -105,7 +96,6 @@ def test_accounting_and_fixed_asset_forms_use_central_date_fields():
         company_dialog,
         year_dialog,
         booking_frame,
-        vat_frame,
         reports,
         asset_dialog,
         disposal_dialog,

@@ -15,10 +15,8 @@ from PySide6.QtWidgets import (
 from simpleob.domain.account import Account
 from simpleob.domain.account_type import AccountType
 from simpleob.domain.template_account import TemplateAccount
-from simpleob.domain.vat_accounts import VatAccounts
 from simpleob.ui_qt.booking_frame import BookingFrame
 from simpleob.ui_qt.main_window import MainWindow
-from simpleob.ui_qt.vat_booking_frame import VatBookingFrame
 
 _APP = QApplication.instance() or QApplication([])
 
@@ -150,7 +148,7 @@ def test_failed_activation_keeps_booking_locked_and_can_be_retried(monkeypatch):
     workspace.activate_chart_context.assert_not_called()
 
 
-def test_booking_frames_refresh_account_choices_after_activation():
+def test_general_booking_frame_refreshes_account_choices_after_activation():
     old_account = Account(
         TemplateAccount("1210", "Forderungen alt", AccountType.ASSET)
     )
@@ -174,21 +172,3 @@ def test_booking_frames_refresh_account_choices_after_activation():
 
     assert simple_row.name_item.text() == "Forderungen neu"
     assert "1200 – Bank" in simple_row.completer.model().stringList()
-
-    vat_accounts = VatAccounts("1576", "1571", "1776", "1771")
-    vat = VatBookingFrame(
-        accounts=(old_account,),
-        vat_accounts=vat_accounts,
-        on_booking_created=Mock(),
-    )
-    vat._counter_account_box.setEditText("1210 – Forderungen alt")
-    position_account_box = vat._position_rows[0]["account_box"]
-    position_account_box.setEditText("1210 – Forderungen alt")
-    vat.update_accounts(
-        accounts=(updated_account, other_account),
-        vat_accounts=vat_accounts,
-    )
-
-    assert vat._counter_account_box.currentText() == "1210 – Forderungen neu"
-    assert position_account_box.currentText() == "1210 – Forderungen neu"
-    assert vat._counter_account_box.count() == 2

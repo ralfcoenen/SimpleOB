@@ -17,7 +17,6 @@ from simpleob.domain.person_account_role import PersonAccountRole
 from simpleob.domain.template_account import TemplateAccount
 from simpleob.domain.vat_accounts import VatAccounts
 from simpleob.ui_qt.main_window import MainWindow
-from simpleob.ui_qt.vat_booking_frame import VatBookingFrame
 
 
 def _booking_window() -> MainWindow:
@@ -82,7 +81,6 @@ def test_booking_tab_only_exposes_general_booking_and_keeps_compact_layout():
     assert "Neue Buchung" in groups
     assert "OP-Verwaltung" not in groups
     assert not any("Umsatzüberwachung" in title for title in groups)
-    assert not window.findChildren(VatBookingFrame)
     assert not hasattr(window, "_booking_columns_splitter")
     assert window._booking_frame.isVisible()
 
