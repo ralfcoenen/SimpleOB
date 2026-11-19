@@ -88,7 +88,6 @@ from simpleob.services.closing_service import (
     ClosingService,
 )
 from simpleob.services.fiscal_year_workspace import FiscalYearWorkspace
-from simpleob.services.kr_monitoring_service import KrMonitoringService
 from simpleob.services.opening_balance_service import OpeningBalanceService
 from simpleob.services.pdf_reporting_service import PdfReportingService
 from simpleob.services.uncovered_equity_deficit_presentation_service import (
@@ -130,10 +129,6 @@ from simpleob.ui_qt.fixed_asset_disposal_link_dialog import (
 from simpleob.ui_qt.income_statement_frame import (
     IncomeStatementFrame,
 )
-from simpleob.ui_qt.kr_monitoring_summary_widget import (
-    KrMonitoringSummaryWidget,
-)
-from simpleob.ui_qt.kr_settings_dialog import KrSettingsDialog
 from simpleob.ui_qt.new_fixed_asset_dialog import NewFixedAssetDialog
 from simpleob.ui_qt.opening_balance_dialog import OpeningBalanceDialog
 from simpleob.ui_qt.person_account_dialog import PersonAccountDialog
@@ -145,7 +140,6 @@ from simpleob.ui_qt.shareholder_dialog import ShareholdersDialog
 from simpleob.ui_qt.tax_depreciation_adjustment_dialog import (
     TaxDepreciationAdjustmentDialog,
 )
-from simpleob.ui_qt.vat_booking_frame import ResponsiveBookingSplitter
 from simpleob.ui_qt.vat_reconciliation_preview_dialog import (
     VatReconciliationPreviewDialog,
 )
@@ -189,7 +183,6 @@ class MainWindow(QMainWindow):
         eric_data_supplier: ElsterDataSupplier | None = None,
         application_config: ApplicationConfig | None = None,
         person_account_repository: PersonAccountRepository | None = None,
-        kr_monitoring_service: KrMonitoringService | None = None,
     ) -> None:
         super().__init__()
 
@@ -228,7 +221,6 @@ class MainWindow(QMainWindow):
         )
         self._application_config = application_config
         self._person_account_repository = person_account_repository
-        self._kr_monitoring_service = kr_monitoring_service
         self._eric_certificate_path = (
             Path(eric_certificate_path).expanduser()
             if eric_certificate_path is not None
@@ -443,10 +435,6 @@ class MainWindow(QMainWindow):
         self._company_master_data_button.triggered.connect(
             self._open_company_master_data
         )
-        self._kr_settings_button = self._administration_menu.addAction(
-            "Kleinunternehmerregelung"
-        )
-        self._kr_settings_button.triggered.connect(self._open_kr_settings)
         self._shareholders_button = self._administration_menu.addAction(
             "Gesellschafter…"
         )
@@ -476,10 +464,6 @@ class MainWindow(QMainWindow):
         self._administration_button = QPushButton("Verwaltung")
         self._administration_button.setMenu(self._administration_menu)
         layout.addWidget(self._administration_button)
-
-    def _refresh_kr_monitoring(self) -> None:
-        """Aktualisiert die rein informative KR-Anzeige."""
-        self._kr_monitoring_widget.refresh()
 
     def closeEvent(self, event) -> None:
         """Kehrt beim Schließen des Hauptfensters zur Buchhaltungsauswahl zurück."""
@@ -2139,30 +2123,7 @@ class MainWindow(QMainWindow):
         self._booking_frame_layout.addWidget(
             self._booking_frame
         )
-        self._kr_monitoring_widget = KrMonitoringSummaryWidget(
-            parent=self._booking_frame_container,
-            summary_provider=(
-                (
-                    lambda: self._kr_monitoring_service.get_summary(
-                        company_id=self._context.company.company_id
-                    )
-                )
-                if self._kr_monitoring_service is not None
-                else None
-            ),
-        )
-
-        booking_left_column = QWidget()
-        booking_left_layout = QVBoxLayout(booking_left_column)
-        booking_left_layout.setContentsMargins(0, 0, 0, 0)
-        booking_left_layout.addWidget(self._booking_frame_container)
-
-        self._booking_columns_splitter = ResponsiveBookingSplitter()
-        self._booking_columns_splitter.addWidget(booking_left_column)
-        self._booking_columns_splitter.addWidget(
-            self._kr_monitoring_widget
-        )
-        booking_layout.addWidget(self._booking_columns_splitter)
+        booking_layout.addWidget(self._booking_frame_container)
         layout.addWidget(booking_group)
         layout.addStretch()
 
@@ -2210,7 +2171,6 @@ class MainWindow(QMainWindow):
             ),
         )
 
-        self._refresh_kr_monitoring()
         self._refresh_accounts()
         self._refresh_journal()
         self._refresh_balance_sheet()
@@ -3978,7 +3938,6 @@ class MainWindow(QMainWindow):
             )
             return
 
-        self._refresh_kr_monitoring()
         self._refresh_journal()
         self._refresh_accounts()
         self._refresh_fixed_assets()
@@ -5520,36 +5479,6 @@ class MainWindow(QMainWindow):
             "Die Unternehmensstammdaten wurden gespeichert.",
         )
 
-    def _open_kr_settings(self) -> None:
-        """Bearbeitet Einstellungen der informativen KR-Anzeige."""
-        service = self._kr_monitoring_service
-        if service is None:
-            return
-        company_id = self._context.company.company_id
-        try:
-            settings = service.get_settings(company_id=company_id)
-        except ValueError as exc:
-            QMessageBox.critical(self, "Kleinunternehmerregelung", str(exc))
-            return
-        dialog = KrSettingsDialog(self, settings=settings)
-        dialog.exec()
-        if dialog.result is None:
-            return
-        try:
-            service.save_settings(
-                dialog.result,
-                expected_settings=settings,
-            )
-        except (ValueError, DatabaseLockError) as exc:
-            QMessageBox.critical(self, "Kleinunternehmerregelung", str(exc))
-            return
-        self._refresh_kr_monitoring()
-        QMessageBox.information(
-            self,
-            "Kleinunternehmerregelung",
-            "Die Einstellungen zur Kleinunternehmerregelung wurden gespeichert.",
-        )
-
     def _reload_bookkeeping_data(
         self,
         _tab_index: int | None = None,
@@ -5710,7 +5639,6 @@ class MainWindow(QMainWindow):
 
         # Mandantenbezogene Verwaltungsfunktionen sperren.
         self._company_master_data_button.setEnabled(False)
-        self._kr_settings_button.setEnabled(False)
         self._shareholders_button.setEnabled(False)
         self._account_configuration_button.setEnabled(False)
         self._export_company_button.setEnabled(False)
@@ -5838,7 +5766,6 @@ class MainWindow(QMainWindow):
                     contribution_account_numbers
                 ),
             )
-            self._kr_monitoring_widget.refresh()
             self._reports_widget.update_accounts(
                 accounts=accounts,
                 person_accounts=(
@@ -5888,7 +5815,6 @@ class MainWindow(QMainWindow):
                     or self._company_master_data.supports_e_bilanz,
                 )
             self._company_master_data_button.setEnabled(True)
-            self._kr_settings_button.setEnabled(True)
             self._shareholders_button.setEnabled(True)
             self._account_configuration_button.setEnabled(True)
             self._export_company_button.setEnabled(
@@ -5923,7 +5849,6 @@ class MainWindow(QMainWindow):
             self._booking_frame.set_enabled(False)
             self._opening_balance_button.setEnabled(False)
             self._company_master_data_button.setEnabled(False)
-            self._kr_settings_button.setEnabled(False)
             self._shareholders_button.setEnabled(False)
             self._account_configuration_button.setEnabled(False)
             self._export_company_button.setEnabled(False)

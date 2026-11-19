@@ -50,10 +50,8 @@ def _activation_window(monkeypatch):
     )
     window._workspace = workspace
     window._booking_frame = Mock()
-    window._kr_monitoring_widget = Mock()
     window._opening_balance_button = QPushButton()
     window._company_master_data_button = QAction(window)
-    window._kr_settings_button = QAction(window)
     window._shareholders_button = QAction(window)
     window._account_configuration_button = QAction(window)
     window._export_company_button = QAction(window)
@@ -73,7 +71,6 @@ def _activation_window(monkeypatch):
     window._notebook.setCurrentWidget(window._accounts_tab)
     window._activate_chart_button = QPushButton()
     window._company_master_data_button = QAction(window)
-    window._kr_settings_button = QAction(window)
     window._shareholders_button = QAction(window)
     window._account_configuration_button = QAction(window)
     window._export_company_button = QAction(window)

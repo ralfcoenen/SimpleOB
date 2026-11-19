@@ -1,6 +1,6 @@
 from unittest.mock import Mock
 
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QLabel
 
 from simpleob.domain.vat_accounts import VatAccounts
 from simpleob.ui_qt.vat_booking_frame import VatBookingFrame
@@ -15,6 +15,19 @@ def _frame() -> tuple[QApplication, VatBookingFrame, Mock]:
         on_booking_created=on_booking_created,
     )
     return app, frame, on_booking_created
+
+
+def test_legacy_invoice_frame_has_no_kr_monitoring_or_threshold_warning():
+    app, frame, _on_booking_created = _frame()
+    try:
+        labels = [label.text() for label in frame.findChildren(QLabel)]
+        assert not any("Umsatzüberwachung" in label for label in labels)
+        assert not any("Umsatzgrenze" in label for label in labels)
+        assert not hasattr(frame, "refresh_kr_summary")
+        assert not hasattr(frame, "_check_kr_invoice_threshold")
+    finally:
+        frame.close()
+        app.processEvents()
 
 
 def test_vat_rate_defaults_to_19_percent_and_is_remembered_by_invoice_type():

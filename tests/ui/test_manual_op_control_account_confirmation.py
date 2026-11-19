@@ -28,7 +28,7 @@ def test_general_booking_posts_without_op_specific_confirmation():
         chart_of_accounts=None,
     )
     window._workspace.load_account_configuration.assert_not_called()
-    window._refresh_kr_monitoring.assert_called_once()
+    assert not hasattr(MainWindow, "_refresh_kr_monitoring")
     window._refresh_accounts.assert_called_once()
     window._refresh_journal.assert_called_once()
     window._refresh_balance_sheet.assert_called_once()

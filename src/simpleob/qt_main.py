@@ -51,7 +51,6 @@ from simpleob.database.fixed_asset_movement_repository import (
     FixedAssetMovementRepository,
 )
 from simpleob.database.fixed_asset_repository import FixedAssetRepository
-from simpleob.database.kr_monitoring_repository import KrMonitoringRepository
 from simpleob.database.migration_service import (
     DatabaseMigrationService,
     PostgreSQLSchemaStatus,
@@ -119,7 +118,6 @@ from simpleob.services.fixed_asset_disposal_workflow import (
 from simpleob.services.fixed_asset_schedule_service import (
     FixedAssetScheduleService,
 )
-from simpleob.services.kr_monitoring_service import KrMonitoringService
 from simpleob.services.pdf_reporting_service import PdfReportingService
 from simpleob.services.posting_service import PostingService
 from simpleob.services.profit_appropriation_booking_service import (
@@ -698,10 +696,6 @@ def main() -> None:
 
         booking_repository = BookingRepository(session)
         person_account_repository = PersonAccountRepository(session)
-        kr_monitoring_service = KrMonitoringService(
-            KrMonitoringRepository(session),
-            company_repository,
-        )
         posting_service = PostingService()
 
         fixed_asset_repository = FixedAssetRepository(session)
@@ -1217,7 +1211,6 @@ def main() -> None:
                 ),
                 application_config=config,
                 person_account_repository=person_account_repository,
-                kr_monitoring_service=kr_monitoring_service,
                 eric_certificate_path=(
                     config.eric_certificate_path
                 ),

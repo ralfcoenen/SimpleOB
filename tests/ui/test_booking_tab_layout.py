@@ -17,7 +17,7 @@ from simpleob.domain.person_account_role import PersonAccountRole
 from simpleob.domain.template_account import TemplateAccount
 from simpleob.domain.vat_accounts import VatAccounts
 from simpleob.ui_qt.main_window import MainWindow
-from simpleob.ui_qt.vat_booking_frame import ResponsiveBookingSplitter, VatBookingFrame
+from simpleob.ui_qt.vat_booking_frame import VatBookingFrame
 
 
 def _booking_window() -> MainWindow:
@@ -51,7 +51,6 @@ def _booking_window() -> MainWindow:
     window._chart_of_accounts = SimpleNamespace(account_mapping_rules=())
     window._context = SimpleNamespace(company=SimpleNamespace(company_id=uuid4()))
     window._workspace = SimpleNamespace(is_open=True)
-    window._kr_monitoring_service = None
     window._person_account_repository = None
     window._opening_balance_button = QPushButton()
     window._create_booking_tab()
@@ -82,10 +81,10 @@ def test_booking_tab_only_exposes_general_booking_and_keeps_compact_layout():
     groups = {group.title() for group in window.findChildren(QGroupBox)}
     assert "Neue Buchung" in groups
     assert "OP-Verwaltung" not in groups
+    assert not any("Umsatzüberwachung" in title for title in groups)
     assert not window.findChildren(VatBookingFrame)
-    assert isinstance(window._booking_columns_splitter, ResponsiveBookingSplitter)
+    assert not hasattr(window, "_booking_columns_splitter")
     assert window._booking_frame.isVisible()
-    assert window._kr_monitoring_widget.isHidden()
 
     scroll_area = window.findChild(QScrollArea)
     assert scroll_area is not None
