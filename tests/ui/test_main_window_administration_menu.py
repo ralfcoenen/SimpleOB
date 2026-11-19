@@ -79,8 +79,6 @@ def test_administration_actions_are_disabled_in_account_editing_mode(
     window._account_editing_mode = False
     window._activate_chart_button = QAction(window)
     window._booking_frame = Mock()
-    window._vat_booking_frame = Mock()
-    window._booking_mode_box = QAction(window)
     window._notebook = QTabWidget()
     window._accounts_tab = QWidget()
     other_tab = QWidget()

@@ -10,7 +10,6 @@ from simpleob.domain.open_item_credit_refund_reversal import (
     OpenItemCreditRefundReversalCandidate,
 )
 from simpleob.domain.open_item_offset import OffsetDirection
-from simpleob.ui_qt.main_window import MainWindow
 from simpleob.ui_qt.open_item_credit_refund_reversal_dialog import (
     OpenItemCreditRefundReversalDialog,
 )
@@ -246,39 +245,3 @@ def test_dialog_reports_service_validation_error(app, monkeypatch):
 
     assert errors == ["Das Geschäftsjahr ist nicht offen."]
     assert dialog.result() != QDialog.DialogCode.Accepted
-
-
-def test_main_window_opens_reversal_dialog_and_refreshes_after_success(monkeypatch):
-    calls = []
-
-    class Dialog:
-        def __init__(self, parent, **kwargs):
-            calls.append(("dialog", parent, kwargs))
-
-        def exec(self):
-            return QDialog.DialogCode.Accepted
-
-    monkeypatch.setattr(
-        "simpleob.ui_qt.main_window.OpenItemCreditRefundReversalDialog", Dialog
-    )
-    service = ReversalService(())
-    company_id, fiscal_year = uuid4(), SimpleNamespace()
-    window = SimpleNamespace(
-        _open_item_credit_refund_reversal_service=service,
-        _workspace=SimpleNamespace(is_closed=False),
-        _context=SimpleNamespace(
-            company=SimpleNamespace(company_id=company_id),
-            fiscal_year=fiscal_year,
-        ),
-        _refresh_after_credit_refund=lambda: calls.append(("refresh",)),
-    )
-
-    MainWindow._open_credit_refund_reversal_dialog(window)
-
-    assert calls[0][0:2] == ("dialog", window)
-    assert calls[0][2] == {
-        "company_id": company_id,
-        "fiscal_year": fiscal_year,
-        "service": service,
-    }
-    assert calls[1] == ("refresh",)

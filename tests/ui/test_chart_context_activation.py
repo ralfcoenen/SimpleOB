@@ -50,8 +50,7 @@ def _activation_window(monkeypatch):
     )
     window._workspace = workspace
     window._booking_frame = Mock()
-    window._vat_booking_frame = Mock()
-    window._booking_mode_box = QPushButton()
+    window._kr_monitoring_widget = Mock()
     window._opening_balance_button = QPushButton()
     window._company_master_data_button = QAction(window)
     window._kr_settings_button = QAction(window)

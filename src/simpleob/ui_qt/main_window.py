@@ -10,12 +10,10 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
-    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFileDialog,
     QFormLayout,
-    QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QHeaderView,
@@ -27,7 +25,6 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QScrollArea,
-    QSizePolicy,
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
@@ -59,7 +56,6 @@ from simpleob.core.config import (
     save_eric_data_supplier,
 )
 from simpleob.core.context import ApplicationContext
-from simpleob.database.business_partner_repository import BusinessPartnerRepository
 from simpleob.database.lock_error import DatabaseLockError
 from simpleob.database.person_account_repository import PersonAccountRepository
 from simpleob.date_input import GermanDateEdit
@@ -72,7 +68,6 @@ from simpleob.domain.booking_type import BookingType
 from simpleob.domain.chart_of_accounts_template import (
     ChartOfAccountsTemplate,
 )
-from simpleob.domain.credit_note import CreditNoteKind
 from simpleob.domain.elster_data_supplier import ElsterDataSupplier
 from simpleob.domain.entry_side import EntrySide
 from simpleob.domain.errors import (
@@ -92,37 +87,10 @@ from simpleob.services.closing_service import (
     ClosingResult,
     ClosingService,
 )
-from simpleob.services.credit_note_posting_service import (
-    CreditNotePostingService,
-)
 from simpleob.services.fiscal_year_workspace import FiscalYearWorkspace
 from simpleob.services.kr_monitoring_service import KrMonitoringService
-from simpleob.services.open_item_credit_refund_reversal_service import (
-    OpenItemCreditRefundReversalService,
-)
-from simpleob.services.open_item_credit_refund_service import (
-    OpenItemCreditRefundService,
-)
-from simpleob.services.open_item_invoice_cancellation_service import (
-    OpenItemInvoiceCancellationService,
-)
-from simpleob.services.open_item_offset_service import OpenItemOffsetService
-from simpleob.services.open_item_overview_service import OpenItemOverviewService
-from simpleob.services.open_item_payment_service import OpenItemPaymentService
-from simpleob.services.open_item_reconciliation_service import (
-    OpenItemReconciliationService,
-)
 from simpleob.services.opening_balance_service import OpeningBalanceService
-from simpleob.services.payable_invoice_posting_service import (
-    PayableInvoicePostingService,
-)
-from simpleob.services.payment_allocation_correction_service import (
-    PaymentAllocationCorrectionService,
-)
 from simpleob.services.pdf_reporting_service import PdfReportingService
-from simpleob.services.receivable_invoice_posting_service import (
-    ReceivableInvoicePostingService,
-)
 from simpleob.services.uncovered_equity_deficit_presentation_service import (
     UncoveredEquityDeficitPresentationService,
 )
@@ -162,20 +130,12 @@ from simpleob.ui_qt.fixed_asset_disposal_link_dialog import (
 from simpleob.ui_qt.income_statement_frame import (
     IncomeStatementFrame,
 )
+from simpleob.ui_qt.kr_monitoring_summary_widget import (
+    KrMonitoringSummaryWidget,
+)
 from simpleob.ui_qt.kr_settings_dialog import KrSettingsDialog
 from simpleob.ui_qt.new_fixed_asset_dialog import NewFixedAssetDialog
-from simpleob.ui_qt.open_item_credit_refund_dialog import OpenItemCreditRefundDialog
-from simpleob.ui_qt.open_item_credit_refund_reversal_dialog import (
-    OpenItemCreditRefundReversalDialog,
-)
-from simpleob.ui_qt.open_item_offset_dialog import OpenItemOffsetDialog
-from simpleob.ui_qt.open_item_overview_widget import OpenItemOverviewWidget
-from simpleob.ui_qt.open_item_payment_dialog import OpenItemPaymentDialog
-from simpleob.ui_qt.open_item_reconciliation_widget import OpenItemReconciliationWidget
 from simpleob.ui_qt.opening_balance_dialog import OpeningBalanceDialog
-from simpleob.ui_qt.payment_allocation_correction_dialog import (
-    PaymentAllocationCorrectionDialog,
-)
 from simpleob.ui_qt.person_account_dialog import PersonAccountDialog
 from simpleob.ui_qt.profit_appropriation_dialog import (
     ProfitAppropriationDialog,
@@ -185,10 +145,7 @@ from simpleob.ui_qt.shareholder_dialog import ShareholdersDialog
 from simpleob.ui_qt.tax_depreciation_adjustment_dialog import (
     TaxDepreciationAdjustmentDialog,
 )
-from simpleob.ui_qt.vat_booking_frame import (
-    ResponsiveBookingSplitter,
-    VatBookingFrame,
-)
+from simpleob.ui_qt.vat_booking_frame import ResponsiveBookingSplitter
 from simpleob.ui_qt.vat_reconciliation_preview_dialog import (
     VatReconciliationPreviewDialog,
 )
@@ -231,19 +188,7 @@ class MainWindow(QMainWindow):
         eric_certificate_path: Path | None = None,
         eric_data_supplier: ElsterDataSupplier | None = None,
         application_config: ApplicationConfig | None = None,
-        business_partner_repository: BusinessPartnerRepository | None = None,
         person_account_repository: PersonAccountRepository | None = None,
-        receivable_invoice_posting_service: ReceivableInvoicePostingService | None = None,
-        payable_invoice_posting_service: PayableInvoicePostingService | None = None,
-        credit_note_posting_service: CreditNotePostingService | None = None,
-        open_item_payment_service: OpenItemPaymentService | None = None,
-        open_item_offset_service: OpenItemOffsetService | None = None,
-        payment_allocation_correction_service: PaymentAllocationCorrectionService | None = None,
-        open_item_reconciliation_service: OpenItemReconciliationService | None = None,
-        open_item_overview_service: OpenItemOverviewService | None = None,
-        open_item_invoice_cancellation_service: OpenItemInvoiceCancellationService | None = None,
-        open_item_credit_refund_service: OpenItemCreditRefundService | None = None,
-        open_item_credit_refund_reversal_service: OpenItemCreditRefundReversalService | None = None,
         kr_monitoring_service: KrMonitoringService | None = None,
     ) -> None:
         super().__init__()
@@ -282,19 +227,7 @@ class MainWindow(QMainWindow):
             elster_bilanz_transmission_service
         )
         self._application_config = application_config
-        self._business_partner_repository = business_partner_repository
         self._person_account_repository = person_account_repository
-        self._receivable_invoice_posting_service = receivable_invoice_posting_service
-        self._payable_invoice_posting_service = payable_invoice_posting_service
-        self._credit_note_posting_service = credit_note_posting_service
-        self._open_item_payment_service = open_item_payment_service
-        self._open_item_offset_service = open_item_offset_service
-        self._payment_allocation_correction_service = payment_allocation_correction_service
-        self._open_item_reconciliation_service = open_item_reconciliation_service
-        self._open_item_overview_service = open_item_overview_service
-        self._open_item_invoice_cancellation_service = open_item_invoice_cancellation_service
-        self._open_item_credit_refund_service = open_item_credit_refund_service
-        self._open_item_credit_refund_reversal_service = open_item_credit_refund_reversal_service
         self._kr_monitoring_service = kr_monitoring_service
         self._eric_certificate_path = (
             Path(eric_certificate_path).expanduser()
@@ -432,10 +365,6 @@ class MainWindow(QMainWindow):
         self._reports_tab = QWidget()
         self._closing_tab = QWidget()
         self._e_bilanz_tab = QWidget()
-        self._open_item_reconciliation_tab = QWidget()
-        self._open_item_overview_tab = QWidget()
-        self._open_item_overview_widget = None
-        self._open_item_reconciliation_widget = None
 
         self._notebook.addTab(
             self._accounts_tab,
@@ -465,16 +394,6 @@ class MainWindow(QMainWindow):
             self._reports_tab,
             "Auswertungen",
         )
-        if self._open_item_overview_service is not None:
-            self._notebook.addTab(
-                self._open_item_overview_tab,
-                "OP-Übersicht",
-            )
-        if self._open_item_reconciliation_service is not None:
-            self._notebook.addTab(
-                self._open_item_reconciliation_tab,
-                "OP-Abstimmung",
-            )
         self._notebook.addTab(
             self._closing_tab,
             "Jahresabschluss",
@@ -491,23 +410,6 @@ class MainWindow(QMainWindow):
         self._create_balance_sheet_tab()
         self._create_income_statement_tab()
         self._create_reports_tab()
-        if self._open_item_overview_service is not None:
-            overview_layout = QVBoxLayout(self._open_item_overview_tab)
-            self._open_item_overview_widget = OpenItemOverviewWidget(
-                company_id=self._context.company.company_id,
-                service=self._open_item_overview_service,
-                cancellation_service=self._open_item_invoice_cancellation_service,
-                fiscal_year=self._context.fiscal_year,
-                on_cancelled=self._refresh_after_open_item_cancellation,
-            )
-            overview_layout.addWidget(self._open_item_overview_widget)
-        if self._open_item_reconciliation_service is not None:
-            reconciliation_layout = QVBoxLayout(self._open_item_reconciliation_tab)
-            self._open_item_reconciliation_widget = OpenItemReconciliationWidget(
-                company_id=self._context.company.company_id,
-                service=self._open_item_reconciliation_service,
-            )
-            reconciliation_layout.addWidget(self._open_item_reconciliation_widget)
         self._create_closing_tab()
         self._create_e_bilanz_tab()
 
@@ -575,35 +477,9 @@ class MainWindow(QMainWindow):
         self._administration_button.setMenu(self._administration_menu)
         layout.addWidget(self._administration_button)
 
-    def _refresh_after_open_item_cancellation(self) -> None:
-        """Aktualisiert Hauptbuchanzeigen nach einem OP-Rechnungsstorno."""
-
-        self._refresh_kr_monitoring()
-        self._workspace.reload()
-        self._refresh_accounts()
-        self._refresh_journal()
-        self._refresh_balance_sheet()
-        self._refresh_closing()
-        self._refresh_visible_open_item_view()
-
     def _refresh_kr_monitoring(self) -> None:
         """Aktualisiert die rein informative KR-Anzeige."""
-        self._vat_booking_frame.refresh_kr_summary()
-
-    def _refresh_visible_open_item_view(self) -> None:
-        """Aktualisiert nur die gerade sichtbare OP-Ansicht."""
-
-        current_widget = self._notebook.currentWidget()
-        if (
-            current_widget is self._open_item_overview_tab
-            and self._open_item_overview_widget is not None
-        ):
-            self._open_item_overview_widget.refresh()
-        elif (
-            current_widget is self._open_item_reconciliation_tab
-            and self._open_item_reconciliation_widget is not None
-        ):
-            self._open_item_reconciliation_widget.refresh()
+        self._kr_monitoring_widget.refresh()
 
     def closeEvent(self, event) -> None:
         """Kehrt beim Schließen des Hauptfensters zur Buchhaltungsauswahl zurück."""
@@ -2207,90 +2083,8 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(10)
 
-        op_group = QGroupBox("OP-Verwaltung")
-        op_layout = QGridLayout(op_group)
-        op_layout.setHorizontalSpacing(10)
-        op_layout.setVerticalSpacing(6)
-
-        def add_op_action(button: QPushButton, row: int, column: int) -> None:
-            button.setSizePolicy(
-                QSizePolicy.Policy.Maximum,
-                QSizePolicy.Policy.Fixed,
-            )
-            op_layout.addWidget(
-                button,
-                row,
-                column,
-                Qt.AlignmentFlag.AlignLeft,
-            )
-
-        self._payment_button = QPushButton("Zahlung auf Rechnung erfassen…")
-        self._payment_button.setEnabled(
-            self._open_item_payment_service is not None
-        )
-        self._payment_button.clicked.connect(self._open_payment_dialog)
-        add_op_action(self._payment_button, 0, 0)
-
-        self._offset_button = QPushButton("Guthaben mit Rechnung verrechnen…")
-        self._offset_button.setEnabled(
-            self._open_item_offset_service is not None
-            and self._business_partner_repository is not None
-        )
-        self._offset_button.clicked.connect(self._open_offset_dialog)
-        add_op_action(self._offset_button, 0, 1)
-
-        self._credit_refund_button = QPushButton("Guthaben erstatten…")
-        self._credit_refund_button.setEnabled(
-            self._open_item_credit_refund_service is not None
-            and self._open_item_offset_service is not None
-            and self._business_partner_repository is not None
-        )
-        self._credit_refund_button.clicked.connect(self._open_credit_refund_dialog)
-        add_op_action(self._credit_refund_button, 0, 2)
-
-        self._credit_refund_reversal_button = QPushButton(
-            "Guthabenrückerstattung zurücknehmen…"
-        )
-        self._credit_refund_reversal_button.setEnabled(
-            self._open_item_credit_refund_reversal_service is not None
-        )
-        self._credit_refund_reversal_button.clicked.connect(
-            self._open_credit_refund_reversal_dialog
-        )
-        add_op_action(self._credit_refund_reversal_button, 1, 0)
-
-        self._payment_correction_button = QPushButton("Zahlungszuordnung korrigieren…")
-        self._payment_correction_button.setEnabled(self._payment_allocation_correction_service is not None)
-        self._payment_correction_button.clicked.connect(self._open_payment_correction_dialog)
-        add_op_action(self._payment_correction_button, 1, 1)
-        op_layout.setColumnStretch(3, 1)
-        layout.addWidget(op_group)
-
         booking_group = QGroupBox("Neue Buchung")
         booking_layout = QVBoxLayout(booking_group)
-
-        mode_layout = QHBoxLayout()
-
-        mode_layout.addWidget(
-            QLabel("Buchungsart")
-        )
-
-        self._booking_mode_box = QComboBox()
-        self._booking_mode_box.addItems(
-            (
-                "Einfache Buchung",
-                "Rechnung mit Umsatzsteuer",
-            )
-        )
-        self._booking_mode_box.setCurrentText(
-            "Einfache Buchung"
-        )
-        self._booking_mode_box.setMaximumWidth(280)
-
-        mode_layout.addWidget(
-            self._booking_mode_box
-        )
-        mode_layout.addStretch()
 
         technical_account_numbers = {
             self._opening_balance_account_number,
@@ -2306,21 +2100,6 @@ class MainWindow(QMainWindow):
                 account.is_active
                 and account.number
                 not in technical_account_numbers
-            )
-        )
-
-        vat_booking_account_numbers = {
-            *technical_account_numbers,
-            *self._vat_accounts.account_numbers,
-        }
-
-        vat_bookable_accounts = tuple(
-            account
-            for account in self._accounts
-            if (
-                account.is_active
-                and account.number
-                not in vat_booking_account_numbers
             )
         )
 
@@ -2357,29 +2136,12 @@ class MainWindow(QMainWindow):
             on_booking_created=self._post_booking,
         )
 
-        self._vat_booking_frame = VatBookingFrame(
-            self._booking_frame_container,
-            accounts=vat_bookable_accounts,
-            vat_accounts=self._vat_accounts,
-            on_booking_created=self._post_booking,
-            company_id=self._context.company.company_id,
-            partner_repository=self._business_partner_repository,
-            on_receivable_invoice_created=(
-                self._post_receivable_invoice
-                if self._receivable_invoice_posting_service is not None
-                else None
-            ),
-            on_payable_invoice_created=(
-                self._post_payable_invoice
-                if self._payable_invoice_posting_service is not None
-                else None
-            ),
-            on_credit_note_created=(
-                self._post_credit_note
-                if self._credit_note_posting_service is not None
-                else None
-            ),
-            kr_summary_provider=(
+        self._booking_frame_layout.addWidget(
+            self._booking_frame
+        )
+        self._kr_monitoring_widget = KrMonitoringSummaryWidget(
+            parent=self._booking_frame_container,
+            summary_provider=(
                 (
                     lambda: self._kr_monitoring_service.get_summary(
                         company_id=self._context.company.company_id
@@ -2390,34 +2152,21 @@ class MainWindow(QMainWindow):
             ),
         )
 
-        self._booking_frame_layout.addWidget(
-            self._booking_frame
-        )
-        self._booking_frame_layout.addWidget(
-            self._vat_booking_frame
-        )
-
         booking_left_column = QWidget()
         booking_left_layout = QVBoxLayout(booking_left_column)
         booking_left_layout.setContentsMargins(0, 0, 0, 0)
-        booking_left_layout.addLayout(mode_layout)
         booking_left_layout.addWidget(self._booking_frame_container)
 
         self._booking_columns_splitter = ResponsiveBookingSplitter()
         self._booking_columns_splitter.addWidget(booking_left_column)
         self._booking_columns_splitter.addWidget(
-            self._vat_booking_frame.kr_summary_widget
+            self._kr_monitoring_widget
         )
         booking_layout.addWidget(self._booking_columns_splitter)
         layout.addWidget(booking_group)
         layout.addStretch()
 
-        self._booking_mode_box.currentTextChanged.connect(
-            self._update_booking_mode
-        )
-
         self._update_editing_state()
-        self._update_booking_mode()
 
     def _update_editing_state(self) -> None:
         """Aktualisiert den Bearbeitungszustand des Geschäftsjahres."""
@@ -2425,8 +2174,6 @@ class MainWindow(QMainWindow):
         enabled = self._workspace.is_open and not self._account_editing_mode
 
         self._booking_frame.set_enabled(enabled)
-        self._vat_booking_frame.set_enabled(enabled)
-        self._booking_mode_box.setEnabled(enabled)
         if hasattr(self, "_new_debtor_button"):
             self._new_debtor_button.setEnabled(
                 enabled and self._person_account_repository is not None
@@ -2435,144 +2182,6 @@ class MainWindow(QMainWindow):
                 enabled and self._person_account_repository is not None
             )
         self._opening_balance_button.setEnabled(enabled)
-        self._payment_button.setEnabled(
-            enabled and self._open_item_payment_service is not None
-        )
-        self._offset_button.setEnabled(
-            enabled
-            and self._open_item_offset_service is not None
-            and self._business_partner_repository is not None
-        )
-        self._credit_refund_button.setEnabled(
-            enabled
-            and self._open_item_credit_refund_service is not None
-            and self._open_item_offset_service is not None
-            and self._business_partner_repository is not None
-        )
-        self._payment_correction_button.setEnabled(
-            enabled and self._payment_allocation_correction_service is not None
-        )
-
-    def _open_payment_dialog(self) -> None:
-        """Erfasst eine einzelne Zahlung auf einen offenen Rechnungs-OP."""
-        service = self._open_item_payment_service
-        if service is None or self._workspace.is_closed:
-            return
-        dialog = OpenItemPaymentDialog(
-            self,
-            company_id=self._context.company.company_id,
-            fiscal_year=self._context.fiscal_year,
-            service=service,
-            accounts=self._accounts,
-        )
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            self._refresh_kr_monitoring()
-            self._workspace.reload()
-            self._refresh_accounts()
-            self._refresh_journal()
-            self._refresh_balance_sheet()
-            self._refresh_visible_open_item_view()
-
-    def _open_offset_dialog(self) -> None:
-        """Erfasst eine manuelle Verrechnung zweier offener Posten."""
-        service = self._open_item_offset_service
-        partner_repository = self._business_partner_repository
-        if service is None or partner_repository is None or self._workspace.is_closed:
-            return
-        dialog = OpenItemOffsetDialog(
-            self,
-            company_id=self._context.company.company_id,
-            fiscal_year=self._context.fiscal_year,
-            service=service,
-            partner_repository=partner_repository,
-        )
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            self._workspace.reload()
-            self._refresh_accounts()
-            self._refresh_journal()
-            self._refresh_balance_sheet()
-            self._refresh_visible_open_item_view()
-
-    def _open_credit_refund_dialog(self) -> None:
-        """Erfasst eine Auszahlung oder Erstattung eines Guthaben-OPs."""
-        service = self._open_item_credit_refund_service
-        offset_service = self._open_item_offset_service
-        partner_repository = self._business_partner_repository
-        if (
-            service is None
-            or offset_service is None
-            or partner_repository is None
-            or self._workspace.is_closed
-        ):
-            return
-        dialog = OpenItemCreditRefundDialog(
-            self,
-            company_id=self._context.company.company_id,
-            fiscal_year=self._context.fiscal_year,
-            service=service,
-            offset_service=offset_service,
-            partner_repository=partner_repository,
-            accounts=self._accounts,
-        )
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            self._refresh_after_credit_refund()
-
-    def _refresh_after_credit_refund(self) -> None:
-        """Aktualisiert Hauptbuch und OP-Ansichten nach einer Rückerstattung."""
-        self._refresh_kr_monitoring()
-        self._workspace.reload()
-        self._refresh_accounts()
-        self._refresh_journal()
-        self._refresh_balance_sheet()
-        self._refresh_visible_open_item_view()
-
-    def _open_credit_refund_reversal_dialog(self) -> None:
-        """Nimmt eine versehentlich gebuchte Guthabenrückerstattung zurück."""
-        service = self._open_item_credit_refund_reversal_service
-        if service is None or self._workspace.is_closed:
-            return
-        dialog = OpenItemCreditRefundReversalDialog(
-            self,
-            company_id=self._context.company.company_id,
-            fiscal_year=self._context.fiscal_year,
-            service=service,
-        )
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            self._refresh_after_credit_refund()
-
-    def _open_payment_correction_dialog(self) -> None:
-        service = self._payment_allocation_correction_service
-        if service is None or self._workspace.is_closed:
-            return
-        dialog = PaymentAllocationCorrectionDialog(
-            self, company_id=self._context.company.company_id,
-            fiscal_year=self._context.fiscal_year, service=service,
-        )
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            self._refresh_kr_monitoring()
-            self._workspace.reload()
-            self._refresh_accounts()
-            self._refresh_journal()
-            self._refresh_balance_sheet()
-            self._refresh_visible_open_item_view()
-
-    def _update_booking_mode(
-        self,
-        *_args: object,
-    ) -> None:
-        """Schaltet zwischen einfacher und Umsatzsteuerbuchung um."""
-
-        vat_mode = (
-            self._booking_mode_box.currentText()
-            == "Rechnung mit Umsatzsteuer"
-        )
-
-        self._booking_frame.setVisible(
-            not vat_mode
-        )
-        self._vat_booking_frame.setVisible(
-            vat_mode
-        )
 
     def _post_booking(
         self,
@@ -2587,9 +2196,6 @@ class MainWindow(QMainWindow):
             .balance_sheet_presentation
             is BalanceSheetPresentation.AFTER_APPROPRIATION
         ):
-            return
-
-        if not self._confirm_op_control_account_booking(booking):
             return
 
         self._workspace.post_booking(
@@ -2608,185 +2214,6 @@ class MainWindow(QMainWindow):
         self._refresh_accounts()
         self._refresh_journal()
         self._refresh_balance_sheet()
-
-    def _confirm_op_control_account_booking(self, booking) -> bool:
-        """Bestätigt manuelle Buchungen auf konfigurierte OP-Sammelkonten."""
-
-        try:
-            _, _, account_roles = (
-                self._workspace.load_account_configuration()
-            )
-        except (RuntimeError, ValueError) as exc:
-            QMessageBox.critical(
-                self,
-                "Kontenkonfiguration",
-                str(exc),
-            )
-            return False
-
-        role_labels = (
-            ("Kundenforderungen", account_roles.customer_receivables),
-            ("Lieferantenverbindlichkeiten", account_roles.supplier_payables),
-            ("Kundenguthaben", account_roles.customer_credit_balances),
-            ("Lieferantenguthaben", account_roles.supplier_credit_balances),
-        )
-        affected_accounts: dict[str, set[str]] = {}
-        for line in booking.lines:
-            for role_label, account_numbers in role_labels:
-                if line.account_number in account_numbers:
-                    affected_accounts.setdefault(
-                        line.account_number,
-                        set(),
-                    ).add(role_label)
-
-        if not affected_accounts:
-            return True
-
-        if not booking.description or not booking.description.strip():
-            QMessageBox.warning(
-                self,
-                "Begründung erforderlich",
-                "Bitte tragen Sie im Buchungstext eine nachvollziehbare "
-                "Begründung für die manuelle Sammelkontobuchung ein.",
-            )
-            return False
-
-        affected_lines = "\n".join(
-            f"• {account_number}: {', '.join(sorted(role_names))}"
-            for account_number, role_names in affected_accounts.items()
-        )
-        message = (
-            "Die Buchung verwendet folgende konfigurierte OP-Sammelkonten:\n"
-            f"{affected_lines}\n\n"
-            "Diese Buchung wird ausschließlich im Hauptbuch gespeichert. "
-            "Sie erzeugt keine OP-Zuordnung und kann eine Differenz zur "
-            "OP-Nebenbuchführung verursachen. Die Bewegung erscheint in der "
-            "OP-Abstimmung als ungeklärt.\n\n"
-            "Der Buchungstext muss den Grund für die manuelle "
-            "Sammelkontobuchung nachvollziehbar beschreiben.\n"
-            f"Buchungstext (Begründung): {booking.description}\n\n"
-            "Soll die Buchung trotzdem übernommen werden?"
-        )
-        answer = QMessageBox.warning(
-            self,
-            "Manuelle Buchung auf OP-Sammelkonto",
-            message,
-            QMessageBox.StandardButton.Yes
-            | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        return answer == QMessageBox.StandardButton.Yes
-
-    def _post_receivable_invoice(
-        self,
-        *,
-        partner_id: UUID,
-        invoice_number: str,
-        booking_date: date,
-        due_date: date,
-        items,
-        description: str | None,
-    ) -> None:
-        """Verbucht eine Ausgangsrechnung mit Forderungs-OP atomar."""
-        if self._workspace.is_closed:
-            raise ValueError("Das Geschäftsjahr ist abgeschlossen.")
-        if self._receivable_invoice_posting_service is None:
-            raise ValueError("Die OP-Verwaltung ist nicht verfügbar.")
-        self._receivable_invoice_posting_service.post_output_invoice_on_account(
-            company_id=self._context.company.company_id,
-            fiscal_year=self._context.fiscal_year,
-            partner_id=partner_id,
-            invoice_number=invoice_number,
-            booking_date=booking_date,
-            due_date=due_date,
-            items=items,
-            vat_accounts=self._vat_accounts,
-            description=description,
-        )
-        self._refresh_kr_monitoring()
-        self._workspace.reload()
-        self._refresh_accounts()
-        self._refresh_journal()
-        self._refresh_balance_sheet()
-        self._refresh_visible_open_item_view()
-
-    def _post_payable_invoice(
-        self,
-        *,
-        partner_id: UUID,
-        invoice_number: str,
-        booking_date: date,
-        due_date: date,
-        items,
-        duplicate_reason: str | None,
-        description: str | None,
-    ) -> None:
-        """Verbucht eine Eingangsrechnung mit Verbindlichkeits-OP atomar."""
-        if self._workspace.is_closed:
-            raise ValueError("Das Geschäftsjahr ist abgeschlossen.")
-        if self._payable_invoice_posting_service is None:
-            raise ValueError("Die OP-Verwaltung ist nicht verfügbar.")
-        self._payable_invoice_posting_service.post_supplier_invoice_on_account(
-            company_id=self._context.company.company_id,
-            fiscal_year=self._context.fiscal_year,
-            partner_id=partner_id,
-            invoice_number=invoice_number,
-            booking_date=booking_date,
-            due_date=due_date,
-            items=items,
-            vat_accounts=self._vat_accounts,
-            duplicate_reason=duplicate_reason,
-            description=description,
-        )
-        self._workspace.reload()
-        self._refresh_accounts()
-        self._refresh_journal()
-        self._refresh_balance_sheet()
-        self._refresh_visible_open_item_view()
-        self._refresh_kr_monitoring()
-
-    def _post_credit_note(
-        self,
-        *,
-        kind: CreditNoteKind,
-        partner_id: UUID,
-        note_number: str,
-        note_date: date,
-        items,
-        original_invoice_number: str | None,
-        duplicate_reason: str | None,
-        description: str | None,
-    ) -> None:
-        """Verbucht eine Gutschrift mit Guthaben-OP atomar."""
-        if self._workspace.is_closed:
-            raise ValueError("Das Geschäftsjahr ist abgeschlossen.")
-        if self._credit_note_posting_service is None:
-            raise ValueError("Die OP-Verwaltung ist nicht verfügbar.")
-        post = (
-            self._credit_note_posting_service.post_customer_credit_note
-            if kind is CreditNoteKind.CUSTOMER
-            else self._credit_note_posting_service.post_supplier_credit_note
-        )
-        arguments = {
-            "company_id": self._context.company.company_id,
-            "fiscal_year": self._context.fiscal_year,
-            "partner_id": partner_id,
-            "note_number": note_number,
-            "note_date": note_date,
-            "items": items,
-            "vat_accounts": self._vat_accounts,
-            "original_invoice_number": original_invoice_number,
-            "description": description,
-        }
-        if kind is CreditNoteKind.SUPPLIER:
-            arguments["duplicate_reason"] = duplicate_reason
-        post(**arguments)
-        self._refresh_kr_monitoring()
-        self._workspace.reload()
-        self._refresh_accounts()
-        self._refresh_journal()
-        self._refresh_balance_sheet()
-        self._refresh_visible_open_item_view()
 
     def _create_fixed_assets_tab(self) -> None:
         """Erzeugt den Arbeitsbereich Anlagen."""
@@ -6159,8 +5586,6 @@ class MainWindow(QMainWindow):
             else:
                 self._e_bilanz_frame.clear_bvv_evaluation()
 
-            self._refresh_visible_open_item_view()
-
             self._journal_status.setText(
                 f"Journal: {len(self._workspace.journal)} Buchungen"
             )
@@ -6282,8 +5707,6 @@ class MainWindow(QMainWindow):
         self._activate_chart_button.setEnabled(True)
 
         self._booking_frame.set_enabled(False)
-        self._vat_booking_frame.set_enabled(False)
-        self._booking_mode_box.setEnabled(False)
 
         # Mandantenbezogene Verwaltungsfunktionen sperren.
         self._company_master_data_button.setEnabled(False)
@@ -6409,26 +5832,13 @@ class MainWindow(QMainWindow):
                 if account.is_active
                 and account.number not in technical_account_numbers
             )
-            vat_blocked_account_numbers = {
-                *technical_account_numbers,
-                *vat_accounts.account_numbers,
-            }
-            vat_bookable_accounts = tuple(
-                account
-                for account in accounts
-                if account.is_active
-                and account.number not in vat_blocked_account_numbers
-            )
             self._booking_frame.update_accounts(
                 accounts=manual_bookable_accounts,
                 equity_contribution_account_numbers=(
                     contribution_account_numbers
                 ),
             )
-            self._vat_booking_frame.update_accounts(
-                accounts=vat_bookable_accounts,
-                vat_accounts=vat_accounts,
-            )
+            self._kr_monitoring_widget.refresh()
             self._reports_widget.update_accounts(
                 accounts=accounts,
                 person_accounts=(
@@ -6511,8 +5921,6 @@ class MainWindow(QMainWindow):
                 )
             self._notebook.setCurrentWidget(self._accounts_tab)
             self._booking_frame.set_enabled(False)
-            self._vat_booking_frame.set_enabled(False)
-            self._booking_mode_box.setEnabled(False)
             self._opening_balance_button.setEnabled(False)
             self._company_master_data_button.setEnabled(False)
             self._kr_settings_button.setEnabled(False)

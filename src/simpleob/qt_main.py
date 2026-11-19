@@ -33,8 +33,6 @@ from simpleob.core.eric_privacy_acknowledgement import (
 )
 from simpleob.core.product import ERIC_MANUFACTURER_ID
 from simpleob.database.booking_repository import BookingRepository
-from simpleob.database.business_partner_repository import BusinessPartnerRepository
-from simpleob.database.person_account_repository import PersonAccountRepository
 from simpleob.database.chart_of_accounts_repository import (
     ChartOfAccountsRepository,
 )
@@ -42,7 +40,6 @@ from simpleob.database.company_repository import CompanyRepository
 from simpleob.database.connection_credentials import (
     PostgreSQLCredentials,
 )
-from simpleob.database.credit_note_repository import CreditNoteRepository
 from simpleob.database.database import Database
 from simpleob.database.equity_contribution_repository import (
     EquityContributionRepository,
@@ -59,37 +56,17 @@ from simpleob.database.migration_service import (
     DatabaseMigrationService,
     PostgreSQLSchemaStatus,
 )
-from simpleob.database.open_item_credit_refund_repository import (
-    OpenItemCreditRefundRepository,
-)
-from simpleob.database.open_item_credit_refund_reversal_repository import (
-    OpenItemCreditRefundReversalRepository,
-)
-from simpleob.database.open_item_invoice_cancellation_repository import (
-    OpenItemInvoiceCancellationRepository,
-)
-from simpleob.database.open_item_offset_repository import OpenItemOffsetRepository
-from simpleob.database.open_item_overview_repository import OpenItemOverviewRepository
-from simpleob.database.open_item_payment_repository import OpenItemPaymentRepository
-from simpleob.database.open_item_reconciliation_repository import (
-    OpenItemReconciliationRepository,
-)
-from simpleob.database.payable_invoice_repository import PayableInvoiceRepository
-from simpleob.database.payment_allocation_correction_repository import (
-    PaymentAllocationCorrectionRepository,
-)
+from simpleob.database.person_account_repository import PersonAccountRepository
 from simpleob.database.profit_appropriation_annual_data_repository import (
     ProfitAppropriationAnnualDataRepository,
 )
 from simpleob.database.profit_appropriation_posting_repository import (
     ProfitAppropriationPostingRepository,
 )
-from simpleob.database.receivable_invoice_repository import ReceivableInvoiceRepository
 from simpleob.database.shareholder_repository import ShareholderRepository
 from simpleob.database.tax_depreciation_adjustment_repository import (
     TaxDepreciationAdjustmentRepository,
 )
-from simpleob.database.person_account_repository import PersonAccountRepository
 from simpleob.eric.elster_bilanz_payload_service import (
     ElsterBilanzPayloadService,
 )
@@ -111,9 +88,6 @@ from simpleob.services.closing_consistency_service import (
     ClosingConsistencyService,
 )
 from simpleob.services.closing_service import ClosingService
-from simpleob.services.credit_note_posting_service import (
-    CreditNotePostingService,
-)
 from simpleob.services.depreciation_booking_service import (
     DepreciationBookingService,
 )
@@ -146,27 +120,6 @@ from simpleob.services.fixed_asset_schedule_service import (
     FixedAssetScheduleService,
 )
 from simpleob.services.kr_monitoring_service import KrMonitoringService
-from simpleob.services.open_item_credit_refund_reversal_service import (
-    OpenItemCreditRefundReversalService,
-)
-from simpleob.services.open_item_credit_refund_service import (
-    OpenItemCreditRefundService,
-)
-from simpleob.services.open_item_invoice_cancellation_service import (
-    OpenItemInvoiceCancellationService,
-)
-from simpleob.services.open_item_offset_service import OpenItemOffsetService
-from simpleob.services.open_item_overview_service import OpenItemOverviewService
-from simpleob.services.open_item_payment_service import OpenItemPaymentService
-from simpleob.services.open_item_reconciliation_service import (
-    OpenItemReconciliationService,
-)
-from simpleob.services.payable_invoice_posting_service import (
-    PayableInvoicePostingService,
-)
-from simpleob.services.payment_allocation_correction_service import (
-    PaymentAllocationCorrectionService,
-)
 from simpleob.services.pdf_reporting_service import PdfReportingService
 from simpleob.services.posting_service import PostingService
 from simpleob.services.profit_appropriation_booking_service import (
@@ -177,9 +130,6 @@ from simpleob.services.profit_appropriation_posting_service import (
 )
 from simpleob.services.profit_appropriation_posting_workflow import (
     ProfitAppropriationPostingWorkflow,
-)
-from simpleob.services.receivable_invoice_posting_service import (
-    ReceivableInvoicePostingService,
 )
 from simpleob.services.reporting_service import ReportingService
 from simpleob.services.taxonomy_management_service import (
@@ -747,75 +697,7 @@ def main() -> None:
         )
 
         booking_repository = BookingRepository(session)
-        business_partner_repository = BusinessPartnerRepository(session)
         person_account_repository = PersonAccountRepository(session)
-        receivable_invoice_repository = ReceivableInvoiceRepository(session)
-        receivable_invoice_posting_service = ReceivableInvoicePostingService(
-            booking_repository=booking_repository,
-            partner_repository=business_partner_repository,
-            invoice_repository=receivable_invoice_repository,
-            chart_of_accounts_repository=chart_of_accounts_repository,
-        )
-        payable_invoice_repository = PayableInvoiceRepository(session)
-        payable_invoice_posting_service = PayableInvoicePostingService(
-            booking_repository=booking_repository,
-            partner_repository=business_partner_repository,
-            invoice_repository=payable_invoice_repository,
-            chart_of_accounts_repository=chart_of_accounts_repository,
-        )
-        credit_note_repository = CreditNoteRepository(session)
-        credit_note_posting_service = CreditNotePostingService(
-            booking_repository=booking_repository,
-            partner_repository=business_partner_repository,
-            credit_note_repository=credit_note_repository,
-            chart_of_accounts_repository=chart_of_accounts_repository,
-        )
-        open_item_payment_service = OpenItemPaymentService(
-            booking_repository=booking_repository,
-            payment_repository=OpenItemPaymentRepository(session),
-            chart_of_accounts_repository=chart_of_accounts_repository,
-        )
-        open_item_reconciliation_service = OpenItemReconciliationService(
-            OpenItemReconciliationRepository(session)
-        )
-        open_item_overview_service = OpenItemOverviewService(
-            OpenItemOverviewRepository(session)
-        )
-        open_item_invoice_cancellation_service = OpenItemInvoiceCancellationService(
-            OpenItemInvoiceCancellationRepository(
-                session=session,
-                booking_repository=booking_repository,
-            )
-        )
-        open_item_offset_repository = OpenItemOffsetRepository(session)
-        open_item_offset_service = OpenItemOffsetService(
-            booking_repository=booking_repository,
-            offset_repository=open_item_offset_repository,
-        )
-        open_item_credit_refund_service = OpenItemCreditRefundService(
-            booking_repository=booking_repository,
-            refund_repository=OpenItemCreditRefundRepository(
-                session,
-                offset_repository=open_item_offset_repository,
-            ),
-            offset_repository=open_item_offset_repository,
-            chart_of_accounts_repository=chart_of_accounts_repository,
-        )
-        open_item_credit_refund_reversal_service = (
-            OpenItemCreditRefundReversalService(
-                OpenItemCreditRefundReversalRepository(
-                    session=session,
-                    booking_repository=booking_repository,
-                    offset_repository=open_item_offset_repository,
-                )
-            )
-        )
-        payment_allocation_correction_service = PaymentAllocationCorrectionService(
-            booking_repository=booking_repository,
-            correction_repository=PaymentAllocationCorrectionRepository(session),
-            offset_repository=OpenItemOffsetRepository(session),
-            payment_repository=OpenItemPaymentRepository(session),
-        )
         kr_monitoring_service = KrMonitoringService(
             KrMonitoringRepository(session),
             company_repository,
@@ -1334,21 +1216,7 @@ def main() -> None:
                     elster_bilanz_transmission_service
                 ),
                 application_config=config,
-                business_partner_repository=business_partner_repository,
                 person_account_repository=person_account_repository,
-                receivable_invoice_posting_service=receivable_invoice_posting_service,
-                payable_invoice_posting_service=payable_invoice_posting_service,
-                credit_note_posting_service=credit_note_posting_service,
-                open_item_payment_service=open_item_payment_service,
-                open_item_reconciliation_service=open_item_reconciliation_service,
-                open_item_overview_service=open_item_overview_service,
-                open_item_invoice_cancellation_service=open_item_invoice_cancellation_service,
-                open_item_offset_service=open_item_offset_service,
-                open_item_credit_refund_service=open_item_credit_refund_service,
-                open_item_credit_refund_reversal_service=(
-                    open_item_credit_refund_reversal_service
-                ),
-                payment_allocation_correction_service=payment_allocation_correction_service,
                 kr_monitoring_service=kr_monitoring_service,
                 eric_certificate_path=(
                     config.eric_certificate_path
