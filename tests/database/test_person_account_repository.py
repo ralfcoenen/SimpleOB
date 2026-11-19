@@ -7,9 +7,17 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 
-from simpleob.accounting.financial_statement_context import create_standard_financial_statement_context
-from simpleob.accounting.hgb_financial_statement_position_provider import HgbFinancialStatementPositionProvider
+from simpleob.accounting.account_balance import AccountBalance
+from simpleob.accounting.financial_statement_builder import FinancialStatementBuilder
+from simpleob.accounting.financial_statement_context import (
+    create_standard_financial_statement_context,
+)
+from simpleob.accounting.hgb_financial_statement_position_provider import (
+    HgbFinancialStatementPositionProvider,
+)
 from simpleob.accounting.ledger import Ledger
+from simpleob.accounting.mapper import AccountMapper
+from simpleob.accounting.trial_balance import TrialBalance
 from simpleob.database.business_partner_repository import BusinessPartnerRepository
 from simpleob.database.chart_of_accounts_repository import ChartOfAccountsRepository
 from simpleob.database.company_repository import CompanyRepository
@@ -21,17 +29,17 @@ from simpleob.database.models import (
     PersonenkontoZuordnung,
 )
 from simpleob.database.person_account_repository import PersonAccountRepository
+from simpleob.domain.account_type import AccountType
 from simpleob.domain.booking import Booking
 from simpleob.domain.booking_line import BookingLine
-from simpleob.domain.account_type import AccountType
-from simpleob.domain.business_partner import BusinessPartner
 from simpleob.domain.booking_validator import BookingValidator
+from simpleob.domain.business_partner import BusinessPartner
 from simpleob.domain.chart_of_accounts import ChartOfAccounts
 from simpleob.domain.company import Company
 from simpleob.domain.entry_side import EntrySide
+from simpleob.domain.errors import InvalidPersonAccountClassificationError
 from simpleob.domain.journal import Journal
 from simpleob.domain.person_account_role import PersonAccountRole
-from simpleob.accounting.trial_balance import TrialBalance
 from simpleob.services.posting_service import PostingService
 from simpleob.services.reporting_service import ReportingService
 
@@ -94,6 +102,50 @@ def test_creates_both_roles_for_one_partner_and_loads_without_hgb_mapping(databa
     assert chart.person_account_role("70000") is PersonAccountRole.KREDITOR
     assert not chart.account_mapping_rules
     assert next(account for account in accounts if account.number == "10000").person_account_role is PersonAccountRole.DEBITOR
+
+
+def test_orphaned_five_digit_account_is_not_silently_mapped_or_ignored(
+    database_session,
+):
+    session, company = database_session
+    company_model = session.query(Mandant).filter_by(
+        company_id=str(company.company_id)
+    ).one()
+    session.add(
+        Konto(
+            mandant_id=company_model.id,
+            account_number="10000",
+            name="Nicht zugeordnetes Konto",
+            account_type="ASSET",
+            is_active=True,
+            debit_position_code="HGB.266.AKTIVA.B.II.1",
+        )
+    )
+    session.commit()
+
+    context = create_standard_financial_statement_context()
+    provider = HgbFinancialStatementPositionProvider(
+        (context.assets, context.liabilities, context.income_statement)
+    )
+    loaded = ChartOfAccountsRepository(session).load_for_company(
+        company_id=company.company_id,
+        position_provider=provider,
+    )
+    assert loaded is not None
+    chart, _accounts = loaded
+    assert not chart.is_person_account("10000")
+    assert chart.person_account_role("10000") is None
+
+    balance = AccountBalance(
+        "10000",
+        debit=Decimal("50.00"),
+    )
+    statement_builder = FinancialStatementBuilder(AccountMapper(chart))
+    expected_error = "keine gültige Personenkontenzuordnung"
+    with pytest.raises(InvalidPersonAccountClassificationError, match=expected_error):
+        statement_builder.build((balance,))
+    with pytest.raises(InvalidPersonAccountClassificationError, match=expected_error):
+        AccountMapper(chart).position_for(balance)
 
 
 def test_person_accounts_use_normal_booking_journal_ledger_and_reports(database_session):
