@@ -2,6 +2,7 @@
 
 from dataclasses import replace
 from datetime import date, datetime, timezone
+from decimal import Decimal
 from pathlib import Path
 from uuid import UUID
 
@@ -56,6 +57,10 @@ from simpleob.client_transfer.model import (
     ClientTransferTaxonomyMapping,
     ClientTransferVatAccounts,
 )
+from simpleob.client_transfer.serialization import (
+    client_transfer_from_dict,
+    client_transfer_to_dict,
+)
 from simpleob.database.booking_repository import (
     BookingRepository,
 )
@@ -66,11 +71,9 @@ from simpleob.database.company_repository import (
     CompanyRepository,
 )
 from simpleob.database.database import Base
-from simpleob.database.models import Geschaeftspartner, Konto, Mandant, PersonenkontoZuordnung
 from simpleob.database.equity_contribution_repository import (
     EquityContributionRepository,
 )
-from simpleob.database.person_account_repository import PersonAccountRepository
 from simpleob.database.fixed_asset_depreciation_repository import (
     FixedAssetDepreciationRepository,
 )
@@ -80,6 +83,13 @@ from simpleob.database.fixed_asset_movement_repository import (
 from simpleob.database.fixed_asset_repository import (
     FixedAssetRepository,
 )
+from simpleob.database.models import (
+    Geschaeftspartner,
+    Konto,
+    Mandant,
+    PersonenkontoZuordnung,
+)
+from simpleob.database.person_account_repository import PersonAccountRepository
 from simpleob.database.profit_appropriation_annual_data_repository import (
     ProfitAppropriationAnnualDataRepository,
 )
@@ -918,6 +928,226 @@ def test_person_account_transfer_roundtrip_preserves_partner_links_and_status(
         assert exported_account.is_active == source_account.is_active
         assert exported_account.debit_position_code is None
         assert exported_account.credit_position_code is None
+    engine.dispose()
+
+
+def test_accounting_transfer_roundtrip_preserves_person_accounts_vat_and_reversals(
+    tmp_path: Path,
+) -> None:
+    partner_id = UUID("22222222-2222-2222-2222-222222222222")
+    source = _build_rich_transfer()
+    accounts = source.client.accounts + (
+        ClientTransferAccount(
+            account_number="10000",
+            name="Transferpartner GmbH",
+            account_type="ASSET",
+            is_active=True,
+        ),
+        ClientTransferAccount(
+            account_number="70000",
+            name="Transferpartner GmbH",
+            account_type="LIABILITY",
+            is_active=True,
+        ),
+    )
+    invoice_booking = ClientTransferBooking(
+        booking_id=UUID("aaaaaaaa-1111-1111-1111-111111111111"),
+        booking_date=date(2026, 8, 10),
+        booking_type="REGULAR",
+        description="Manuelle Ausgangsrechnungsbuchung",
+        lines=(
+            ClientTransferBookingLine(0, "10000", "DEBIT", "119.00"),
+            ClientTransferBookingLine(1, "4900", "CREDIT", "100.00"),
+            ClientTransferBookingLine(2, "1776", "CREDIT", "19.00"),
+        ),
+    )
+    payable_booking = ClientTransferBooking(
+        booking_id=UUID("bbbbbbbb-1111-1111-1111-111111111111"),
+        booking_date=date(2026, 8, 11),
+        booking_type="REGULAR",
+        description="Manuelle Eingangsrechnungsbuchung",
+        lines=(
+            ClientTransferBookingLine(0, "4830", "DEBIT", "100.00"),
+            ClientTransferBookingLine(1, "1576", "DEBIT", "19.00"),
+            ClientTransferBookingLine(2, "70000", "CREDIT", "119.00"),
+        ),
+    )
+    original_booking_id = UUID("cccccccc-1111-1111-1111-111111111111")
+    original_booking = ClientTransferBooking(
+        booking_id=original_booking_id,
+        booking_date=date(2026, 8, 12),
+        booking_type="REGULAR",
+        description="Zu stornierende Buchung",
+        lines=(
+            ClientTransferBookingLine(0, "1200", "DEBIT", "5.00"),
+            ClientTransferBookingLine(1, "4900", "CREDIT", "5.00"),
+        ),
+    )
+    reversal_booking = ClientTransferBooking(
+        booking_id=UUID("dddddddd-1111-1111-1111-111111111111"),
+        booking_date=date(2026, 8, 13),
+        booking_type="REVERSAL",
+        reversal_of_booking_id=original_booking_id,
+        description="Storno der Buchung",
+        lines=(
+            ClientTransferBookingLine(0, "1200", "CREDIT", "5.00"),
+            ClientTransferBookingLine(1, "4900", "DEBIT", "5.00"),
+        ),
+    )
+    fiscal_years = list(source.client.fiscal_years)
+    open_year = fiscal_years[1]
+    fiscal_years[1] = replace(
+        open_year,
+        bookings=(
+            *open_year.bookings,
+            invoice_booking,
+            payable_booking,
+            original_booking,
+            reversal_booking,
+        ),
+    )
+    transfer = replace(
+        source,
+        client=replace(
+            source.client,
+            accounts=accounts,
+            business_partners=(
+                ClientTransferBusinessPartner(
+                    partner_id=partner_id,
+                    name="Transferpartner GmbH",
+                    is_customer=True,
+                    is_supplier=True,
+                    is_active=True,
+                ),
+            ),
+            person_accounts=(
+                ClientTransferPersonAccount(
+                    account_number="10000",
+                    partner_id=partner_id,
+                    role="DEBITOR",
+                ),
+                ClientTransferPersonAccount(
+                    account_number="70000",
+                    partner_id=partner_id,
+                    role="KREDITOR",
+                ),
+            ),
+            fiscal_years=tuple(fiscal_years),
+        ),
+    )
+
+    source_engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(source_engine)
+    source_export = _import_and_export(engine=source_engine, transfer=transfer)
+    archive_path = tmp_path / "personenkonten-rundlauf.simpleob"
+    write_client_transfer_archive(archive_path, source_export)
+    archived_transfer = read_client_transfer_archive(archive_path)
+
+    target_engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(target_engine)
+    target_export = _import_and_export(
+        engine=target_engine,
+        transfer=archived_transfer,
+    )
+
+    assert target_export.client == source_export.client
+    assert target_export.client.business_partners == (
+        ClientTransferBusinessPartner(
+            partner_id=partner_id,
+            name="Transferpartner GmbH",
+            is_customer=True,
+            is_supplier=True,
+            is_active=True,
+        ),
+    )
+    assert target_export.client.person_accounts == (
+        ClientTransferPersonAccount("10000", partner_id, "DEBITOR"),
+        ClientTransferPersonAccount("70000", partner_id, "KREDITOR"),
+    )
+    imported_bookings = {
+        booking.booking_id: booking
+        for fiscal_year in target_export.client.fiscal_years
+        for booking in fiscal_year.bookings
+    }
+    assert imported_bookings[invoice_booking.booking_id].lines == invoice_booking.lines
+    assert imported_bookings[payable_booking.booking_id].lines == payable_booking.lines
+    assert imported_bookings[reversal_booking.booking_id].reversal_of_booking_id == (
+        original_booking_id
+    )
+    assert target_export.client.account_roles == source_export.client.account_roles
+
+    def balances_by_account(client):
+        balances = {}
+        for fiscal_year in client.fiscal_years:
+            for booking in fiscal_year.bookings:
+                for line in booking.lines:
+                    amount = Decimal(line.amount)
+                    balances[line.account_number] = balances.get(
+                        line.account_number, Decimal("0.00")
+                    ) + (amount if line.side == "DEBIT" else -amount)
+        return balances
+
+    assert balances_by_account(target_export.client) == balances_by_account(
+        source_export.client
+    )
+    target_balances = balances_by_account(target_export.client)
+    assert target_balances["10000"] == Decimal("119.00")
+    assert target_balances["70000"] == Decimal("-119.00")
+    assert target_balances["1576"] == Decimal("19.00")
+    assert target_balances["1776"] == Decimal("-19.00")
+    source_engine.dispose()
+    target_engine.dispose()
+
+
+@pytest.mark.parametrize("format_version", (1, 2))
+def test_legacy_open_item_roles_are_ignored_during_transfer_import(
+    format_version: int,
+) -> None:
+    source = _build_rich_transfer()
+    legacy_role_accounts = (
+        ClientTransferAccount("1400", "Kundenforderungen", "ASSET", True),
+        ClientTransferAccount(
+            "1600", "Lieferantenverbindlichkeiten", "LIABILITY", True
+        ),
+        ClientTransferAccount("1610", "Kundenguthaben", "LIABILITY", True),
+        ClientTransferAccount("1410", "Lieferantenguthaben", "ASSET", True),
+    )
+    transfer = replace(
+        source,
+        format=ClientTransferFormat(version=format_version),
+        client=replace(
+            source.client,
+            accounts=source.client.accounts + legacy_role_accounts,
+        ),
+    )
+    legacy_data = client_transfer_to_dict(transfer)
+    legacy_data["client"]["account_roles"].update(
+        {
+            "customer_receivables": ["1400"],
+            "supplier_payables": ["1600"],
+            "customer_credit_balances": ["1610"],
+            "supplier_credit_balances": ["1410"],
+        }
+    )
+    legacy_transfer = client_transfer_from_dict(legacy_data)
+
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    imported = _import_and_export(engine=engine, transfer=legacy_transfer)
+
+    assert imported.client.kr_settings == transfer.client.kr_settings
+    assert imported.client.account_roles == transfer.client.account_roles
+    assert {
+        account.account_number for account in imported.client.accounts
+    } >= {"1400", "1600", "1610", "1410"}
+    with Session(engine) as session:
+        roles = ChartOfAccountsRepository(session).load_account_roles(
+            company_id=transfer.client.company_id
+        )
+    assert roles.customer_receivables == frozenset()
+    assert roles.supplier_payables == frozenset()
+    assert roles.customer_credit_balances == frozenset()
+    assert roles.supplier_credit_balances == frozenset()
     engine.dispose()
 
 
