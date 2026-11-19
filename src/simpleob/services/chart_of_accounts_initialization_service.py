@@ -97,10 +97,6 @@ class ChartOfAccountsInitializationService:
                     cash_accounts=frozenset(("1000",)),
                     bank_accounts=frozenset(("1200",)),
                     general_rate_sales_accounts=frozenset(("8400",)),
-                    customer_receivables=frozenset(("1400",)),
-                    supplier_payables=frozenset(("1600",)),
-                    customer_credit_balances=frozenset(("1610",)),
-                    supplier_credit_balances=frozenset(("1410",)),
                     vat_advance_payments=(
                         frozenset(("3820",))
                         if has_vat_transfer_accounts

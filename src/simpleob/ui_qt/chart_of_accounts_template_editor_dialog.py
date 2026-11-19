@@ -79,10 +79,6 @@ class ChartOfAccountsTemplateEditorDialog(QDialog):
         "cash_accounts": "Kontenrolle: Kasse",
         "bank_accounts": "Kontenrolle: Bank",
         "general_rate_sales_accounts": "Kontenrolle: Umsatzerlöse",
-        "customer_receivables": "Kontenrolle: Kundenforderungen",
-        "supplier_payables": "Kontenrolle: Lieferantenverbindlichkeiten",
-        "customer_credit_balances": "Kontenrolle: Kundenguthaben",
-        "supplier_credit_balances": "Kontenrolle: Lieferantenguthaben",
     }
 
     def __init__(

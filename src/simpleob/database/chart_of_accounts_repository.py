@@ -18,8 +18,8 @@ from simpleob.database.models import (
     Kontenrolle,
     KontenTaxonomieZuordnung,
     Konto,
-    PersonenkontoZuordnung,
     Mandant,
+    PersonenkontoZuordnung,
     Wirtschaftsjahr,
 )
 from simpleob.domain.account import Account
@@ -27,7 +27,6 @@ from simpleob.domain.account_mapping_rule import (
     AccountMappingRule,
 )
 from simpleob.domain.account_type import AccountType
-from simpleob.domain.person_account_role import PersonAccountRole
 from simpleob.domain.accounting_account_roles import (
     AccountingAccountRoles,
 )
@@ -37,6 +36,7 @@ from simpleob.domain.accounting_control_accounts import (
 from simpleob.domain.chart_of_accounts_template import (
     ChartOfAccountsTemplate,
 )
+from simpleob.domain.person_account_role import PersonAccountRole
 from simpleob.domain.template_account import TemplateAccount
 from simpleob.domain.vat_accounts import VatAccounts
 
@@ -1749,92 +1749,6 @@ class ChartOfAccountsRepository:
                         f"Zuordnung {expected_code}."
                     )
 
-        unsuitable_receivable_accounts = {
-            account_number
-            for account_number in account_roles.customer_receivables
-            if (
-                self._session.query(Konto.account_type)
-                .filter(
-                    Konto.mandant_id == company_model.id,
-                    Konto.account_number == account_number,
-                )
-                .scalar()
-                != AccountType.ASSET.name
-            )
-        }
-        if unsuitable_receivable_accounts:
-            unsuitable = ", ".join(
-                sorted(unsuitable_receivable_accounts)
-            )
-            raise ValueError(
-                "Kundenforderungskonten müssen Aktivkonten sein: "
-                f"{unsuitable}"
-            )
-
-        unsuitable_payable_accounts = {
-            account_number
-            for account_number in account_roles.supplier_payables
-            if (
-                self._session.query(Konto.account_type)
-                .filter(
-                    Konto.mandant_id == company_model.id,
-                    Konto.account_number == account_number,
-                )
-                .scalar()
-                != AccountType.LIABILITY.name
-            )
-        }
-        if unsuitable_payable_accounts:
-            unsuitable = ", ".join(sorted(unsuitable_payable_accounts))
-            raise ValueError(
-                "Lieferantenverbindlichkeitskonten müssen Passivkonten sein: "
-                f"{unsuitable}"
-            )
-
-        unsuitable_customer_credit_accounts = {
-            account_number
-            for account_number in account_roles.customer_credit_balances
-            if (
-                self._session.query(Konto.account_type)
-                .filter(
-                    Konto.mandant_id == company_model.id,
-                    Konto.account_number == account_number,
-                )
-                .scalar()
-                != AccountType.LIABILITY.name
-            )
-        }
-        if unsuitable_customer_credit_accounts:
-            unsuitable = ", ".join(
-                sorted(unsuitable_customer_credit_accounts)
-            )
-            raise ValueError(
-                "Kundenguthabenkonten müssen Passivkonten sein: "
-                f"{unsuitable}"
-            )
-
-        unsuitable_supplier_credit_accounts = {
-            account_number
-            for account_number in account_roles.supplier_credit_balances
-            if (
-                self._session.query(Konto.account_type)
-                .filter(
-                    Konto.mandant_id == company_model.id,
-                    Konto.account_number == account_number,
-                )
-                .scalar()
-                != AccountType.ASSET.name
-            )
-        }
-        if unsuitable_supplier_credit_accounts:
-            unsuitable = ", ".join(
-                sorted(unsuitable_supplier_credit_accounts)
-            )
-            raise ValueError(
-                "Lieferantenguthabenkonten müssen Aktivkonten sein: "
-                f"{unsuitable}"
-            )
-
         (
             self._session.query(Kontenrolle)
             .filter(
@@ -1858,22 +1772,6 @@ class ChartOfAccountsRepository:
             (
                 "GENERAL_RATE_SALES",
                 account_roles.general_rate_sales_accounts,
-            ),
-            (
-                "CUSTOMER_RECEIVABLES",
-                account_roles.customer_receivables,
-            ),
-            (
-                "SUPPLIER_PAYABLES",
-                account_roles.supplier_payables,
-            ),
-            (
-                "CUSTOMER_CREDIT_BALANCES",
-                account_roles.customer_credit_balances,
-            ),
-            (
-                "SUPPLIER_CREDIT_BALANCES",
-                account_roles.supplier_credit_balances,
             ),
             (
                 "VAT_ADVANCE_PAYMENTS",
@@ -2022,48 +1920,27 @@ class ChartOfAccountsRepository:
             if model.role == "VAT_PRIOR_YEAR_PAYABLES"
         )
 
-        customer_receivables = frozenset(
-            model.account_number
-            for model in models
-            if model.role == "CUSTOMER_RECEIVABLES"
-        )
-
-        supplier_payables = frozenset(
-            model.account_number
-            for model in models
-            if model.role == "SUPPLIER_PAYABLES"
-        )
-
-        customer_credit_balances = frozenset(
-            model.account_number
-            for model in models
-            if model.role == "CUSTOMER_CREDIT_BALANCES"
-        )
-
-        supplier_credit_balances = frozenset(
-            model.account_number
-            for model in models
-            if model.role == "SUPPLIER_CREDIT_BALANCES"
-        )
-
         known_roles = {
             "CASH",
             "BANK",
             "GENERAL_RATE_SALES",
-            "CUSTOMER_RECEIVABLES",
-            "SUPPLIER_PAYABLES",
-            "CUSTOMER_CREDIT_BALANCES",
-            "SUPPLIER_CREDIT_BALANCES",
             "VAT_ADVANCE_PAYMENTS",
             "VAT_CURRENT_YEAR",
             "VAT_PRIOR_YEAR_RECEIVABLES",
             "VAT_PRIOR_YEAR_PAYABLES",
+        }
+        legacy_open_item_roles = {
+            "CUSTOMER_RECEIVABLES",
+            "SUPPLIER_PAYABLES",
+            "CUSTOMER_CREDIT_BALANCES",
+            "SUPPLIER_CREDIT_BALANCES",
         }
 
         unknown_roles = {
             model.role
             for model in models
             if model.role not in known_roles
+            and model.role not in legacy_open_item_roles
         }
 
         if unknown_roles:
@@ -2082,100 +1959,10 @@ class ChartOfAccountsRepository:
             general_rate_sales_accounts=(
                 general_rate_sales_accounts
             ),
-            customer_receivables=customer_receivables,
-            supplier_payables=supplier_payables,
-            customer_credit_balances=customer_credit_balances,
-            supplier_credit_balances=supplier_credit_balances,
             vat_advance_payments=vat_advance_payments,
             vat_current_year=vat_current_year,
             vat_prior_year_receivables=vat_prior_year_receivables,
             vat_prior_year_payables=vat_prior_year_payables,
-        )
-
-    def validate_customer_receivable_account(
-        self,
-        *,
-        company_id: UUID,
-        account_number: str,
-    ) -> None:
-        """Prüft das konfigurierte, aktive Debitoren-Sammelkonto."""
-
-        company_model = self._find_company(company_id)
-        if company_model is None:
-            raise ValueError("Das Unternehmen ist nicht vorhanden.")
-
-        account = (
-            self._session.query(Konto)
-            .filter(
-                Konto.mandant_id == company_model.id,
-                Konto.account_number == account_number,
-            )
-            .one_or_none()
-        )
-        if account is None or not account.is_active:
-            raise ValueError(
-                "Das konfigurierte Forderungskonto ist nicht vorhanden "
-                "oder nicht aktiv."
-            )
-        if account.account_type != AccountType.ASSET.name:
-            raise ValueError(
-                "Das Forderungskonto muss ein Aktivkonto sein."
-            )
-
-    def validate_supplier_payable_account(
-        self,
-        *,
-        company_id: UUID,
-        account_number: str,
-    ) -> None:
-        """Prüft das konfigurierte, aktive Verbindlichkeitskonto."""
-
-        company_model = self._find_company(company_id)
-        if company_model is None:
-            raise ValueError("Das Unternehmen ist nicht vorhanden.")
-
-        account = (
-            self._session.query(Konto)
-            .filter(
-                Konto.mandant_id == company_model.id,
-                Konto.account_number == account_number,
-            )
-            .one_or_none()
-        )
-        if account is None or not account.is_active:
-            raise ValueError(
-                "Das konfigurierte Verbindlichkeitskonto ist nicht vorhanden "
-                "oder nicht aktiv."
-            )
-        if account.account_type != AccountType.LIABILITY.name:
-            raise ValueError(
-                "Das Verbindlichkeitskonto muss ein Passivkonto sein."
-            )
-
-    def validate_customer_credit_balance_account(
-        self,
-        *,
-        company_id: UUID,
-        account_number: str,
-    ) -> None:
-        self._validate_active_account_type(
-            company_id=company_id,
-            account_number=account_number,
-            account_type=AccountType.LIABILITY,
-            label="Kundenguthabenkonto",
-        )
-
-    def validate_supplier_credit_balance_account(
-        self,
-        *,
-        company_id: UUID,
-        account_number: str,
-    ) -> None:
-        self._validate_active_account_type(
-            company_id=company_id,
-            account_number=account_number,
-            account_type=AccountType.ASSET,
-            label="Lieferantenguthabenkonto",
         )
 
     def validate_payment_cash_bank_account(

@@ -1144,10 +1144,17 @@ def test_legacy_open_item_roles_are_ignored_during_transfer_import(
         roles = ChartOfAccountsRepository(session).load_account_roles(
             company_id=transfer.client.company_id
         )
-    assert roles.customer_receivables == frozenset()
-    assert roles.supplier_payables == frozenset()
-    assert roles.customer_credit_balances == frozenset()
-    assert roles.supplier_credit_balances == frozenset()
+    assert not hasattr(roles, "customer_receivables")
+    assert not hasattr(roles, "supplier_payables")
+    assert not hasattr(roles, "customer_credit_balances")
+    assert not hasattr(roles, "supplier_credit_balances")
+    exported_roles = client_transfer_to_dict(imported)["client"]["account_roles"]
+    assert not {
+        "customer_receivables",
+        "supplier_payables",
+        "customer_credit_balances",
+        "supplier_credit_balances",
+    } & exported_roles.keys()
     engine.dispose()
 
 

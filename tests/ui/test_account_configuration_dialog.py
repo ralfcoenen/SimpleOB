@@ -74,10 +74,6 @@ def _dialog() -> AccountConfigurationDialog:
             cash_accounts=frozenset({"1000"}),
             bank_accounts=frozenset({"1800"}),
             general_rate_sales_accounts=frozenset({"4000"}),
-            customer_receivables=frozenset({"1100"}),
-            supplier_payables=frozenset({"1600"}),
-            customer_credit_balances=frozenset({"1610"}),
-            supplier_credit_balances=frozenset({"1400"}),
         ),
     )
 
@@ -146,30 +142,23 @@ def test_switching_roles_preserves_multiple_unsaved_assignments_until_save():
     assert dialog.result[2].general_rate_sales_accounts == frozenset(
         {"4000", "4001"}
     )
-    assert dialog.result[2].customer_receivables == frozenset({"1100"})
-    assert dialog.result[2].supplier_payables == frozenset({"1600"})
-    assert dialog.result[2].customer_credit_balances == frozenset({"1610"})
-    assert dialog.result[2].supplier_credit_balances == frozenset({"1400"})
     assert dialog.result is not None
 
 
-def test_hidden_op_assignments_are_preserved_and_reserve_their_accounts():
+def test_old_op_sammelkonten_are_no_longer_reserved_by_role_configuration():
     dialog = _dialog()
     _show_roles_tab(dialog)
 
-    customer_receivable = _account_item(dialog, "1100")
-    assert not customer_receivable.flags() & Qt.ItemFlag.ItemIsEnabled
-    assert "Kundenforderungen" in customer_receivable.toolTip()
-
-    _account_item(dialog, "1001").setCheckState(Qt.CheckState.Checked)
+    for number in ("1100", "1400", "1600", "1610"):
+        item = _account_item(dialog, number)
+        assert item.flags() & Qt.ItemFlag.ItemIsEnabled
+        assert item.flags() & Qt.ItemFlag.ItemIsUserCheckable
+        assert "Kontenrolle:" not in item.toolTip()
+    _account_item(dialog, "1100").setCheckState(Qt.CheckState.Checked)
     dialog._save()
 
     assert dialog.result is not None
-    assert dialog.result[2].customer_receivables == frozenset({"1100"})
-    assert dialog.result[2].supplier_payables == frozenset({"1600"})
-    assert dialog.result[2].customer_credit_balances == frozenset({"1610"})
-    assert dialog.result[2].supplier_credit_balances == frozenset({"1400"})
-    assert dialog.result[2].cash_accounts == frozenset({"1000", "1001"})
+    assert dialog.result[2].cash_accounts == frozenset({"1000", "1100"})
 
 
 def test_account_assigned_to_another_role_cannot_be_selected_twice():

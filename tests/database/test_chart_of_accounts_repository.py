@@ -22,7 +22,7 @@ from simpleob.database.company_repository import (
     CompanyRepository,
 )
 from simpleob.database.database import Base
-from simpleob.database.models import Konto
+from simpleob.database.models import Kontenrolle, Konto, Mandant
 from simpleob.domain.account import Account
 from simpleob.domain.account_mapping_rule import (
     AccountMappingRule,
@@ -101,6 +101,61 @@ def test_persists_and_reloads_vat_closing_roles_without_schema_changes() -> None
     }
     assert rules["3840"].debit_position.code == "HGB.266.AKTIVA.B.II.4"
     assert rules["3840"].credit_position.code == "HGB.266.PASSIVA.C.8"
+
+
+def test_ignores_legacy_open_item_roles_in_existing_database():
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine)
+    company = Company(company_id=uuid4(), name="Altrollen UG")
+    context = create_standard_financial_statement_context()
+    active_roles = AccountingAccountRoles(
+        cash_accounts=frozenset({"1000"}),
+        bank_accounts=frozenset({"1200"}),
+        general_rate_sales_accounts=frozenset({"8400"}),
+    )
+
+    with Session() as session:
+        CompanyRepository(session).add(company)
+        repository = ChartOfAccountsRepository(session)
+        repository.save_for_company(
+            company_id=company.company_id,
+            chart_of_accounts=context.chart_of_accounts,
+            accounts=context.accounts,
+        )
+        mandant_id = session.query(Mandant.id).filter(
+            Mandant.company_id == str(company.company_id)
+        ).scalar()
+        for role, number in (
+            ("CUSTOMER_RECEIVABLES", "1400"),
+            ("SUPPLIER_PAYABLES", "1600"),
+            ("CUSTOMER_CREDIT_BALANCES", "1610"),
+            ("SUPPLIER_CREDIT_BALANCES", "1410"),
+        ):
+            session.add(
+                Kontenrolle(
+                    mandant_id=mandant_id,
+                    role=role,
+                    account_number=number,
+                )
+            )
+        session.flush()
+
+        loaded = repository.load_account_roles(company.company_id)
+        assert loaded == AccountingAccountRoles(
+            cash_accounts=frozenset(),
+            bank_accounts=frozenset(),
+            general_rate_sales_accounts=frozenset(),
+        )
+
+        repository.save_account_roles(
+            company_id=company.company_id,
+            account_roles=active_roles,
+        )
+        saved_roles = repository.load_account_roles(company.company_id)
+
+    assert saved_roles == active_roles
+    engine.dispose()
 
 
 def test_saves_and_loads_chart_of_accounts() -> None:

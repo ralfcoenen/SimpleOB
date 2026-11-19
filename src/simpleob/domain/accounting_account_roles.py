@@ -43,10 +43,6 @@ class AccountingAccountRoles:
     cash_accounts: frozenset[str]
     bank_accounts: frozenset[str]
     general_rate_sales_accounts: frozenset[str]
-    customer_receivables: frozenset[str] = frozenset()
-    supplier_payables: frozenset[str] = frozenset()
-    customer_credit_balances: frozenset[str] = frozenset()
-    supplier_credit_balances: frozenset[str] = frozenset()
     vat_advance_payments: frozenset[str] = frozenset()
     vat_current_year: frozenset[str] = frozenset()
     vat_prior_year_receivables: frozenset[str] = frozenset()
@@ -64,22 +60,6 @@ class AccountingAccountRoles:
         _validate_account_numbers(
             field_name="general_rate_sales_accounts",
             account_numbers=self.general_rate_sales_accounts,
-        )
-        _validate_account_numbers(
-            field_name="customer_receivables",
-            account_numbers=self.customer_receivables,
-        )
-        _validate_account_numbers(
-            field_name="supplier_payables",
-            account_numbers=self.supplier_payables,
-        )
-        _validate_account_numbers(
-            field_name="customer_credit_balances",
-            account_numbers=self.customer_credit_balances,
-        )
-        _validate_account_numbers(
-            field_name="supplier_credit_balances",
-            account_numbers=self.supplier_credit_balances,
         )
         _validate_account_numbers(
             field_name="vat_advance_payments",
@@ -118,34 +98,10 @@ class AccountingAccountRoles:
             raise ValueError(
                 "Die Umsatzsteuerrollen müssen vollständig zugeordnet sein."
             )
-        if len(self.customer_receivables) > 1:
-            raise ValueError(
-                "Es darf höchstens ein Kundenforderungskonto "
-                "konfiguriert sein."
-            )
-        if len(self.supplier_payables) > 1:
-            raise ValueError(
-                "Es darf höchstens ein Lieferantenverbindlichkeitskonto "
-                "konfiguriert sein."
-            )
-        if len(self.customer_credit_balances) > 1:
-            raise ValueError(
-                "Es darf höchstens ein Kundenguthabenkonto konfiguriert sein."
-            )
-        if len(self.supplier_credit_balances) > 1:
-            raise ValueError(
-                "Es darf höchstens ein Lieferantenguthabenkonto "
-                "konfiguriert sein."
-            )
-
         role_sets = (
             self.cash_accounts,
             self.bank_accounts,
             self.general_rate_sales_accounts,
-            self.customer_receivables,
-            self.supplier_payables,
-            self.customer_credit_balances,
-            self.supplier_credit_balances,
             self.vat_advance_payments,
             self.vat_current_year,
             self.vat_prior_year_receivables,
@@ -178,10 +134,6 @@ class AccountingAccountRoles:
             self.cash_accounts,
             self.bank_accounts,
             self.general_rate_sales_accounts,
-            self.customer_receivables,
-            self.supplier_payables,
-            self.customer_credit_balances,
-            self.supplier_credit_balances,
             self.vat_advance_payments,
             self.vat_current_year,
             self.vat_prior_year_receivables,

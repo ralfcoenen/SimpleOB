@@ -29,18 +29,6 @@
     "general_rate_sales_accounts": [
       "4400"
     ],
-    "customer_receivables": [
-      "1200"
-    ],
-    "supplier_payables": [
-      "3300"
-    ],
-    "customer_credit_balances": [
-      "3500"
-    ],
-    "supplier_credit_balances": [
-      "1300"
-    ],
     "vat_advance_payments": [
       "3820"
     ],

@@ -282,10 +282,16 @@ def test_initializes_chart_of_accounts_for_company() -> None:
         loaded_account_roles.general_rate_sales_accounts
         == frozenset({"8400"})
     )
-    assert loaded_account_roles.customer_receivables == frozenset({"1400"})
-    assert loaded_account_roles.supplier_payables == frozenset({"1600"})
-    assert loaded_account_roles.customer_credit_balances == frozenset({"1610"})
-    assert loaded_account_roles.supplier_credit_balances == frozenset({"1410"})
+    assert not {
+        "1400",
+        "1410",
+        "1600",
+        "1610",
+    } & loaded_account_roles.account_numbers
+    assert loaded_account_roles.vat_advance_payments == frozenset()
+    assert loaded_account_roles.vat_current_year == frozenset()
+    assert loaded_account_roles.vat_prior_year_receivables == frozenset()
+    assert loaded_account_roles.vat_prior_year_payables == frozenset()
     assert loaded_account_taxonomy_concepts == {
         "4900": (
             "is.netIncome.regular.operatingTC."
@@ -378,13 +384,9 @@ def test_does_not_replace_existing_chart_of_accounts() -> None:
         session.commit()
 
         custom_roles = AccountingAccountRoles(
-            cash_accounts=frozenset(("1000",)),
-            bank_accounts=frozenset(("1200",)),
-            general_rate_sales_accounts=frozenset(("8400",)),
-            customer_receivables=frozenset(("1410",)),
-            supplier_payables=frozenset(("1600",)),
-            customer_credit_balances=frozenset(("0755",)),
-            supplier_credit_balances=frozenset(("1400",)),
+            cash_accounts=frozenset(),
+            bank_accounts=frozenset(),
+            general_rate_sales_accounts=frozenset(),
         )
         repository.save_account_roles(
             company_id=company.company_id,

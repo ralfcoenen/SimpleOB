@@ -72,16 +72,6 @@ class ChartOfAccountsTemplateBundleImporter:
             general_rate_sales_accounts=self._account_set(
                 roles_data, "general_rate_sales_accounts"
             ),
-            customer_receivables=self._account_set(
-                roles_data, "customer_receivables"
-            ),
-            supplier_payables=self._account_set(roles_data, "supplier_payables"),
-            customer_credit_balances=self._account_set(
-                roles_data, "customer_credit_balances"
-            ),
-            supplier_credit_balances=self._account_set(
-                roles_data, "supplier_credit_balances"
-            ),
             vat_advance_payments=self._account_set(
                 roles_data, "vat_advance_payments"
             ),
@@ -328,26 +318,6 @@ class ChartOfAccountsTemplateBundleImporter:
                 roles.general_rate_sales_accounts,
                 AccountType.REVENUE,
                 "Umsatzerlöse allgemeiner Steuersatz",
-            ),
-            (
-                roles.customer_receivables,
-                AccountType.ASSET,
-                "Kundenforderungen",
-            ),
-            (
-                roles.supplier_payables,
-                AccountType.LIABILITY,
-                "Lieferantenverbindlichkeiten",
-            ),
-            (
-                roles.customer_credit_balances,
-                AccountType.LIABILITY,
-                "Kundenguthaben",
-            ),
-            (
-                roles.supplier_credit_balances,
-                AccountType.ASSET,
-                "Lieferantenguthaben",
             ),
             (
                 roles.vat_advance_payments,

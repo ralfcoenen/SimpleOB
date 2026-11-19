@@ -148,7 +148,6 @@ def test_loads_standard_chart_with_reusable_configuration():
     assert bundle.vat_accounts is not None
     assert bundle.vat_accounts.input_tax_7 == "1571"
     assert bundle.account_roles is not None
-    assert bundle.account_roles.customer_receivables == frozenset({"1400"})
     assert bundle.account_roles.vat_advance_payments == frozenset({"3820"})
     assert bundle.account_roles.vat_current_year == frozenset({"3840"})
     assert bundle.account_roles.vat_prior_year_receivables == frozenset({"1422"})
@@ -173,6 +172,54 @@ def test_loads_standard_chart_with_reusable_configuration():
     assert mappings["3840"].credit_position.code == "HGB.266.PASSIVA.C.8"
     assert bundle.taxonomy_version == "6.9"
     assert bundle.taxonomy_mappings
+
+
+def test_legacy_op_roles_in_template_config_are_ignored_and_not_resaved(
+    tmp_path: Path,
+):
+    resources = Path("src/simpleob/resources/chart_of_accounts")
+    source_csv = resources / "openbilanz_standard.csv"
+    source_config = resources / "openbilanz_standard.config.json"
+    csv_file = tmp_path / source_csv.name
+    config_file = tmp_path / source_config.name
+    csv_file.write_text(source_csv.read_text(encoding="utf-8"), encoding="utf-8")
+    legacy_data = json.loads(source_config.read_text(encoding="utf-8"))
+    legacy_data["account_roles"].update(
+        {
+            "customer_receivables": ["1400"],
+            "supplier_payables": ["1600"],
+            "customer_credit_balances": ["1610"],
+            "supplier_credit_balances": ["1410"],
+        }
+    )
+    legacy_data.pop("taxonomy_mapping_file", None)
+    legacy_data.pop("taxonomy_version", None)
+    config_file.write_text(
+        json.dumps(legacy_data, ensure_ascii=False), encoding="utf-8"
+    )
+    importer = ChartOfAccountsTemplateBundleImporter(
+        chart_importer=CsvChartOfAccountsImporter(
+            position_provider=_position_provider_for_template_import()
+        )
+    )
+
+    bundle = importer.load(csv_file)
+
+    assert bundle.account_roles is not None
+    assert bundle.account_roles.cash_accounts == frozenset({"1000"})
+    assert bundle.account_roles.bank_accounts == frozenset({"1200"})
+    assert not hasattr(bundle.account_roles, "customer_receivables")
+    output_config = tmp_path / "roundtrip.config.json"
+    importer.save_configuration(bundle, output_config)
+    saved_roles = json.loads(output_config.read_text(encoding="utf-8"))[
+        "account_roles"
+    ]
+    assert not {
+        "customer_receivables",
+        "supplier_payables",
+        "customer_credit_balances",
+        "supplier_credit_balances",
+    } & saved_roles.keys()
 
 
 def test_rejects_incompatible_system_account_type():
