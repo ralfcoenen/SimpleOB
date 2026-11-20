@@ -6,6 +6,7 @@ import socket
 import subprocess
 from pathlib import Path
 from unittest.mock import patch
+from uuid import UUID
 
 import pytest
 from alembic import command
@@ -189,6 +190,12 @@ def test_historical_database_completes_administrative_upgrade_on_isolated_postgr
             alembic_config.attributes["connection"] = connection
             command.upgrade(alembic_config, starting_revision)
             _seed_historical_upgrade_data(connection)
+            company_ids = connection.execute(
+                text("SELECT company_id FROM public.mandanten")
+            ).scalars().all()
+            assert company_ids
+            for company_id in company_ids:
+                UUID(company_id)
             _grant_historical_runtime_access(connection)
             connection.commit()
             before_upgrade = _snapshot_historical_upgrade_data(connection)
@@ -556,7 +563,7 @@ def _seed_historical_upgrade_data(connection: Connection) -> None:
     mandant_id = insert(
         "mandanten",
         {
-            "company_id": "isolated-upgrade-company",
+            "company_id": "00000000-0000-4000-8000-000000000010",
             "name": "Upgrade-Testmandant",
             "kr_verzicht": False,
         },
