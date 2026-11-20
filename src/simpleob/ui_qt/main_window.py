@@ -1928,23 +1928,12 @@ class MainWindow(QMainWindow):
             self._new_account_button
         )
 
-        self._new_debtor_button = QPushButton("Neuer Debitor")
-        self._new_debtor_button.clicked.connect(
-            lambda: self._open_new_person_account(PersonAccountRole.DEBITOR)
-        )
-        self._new_debtor_button.setEnabled(
+        self._new_person_account_button = QPushButton("Neues Personenkonto")
+        self._new_person_account_button.clicked.connect(self._open_new_person_account)
+        self._new_person_account_button.setEnabled(
             self._workspace.is_open and self._person_account_repository is not None
         )
-        button_layout.addWidget(self._new_debtor_button)
-
-        self._new_creditor_button = QPushButton("Neuer Kreditor")
-        self._new_creditor_button.clicked.connect(
-            lambda: self._open_new_person_account(PersonAccountRole.KREDITOR)
-        )
-        self._new_creditor_button.setEnabled(
-            self._workspace.is_open and self._person_account_repository is not None
-        )
-        button_layout.addWidget(self._new_creditor_button)
+        button_layout.addWidget(self._new_person_account_button)
 
         self._edit_account_button = QPushButton(
             "Konto bearbeiten"
@@ -2135,11 +2124,8 @@ class MainWindow(QMainWindow):
         enabled = self._workspace.is_open and not self._account_editing_mode
 
         self._booking_frame.set_enabled(enabled)
-        if hasattr(self, "_new_debtor_button"):
-            self._new_debtor_button.setEnabled(
-                enabled and self._person_account_repository is not None
-            )
-            self._new_creditor_button.setEnabled(
+        if hasattr(self, "_new_person_account_button"):
+            self._new_person_account_button.setEnabled(
                 enabled and self._person_account_repository is not None
             )
         self._opening_balance_button.setEnabled(enabled)
@@ -5024,14 +5010,13 @@ class MainWindow(QMainWindow):
             ),
         )
 
-    def _open_new_person_account(self, role: PersonAccountRole) -> None:
+    def _open_new_person_account(self) -> None:
         repository = self._person_account_repository
         if repository is None or not self._workspace.is_open:
             return
         dialog = PersonAccountDialog(
             self,
             company_id=self._context.company.company_id,
-            role=role,
             repository=repository,
         )
         if dialog.exec() != QDialog.DialogCode.Accepted or dialog.saved is None:

@@ -3,14 +3,17 @@
 from uuid import UUID
 
 from PySide6.QtWidgets import (
+    QButtonGroup,
     QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
+    QHBoxLayout,
     QLabel,
     QLineEdit,
     QMessageBox,
+    QRadioButton,
     QVBoxLayout,
     QWidget,
 )
@@ -28,7 +31,7 @@ class PersonAccountDialog(QDialog):
         parent: QWidget | None,
         *,
         company_id: UUID,
-        role: PersonAccountRole,
+        role: PersonAccountRole = PersonAccountRole.DEBITOR,
         repository: PersonAccountRepository,
         existing: PersonAccount | None = None,
     ) -> None:
@@ -38,18 +41,50 @@ class PersonAccountDialog(QDialog):
         self._repository = repository
         self._existing = existing
         self.saved: PersonAccount | None = None
+        self._number_is_manual = False
+        self._updating_number = False
         label = "Debitor" if role is PersonAccountRole.DEBITOR else "Kreditor"
-        self.setWindowTitle(f"Personenkonto {label} bearbeiten" if existing else f"Neuer {label}")
+        self.setWindowTitle(
+            f"Personenkonto {label} bearbeiten" if existing else "Neues Personenkonto"
+        )
         self.setMinimumWidth(520)
 
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel(f"{label} – Geschäftspartner und Personenkonto"))
+        self._heading = QLabel(f"{label} – Geschäftspartner und Personenkonto")
+        layout.addWidget(self._heading)
         form = QFormLayout()
+
+        self._debtor_radio: QRadioButton | None = None
+        self._creditor_radio: QRadioButton | None = None
+        self._role_button_group: QButtonGroup | None = None
+        if existing is None:
+            role_layout = QHBoxLayout()
+            self._role_button_group = QButtonGroup(self)
+            self._role_button_group.setExclusive(True)
+            self._debtor_radio = QRadioButton("Debitor")
+            self._creditor_radio = QRadioButton("Kreditor")
+            self._role_button_group.addButton(self._debtor_radio)
+            self._role_button_group.addButton(self._creditor_radio)
+            self._debtor_radio.setChecked(role is PersonAccountRole.DEBITOR)
+            self._creditor_radio.setChecked(role is PersonAccountRole.KREDITOR)
+            self._debtor_radio.toggled.connect(
+                lambda checked: checked
+                and self._role_changed(PersonAccountRole.DEBITOR)
+            )
+            self._creditor_radio.toggled.connect(
+                lambda checked: checked
+                and self._role_changed(PersonAccountRole.KREDITOR)
+            )
+            role_layout.addWidget(self._debtor_radio)
+            role_layout.addWidget(self._creditor_radio)
+            role_layout.addStretch()
+            form.addRow("Kontoart", role_layout)
 
         self._number = QLineEdit()
         if existing is None:
             self._number.setText(repository.suggest_account_number(company_id=company_id, role=role))
             self._number.setPlaceholderText("Fünfstellige Kontonummer")
+            self._number.textEdited.connect(self._number_edited)
         else:
             self._number.setText(existing.account_number)
             self._number.setReadOnly(True)
@@ -89,6 +124,68 @@ class PersonAccountDialog(QDialog):
         buttons.accepted.connect(self._save)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
+        self._partner_changed()
+
+    def _number_edited(self, _text: str) -> None:
+        if not self._updating_number:
+            self._number_is_manual = True
+
+    def _role_changed(self, role: PersonAccountRole) -> None:
+        if self._existing is not None:
+            return
+        if role is self._role:
+            return
+        replace_number = not self._number_is_manual
+
+        self._role = role
+        self._heading.setText(
+            f"{'Debitor' if role is PersonAccountRole.DEBITOR else 'Kreditor'} "
+            "– Geschäftspartner und Personenkonto"
+        )
+        self._refresh_partners()
+        try:
+            suggestion = self._repository.suggest_account_number(
+                company_id=self._company_id, role=role
+            )
+        except (TypeError, ValueError) as exc:
+            QMessageBox.warning(self, "Personenkonto", str(exc))
+            return
+
+        if self._number_is_manual:
+            answer = QMessageBox.question(
+                self,
+                "Kontonummer ändern?",
+                f"Die Kontonummer wurde manuell geändert. Soll sie durch den "
+                f"Nummernvorschlag {suggestion} für die neue Kontoart ersetzt werden?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            replace_number = answer == QMessageBox.StandardButton.Yes
+
+        if replace_number:
+            self._updating_number = True
+            self._number.setText(suggestion)
+            self._updating_number = False
+            self._number_is_manual = False
+
+    def _refresh_partners(self) -> None:
+        if self._partner_choice is None:
+            return
+        selected_id = self._partner_choice.currentData()
+        partners = self._repository.available_partners(
+            company_id=self._company_id, role=self._role
+        )
+        self._available_partners = {str(partner.partner_id): partner for partner in partners}
+        self._partner_choice.blockSignals(True)
+        self._partner_choice.clear()
+        self._partner_choice.addItem("Neuen Geschäftspartner anlegen", None)
+        for partner in partners:
+            self._partner_choice.addItem(partner.name, str(partner.partner_id))
+        index = self._partner_choice.findData(selected_id)
+        if selected_id is not None and index < 0:
+            self._name.clear()
+        self._partner_choice.setCurrentIndex(index if index >= 0 else 0)
+        self._partner_choice.blockSignals(False)
         self._partner_changed()
 
     def _partner_changed(self, *_args: object) -> None:

@@ -143,6 +143,7 @@ class _FakeMessageBox:
     ButtonRole = QMessageBox.ButtonRole
     StandardButton = QMessageBox.StandardButton
     choice = "Abbrechen"
+    choices = {}
     instances = []
     question_calls = 0
     question_answer = QMessageBox.StandardButton.No
@@ -176,9 +177,10 @@ class _FakeMessageBox:
         return 0
 
     def clickedButton(self):
+        choice = self.__class__.choices.get(self.title, self.choice)
         return next(
             button for button in self.buttons
-            if button.text == self.choice
+            if button.text == choice
         )
 
     @classmethod
@@ -352,11 +354,14 @@ def test_preview_without_bookings_disables_accept_button() -> None:
         dialog.close()
 
 
-def _prepare_closing_warning(monkeypatch, *, choice="Abbrechen") -> None:
+def _prepare_closing_warning(
+    monkeypatch, *, choice="Abbrechen", choices=None
+) -> None:
     _FakeMessageBox.instances.clear()
     _FakeMessageBox.question_calls = 0
     _FakeMessageBox.question_answer = QMessageBox.StandardButton.No
     _FakeMessageBox.choice = choice
+    _FakeMessageBox.choices = choices or {}
     monkeypatch.setattr(main_window, "QMessageBox", _FakeMessageBox)
 
 
@@ -390,7 +395,10 @@ def test_closing_can_continue_after_vat_warning(monkeypatch) -> None:
     window = _ClosingWindow(balances=(("1571", "debit", "50.00"),))
     _prepare_closing_warning(
         monkeypatch,
-        choice="Ohne Verrechnung fortfahren",
+        choices={
+            "Umsatzsteuerkonten nicht verrechnet": "Ohne Verrechnung fortfahren",
+            "Bilanzdarstellung": "Variante A – vor Ergebnisverwendung",
+        },
     )
     _FakeMessageBox.question_answer = QMessageBox.StandardButton.Yes
 
