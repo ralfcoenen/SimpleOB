@@ -312,8 +312,13 @@ class _ReadOnlyConnection:
 
 def test_inspection_uses_select_only_queries_and_reports_catalog_facts(monkeypatch):
     class _MigrationService:
-        def __init__(self, **_kwargs):
-            pass
+        def __init__(self, **kwargs):
+            self._application_config = kwargs["application_config"]
+
+        def _create_alembic_config(self):
+            return DatabaseMigrationService(
+                application_config=self._application_config
+            )._create_alembic_config()
 
         def inspect_postgresql_schema_on_connection(self, _connection):
             return PostgreSQLSchemaInspection(

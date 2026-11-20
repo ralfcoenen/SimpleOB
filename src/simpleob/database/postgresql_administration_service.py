@@ -214,9 +214,7 @@ class PostgreSQLAdministrationService:
 
         admin_flags = admin_connection.execute(
             text(
-                "SELECT r.rolsuper, r.rolcreatedb, "
-                "pg_has_role(current_user, 'pg_read_all_stats', 'USAGE') "
-                "AS can_read_all_stats FROM pg_roles AS r "
+                "SELECT r.rolsuper, r.rolcreatedb FROM pg_roles AS r "
                 "WHERE r.rolname = current_user"
             )
         ).one_or_none()
@@ -227,13 +225,6 @@ class PostgreSQLAdministrationService:
                 "Die Administrationsrolle benötigt CREATEDB oder SUPERUSER, "
                 "um die Wiederherstellungsprobe anzulegen und zu bereinigen."
             )
-        if not admin_flags.rolsuper and not admin_flags.can_read_all_stats:
-            raise RuntimeError(
-                "Die Administrationsrolle benötigt SUPERUSER oder Mitgliedschaft "
-                "in pg_read_all_stats, damit konkurrierende Sitzungen vollständig "
-                "erkannt werden."
-            )
-
         actual_database, actual_role, database_owner = migration_connection.execute(
             text(
                 "SELECT current_database(), current_user, "
@@ -446,12 +437,10 @@ class PostgreSQLAdministrationService:
             admin_role,
             is_superuser,
             can_create_database,
-            can_read_stats,
         ) = admin_connection.execute(
             text(
                 "SELECT current_database(), current_user, r.rolsuper, "
-                "r.rolcreatedb, pg_has_role(current_user, "
-                "'pg_read_all_stats', 'USAGE') "
+                "r.rolcreatedb "
                 "FROM pg_roles AS r WHERE r.rolname = current_user"
             )
         ).one()
@@ -464,11 +453,6 @@ class PostgreSQLAdministrationService:
             raise RuntimeError(
                 "Die Administrationsrolle benötigt CREATEDB oder SUPERUSER, "
                 "um die Wiederherstellungsprobe anzulegen und zu bereinigen."
-            )
-        if not is_superuser and not can_read_stats:
-            raise RuntimeError(
-                "Die Administrationsrolle benötigt SUPERUSER oder Mitgliedschaft "
-                "in pg_read_all_stats, damit aktive Sitzungen vollständig erkannt werden."
             )
         session_database, session_role = session_connection.execute(
             text("SELECT current_database(), current_user")

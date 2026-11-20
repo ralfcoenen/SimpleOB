@@ -127,13 +127,37 @@ def test_pre_cleanup_revision_accepts_owned_legacy_open_item_tables(tmp_path):
     connection = _ownership_rows(
         *((name, "r", "simpleob_migrator", None) for name in LEGACY_OPEN_ITEM_TABLES)
     )
-
     service._verify_migration_object_ownership(
         connection,
         migration_role="simpleob_migrator",
         current_revision="2f8c41d7a6b3",
         head_revision=OPEN_ITEM_CLEANUP_REVISION,
     )
+
+
+def test_admin_capabilities_accept_createdb_without_statistics_access(tmp_path):
+    service = _ownership_service(tmp_path)
+    admin_connection = Mock()
+    admin_connection.execute.return_value.one.return_value = (
+        "postgres",
+        "simpleob_migrator",
+        False,
+        True,
+    )
+    session_connection = Mock()
+    session_connection.execute.return_value.one.return_value = (
+        "simpleob_customer_books",
+        "simpleob_migrator",
+    )
+
+    service._validate_admin_capabilities(
+        admin_connection=admin_connection,
+        session_connection=session_connection,
+        target_database="simpleob_customer_books",
+    )
+
+    capability_sql = str(admin_connection.execute.call_args.args[0])
+    assert "pg_read_all_stats" not in capability_sql
 
 
 def test_pre_cleanup_revision_accepts_owned_sequence_of_legacy_table(tmp_path):
@@ -1016,6 +1040,8 @@ def split_role_upgrade(monkeypatch, tmp_path):
             database_owner="migrator",
             schema_owner="pg_database_owner",
             schema_status=state.status,
+            current_revision=state.revision,
+            head_revision=head,
             alembic_version_owner="migrator" if present else None,
             alembic_version_privileges=(
                 ("SELECT", True),
@@ -1103,7 +1129,7 @@ def split_role_upgrade(monkeypatch, tmp_path):
             if "FROM pg_locks" in sql:
                 return result(state.locked)
             if "current_database(), current_user, r.rolsuper" in sql:
-                return result((url.database, url.username, False, True, True))
+                return result((url.database, url.username, False, True))
             if sql.startswith("SELECT r.rolsuper, r.rolcreatedb"):
                 return result(
                     SimpleNamespace(
@@ -1156,7 +1182,7 @@ def split_role_upgrade(monkeypatch, tmp_path):
             if sql == "SELECT current_database()":
                 return result(url.database)
             if "FROM pg_stat_activity" in sql:
-                return result(rows=[])
+                return result(0)
             if "SELECT datallowconn" in sql:
                 return result(state.allowed)
             if sql.startswith("ALTER DATABASE"):

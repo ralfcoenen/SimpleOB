@@ -41,36 +41,26 @@ def inspect_postgresql_sessions(
 
     excluded = tuple(int(pid) for pid in excluded_pids)
     exclusion_sql = "".join(f" AND pid <> {pid}" for pid in excluded)
-    rows = connection.execute(
+    session_count = connection.execute(
         text(
             f"""
-            SELECT state, COUNT(*) AS session_count
+            SELECT COUNT(*)
             FROM pg_stat_activity
-            WHERE datname = current_database()
+            WHERE datid = (
+                    SELECT oid FROM pg_database WHERE datname = current_database()
+                  )
               AND pid <> pg_backend_pid()
               {exclusion_sql}
-            GROUP BY state
             """
         )
-    ).all()
-
-    active = 0
-    idle = 0
-    unknown = 0
-
-    for state, count in rows:
-        count = int(count)
-
-        if state == "active":
-            active += count
-        elif state == "idle":
-            idle += count
-        else:
-            unknown += count
+    ).scalar_one()
+    total = int(session_count)
 
     return PostgreSQLSessionInspection(
-        other_session_count=active + idle + unknown,
-        active_session_count=active,
-        idle_session_count=idle,
-        unknown_state_count=unknown,
+        other_session_count=total,
+        # Session state is protected statistics data. Keep the compatibility
+        # fields, but classify counted sessions as unknown without reading it.
+        active_session_count=0,
+        idle_session_count=0,
+        unknown_state_count=total,
     )

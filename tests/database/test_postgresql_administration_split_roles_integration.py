@@ -128,7 +128,14 @@ def test_historical_database_completes_administrative_upgrade_on_isolated_postgr
                 "CREATE ROLE simpleob_admin LOGIN CREATEDB "
                 "PASSWORD 'temporary-admin-secret'"
             )
-            connection.exec_driver_sql("GRANT pg_read_all_stats TO simpleob_admin")
+            admin_flags = connection.execute(
+                text(
+                    "SELECT rolsuper, rolcreatedb, "
+                    "pg_has_role('simpleob_admin', 'pg_read_all_stats', 'USAGE') "
+                    "FROM pg_roles WHERE rolname = 'simpleob_admin'"
+                )
+            ).one()
+            assert admin_flags == (False, True, False)
             connection.exec_driver_sql(
                 "CREATE ROLE simpleob_weak_admin LOGIN "
                 "PASSWORD 'temporary-weak-admin-secret'"

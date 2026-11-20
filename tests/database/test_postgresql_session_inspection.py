@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import os
+from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 from sqlalchemy import create_engine
@@ -43,6 +45,26 @@ def test_session_inspection_rejects_sqlite() -> None:
                 inspect_postgresql_sessions(connection)
     finally:
         engine.dispose()
+
+
+def test_session_inspection_counts_without_reading_statistics_details() -> None:
+    connection = Mock()
+    connection.dialect = SimpleNamespace(name="postgresql")
+    result = Mock()
+    result.scalar_one.return_value = 2
+    connection.execute.return_value = result
+
+    inspection = inspect_postgresql_sessions(connection, excluded_pids=(123,))
+
+    sql = str(connection.execute.call_args.args[0]).lower()
+    assert "datid" in sql
+    assert "pid" in sql
+    assert "state" not in sql
+    assert "application_name" not in sql
+    assert "query" not in sql
+    assert inspection.other_session_count == 2
+    assert inspection.unknown_state_count == 2
+    assert inspection.active_session_count == inspection.idle_session_count == 0
 
 
 def test_session_inspection_detects_other_connection(
