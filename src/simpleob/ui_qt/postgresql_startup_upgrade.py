@@ -19,8 +19,80 @@ from simpleob.database.migration_service import (
 from simpleob.database.postgresql_administration_service import (
     PostgreSQLAdministrationService,
 )
+from simpleob.database.postgresql_existing_installation_inspector import (
+    PostgreSQLExistingInstallationAssessment,
+    PostgreSQLExistingInstallationInspector,
+)
 from simpleob.database.postgresql_migration_safety import PostgreSQLMigrationApproval
 from simpleob.ui_qt.postgresql_password_dialog import PostgreSQLPasswordDialog
+
+
+def prepare_postgresql_candidate(
+    config: ApplicationConfig,
+    operating_credentials: PostgreSQLCredentials,
+) -> str:
+    """Prüft eine PostgreSQL-Auswahl und migriert veraltete Datenbanken sofort.
+
+    Die Konfiguration bleibt unverändert. Eine Rückgabe "ready" erfolgt erst,
+    wenn die Betriebsrolle nach der Prüfung oder dem Upgrade ein aktuelles,
+    konsistentes Schema mit den erforderlichen Rechten erreicht.
+    """
+    assessment = PostgreSQLExistingInstallationInspector(
+        application_config=config,
+        credentials=operating_credentials,
+    ).inspect()
+
+    if assessment.schema_status == PostgreSQLSchemaStatus.CURRENT:
+        _require_operational_assessment(assessment)
+        return "ready"
+
+    if assessment.schema_status == PostgreSQLSchemaStatus.EMPTY:
+        raise RuntimeError(
+            "Die ausgewählte PostgreSQL-Datenbank ist leer. "
+            "Eine PostgreSQL-Ersteinrichtung ist erforderlich."
+        )
+
+    if assessment.schema_status == PostgreSQLSchemaStatus.UNKNOWN:
+        raise RuntimeError(
+            "Die ausgewählte PostgreSQL-Datenbank hat einen unbekannten "
+            "oder inkonsistenten Alembic-Schemazustand. Der Betrieb bleibt gesperrt."
+        )
+
+    inspection = PostgreSQLSchemaInspection(
+        status=assessment.schema_status,
+        current_revision=assessment.current_revision,
+        head_revision=assessment.head_revision,
+    )
+    action = offer_postgresql_upgrade(
+        config,
+        operating_credentials,
+        inspection,
+    )
+    if action != "ready":
+        return action
+
+    verified = PostgreSQLExistingInstallationInspector(
+        application_config=config,
+        credentials=operating_credentials,
+    ).inspect()
+    _require_operational_assessment(verified)
+    return "upgraded"
+
+
+def _require_operational_assessment(
+    assessment: PostgreSQLExistingInstallationAssessment,
+) -> None:
+    if assessment.schema_status != PostgreSQLSchemaStatus.CURRENT:
+        raise RuntimeError(
+            "Die PostgreSQL-Datenbank ist nach der Vorbereitung nicht aktuell. "
+            "Der Betrieb bleibt gesperrt."
+        )
+    if assessment.blockers:
+        raise RuntimeError(
+            "Die PostgreSQL-Datenbank ist nicht betriebsbereit. "
+            "Der Betrieb bleibt gesperrt.\n"
+            + "\n".join(assessment.blockers)
+        )
 
 
 def offer_postgresql_upgrade(

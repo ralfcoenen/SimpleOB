@@ -141,15 +141,13 @@ def test_successful_change_saves_and_closes(
     dialog,
     config,
 ):
-    save = MagicMock()
     reject = MagicMock()
     information = MagicMock()
-
-    monkeypatch.setattr(
-        module,
-        "save_database_configuration",
-        save,
+    config.config_file.write_text(
+        f'[database]\nfile = "{config.database_file.as_posix()}"\n',
+        encoding="utf-8",
     )
+
     monkeypatch.setattr(
         module.QMessageBox,
         "information",
@@ -165,29 +163,32 @@ def test_successful_change_saves_and_closes(
 
     dialog._change_database()
 
-    save.assert_called_once_with(
-        config,
-        POSTGRES_URL,
-    )
     information.assert_called_once()
     reject.assert_called_once()
+    from simpleob.core.config import load_config
+
+    reloaded = load_config(config.config_file, defaults=config)
+    assert reloaded.database_url == POSTGRES_URL
+    assert "password" not in reloaded.database_url
 
 
 def test_save_error_keeps_start_dialog_open(
     monkeypatch,
     dialog,
+    config,
 ):
     reject = MagicMock()
     warning = MagicMock()
+    original = (
+        f'[database]\nfile = "{config.database_file.as_posix()}"\n'
+    )
+    config.config_file.write_text(original, encoding="utf-8")
+    from simpleob.core import config as config_module
 
-    def failing_save(config, url):
+    def failing_replace(_source, _target):
         raise OSError("Schreibzugriff verweigert")
 
-    monkeypatch.setattr(
-        module,
-        "save_database_configuration",
-        failing_save,
-    )
+    monkeypatch.setattr(config_module.os, "replace", failing_replace)
     monkeypatch.setattr(
         module.QMessageBox,
         "warning",
@@ -208,3 +209,4 @@ def test_save_error_keeps_start_dialog_open(
         warning.call_args.args[2]
     )
     reject.assert_not_called()
+    assert config.config_file.read_text(encoding="utf-8") == original

@@ -689,12 +689,19 @@ class StartDialog(QDialog):
             )
             return
 
+        if selected_url is None:
+            selected_database = f"SQLite-Datei {self._config.database_file}"
+        else:
+            database_url = make_url(selected_url)
+            selected_database = (
+                f"PostgreSQL-Datenbank {database_url.database or '(ohne Namen)'}"
+            )
         QMessageBox.information(
             self,
             "Datenbankwechsel",
-            "Die neue Datenbankverbindung wurde gespeichert.\n\n"
-            "SimpleOB wird jetzt beendet. "
-            "Bitte starten Sie die Anwendung erneut.",
+            f"{selected_database} wurde geprüft und die Verbindung gespeichert.\n\n"
+            "SimpleOB wird jetzt beendet. Ein Neustart aktiviert die neue "
+            "Datenbankverbindung.",
         )
 
         self.reject()

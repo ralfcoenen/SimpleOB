@@ -1058,3 +1058,38 @@ def test_save_database_configuration_rejects_password(
         )
 
     assert not config_file.exists()
+
+
+def test_failed_atomic_database_configuration_save_preserves_existing_file(
+    tmp_path, monkeypatch
+) -> None:
+    import pytest
+
+    from simpleob.core import config as config_module
+    from simpleob.core.config import ApplicationConfig, save_database_configuration
+
+    config_file = tmp_path / "config.toml"
+    original = (
+        '[application]\ndata_dir = "/tmp/original-data"\n'
+        '\n[database]\nfile = "/tmp/original.db"\n'
+    )
+    config_file.write_text(original, encoding="utf-8")
+    config = ApplicationConfig(
+        data_dir=tmp_path,
+        database_file=tmp_path / "original.db",
+        taxonomy_dir=tmp_path / "taxonomy",
+        config_file=config_file,
+    )
+
+    def fail_replace(_source, _target):
+        raise OSError("simulated replace failure")
+
+    monkeypatch.setattr(config_module.os, "replace", fail_replace)
+    with pytest.raises(OSError, match="simulated replace failure"):
+        save_database_configuration(
+            config,
+            "postgresql+psycopg://operator@localhost/books",
+        )
+
+    assert config_file.read_text(encoding="utf-8") == original
+    assert not tuple(tmp_path.glob(".config.toml.*.tmp"))

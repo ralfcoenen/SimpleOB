@@ -25,7 +25,6 @@ from simpleob.database.connection_credentials import (
     PostgreSQLCredentials,
 )
 from simpleob.database.migration_service import (
-    DatabaseMigrationService,
     PostgreSQLSchemaStatus,
 )
 from simpleob.database.postgresql_existing_installation_inspector import (
@@ -40,6 +39,9 @@ from simpleob.database.postgresql_role_separation_service import (
 )
 from simpleob.ui_qt.postgresql_password_dialog import (
     PostgreSQLPasswordDialog,
+)
+from simpleob.ui_qt.postgresql_startup_upgrade import (
+    prepare_postgresql_candidate,
 )
 
 
@@ -61,6 +63,8 @@ class DatabaseConfigurationDialog(QDialog):
 
         self._checked_database_url: str | None = None
         self._checked_credentials: PostgreSQLCredentials | None = None
+        self._candidate_prepared = False
+        self._preparation_status: str | None = None
 
         self.setWindowTitle(
             "SimpleOB – Datenbank konfigurieren"
@@ -77,6 +81,11 @@ class DatabaseConfigurationDialog(QDialog):
         """Liefert die erfolgreich geprüften PostgreSQL-Zugangsdaten."""
 
         return self._checked_credentials
+
+    @property
+    def candidate_prepared(self) -> bool:
+        """Gibt an, ob die ausgewählte PostgreSQL-Datenbank vorbereitet ist."""
+        return self._candidate_prepared
 
     def _create_ui(self) -> None:
         layout = QVBoxLayout(self)
@@ -211,6 +220,8 @@ class DatabaseConfigurationDialog(QDialog):
     def _invalidate_connection_check(self) -> None:
         self._checked_database_url = None
         self._checked_credentials = None
+        self._candidate_prepared = False
+        self._preparation_status = None
         self._status_label.clear()
 
     def _update_fields(self) -> None:
@@ -303,27 +314,32 @@ class DatabaseConfigurationDialog(QDialog):
             database_url_override=database_url,
         )
 
-        migration_service = DatabaseMigrationService(
-            application_config=test_config,
-            credentials=credentials,
-        )
+        self._checked_credentials = credentials
         try:
-            migration_service.check_ready_for_start()
-        except Exception:
-            # Eine bekannte ältere Datenbank darf ausgewählt werden. Der
-            # Startablauf hält den Betrieb bis zum bestätigten Upgrade gesperrt.
-            inspection = migration_service.inspect_postgresql_schema()
-            if inspection.status != PostgreSQLSchemaStatus.OUTDATED:
-                raise
+            preparation = prepare_postgresql_candidate(test_config, credentials)
+        except Exception as exc:
+            self._checked_credentials = None
+            detail = str(exc)
+            if credentials.password:
+                detail = detail.replace(credentials.password, "[entfernt]")
+            raise RuntimeError(detail) from None
+        if preparation not in {"ready", "upgraded"}:
+            self._checked_credentials = None
+            raise RuntimeError(
+                "Die PostgreSQL-Datenbank wurde nicht vorbereitet. "
+                "Wählen Sie eine andere Datenbank oder bestätigen Sie das Upgrade."
+            )
 
         self._checked_database_url = database_url
         self._checked_credentials = credentials
+        self._candidate_prepared = True
+        self._preparation_status = preparation
 
         return database_url
 
     def _test_connection(self) -> None:
         try:
-            self._check_connection()
+            database_url = self._check_connection()
         except Exception as exc:
             self._status_label.setText(
                 "Verbindungsprüfung fehlgeschlagen."
@@ -331,13 +347,24 @@ class DatabaseConfigurationDialog(QDialog):
             QMessageBox.warning(
                 self,
                 "Datenbankverbindung",
-                str(exc),
+                self._safe_error_text(exc),
             )
             return
 
-        self._status_label.setText(
-            "Datenbankprüfung erfolgreich."
-        )
+        if database_url is None:
+            self._status_label.setText(
+                f"SQLite-Datei ausgewählt: {self._config.database_file}. "
+                "Sie wird beim Programmstart geprüft."
+            )
+            return
+
+        url = make_url(database_url)
+        database_name = url.database or "PostgreSQL"
+        if self._preparation_status == "upgraded":
+            status = "Das administrative Upgrade wurde erfolgreich geprüft."
+        else:
+            status = "Die Datenbank ist aktuell und betriebsbereit."
+        self._status_label.setText(f"{database_name}: {status}")
 
     def _initialize_postgresql_database(self) -> None:
         try:
@@ -346,7 +373,7 @@ class DatabaseConfigurationDialog(QDialog):
             QMessageBox.warning(
                 self,
                 "PostgreSQL-Ersteinrichtung",
-                str(exc),
+                self._safe_error_text(exc),
             )
             return
 
@@ -728,7 +755,7 @@ class DatabaseConfigurationDialog(QDialog):
             QMessageBox.warning(
                 self,
                 "Datenbankverbindung",
-                str(exc),
+                self._safe_error_text(exc),
             )
             return
 
@@ -754,3 +781,10 @@ class DatabaseConfigurationDialog(QDialog):
         return PostgreSQLCredentials(
             password=dialog.password,
         )
+
+    def _safe_error_text(self, error: Exception) -> str:
+        detail = str(error)
+        credentials = self._checked_credentials
+        if credentials is not None and credentials.password:
+            detail = detail.replace(credentials.password, "[entfernt]")
+        return detail

@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import stat
 import sys
+import tempfile
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
@@ -852,10 +853,29 @@ def save_database_configuration(
         exist_ok=True,
     )
 
-    config_file.write_text(
-        "\n".join(lines) + "\n",
-        encoding="utf-8",
+    rendered = "\n".join(lines) + "\n"
+    existing_mode = (
+        stat.S_IMODE(config_file.stat().st_mode)
+        if config_file.is_file()
+        else 0o600
     )
+    temporary_path: Path | None = None
+    try:
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=f".{config_file.name}.",
+            suffix=".tmp",
+            dir=config_file.parent,
+        )
+        temporary_path = Path(temporary_name)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as temporary_file:
+            temporary_file.write(rendered)
+            temporary_file.flush()
+            os.fsync(temporary_file.fileno())
+        temporary_path.chmod(existing_mode)
+        os.replace(temporary_path, config_file)
+    finally:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
 
 def prepare_application_data_directories(
     config: ApplicationConfig,

@@ -53,7 +53,6 @@ from simpleob.database.fixed_asset_movement_repository import (
 from simpleob.database.fixed_asset_repository import FixedAssetRepository
 from simpleob.database.migration_service import (
     DatabaseMigrationService,
-    PostgreSQLSchemaStatus,
 )
 from simpleob.database.person_account_repository import PersonAccountRepository
 from simpleob.database.profit_appropriation_annual_data_repository import (
@@ -150,6 +149,9 @@ from simpleob.ui_qt.eric_privacy_dialog import EricPrivacyDialog
 from simpleob.ui_qt.main_window import MainWindow
 from simpleob.ui_qt.postgresql_password_dialog import (
     PostgreSQLPasswordDialog,
+)
+from simpleob.ui_qt.postgresql_startup_upgrade import (
+    prepare_postgresql_candidate,
 )
 from simpleob.ui_qt.start_dialog import StartDialog
 
@@ -418,34 +420,21 @@ def _prepare_database_connection(
         candidate: ApplicationConfig,
         credentials: PostgreSQLCredentials | None,
     ) -> None:
-        migration_service = DatabaseMigrationService(
-            application_config=candidate,
-            credentials=credentials,
-        )
-
         if is_postgresql(candidate):
-            try:
-                migration_service.check_ready_for_start()
-            except Exception as exc:
-                if _is_postgresql_authentication_error(exc):
-                    raise
-                inspection = migration_service.inspect_postgresql_schema()
-                if inspection.status == PostgreSQLSchemaStatus.CURRENT:
-                    raise
-                from simpleob.ui_qt.postgresql_startup_upgrade import (
-                    offer_postgresql_upgrade,
+            action = prepare_postgresql_candidate(candidate, credentials)
+            if action == "cancel":
+                raise _DatabaseStartupCancelled from None
+            if action == "change":
+                raise _DatabaseConnectionChangeRequested from None
+            if action not in {"ready", "upgraded"}:
+                raise RuntimeError(
+                    "Die PostgreSQL-Datenbank wurde nicht betriebsbereit geprüft."
                 )
-
-                action = offer_postgresql_upgrade(candidate, credentials, inspection)
-                if action == "cancel":
-                    raise _DatabaseStartupCancelled from None
-                if action != "ready":
-                    raise _DatabaseConnectionChangeRequested from None
-                # Neue Betriebsverbindung; keine Startfreigabe allein aufgrund
-                # eines erfolgreichen administrativen Rückgabewerts.
-                migration_service.check_ready_for_start()
         else:
-            migration_service.upgrade_to_head()
+            DatabaseMigrationService(
+                application_config=candidate,
+                credentials=credentials,
+            ).upgrade_to_head()
 
     requires_database_selection = configuration_notice is not None
     credentials = (
@@ -524,6 +513,7 @@ def _prepare_database_connection(
         )
 
         candidate_credentials = dialog.checked_credentials
+        candidate_prepared = bool(getattr(dialog, "candidate_prepared", False))
 
         if is_postgresql(candidate) and candidate_credentials is None:
             return None
@@ -533,6 +523,22 @@ def _prepare_database_connection(
         pending_configuration = True
         requires_database_selection = False
         configuration_notice = None
+        if candidate_prepared:
+            try:
+                save_database_configuration(
+                    original_config,
+                    config.database_url_override,
+                )
+            except (OSError, ValueError) as exc:
+                QMessageBox.warning(
+                    None,
+                    "Datenbankkonfiguration",
+                    "Die geprüfte Datenbank wurde nicht aktiviert, weil die "
+                    "Konfiguration nicht gespeichert werden konnte. Die bisherige "
+                    f"Konfiguration bleibt ausgewählt.\n\n{exc}",
+                )
+                return None
+            return config, credentials
 
 
 def main() -> None:

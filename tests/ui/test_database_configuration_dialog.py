@@ -151,8 +151,9 @@ def test_postgresql_connection_is_checked(
         ) as request_credentials,
         patch(
             "simpleob.ui_qt.database_configuration_dialog."
-            "DatabaseMigrationService"
-        ) as migration_service,
+            "prepare_postgresql_candidate",
+            return_value="ready",
+        ) as prepare_candidate,
     ):
         database_url = dialog._check_connection()
 
@@ -161,9 +162,70 @@ def test_postgresql_connection_is_checked(
         "testuser@localhost:5432/testdatabase"
     )
 
-    migration_service.return_value.check_ready_for_start.assert_called_once()
     request_credentials.assert_called_once_with(database_url)
-    assert migration_service.call_args.kwargs["credentials"] is credentials
+    prepare_candidate.assert_called_once()
+    assert prepare_candidate.call_args.args[1] is credentials
+    assert dialog.candidate_prepared is True
+
+
+def test_postgresql_candidate_is_upgraded_during_database_switch_without_restart(
+    app, config: ApplicationConfig, monkeypatch
+):
+    dialog = DatabaseConfigurationDialog(config=config)
+    dialog._backend_box.setCurrentIndex(1)
+    dialog._host_edit.setText("localhost")
+    dialog._port_edit.setText("5432")
+    dialog._user_edit.setText("operator")
+    dialog._database_edit.setText("books")
+    credentials = PostgreSQLCredentials("runtime-secret")
+    preparations = []
+    monkeypatch.setattr(
+        dialog, "_request_credentials", lambda _url: credentials
+    )
+    monkeypatch.setattr(
+        "simpleob.ui_qt.database_configuration_dialog.prepare_postgresql_candidate",
+        lambda candidate, access: preparations.append((candidate.database_url, access))
+        or "upgraded",
+    )
+
+    dialog._accept_configuration()
+
+    assert dialog.result() == QDialog.DialogCode.Accepted
+    assert dialog.selected_database_url == (
+        "postgresql+psycopg://operator@localhost:5432/books"
+    )
+    assert dialog.candidate_prepared
+    assert preparations == [(dialog.selected_database_url, credentials)]
+
+
+def test_cancelled_postgresql_upgrade_keeps_sqlite_candidate_and_file_untouched(
+    app, config: ApplicationConfig, monkeypatch
+):
+    config.database_file.write_bytes(b"original SQLite contents")
+    dialog = DatabaseConfigurationDialog(config=config)
+    dialog._backend_box.setCurrentIndex(1)
+    dialog._host_edit.setText("localhost")
+    dialog._port_edit.setText("5432")
+    dialog._user_edit.setText("operator")
+    dialog._database_edit.setText("books")
+    credentials = PostgreSQLCredentials("runtime-secret")
+    monkeypatch.setattr(dialog, "_request_credentials", lambda _url: credentials)
+    monkeypatch.setattr(
+        "simpleob.ui_qt.database_configuration_dialog.prepare_postgresql_candidate",
+        lambda *_: "cancel",
+    )
+    monkeypatch.setattr(
+        "simpleob.ui_qt.database_configuration_dialog.QMessageBox.warning",
+        lambda *_args: None,
+    )
+
+    dialog._accept_configuration()
+
+    assert dialog.result() == QDialog.DialogCode.Rejected
+    assert dialog.selected_database_url is None
+    assert dialog.checked_credentials is None
+    assert config.database_file.read_bytes() == b"original SQLite contents"
+    assert not config.config_file.exists()
 
 
 def test_initialization_uses_separate_runtime_and_migration_roles(
@@ -360,15 +422,22 @@ def test_old_connection_can_be_selected_only_for_known_revision(app, config, sta
     with (
         patch.object(dialog, "_selected_url", return_value=url),
         patch.object(dialog, "_request_credentials", return_value=credentials),
-        patch("simpleob.ui_qt.database_configuration_dialog.DatabaseMigrationService") as service,
+        patch(
+            "simpleob.ui_qt.database_configuration_dialog.prepare_postgresql_candidate",
+            return_value=("upgraded" if status == PostgreSQLSchemaStatus.OUTDATED else None),
+            side_effect=(
+                None
+                if status == PostgreSQLSchemaStatus.OUTDATED
+                else RuntimeError("unknown schema")
+            ),
+        ) as prepare_candidate,
     ):
-        service.return_value.check_ready_for_start.side_effect = RuntimeError("outdated")
-        service.return_value.inspect_postgresql_schema.return_value = SimpleNamespace(status=status)
         if status == PostgreSQLSchemaStatus.OUTDATED:
             assert dialog._check_connection() == url
             assert dialog.checked_credentials is credentials
+            assert dialog.candidate_prepared
         else:
             with pytest.raises(RuntimeError):
                 dialog._check_connection()
             assert dialog.checked_credentials is None
-        service.return_value.upgrade_to_head.assert_not_called()
+        prepare_candidate.assert_called_once()

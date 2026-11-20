@@ -141,6 +141,7 @@ def test_invalid_database_url_recovery_preserves_other_settings(
             assert "ungültig" in configuration_notice
             self.selected_database_url = selected_url
             self.checked_credentials = credentials
+            self.candidate_prepared = True
 
         def exec(self):
             return QDialog.DialogCode.Accepted
@@ -299,7 +300,6 @@ def test_postgresql_start_uses_read_only_check(
     credentials = PostgreSQLCredentials(
         password="test-secret"
     )
-    migration = MagicMock()
     received_credentials = []
 
     monkeypatch.setattr(
@@ -308,27 +308,22 @@ def test_postgresql_start_uses_read_only_check(
         lambda candidate: credentials,
     )
 
-    def create_migration_service(
-        *,
-        application_config,
-        credentials=None,
-    ):
+    def prepare_candidate(application_config, candidate_credentials):
         assert application_config is config
+        assert candidate_credentials is credentials
         received_credentials.append(credentials)
-        return migration
+        return "ready"
 
     monkeypatch.setattr(
         qt_main,
-        "DatabaseMigrationService",
-        create_migration_service,
+        "prepare_postgresql_candidate",
+        prepare_candidate,
     )
 
     result = qt_main._prepare_database_connection(config)
 
     assert result == (config, credentials)
     assert received_credentials == [credentials]
-    migration.check_ready_for_start.assert_called_once()
-    migration.upgrade_to_head.assert_not_called()
 
 
 def test_postgresql_password_dialog_cancelled(
@@ -343,24 +338,15 @@ def test_postgresql_password_dialog_cancelled(
         ),
     )
 
-    migration = MagicMock()
-
     monkeypatch.setattr(
         qt_main,
         "_request_postgresql_credentials",
         lambda candidate: None,
     )
-    monkeypatch.setattr(
-        qt_main,
-        "DatabaseMigrationService",
-        lambda **kwargs: migration,
-    )
 
     result = qt_main._prepare_database_connection(config)
 
     assert result is None
-    migration.check_ready_for_start.assert_not_called()
-    migration.upgrade_to_head.assert_not_called()
 
 
 def test_failed_connection_can_be_cancelled(
@@ -437,6 +423,7 @@ def test_corrected_connection_is_saved_after_check(
     class FakeDialog:
         selected_database_url = postgres_url
         checked_credentials = credentials
+        candidate_prepared = True
 
         def __init__(self, *, config, configuration_notice=None):
             pass
@@ -444,11 +431,7 @@ def test_corrected_connection_is_saved_after_check(
         def exec(self):
             return QDialog.DialogCode.Accepted
 
-    monkeypatch.setattr(
-        qt_main,
-        "DatabaseMigrationService",
-        FakeMigrationService,
-    )
+    monkeypatch.setattr(qt_main, "DatabaseMigrationService", FakeMigrationService)
     monkeypatch.setattr(
         qt_main,
         "DatabaseConfigurationDialog",
@@ -474,8 +457,8 @@ def test_corrected_connection_is_saved_after_check(
 
     result = qt_main._prepare_database_connection(config)
 
-    assert checked_urls == [postgres_url]
-    assert received_credentials == [credentials]
+    assert checked_urls == []
+    assert received_credentials == []
     assert saved_urls == [postgres_url]
 
     assert result is not None
@@ -483,6 +466,98 @@ def test_corrected_connection_is_saved_after_check(
 
     assert selected_config.database_url == postgres_url
     assert selected_credentials is credentials
+
+
+def test_prepared_postgresql_candidate_is_saved_then_rechecked_on_next_start(
+    monkeypatch, config
+):
+    postgres_url = "postgresql+psycopg://operator@localhost/books"
+    credentials = PostgreSQLCredentials("runtime-only")
+
+    class PreparedDialog:
+        selected_database_url = postgres_url
+        checked_credentials = credentials
+        candidate_prepared = True
+
+        def __init__(self, **_kwargs):
+            pass
+
+        def exec(self):
+            return QDialog.DialogCode.Accepted
+
+    monkeypatch.setattr(qt_main, "DatabaseConfigurationDialog", PreparedDialog)
+    first = qt_main._prepare_database_connection(
+        config,
+        configuration_notice="Datenbankauswahl erforderlich",
+    )
+    assert first is not None
+    selected_config, selected_credentials = first
+    assert selected_config.database_url == postgres_url
+    assert selected_credentials is credentials
+
+    reloaded = load_config(config.config_file, defaults=config)
+    assert reloaded.database_url == postgres_url
+    second_start_checks = []
+    monkeypatch.setattr(
+        qt_main,
+        "_request_postgresql_credentials",
+        lambda _candidate: credentials,
+    )
+    monkeypatch.setattr(
+        qt_main,
+        "prepare_postgresql_candidate",
+        lambda candidate, access: second_start_checks.append(
+            (candidate.database_url, access)
+        )
+        or "ready",
+    )
+
+    second = qt_main._prepare_database_connection(reloaded)
+
+    assert second == (reloaded, credentials)
+    assert second_start_checks == [(postgres_url, credentials)]
+    assert "runtime-only" not in config.config_file.read_text(encoding="utf-8")
+
+
+def test_save_failure_after_candidate_preparation_preserves_old_database(
+    monkeypatch, config
+):
+    postgres_url = "postgresql+psycopg://operator@localhost/books"
+    credentials = PostgreSQLCredentials("runtime-only")
+    original = f'[database]\nfile = "{config.database_file.as_posix()}"\n'
+    config.config_file.write_text(original, encoding="utf-8")
+
+    class PreparedDialog:
+        selected_database_url = postgres_url
+        checked_credentials = credentials
+        candidate_prepared = True
+
+        def __init__(self, **_kwargs):
+            pass
+
+        def exec(self):
+            return QDialog.DialogCode.Accepted
+
+    monkeypatch.setattr(qt_main, "DatabaseConfigurationDialog", PreparedDialog)
+    monkeypatch.setattr(qt_main.QMessageBox, "warning", lambda *_args: None)
+    from simpleob.core import config as config_module
+
+    monkeypatch.setattr(
+        config_module.os,
+        "replace",
+        lambda *_: (_ for _ in ()).throw(OSError("replace failed")),
+    )
+
+    result = qt_main._prepare_database_connection(
+        config, configuration_notice="Datenbankauswahl erforderlich"
+    )
+
+    assert result is None
+    assert config.config_file.read_text(encoding="utf-8") == original
+    assert "postgresql" not in config.config_file.read_text(encoding="utf-8")
+    assert "runtime-only" not in config.config_file.read_text(encoding="utf-8")
+    reloaded = load_config(config.config_file, defaults=config)
+    assert reloaded.database_url.startswith("sqlite:")
 
 
 def test_postgresql_wrong_password_can_be_retried(
@@ -519,30 +594,11 @@ def test_postgresql_wrong_password_can_be_retried(
     class InvalidPasswordError(Exception):
         sqlstate = "28P01"
 
-    class FakeMigrationService:
-        def __init__(
-            self,
-            *,
-            application_config,
-            credentials=None,
-        ):
-            self.credentials = credentials
-
-        def check_ready_for_start(self):
-            received_credentials.append(
-                self.credentials
-            )
-
-            if self.credentials is wrong_credentials:
-                raise InvalidPasswordError(
-                    "password authentication failed"
-                )
-
-        def upgrade_to_head(self):
-            raise AssertionError(
-                "PostgreSQL darf keine automatische "
-                "Migration ausführen."
-            )
+    def prepare_candidate(candidate, credentials):
+        received_credentials.append(credentials)
+        if credentials is wrong_credentials:
+            raise InvalidPasswordError("password authentication failed")
+        return "ready"
 
     def answer_question(
         parent,
@@ -554,11 +610,7 @@ def test_postgresql_wrong_password_can_be_retried(
         questions.append((title, message))
         return QMessageBox.StandardButton.Yes
 
-    monkeypatch.setattr(
-        qt_main,
-        "DatabaseMigrationService",
-        FakeMigrationService,
-    )
+    monkeypatch.setattr(qt_main, "prepare_postgresql_candidate", prepare_candidate)
     monkeypatch.setattr(
         qt_main.QMessageBox,
         "question",
@@ -610,29 +662,16 @@ def test_postgresql_password_error_without_sqlstate_is_recognized():
 
 @pytest.mark.parametrize("outcome", ["ready", "cancel", "change", "failed_recheck"])
 def test_outdated_postgresql_requires_upgrade_and_runtime_recheck(monkeypatch, config, outcome):
-    from simpleob.database.migration_service import (
-        PostgreSQLSchemaInspection,
-        PostgreSQLSchemaStatus,
-    )
-    from simpleob.ui_qt import postgresql_startup_upgrade
-
     config = replace(config, database_url_override="postgresql+psycopg://operator@localhost/books")
     runtime = PostgreSQLCredentials("runtime-secret")
-    migration = MagicMock()
-    migration.check_ready_for_start.side_effect = [RuntimeError("outdated"),
-        RuntimeError("still incompatible") if outcome == "failed_recheck" else None]
-    migration.inspect_postgresql_schema.return_value = PostgreSQLSchemaInspection(
-        PostgreSQLSchemaStatus.OUTDATED, "old", "head"
-    )
-    monkeypatch.setattr(qt_main, "DatabaseMigrationService", lambda **kwargs: migration)
+    action = "ready" if outcome in {"ready", "failed_recheck"} else outcome
+    if outcome == "failed_recheck":
+        action = "change"
+    monkeypatch.setattr(qt_main, "prepare_postgresql_candidate", lambda *_: action)
     monkeypatch.setattr(qt_main, "_request_postgresql_credentials", lambda config: runtime)
-    offer = MagicMock(return_value="ready" if outcome == "failed_recheck" else outcome)
-    monkeypatch.setattr(postgresql_startup_upgrade, "offer_postgresql_upgrade", offer)
     monkeypatch.setattr(qt_main.QMessageBox, "question", lambda *args: QMessageBox.StandardButton.No)
     dialog = MagicMock()
     dialog.exec.return_value = QDialog.DialogCode.Rejected
     monkeypatch.setattr(qt_main, "DatabaseConfigurationDialog", lambda **kwargs: dialog)
     result = qt_main._prepare_database_connection(config)
     assert result == ((config, runtime) if outcome == "ready" else None)
-    assert migration.check_ready_for_start.call_count == (2 if outcome in {"ready", "failed_recheck"} else 1)
-    migration.upgrade_to_head.assert_not_called()
