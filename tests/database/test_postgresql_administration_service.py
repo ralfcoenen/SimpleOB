@@ -14,6 +14,10 @@ from sqlalchemy.engine import make_url
 
 from simpleob.core.config import ApplicationConfig
 from simpleob.database.connection_credentials import PostgreSQLCredentials
+from simpleob.database.legacy_open_item_tables import (
+    LEGACY_OPEN_ITEM_TABLES,
+    OPEN_ITEM_CLEANUP_REVISION,
+)
 from simpleob.database.migration_service import (
     PostgreSQLSchemaStatus,
 )
@@ -73,6 +77,162 @@ def _service(
 ) -> PostgreSQLAdministrationService:
     config = application_config or Mock(database_url=database_url)
     return PostgreSQLAdministrationService(application_config=config, **role_access)
+
+
+def _ownership_service(tmp_path: Path) -> PostgreSQLAdministrationService:
+    config = ApplicationConfig(
+        data_dir=tmp_path,
+        database_file=tmp_path / "unused.sqlite",
+        taxonomy_dir=tmp_path,
+        config_file=tmp_path / "config.toml",
+        database_url_override=(
+            "postgresql+psycopg://simpleob_migrator@localhost:5432/unused_test_db"
+        ),
+    )
+    return PostgreSQLAdministrationService(application_config=config)
+
+
+class _OwnershipRows:
+    def __init__(self, rows):
+        self._rows = rows
+
+    def all(self):
+        return self._rows
+
+
+class _OwnershipConnection:
+    def __init__(self, rows):
+        self.rows = rows
+
+    def execute(self, _statement):
+        return _OwnershipRows(self.rows)
+
+
+def _ownership_rows(*rows):
+    return _OwnershipConnection(
+        [
+            SimpleNamespace(
+                relname=name,
+                relkind=kind,
+                owner=owner,
+                owning_table=owning_table,
+            )
+            for name, kind, owner, owning_table in rows
+        ]
+    )
+
+
+def test_pre_cleanup_revision_accepts_owned_legacy_open_item_tables(tmp_path):
+    service = _ownership_service(tmp_path)
+    connection = _ownership_rows(
+        *((name, "r", "simpleob_migrator", None) for name in LEGACY_OPEN_ITEM_TABLES)
+    )
+
+    service._verify_migration_object_ownership(
+        connection,
+        migration_role="simpleob_migrator",
+        current_revision="2f8c41d7a6b3",
+        head_revision=OPEN_ITEM_CLEANUP_REVISION,
+    )
+
+
+def test_pre_cleanup_revision_accepts_owned_sequence_of_legacy_table(tmp_path):
+    service = _ownership_service(tmp_path)
+    connection = _ownership_rows(
+        ("ausgangsrechnungen", "r", "simpleob_migrator", None),
+        (
+            "ausgangsrechnungen_id_seq",
+            "S",
+            "simpleob_migrator",
+            "ausgangsrechnungen",
+        )
+    )
+
+    service._verify_migration_object_ownership(
+        connection,
+        migration_role="simpleob_migrator",
+        current_revision="a6d18f2c94b7",
+        head_revision=OPEN_ITEM_CLEANUP_REVISION,
+    )
+
+
+@pytest.mark.parametrize(
+    "row, current_revision, message",
+    [
+        (
+            ("ausgangsrechnungen", "r", "another_owner", None),
+            "2f8c41d7a6b3",
+            "Migrationsrolle",
+        ),
+        (
+            (
+                "ausgangsrechnungen_id_seq",
+                "S",
+                "another_owner",
+                "ausgangsrechnungen",
+            ),
+            "2f8c41d7a6b3",
+            "Migrationsrolle",
+        ),
+        (
+            ("customer_custom_table", "r", "simpleob_migrator", None),
+            "2f8c41d7a6b3",
+            "unbekannte Tabellen",
+        ),
+        (
+            ("unrelated_id_seq", "S", "simpleob_migrator", "customer_custom_table"),
+            "2f8c41d7a6b3",
+            "Migrationsrolle",
+        ),
+        (
+            ("ausgangsrechnungen", "r", "simpleob_migrator", None),
+            OPEN_ITEM_CLEANUP_REVISION,
+            "unbekannte Tabellen",
+        ),
+        (
+            ("ausgangsrechnungen", "r", "simpleob_migrator", None),
+            "unknown_revision",
+            "unbekannte Tabellen",
+        ),
+    ],
+)
+def test_ownership_verification_fails_closed_for_invalid_legacy_objects(
+    tmp_path, row, current_revision, message
+):
+    service = _ownership_service(tmp_path)
+
+    with pytest.raises(RuntimeError, match=message):
+        service._verify_migration_object_ownership(
+            _ownership_rows(row),
+            migration_role="simpleob_migrator",
+            current_revision=current_revision,
+            head_revision=OPEN_ITEM_CLEANUP_REVISION,
+        )
+
+
+def test_legacy_allowlist_uses_alembic_ancestry_including_merge_history(tmp_path):
+    service = _ownership_service(tmp_path)
+
+    assert service._legacy_open_item_tables_are_present(
+        current_revision="a6d18f2c94b7",
+        head_revision=OPEN_ITEM_CLEANUP_REVISION,
+    )
+    assert service._legacy_open_item_tables_are_present(
+        current_revision="2f8c41d7a6b3",
+        head_revision=OPEN_ITEM_CLEANUP_REVISION,
+    )
+    assert not service._legacy_open_item_tables_are_present(
+        current_revision=OPEN_ITEM_CLEANUP_REVISION,
+        head_revision=OPEN_ITEM_CLEANUP_REVISION,
+    )
+    assert not service._legacy_open_item_tables_are_present(
+        current_revision="unknown_revision",
+        head_revision=OPEN_ITEM_CLEANUP_REVISION,
+    )
+    assert not service._legacy_open_item_tables_are_present(
+        current_revision="2f8c41d7a6b3",
+        head_revision="unknown_head",
+    )
 
 
 def test_administration_service_uses_explicit_credentials_for_engines(

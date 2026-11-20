@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from pathlib import Path
 
+from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import URL, make_url
 
@@ -13,6 +14,10 @@ from simpleob.database import models
 from simpleob.database.connection_credentials import (
     PostgreSQLCredentials,
     database_connect_args,
+)
+from simpleob.database.legacy_open_item_tables import (
+    LEGACY_OPEN_ITEM_TABLES,
+    is_pre_open_item_cleanup_revision,
 )
 from simpleob.database.migration_service import (
     _ADMIN_POSTGRESQL_UPGRADE_AUTHORIZATION,
@@ -301,6 +306,8 @@ class PostgreSQLAdministrationService:
         self._verify_migration_object_ownership(
             migration_connection,
             migration_role=self._migration_username,
+            current_revision=assessment.current_revision,
+            head_revision=assessment.head_revision,
         )
         runtime = next(
             (
@@ -367,6 +374,8 @@ class PostgreSQLAdministrationService:
         connection,
         *,
         migration_role: str,
+        current_revision: str | None,
+        head_revision: str,
     ) -> None:
         rows = connection.execute(
             text(
@@ -382,6 +391,11 @@ class PostgreSQLAdministrationService:
             )
         ).all()
         known_tables = set(models.Base.metadata.tables) | {"alembic_version"}
+        if self._legacy_open_item_tables_are_present(
+            current_revision=current_revision,
+            head_revision=head_revision,
+        ):
+            known_tables.update(LEGACY_OPEN_ITEM_TABLES)
         unexpected_tables = sorted(
             row.relname
             for row in rows
@@ -404,6 +418,21 @@ class PostgreSQLAdministrationService:
                 "Nicht alle Upgradeobjekte gehören der Migrationsrolle: "
                 + ", ".join(invalid_objects)
             )
+
+    def _legacy_open_item_tables_are_present(
+        self,
+        *,
+        current_revision: str | None,
+        head_revision: str | None,
+    ) -> bool:
+        """Allow only known OP tables on a verifiable pre-cleanup revision."""
+        return is_pre_open_item_cleanup_revision(
+            current_revision=current_revision,
+            head_revision=head_revision,
+            script_directory=ScriptDirectory.from_config(
+                self._migration_service._create_alembic_config()
+            ),
+        )
 
     def _validate_admin_capabilities(
         self,

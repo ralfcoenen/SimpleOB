@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import pytest
 from alembic import command
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.engine import URL, Connection
 
 from simpleob.core.config import ApplicationConfig
@@ -22,9 +22,6 @@ from simpleob.database.migration_service import (
 from simpleob.database.postgresql_administration_service import (
     PostgreSQLAdministrationService,
 )
-from simpleob.database.postgresql_initialization_service import (
-    PostgreSQLInitializationService,
-)
 from simpleob.database.postgresql_maintenance_isolation import (
     postgresql_maintenance_isolation,
 )
@@ -35,9 +32,14 @@ from simpleob.database.postgresql_migration_safety import (
 
 
 @pytest.mark.integration
-def test_initialized_database_completes_administrative_upgrade_on_isolated_postgresql(
+@pytest.mark.parametrize(
+    "starting_revision",
+    ("a6d18f2c94b7", "2f8c41d7a6b3"),
+)
+def test_historical_database_completes_administrative_upgrade_on_isolated_postgresql(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    starting_revision: str,
 ) -> None:
     binary_dir_value = os.environ.get("SIMPLEOB_POSTGRES_BIN")
     if not binary_dir_value:
@@ -131,6 +133,14 @@ def test_initialized_database_completes_administrative_upgrade_on_isolated_postg
                 "CREATE ROLE simpleob_weak_admin LOGIN "
                 "PASSWORD 'temporary-weak-admin-secret'"
             )
+            connection.exec_driver_sql(
+                'CREATE DATABASE "simpleob_customer_books" '
+                "OWNER simpleob_migrator"
+            )
+            connection.exec_driver_sql(
+                "GRANT CONNECT ON DATABASE simpleob_customer_books "
+                "TO simpleob_operator"
+            )
 
         migration_url = URL.create(
             "postgresql+psycopg",
@@ -157,20 +167,6 @@ def test_initialized_database_completes_administrative_upgrade_on_isolated_postg
             database_url_override=operating_url.render_as_string(hide_password=True),
         )
 
-        initialization = PostgreSQLInitializationService().initialize_database(
-            application_config=application_config,
-            admin_username="postgres",
-            admin_credentials=PostgreSQLCredentials(postgres_password),
-            migration_username="simpleob_migrator",
-            migration_credentials=migration_credentials,
-            application_credentials=operating_credentials,
-            confirmed=True,
-        )
-        assert initialization.initialized
-        assert initialization.database_name == "simpleob_customer_books"
-        assert initialization.owner_role == "simpleob_migrator"
-        assert initialization.operating_role == "simpleob_operator"
-
         migration_service = DatabaseMigrationService(
             application_config=migration_config,
             credentials=migration_credentials,
@@ -182,43 +178,13 @@ def test_initialized_database_completes_administrative_upgrade_on_isolated_postg
         )
         engines.append(migration_engine)
         with migration_engine.connect() as connection:
-            for table_name in models.Base.metadata.tables:
-                for privilege in ("SELECT", "INSERT", "UPDATE", "DELETE"):
-                    assert connection.execute(
-                        text(
-                            "SELECT has_table_privilege(:role, :table_name, :privilege)"
-                        ),
-                        {
-                            "role": "simpleob_operator",
-                            "table_name": f'public."{table_name}"',
-                            "privilege": privilege,
-                        },
-                    ).scalar_one()
-            assert connection.execute(
-                text(
-                    "SELECT has_table_privilege('simpleob_operator', "
-                    "'public.alembic_version', 'SELECT')"
-                )
-            ).scalar_one()
-            assert not any(
-                connection.execute(
-                    text(
-                        "SELECT has_table_privilege('simpleob_operator', "
-                        "'public.alembic_version', :privilege)"
-                    ),
-                    {"privilege": privilege},
-                ).scalar_one()
-                for privilege in ("INSERT", "UPDATE", "DELETE")
-            )
-
-            # Nach erfolgreicher Erstinitialisierung wird derselbe temporäre
-            # Mandant auf einen bekannten älteren Revisionsstand gesetzt.
-            # Das Upgrade selbst läuft unten ausschließlich administrativ.
             alembic_config = migration_service._create_alembic_config()
             alembic_config.attributes["connection"] = connection
-            connection.rollback()
-            with connection.begin():
-                command.downgrade(alembic_config, "a6d18f2c94b7")
+            command.upgrade(alembic_config, starting_revision)
+            _seed_historical_upgrade_data(connection)
+            _grant_historical_runtime_access(connection)
+            connection.commit()
+            before_upgrade = _snapshot_historical_upgrade_data(connection)
         migration_engine.dispose()
         engines.remove(migration_engine)
         approval = PostgreSQLMigrationApproval(
@@ -273,7 +239,8 @@ def test_initialized_database_completes_administrative_upgrade_on_isolated_postg
         assert not (tmp_path / "unknown-revision.dump").exists()
         with migration_engine.connect() as connection:
             connection.execute(
-                text("UPDATE alembic_version SET version_num = 'a6d18f2c94b7'")
+                text("UPDATE alembic_version SET version_num = :revision"),
+                {"revision": starting_revision},
             )
             connection.commit()
         migration_engine.dispose()
@@ -464,6 +431,30 @@ def test_initialized_database_completes_administrative_upgrade_on_isolated_postg
             migration_check.inspect_postgresql_schema().status
             == PostgreSQLSchemaStatus.CURRENT
         )
+        with migration_engine.connect() as connection:
+            after_upgrade = _snapshot_historical_upgrade_data(connection)
+            assert after_upgrade == before_upgrade
+            assert not (
+                {
+                    "zahlungszuordnungskorrekturereignisse",
+                    "zahlungszuordnungskorrekturen",
+                    "rechnungs_op_zahlungsereignisse",
+                    "rechnungs_op_verrechnungsereignisse",
+                    "guthaben_op_ereignisse",
+                    "guthaben_op_rueckerstattungsruecknahmen",
+                    "guthaben_op_rueckerstattungen",
+                    "op_guthabenverrechnungen",
+                    "zahlungen",
+                    "guthaben_ops",
+                    "rechnungs_op_stornos",
+                    "forderungs_ops",
+                    "verbindlichkeits_ops",
+                    "gutschriften",
+                    "ausgangsrechnungen",
+                    "eingangsrechnungen",
+                }
+                & set(inspect(connection).get_table_names())
+            )
         with bootstrap_engine.connect() as connection:
             assert connection.execute(
                 text(
@@ -537,3 +528,160 @@ def test_initialized_database_completes_administrative_upgrade_on_isolated_postg
             password_file.unlink(missing_ok=True)
             (tmp_path / "server.log").unlink(missing_ok=True)
             backup_path.unlink(missing_ok=True)
+
+
+def _seed_historical_upgrade_data(connection: Connection) -> None:
+    """Seed only rows whose tables exist at the selected historical revision."""
+    inspector = inspect(connection)
+
+    def insert(table: str, values: dict[str, object]) -> int | None:
+        columns = {column["name"] for column in inspector.get_columns(table)}
+        selected = {key: value for key, value in values.items() if key in columns}
+        names = tuple(selected)
+        quoted_names = ", ".join('"' + name + '"' for name in names)
+        parameters = ", ".join(f":{name}" for name in names)
+        statement = text(
+            f'INSERT INTO public."{table}" '
+            f"({quoted_names}) VALUES ({parameters}) RETURNING id"
+        )
+        return connection.execute(statement, selected).scalar_one()
+
+    mandant_id = insert(
+        "mandanten",
+        {
+            "company_id": "isolated-upgrade-company",
+            "name": "Upgrade-Testmandant",
+            "kr_verzicht": False,
+        },
+    )
+    partner_id = "00000000-0000-4000-8000-000000000001"
+    insert(
+        "geschaeftspartner",
+        {
+            "partner_id": partner_id,
+            "mandant_id": mandant_id,
+            "name": "Upgrade-Testpartner",
+            "is_customer": True,
+            "is_supplier": False,
+            "is_active": True,
+        },
+    )
+    insert(
+        "wirtschaftsjahre",
+        {
+            "mandant_id": mandant_id,
+            "start_date": "2026-01-01",
+            "end_date": "2026-12-31",
+            "status": "OPEN",
+        },
+    )
+    insert(
+        "konten",
+        {
+            "mandant_id": mandant_id,
+            "account_number": "10000",
+            "name": "Upgrade-Testdebitor",
+            "account_type": "ASSET",
+            "is_active": True,
+        },
+    )
+    if inspector.has_table("personenkonto_zuordnungen"):
+        connection.execute(
+            text(
+                "INSERT INTO public.personenkonto_zuordnungen "
+                "(mandant_id, account_number, partner_id, role) "
+                "VALUES (:mandant_id, '10000', :partner_id, 'DEBITOR')"
+            ),
+            {"mandant_id": mandant_id, "partner_id": partner_id},
+        )
+    year_id = connection.execute(
+        text(
+            "SELECT id FROM public.wirtschaftsjahre "
+            "WHERE mandant_id = :mandant_id"
+        ),
+        {"mandant_id": mandant_id},
+    ).scalar_one()
+    booking_id = "00000000-0000-4000-8000-000000000002"
+    booking_row_id = insert(
+        "buchungen",
+        {
+            "booking_id": booking_id,
+            "wirtschaftsjahr_id": year_id,
+            "booking_date": "2026-02-01",
+            "voucher_no": "UPGRADE-1",
+            "description": "Historische Hauptbuchbuchung",
+            "booking_type": "REGULAR",
+            "reversal_of_booking_id": None,
+        },
+    )
+    connection.execute(
+        text(
+            "INSERT INTO public.buchungszeilen "
+            "(buchung_id, position, account_number, side, amount) "
+            "VALUES (:booking_id, 1, '10000', 'DEBIT', 125.50), "
+            "(:booking_id, 2, '4000', 'CREDIT', 125.50)"
+        ),
+        {"booking_id": booking_row_id},
+    )
+
+
+def _grant_historical_runtime_access(connection: Connection) -> None:
+    connection.exec_driver_sql("GRANT USAGE ON SCHEMA public TO simpleob_operator")
+    connection.exec_driver_sql(
+        "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public "
+        "TO simpleob_operator"
+    )
+    connection.exec_driver_sql(
+        "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public "
+        "TO simpleob_operator"
+    )
+    connection.exec_driver_sql(
+        "REVOKE INSERT, UPDATE, DELETE ON public.alembic_version "
+        "FROM simpleob_operator"
+    )
+    connection.exec_driver_sql(
+        "GRANT SELECT ON public.alembic_version TO simpleob_operator"
+    )
+    connection.exec_driver_sql(
+        "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, "
+        "DELETE ON TABLES TO simpleob_operator"
+    )
+    connection.exec_driver_sql(
+        "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT "
+        "ON SEQUENCES TO simpleob_operator"
+    )
+
+
+def _snapshot_historical_upgrade_data(connection: Connection) -> tuple[object, ...]:
+    def rows(statement: str) -> tuple[tuple[object, ...], ...]:
+        return tuple(tuple(row) for row in connection.execute(text(statement)).all())
+
+    person_accounts = (
+        rows(
+            "SELECT mandant_id, account_number, partner_id, role "
+            "FROM personenkonto_zuordnungen ORDER BY id"
+        )
+        if inspect(connection).has_table("personenkonto_zuordnungen")
+        else ()
+    )
+    return (
+        rows("SELECT company_id, name FROM mandanten ORDER BY id"),
+        rows(
+            "SELECT partner_id, mandant_id, name, is_customer, is_supplier, is_active "
+            "FROM geschaeftspartner ORDER BY id"
+        ),
+        rows(
+            "SELECT mandant_id, account_number, name, account_type, is_active "
+            "FROM konten ORDER BY id"
+        ),
+        rows(
+            "SELECT booking_id, wirtschaftsjahr_id, booking_date, voucher_no, "
+            "description, booking_type, reversal_of_booking_id "
+            "FROM buchungen ORDER BY id"
+        ),
+        rows(
+            "SELECT buchung_id, position, account_number, side, amount "
+            "FROM buchungszeilen ORDER BY id"
+        ),
+        person_accounts,
+    )

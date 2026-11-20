@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
+from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Connection, make_url
 
@@ -13,6 +14,10 @@ from simpleob.database import models
 from simpleob.database.connection_credentials import (
     PostgreSQLCredentials,
     database_connect_args,
+)
+from simpleob.database.legacy_open_item_tables import (
+    LEGACY_OPEN_ITEM_TABLES,
+    is_pre_open_item_cleanup_revision,
 )
 from simpleob.database.migration_service import (
     DatabaseMigrationService,
@@ -89,27 +94,6 @@ class PostgreSQLExistingInstallationInspector:
 
     _TABLE_PRIVILEGES = ("SELECT", "INSERT", "UPDATE", "DELETE")
     _SEQUENCE_PRIVILEGES = ("USAGE", "SELECT")
-    _LEGACY_OPEN_ITEM_TABLES = frozenset(
-        {
-            "zahlungszuordnungskorrekturereignisse",
-            "zahlungszuordnungskorrekturen",
-            "rechnungs_op_zahlungsereignisse",
-            "rechnungs_op_verrechnungsereignisse",
-            "guthaben_op_ereignisse",
-            "guthaben_op_rueckerstattungsruecknahmen",
-            "guthaben_op_rueckerstattungen",
-            "op_guthabenverrechnungen",
-            "zahlungen",
-            "guthaben_ops",
-            "rechnungs_op_stornos",
-            "forderungs_ops",
-            "verbindlichkeits_ops",
-            "gutschriften",
-            "ausgangsrechnungen",
-            "eingangsrechnungen",
-        }
-    )
-
     def __init__(
         self,
         *,
@@ -184,19 +168,26 @@ class PostgreSQLExistingInstallationInspector:
             )
         ).all()
 
-        migration_inspection = DatabaseMigrationService(
+        migration_service = DatabaseMigrationService(
             application_config=self._application_config,
             credentials=self._credentials,
-        ).inspect_postgresql_schema_on_connection(connection)
+        )
+        migration_inspection = migration_service.inspect_postgresql_schema_on_connection(
+            connection
+        )
         expected_tables = set(models.Base.metadata.tables) | {"alembic_version"}
         # The removed ORM models cannot identify their PostgreSQL owners. During
         # an upgrade from an older revision, include the legacy relations so the
         # migration role is checked against the objects the DROP migration needs.
-        inspect_legacy_open_item_tables = (
-            migration_inspection.status == PostgreSQLSchemaStatus.OUTDATED
+        inspect_legacy_open_item_tables = is_pre_open_item_cleanup_revision(
+            current_revision=migration_inspection.current_revision,
+            head_revision=migration_inspection.head_revision,
+            script_directory=ScriptDirectory.from_config(
+                migration_service._create_alembic_config()
+            ),
         )
         ownership_tables = expected_tables | (
-            self._LEGACY_OPEN_ITEM_TABLES
+            LEGACY_OPEN_ITEM_TABLES
             if inspect_legacy_open_item_tables
             else set()
         )
