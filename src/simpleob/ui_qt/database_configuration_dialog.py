@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -53,8 +54,11 @@ class DatabaseConfigurationDialog(QDialog):
         *,
         config: ApplicationConfig,
         configuration_notice: str | None = None,
+        parent=None,
     ) -> None:
-        super().__init__()
+        super().__init__(parent)
+        if parent is not None:
+            self.setWindowModality(Qt.WindowModality.WindowModal)
 
         self._config = config
         self._configuration_notice = configuration_notice
@@ -316,7 +320,9 @@ class DatabaseConfigurationDialog(QDialog):
 
         self._checked_credentials = credentials
         try:
-            preparation = prepare_postgresql_candidate(test_config, credentials)
+            preparation = prepare_postgresql_candidate(
+                test_config, credentials, parent=self
+            )
         except Exception as exc:
             self._checked_credentials = None
             detail = str(exc)

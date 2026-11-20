@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QDialog,
     QFileDialog,
@@ -30,6 +31,8 @@ from simpleob.ui_qt.postgresql_password_dialog import PostgreSQLPasswordDialog
 def prepare_postgresql_candidate(
     config: ApplicationConfig,
     operating_credentials: PostgreSQLCredentials,
+    *,
+    parent=None,
 ) -> str:
     """Prüft eine PostgreSQL-Auswahl und migriert veraltete Datenbanken sofort.
 
@@ -63,11 +66,19 @@ def prepare_postgresql_candidate(
         current_revision=assessment.current_revision,
         head_revision=assessment.head_revision,
     )
-    action = offer_postgresql_upgrade(
-        config,
-        operating_credentials,
-        inspection,
-    )
+    if parent is None:
+        action = offer_postgresql_upgrade(
+            config,
+            operating_credentials,
+            inspection,
+        )
+    else:
+        action = offer_postgresql_upgrade(
+            config,
+            operating_credentials,
+            inspection,
+            parent=parent,
+        )
     if action != "ready":
         return action
 
@@ -99,11 +110,15 @@ def offer_postgresql_upgrade(
     config: ApplicationConfig,
     operating_credentials: PostgreSQLCredentials,
     inspection: PostgreSQLSchemaInspection,
+    *,
+    parent=None,
 ) -> str:
     """Liefert ready, change oder cancel; speichert keine Zugangsdaten."""
     url = make_url(config.database_url)
     database = url.database or ""
-    box = QMessageBox()
+    box = QMessageBox(parent)
+    if parent is not None:
+        box.setWindowModality(Qt.WindowModality.WindowModal)
     box.setWindowTitle("SimpleOB – PostgreSQL-Schema")
     box.setText(
         f"Datenbank: {database}\n"
@@ -132,7 +147,7 @@ def offer_postgresql_upgrade(
         return "cancel"
 
     confirmed, accepted = QInputDialog.getText(
-        None,
+        parent,
         "Schema-Upgrade bestätigen",
         f"Zieldatenbank: {database}\n"
         f"Revision {inspection.current_revision} → {inspection.head_revision}\n\n"
@@ -146,16 +161,19 @@ def offer_postgresql_upgrade(
         return "cancel"
     if confirmed != database:
         QMessageBox.warning(
-            None, "Upgrade nicht bestätigt", "Der Datenbankname stimmt nicht überein."
+            parent, "Upgrade nicht bestätigt", "Der Datenbankname stimmt nicht überein."
         )
         return "change"
 
     def request_role(label):
-        username, accepted = QInputDialog.getText(None, "PostgreSQL-Upgrade", label)
+        username, accepted = QInputDialog.getText(parent, "PostgreSQL-Upgrade", label)
         if not accepted or not username.strip():
             return None
         dialog = PostgreSQLPasswordDialog(
-            username=username.strip(), host=url.host or "", database=database
+            username=username.strip(),
+            host=url.host or "",
+            database=database,
+            parent=parent,
         )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return None
@@ -172,7 +190,7 @@ def offer_postgresql_upgrade(
     if administration is None:
         return "cancel"
     filename, _ = QFileDialog.getSaveFileName(
-        None,
+        parent,
         "Sicherung vor dem Schema-Upgrade",
         str(config.data_dir / "simpleob-vor-upgrade.dump"),
         "PostgreSQL-Sicherung (*.dump)",
@@ -208,7 +226,7 @@ def offer_postgresql_upgrade(
                     detail = detail.replace(credentials.password, "[entfernt]")
             detail = detail + "\n\n"
         QMessageBox.warning(
-            None,
+            parent,
             "PostgreSQL-Upgrade fehlgeschlagen",
             detail
             + "Das Upgrade wurde nicht erfolgreich abgeschlossen. Der Betrieb bleibt "

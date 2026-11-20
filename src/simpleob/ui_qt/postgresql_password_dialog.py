@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -24,6 +25,8 @@ class PostgreSQLPasswordDialog(QDialog):
         parent=None,
     ) -> None:
         super().__init__(parent)
+        if parent is not None:
+            self.setWindowModality(Qt.WindowModality.WindowModal)
 
         self.setWindowTitle("SimpleOB – PostgreSQL-Anmeldung")
 

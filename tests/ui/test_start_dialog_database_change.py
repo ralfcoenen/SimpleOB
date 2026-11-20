@@ -56,8 +56,9 @@ def _mock_configuration_dialog(
     class FakeConfigurationDialog:
         selected_database_url = selected_url
 
-        def __init__(self, *, config):
+        def __init__(self, *, config, parent=None):
             self.config = config
+            self.parent = parent
 
         def exec(self):
             return result
@@ -92,6 +93,27 @@ def test_cancelled_selection_does_not_save(
 
     save.assert_not_called()
     reject.assert_not_called()
+
+
+def test_database_configuration_dialog_is_owned_by_start_dialog(
+    monkeypatch,
+    dialog,
+):
+    captured = {}
+
+    class FakeConfigurationDialog:
+        selected_database_url = None
+
+        def __init__(self, *, config, parent=None):
+            captured["parent"] = parent
+
+        def exec(self):
+            return QDialog.DialogCode.Rejected
+
+    monkeypatch.setattr(module, "DatabaseConfigurationDialog", FakeConfigurationDialog)
+    dialog._change_database()
+
+    assert captured["parent"] is dialog
 
 
 def test_start_dialog_title_uses_central_application_version(

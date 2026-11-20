@@ -661,7 +661,8 @@ class StartDialog(QDialog):
         """Wechselt die Datenbank nach Prüfung und Bestätigung."""
 
         dialog = DatabaseConfigurationDialog(
-            config=self._config
+            config=self._config,
+            parent=self,
         )
 
         if dialog.exec() != QDialog.DialogCode.Accepted:

@@ -2,6 +2,7 @@
 
 from dataclasses import replace
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -20,6 +21,8 @@ from simpleob.database.postgresql_user_service import PostgreSQLUserService
 class PostgreSQLUserDialog(QDialog):
     def __init__(self, *, config, new_database, parent=None):
         super().__init__(parent)
+        if parent is not None:
+            self.setWindowModality(Qt.WindowModality.WindowModal)
         self._config = config
         self._new_database = new_database
         self.setWindowTitle(

@@ -32,6 +32,12 @@ def setup(monkeypatch, tmp_path):
         ButtonRole = QMessageBox.ButtonRole
         StandardButton = QMessageBox.StandardButton
 
+        def __init__(self, parent=None):
+            state.parent = parent
+
+        def setWindowModality(self, modality):
+            state.modality = modality
+
         def setWindowTitle(self, value):
             pass
 
@@ -100,6 +106,54 @@ def test_confirmed_upgrade_uses_runtime_and_temporary_admin_credentials(setup):
     assert approval.confirmed_database_name == "books"
     assert approval.migration_confirmed and approval.maintenance_confirmed
     assert not config.config_file.exists()
+
+
+def test_nested_upgrade_dialogs_use_the_active_configuration_dialog_as_parent(
+    setup, monkeypatch
+):
+    config, state, _, _, inspection = setup
+    parent = object()
+    input_parents = []
+    password_parents = []
+    file_parents = []
+    answers = iter([("books", True), ("migrator", True), ("admin", True)])
+
+    def get_text(owner, *args):
+        input_parents.append(owner)
+        return next(answers)
+
+    monkeypatch.setattr(ui.QInputDialog, "getText", get_text)
+    monkeypatch.setattr(
+        ui,
+        "PostgreSQLPasswordDialog",
+        lambda **kwargs: password_parents.append(kwargs["parent"])
+        or SimpleNamespace(
+            exec=lambda: QDialog.DialogCode.Accepted,
+            password="temporary-secret",
+            _password_edit=SimpleNamespace(clear=lambda: None),
+        ),
+    )
+    monkeypatch.setattr(
+        ui.QFileDialog,
+        "getSaveFileName",
+        lambda owner, *args: file_parents.append(owner)
+        or (str(config.data_dir / "backup.dump"), ""),
+    )
+
+    assert (
+        ui.offer_postgresql_upgrade(
+            config,
+            PostgreSQLCredentials("runtime-secret"),
+            inspection,
+            parent=parent,
+        )
+        == "ready"
+    )
+    assert state.parent is parent
+    assert state.modality.name == "WindowModal"
+    assert input_parents == [parent, parent, parent]
+    assert password_parents == [parent, parent]
+    assert file_parents == [parent]
 
 
 @pytest.mark.parametrize("choice", ["cancel", "change"])
@@ -272,7 +326,7 @@ def test_successful_upgrade_with_noncurrent_verification_stays_blocked(
     inspector = Mock()
     inspector.return_value.inspect.side_effect = (outdated, still_outdated)
     monkeypatch.setattr(ui, "PostgreSQLExistingInstallationInspector", inspector)
-    monkeypatch.setattr(ui, "offer_postgresql_upgrade", lambda *_: "ready")
+    monkeypatch.setattr(ui, "offer_postgresql_upgrade", lambda *_, **__: "ready")
 
     with pytest.raises(RuntimeError, match="nicht aktuell"):
         ui.prepare_postgresql_candidate(

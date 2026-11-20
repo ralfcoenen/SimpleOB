@@ -7,7 +7,8 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
-from PySide6.QtWidgets import QApplication, QDialog, QMessageBox
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QApplication, QDialog, QMessageBox, QWidget
 
 from simpleob.core.config import ApplicationConfig
 from simpleob.database.connection_credentials import PostgreSQLCredentials
@@ -21,6 +22,7 @@ from simpleob.database.postgresql_role_separation_service import (
 from simpleob.ui_qt.database_configuration_dialog import (
     DatabaseConfigurationDialog,
 )
+from simpleob.ui_qt.postgresql_password_dialog import PostgreSQLPasswordDialog
 
 
 @pytest.fixture
@@ -50,6 +52,56 @@ def test_sqlite_is_selected_by_default(
     assert dialog._backend_box.currentData() == "sqlite"
     assert not dialog._host_edit.isEnabled()
     assert dialog._selected_url() is None
+
+
+def test_parented_configuration_dialog_is_window_modal(app, config):
+    owner = QWidget()
+    dialog = DatabaseConfigurationDialog(config=config, parent=owner)
+
+    assert dialog.parentWidget() is owner
+    assert dialog.windowModality() == Qt.WindowModality.WindowModal
+
+    dialog.close()
+    owner.close()
+
+
+def test_failed_connection_warning_is_parented_to_configuration_dialog(
+    app, config, monkeypatch
+):
+    owner = QWidget()
+    dialog = DatabaseConfigurationDialog(config=config, parent=owner)
+    warning = {}
+    monkeypatch.setattr(
+        dialog,
+        "_check_connection",
+        lambda: (_ for _ in ()).throw(RuntimeError("connection failed")),
+    )
+    monkeypatch.setattr(
+        "simpleob.ui_qt.database_configuration_dialog.QMessageBox.warning",
+        lambda parent, *args: warning.setdefault("parent", parent),
+    )
+
+    dialog._accept_configuration()
+
+    assert warning["parent"] is dialog
+    assert dialog.result() == 0
+    dialog.close()
+    owner.close()
+
+
+def test_password_dialog_is_window_modal_child_of_its_owner(app):
+    owner = QWidget()
+    dialog = PostgreSQLPasswordDialog(
+        username="operator",
+        host="localhost",
+        database="books",
+        parent=owner,
+    )
+
+    assert dialog.parentWidget() is owner
+    assert dialog.windowModality() == Qt.WindowModality.WindowModal
+    dialog.close()
+    owner.close()
 
 
 @pytest.mark.parametrize("confirm", [False, True])
@@ -184,7 +236,7 @@ def test_postgresql_candidate_is_upgraded_during_database_switch_without_restart
     )
     monkeypatch.setattr(
         "simpleob.ui_qt.database_configuration_dialog.prepare_postgresql_candidate",
-        lambda candidate, access: preparations.append((candidate.database_url, access))
+        lambda candidate, access, **kwargs: preparations.append((candidate.database_url, access))
         or "upgraded",
     )
 
@@ -212,7 +264,7 @@ def test_cancelled_postgresql_upgrade_keeps_sqlite_candidate_and_file_untouched(
     monkeypatch.setattr(dialog, "_request_credentials", lambda _url: credentials)
     monkeypatch.setattr(
         "simpleob.ui_qt.database_configuration_dialog.prepare_postgresql_candidate",
-        lambda *_: "cancel",
+        lambda *_, **__: "cancel",
     )
     monkeypatch.setattr(
         "simpleob.ui_qt.database_configuration_dialog.QMessageBox.warning",
