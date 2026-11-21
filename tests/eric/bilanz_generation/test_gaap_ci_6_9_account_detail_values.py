@@ -13,6 +13,7 @@ from simpleob.domain.e_bilanz_account_detail import (
 from simpleob.eric.bilanz_generation.gaap_ci_6_9_account_detail_values import (
     GaapCi69AccountDetailValueBuilder,
 )
+from simpleob.services.e_bilanz_service import EBilanzService
 
 
 def _detail(
@@ -53,6 +54,71 @@ def test_builds_bga_value() -> None:
         (
             "bs.ass.fixAss.tan.otherEquipm.otherbga",
         ): Decimal("5000.00"),
+    }
+
+
+def test_configured_bank_liability_is_added_to_other_child_without_netting() -> None:
+    details = (
+        _detail(
+            position_code="HGB.266.PASSIVA.C.2",
+            account_number="1800",
+            account_description="Bank",
+            balance="-250.00",
+        ),
+        _detail(
+            position_code="HGB.266.AKTIVA.B.IV",
+            account_number="1810",
+            account_description="Qonto",
+            balance="5000.00",
+        ),
+        _detail(
+            position_code="HGB.266.PASSIVA.C.2",
+            account_number="1820",
+            account_description="Zweites Bankkonto",
+            balance="-125.00",
+        ),
+    )
+    concepts = EBilanzService._effective_account_taxonomy_concepts(
+        account_details=details,
+        bank_account_numbers=frozenset({"1800", "1810", "1820"}),
+        explicit_account_taxonomy_concepts=None,
+    )
+
+    values = GaapCi69AccountDetailValueBuilder.build(
+        account_details=details,
+        bank_accounts=("1800", "1810", "1820"),
+        account_taxonomy_concepts=concepts,
+    )
+
+    assert values == {
+        ("bs.eqLiab.liab.bank.other",): Decimal("375.00"),
+        ("bs.ass.currAss.cashEquiv.bank",): Decimal("5000.00"),
+    }
+
+
+def test_explicit_bank_liability_child_is_counted_once() -> None:
+    detail = _detail(
+        position_code="HGB.266.PASSIVA.C.2",
+        account_number="1800",
+        account_description="Bank",
+        balance="-250.00",
+    )
+    concepts = EBilanzService._effective_account_taxonomy_concepts(
+        account_details=(detail,),
+        bank_account_numbers=frozenset({"1800"}),
+        explicit_account_taxonomy_concepts={
+            "1800": "bs.eqLiab.liab.bank.misc",
+        },
+    )
+
+    values = GaapCi69AccountDetailValueBuilder.build(
+        account_details=(detail,),
+        bank_accounts=("1800",),
+        account_taxonomy_concepts=concepts,
+    )
+
+    assert values == {
+        ("bs.eqLiab.liab.bank.misc",): Decimal("250.00"),
     }
 
 

@@ -100,6 +100,81 @@ def test_mapped_tangible_depreciation_uses_selected_depreciation_accounts() -> N
     assert result == Decimal("833.33")
 
 
+def test_configured_bank_liabilities_get_other_taxonomy_child() -> None:
+    detail = EBilanzAccountDetail(
+        position=FinancialStatementPosition(
+            code="HGB.266.PASSIVA.C.2",
+            name="Verbindlichkeiten gegenüber Kreditinstituten",
+        ),
+        account_number="198765",
+        account_description="Freies Zahlungskonto",
+        balance=Decimal("-250.00"),
+    )
+
+    concepts = EBilanzService._effective_account_taxonomy_concepts(
+        account_details=(detail,),
+        bank_account_numbers=frozenset({"198765"}),
+        explicit_account_taxonomy_concepts=None,
+    )
+
+    assert concepts == {
+        "198765": "bs.eqLiab.liab.bank.other",
+    }
+
+
+def test_explicit_bank_liability_taxonomy_child_takes_precedence() -> None:
+    detail = EBilanzAccountDetail(
+        position=FinancialStatementPosition(
+            code="HGB.266.PASSIVA.C.2",
+            name="Verbindlichkeiten gegenüber Kreditinstituten",
+        ),
+        account_number="198765",
+        account_description="Freies Zahlungskonto",
+        balance=Decimal("-250.00"),
+    )
+
+    concepts = EBilanzService._effective_account_taxonomy_concepts(
+        account_details=(detail,),
+        bank_account_numbers=frozenset({"198765"}),
+        explicit_account_taxonomy_concepts={
+            "198765": "bs.eqLiab.liab.bank.misc",
+        },
+    )
+
+    assert concepts == {
+        "198765": "bs.eqLiab.liab.bank.misc",
+    }
+
+
+def test_bank_auto_mapping_requires_bank_role_and_liability_position() -> None:
+    liability = EBilanzAccountDetail(
+        position=FinancialStatementPosition(
+            code="HGB.266.PASSIVA.C.2",
+            name="Verbindlichkeiten gegenüber Kreditinstituten",
+        ),
+        account_number="198765",
+        account_description="Freies Zahlungskonto",
+        balance=Decimal("-250.00"),
+    )
+    asset = EBilanzAccountDetail(
+        position=FinancialStatementPosition(
+            code="HGB.266.AKTIVA.B.IV",
+            name="Kassenbestand und Guthaben bei Kreditinstituten",
+        ),
+        account_number="198766",
+        account_description="Weiteres Bankkonto",
+        balance=Decimal("5000.00"),
+    )
+
+    concepts = EBilanzService._effective_account_taxonomy_concepts(
+        account_details=(liability, asset),
+        bank_account_numbers=frozenset({"198766"}),
+        explicit_account_taxonomy_concepts=None,
+    )
+
+    assert concepts == {}
+
+
 class FakeResolver:
     """Minimaler Resolver für den E-Bilanz-Service-Test."""
 

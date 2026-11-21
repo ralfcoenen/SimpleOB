@@ -133,6 +133,9 @@ BALANCE_SHEET_ROLE = (
     "http://www.xbrl.de/taxonomies/de-gaap-ci/role/balanceSheet"
 )
 
+_BANK_LIABILITY_HGB_POSITION = "HGB.266.PASSIVA.C.2"
+_BANK_LIABILITY_OTHER_CONCEPT = "bs.eqLiab.liab.bank.other"
+
 INCOME_STATEMENT_ROLE = (
     "http://www.xbrl.de/taxonomies/de-gaap-ci/role/incomeStatement"
 )
@@ -186,6 +189,28 @@ class EBilanzService:
             ),
             Decimal("0.00"),
         )
+
+    @staticmethod
+    def _effective_account_taxonomy_concepts(
+        *,
+        account_details: tuple[EBilanzAccountDetail, ...],
+        bank_account_numbers: frozenset[str],
+        explicit_account_taxonomy_concepts: Mapping[str, str] | None,
+    ) -> dict[str, str]:
+        """Ergänzt BANK-Unterpositionen ohne manuelle Kontenzuordnung."""
+
+        concepts = dict(explicit_account_taxonomy_concepts or {})
+        for detail in account_details:
+            if (
+                detail.position.code == _BANK_LIABILITY_HGB_POSITION
+                and detail.account_number in bank_account_numbers
+            ):
+                concepts.setdefault(
+                    detail.account_number,
+                    _BANK_LIABILITY_OTHER_CONCEPT,
+                )
+
+        return concepts
 
     def account_taxonomy_choices(
         self,
@@ -602,8 +627,14 @@ class EBilanzService:
 
         effective_fact_plan = profile.fact_plan
 
-        explicit_taxonomy_concepts = (
-            account_taxonomy_concepts or {}
+        effective_account_taxonomy_concepts = (
+            self._effective_account_taxonomy_concepts(
+                account_details=account_details,
+                bank_account_numbers=account_roles.bank_accounts,
+                explicit_account_taxonomy_concepts=(
+                    account_taxonomy_concepts
+                ),
+            )
         )
 
         extended_concepts: set[str] = set()
@@ -615,7 +646,7 @@ class EBilanzService:
 
         for detail in account_details:
             target_concept_name = (
-                explicit_taxonomy_concepts.get(
+                effective_account_taxonomy_concepts.get(
                     detail.account_number
                 )
             )
@@ -779,7 +810,7 @@ class EBilanzService:
                     vat_accounts.input_tax_19,
                 ),
                 account_taxonomy_concepts=(
-                    account_taxonomy_concepts
+                    effective_account_taxonomy_concepts
                 ),
                 account_taxonomy_calculation_ancestors=(
                     account_calculation_ancestors

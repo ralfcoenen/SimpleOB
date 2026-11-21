@@ -1,6 +1,9 @@
 """Tests für die GAAP-CI-Bilanzwerte der Taxonomie 6.9."""
 
 from decimal import Decimal
+from pathlib import Path
+from xml.etree import ElementTree
+from zipfile import ZipFile
 
 import pytest
 
@@ -22,7 +25,11 @@ from simpleob.domain.balance_sheet_presentation import (
     BalanceSheetPresentation,
 )
 from simpleob.domain.chart_of_accounts_template import ChartOfAccountsTemplate
+from simpleob.domain.e_bilanz_account_detail import EBilanzAccountDetail
 from simpleob.domain.template_account import TemplateAccount
+from simpleob.eric.bilanz_generation.gaap_ci_6_9_account_detail_values import (
+    GaapCi69AccountDetailValueBuilder,
+)
 from simpleob.eric.bilanz_generation.gaap_ci_6_9_balance_sheet_values import (
     GaapCi69BalanceSheetValueBuilder,
 )
@@ -32,6 +39,7 @@ from simpleob.hgb.balance_sheet_structure import (
 from simpleob.hgb.income_statement_structure import (
     create_hgb_income_statement_structure,
 )
+from simpleob.services.e_bilanz_service import EBilanzService
 from simpleob.services.uncovered_equity_deficit_presentation_service import (
     UncoveredEquityDeficitPresentationService,
 )
@@ -148,7 +156,7 @@ def test_negative_bank_balance_maps_to_existing_bank_liability_taxonomy_fact():
         bank_account_numbers=frozenset({"198765"}),
     )
     amounts = FinancialStatementBuilder(mapper).build(
-        (AccountBalance("198765", credit=Decimal("375.00")),),
+        (AccountBalance("198765", credit=Decimal("250.00")),),
         root_positions=(assets, liabilities),
     )
     balance_sheet = BalanceSheet(
@@ -162,8 +170,87 @@ def test_negative_bank_balance_maps_to_existing_bank_liability_taxonomy_fact():
         income_statement=income_statement,
     )
 
-    assert values[("bs.eqLiab.liab.bank",)] == Decimal("375.00")
+    assert values[("bs.eqLiab.liab.bank",)] == Decimal("250.00")
     assert ("bs.ass.currAss.cashEquiv.bank",) not in values
+
+    detail = EBilanzAccountDetail(
+        position=provider.get("HGB.266.PASSIVA.C.2"),
+        account_number="198765",
+        account_description="Freies Zahlungskonto",
+        balance=Decimal("-250.00"),
+    )
+    effective_concepts = (
+        EBilanzService._effective_account_taxonomy_concepts(
+            account_details=(detail,),
+            bank_account_numbers=frozenset({"198765"}),
+            explicit_account_taxonomy_concepts=None,
+        )
+    )
+    detail_values = GaapCi69AccountDetailValueBuilder.build(
+        account_details=(detail,),
+        bank_accounts=("198765",),
+        account_taxonomy_concepts=effective_concepts,
+    )
+
+    assert detail_values[("bs.eqLiab.liab.bank.other",)] == Decimal("250.00")
+
+
+def test_bank_other_is_a_positive_calculation_child_of_bank_liabilities() -> None:
+    archive = Path(__file__).parents[3] / (
+        "german-gaap-taxonomy-v6.9-2025-04-01.zip"
+    )
+    linkbase = (
+        "german-gaap-taxonomy-v6.9-2025-04-01/"
+        "xbrl/de-gaap-ci-2025-04-01/"
+        "de-gaap-ci-2025-04-01-calculation-balanceSheet.xml"
+    )
+    namespaces = {
+        "xlink": "http://www.w3.org/1999/xlink",
+    }
+
+    with ZipFile(archive) as taxonomy_zip:
+        root = ElementTree.fromstring(taxonomy_zip.read(linkbase))
+
+    labels_to_concepts = {}
+    for locator in root.findall(".//{*}loc"):
+        href = locator.attrib[f"{{{namespaces['xlink']}}}href"]
+        label = locator.attrib[f"{{{namespaces['xlink']}}}label"]
+        concept_id = href.rsplit("#", 1)[-1]
+        labels_to_concepts[label] = concept_id.split("_", 1)[-1]
+
+    bank_parent_id = next(
+        concept_id
+        for concept_id in labels_to_concepts.values()
+        if concept_id.endswith("bs.eqLiab.liab.bank")
+    )
+    bank_other_id = next(
+        concept_id
+        for concept_id in labels_to_concepts.values()
+        if concept_id.endswith("bs.eqLiab.liab.bank.other")
+    )
+    bank_parent_label = next(
+        label
+        for label, concept_id in labels_to_concepts.items()
+        if concept_id == bank_parent_id
+    )
+    bank_other_label = next(
+        label
+        for label, concept_id in labels_to_concepts.items()
+        if concept_id == bank_other_id
+    )
+    arcs = root.findall(".//{*}calculationArc")
+    relationship = next(
+        arc
+        for arc in arcs
+        if (
+            arc.attrib[f"{{{namespaces['xlink']}}}from"]
+            == bank_parent_label
+            and arc.attrib[f"{{{namespaces['xlink']}}}to"]
+            == bank_other_label
+        )
+    )
+
+    assert relationship.attrib["weight"] == "1"
 
 
 def test_zero_amounts_are_omitted() -> None:
