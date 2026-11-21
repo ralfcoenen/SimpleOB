@@ -10,6 +10,9 @@ from sqlalchemy.orm import sessionmaker
 from simpleob.database.booking_repository import (
     BookingRepository,
 )
+from simpleob.database.chart_of_accounts_repository import (
+    ChartOfAccountsRepository,
+)
 from simpleob.database.company_repository import (
     CompanyRepository,
 )
@@ -92,6 +95,59 @@ def test_adds_and_loads_booking() -> None:
         )
 
     assert loaded_bookings == (booking,)
+
+
+def test_booking_add_locks_company_before_fiscal_year(monkeypatch) -> None:
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    session_factory = sessionmaker(bind=engine)
+    events = []
+    original_lock_company = (
+        ChartOfAccountsRepository.lock_company_for_account_reference_change
+    )
+    original_find_fiscal_year = BookingRepository._find_fiscal_year
+
+    def lock_company(repository, company_id):
+        events.append("company")
+        return original_lock_company(repository, company_id)
+
+    def find_fiscal_year(repository, **kwargs):
+        events.append("fiscal_year")
+        return original_find_fiscal_year(repository, **kwargs)
+
+    monkeypatch.setattr(
+        ChartOfAccountsRepository,
+        "lock_company_for_account_reference_change",
+        lock_company,
+    )
+    monkeypatch.setattr(BookingRepository, "_find_fiscal_year", find_fiscal_year)
+    try:
+        with session_factory() as session:
+            company = Company(company_id=uuid4(), name="Sperrtest UG")
+            fiscal_year = FiscalYear(
+                start_date=date(2026, 1, 1), end_date=date(2026, 12, 31)
+            )
+            company_repository = CompanyRepository(session)
+            company_repository.add(company)
+            company_repository.add_fiscal_year(company.company_id, fiscal_year)
+
+            booking = Booking(
+                booking_date=date(2026, 8, 8),
+                description="Sperrreihenfolge",
+                lines=(
+                    BookingLine("4980", EntrySide.DEBIT, Decimal("5.00")),
+                    BookingLine("1200", EntrySide.CREDIT, Decimal("5.00")),
+                ),
+            )
+            BookingRepository(session).add(
+                company_id=company.company_id,
+                fiscal_year=fiscal_year,
+                booking=booking,
+            )
+
+        assert events[:2] == ["company", "fiscal_year"]
+    finally:
+        engine.dispose()
 
 def test_preserves_closing_booking_type() -> None:
     """Der Buchungstyp bleibt beim Datenbank-Roundtrip erhalten."""

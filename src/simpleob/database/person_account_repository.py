@@ -113,6 +113,50 @@ class PersonAccountRepository:
             is not None
         )
 
+    def delete_account(
+        self, *, company_id: UUID, account_number: str
+    ) -> dict[str, tuple[str, ...]]:
+        """Löscht ein unbebuchtes Personenkonto transaktional.
+
+        Die vorhandene Zuordnung ist die erwartete Personenkonto-Referenz;
+        alle übrigen Abhängigkeiten prüft die generische Kontenlöschung.
+        Geschäftspartner und Rollenflags bleiben unverändert.
+        """
+        if not isinstance(company_id, UUID):
+            raise TypeError("company_id must be a UUID")
+        if not isinstance(account_number, str) or not account_number.strip():
+            raise ValueError("Eine gültige Kontonummer ist erforderlich.")
+
+        number = account_number.strip()
+        try:
+            company = self._accounts.lock_company_for_account_reference_change(
+                company_id
+            )
+            assignment = (
+                self._session.query(PersonenkontoZuordnung)
+                .filter(
+                    PersonenkontoZuordnung.mandant_id == company.id,
+                    PersonenkontoZuordnung.account_number == number,
+                )
+                .one_or_none()
+            )
+            if assignment is None:
+                raise ValueError(
+                    f"Das Personenkonto {number} ist nicht vorhanden."
+                )
+
+            # Die Zuordnung wird in derselben Transaktion entfernt. Dadurch
+            # kann delete_accounts die eigene Referenz ignorieren, während
+            # alle anderen Abhängigkeiten weiterhin sperren.
+            self._session.delete(assignment)
+            return self._accounts.delete_accounts(
+                company_id=company_id,
+                account_numbers=(number,),
+            )
+        except Exception:
+            self._session.rollback()
+            raise
+
     def create(
         self,
         *,

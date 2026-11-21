@@ -5269,6 +5269,71 @@ class MainWindow(QMainWindow):
         account_names = {
             account.number: account.name for account in self._accounts
         }
+        selected_person_accounts = tuple(
+            number
+            for number in account_numbers
+            if any(
+                account.number == number
+                and account.person_account_role is not None
+                for account in self._accounts
+            )
+        )
+        if selected_person_accounts:
+            if len(account_numbers) != 1:
+                QMessageBox.information(
+                    self,
+                    "Personenkonten löschen",
+                    "Personenkonten können nur einzeln gelöscht werden.",
+                )
+                return
+
+            number = selected_person_accounts[0]
+            answer = QMessageBox.question(
+                self,
+                "Personenkonto löschen",
+                f"Personenkonto {number} – {account_names.get(number, '')} "
+                "dauerhaft löschen? Der Geschäftspartner und seine Rollen "
+                "bleiben erhalten.",
+                QMessageBox.StandardButton.Yes
+                | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                return
+
+            try:
+                blocked = self._person_account_repository.delete_account(
+                    company_id=self._context.company.company_id,
+                    account_number=number,
+                )
+            except (RuntimeError, ValueError) as exc:
+                QMessageBox.critical(
+                    self, "Personenkonto löschen", str(exc)
+                )
+                return
+
+            if blocked:
+                reasons = ", ".join(blocked.get(number, ()))
+                QMessageBox.warning(
+                    self,
+                    "Personenkonto kann nicht gelöscht werden",
+                    f"Personenkonto {number} wurde nicht gelöscht. "
+                    "Es bestehen fachliche Abhängigkeiten: "
+                    f"{reasons}",
+                )
+                return
+
+            self._activate_account_editing_mode()
+            (
+                self._chart_of_accounts,
+                self._accounts,
+            ) = self._reload_chart_of_accounts()
+            self._account_table.clearSelection()
+            self._account_table.setCurrentCell(-1, -1)
+            self._refresh_accounts()
+            self._refresh_person_account_reports()
+            return
+
         details = []
         taxonomy_concepts_by_version = (
             self._workspace.load_all_account_taxonomy_concepts()

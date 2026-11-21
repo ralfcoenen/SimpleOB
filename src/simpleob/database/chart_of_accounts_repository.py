@@ -2023,6 +2023,24 @@ class ChartOfAccountsRepository:
 
         self._lock_company(company_id)
 
+    def lock_company_for_account_reference_change(
+        self,
+        company_id: UUID,
+    ) -> Mandant:
+        """Serialisiert Buchungen und Änderungen an Kontoreferenzen."""
+
+        company = self._lock_company(company_id)
+        if self._session.get_bind().dialect.name == "sqlite":
+            # SQLite kennt kein SELECT FOR UPDATE. Das No-op-UPDATE hält
+            # dennoch den Schreib-Lock bis zum Commit/Rollback der Session.
+            self._session.query(Mandant).filter(
+                Mandant.id == company.id
+            ).update(
+                {Mandant.id: Mandant.id},
+                synchronize_session=False,
+            )
+        return company
+
     def _lock_company(
         self,
         company_id: UUID,

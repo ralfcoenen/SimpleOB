@@ -24,12 +24,19 @@ from simpleob.database.chart_of_accounts_repository import ChartOfAccountsReposi
 from simpleob.database.company_repository import CompanyRepository
 from simpleob.database.database import Base
 from simpleob.database.models import (
+    Buchung as BuchungModel,
+)
+from simpleob.database.models import (
+    Buchungszeile,
     Geschaeftspartner,
+    KontenTaxonomieZuordnung,
     Konto,
     Mandant,
     PersonenkontoZuordnung,
+    Wirtschaftsjahr,
 )
 from simpleob.database.person_account_repository import PersonAccountRepository
+from simpleob.domain.account import Account
 from simpleob.domain.account_type import AccountType
 from simpleob.domain.booking import Booking
 from simpleob.domain.booking_line import BookingLine
@@ -43,6 +50,7 @@ from simpleob.domain.errors import InvalidPersonAccountClassificationError
 from simpleob.domain.fiscal_year import FiscalYear
 from simpleob.domain.journal import Journal
 from simpleob.domain.person_account_role import PersonAccountRole
+from simpleob.domain.template_account import TemplateAccount
 from simpleob.services.posting_service import PostingService
 from simpleob.services.reporting_service import ReportingService
 
@@ -640,3 +648,169 @@ def test_failed_creation_rolls_back_partner_and_account(database_session, monkey
     assert session.query(Geschaeftspartner).count() == 0
     assert session.query(Konto).count() == 0
     assert session.query(PersonenkontoZuordnung).count() == 0
+
+
+def test_delete_person_account_preserves_partner_other_role_and_reuses_number(
+    database_session,
+):
+    session, company = database_session
+    repository = PersonAccountRepository(session)
+    created = repository.create_many(
+        company_id=company.company_id,
+        account_numbers={
+            PersonAccountRole.DEBITOR: "10000",
+            PersonAccountRole.KREDITOR: "70000",
+        },
+        name="Doppelrolle GmbH",
+    )
+    partner_id = created[0].partner.partner_id
+    mandant_id = session.query(Mandant.id).scalar()
+    session.add(
+        KontenTaxonomieZuordnung(
+            mandant_id=mandant_id,
+            account_number="10000",
+            taxonomy_version="6.9",
+            concept_name="sample.customer",
+        )
+    )
+    # Die generische Löschung erhält mindestens ein Konto im Kontenrahmen.
+    ChartOfAccountsRepository(session).add_account(
+        company_id=company.company_id,
+        account=Account(
+            template=TemplateAccount("9000", "Eigenkapital", AccountType.EQUITY)
+        ),
+        mapping_rule=None,
+    )
+
+    assert repository.delete_account(
+        company_id=company.company_id, account_number="10000"
+    ) == {}
+
+    assert session.query(Konto).filter_by(account_number="10000").one_or_none() is None
+    assert (
+        session.query(PersonenkontoZuordnung)
+        .filter_by(account_number="10000")
+        .one_or_none()
+        is None
+    )
+    assert session.query(Konto).filter_by(account_number="70000").one_or_none()
+    assert (
+        session.query(PersonenkontoZuordnung)
+        .filter_by(account_number="70000")
+        .one_or_none()
+    )
+    partner = session.query(Geschaeftspartner).filter_by(partner_id=str(partner_id)).one()
+    assert partner.is_customer and partner.is_supplier
+    assert repository.suggest_account_number(
+        company_id=company.company_id, role=PersonAccountRole.DEBITOR
+    ) == "10000"
+    assert (
+        session.query(KontenTaxonomieZuordnung)
+        .filter_by(account_number="10000")
+        .one_or_none()
+        is None
+    )
+    assert repository.delete_account(
+        company_id=company.company_id, account_number="70000"
+    ) == {}
+    session.expire_all()
+    remaining_partner = (
+        session.query(Geschaeftspartner)
+        .filter_by(partner_id=str(partner_id))
+        .one_or_none()
+    )
+    assert remaining_partner is not None
+    assert remaining_partner.is_customer and remaining_partner.is_supplier
+    assert session.query(PersonenkontoZuordnung).count() == 0
+    assert session.query(Konto).filter_by(account_number="9000").one_or_none()
+
+
+def test_delete_person_account_is_blocked_by_zero_balance_booking_in_closed_year(
+    database_session,
+):
+    session, company = database_session
+    person_account = PersonAccountRepository(session).create(
+        company_id=company.company_id,
+        role=PersonAccountRole.DEBITOR,
+        name="Kunde",
+        account_number="10000",
+    )
+    ChartOfAccountsRepository(session).add_account(
+        company_id=company.company_id,
+        account=Account(
+            template=TemplateAccount("9000", "Eigenkapital", AccountType.EQUITY)
+        ),
+        mapping_rule=None,
+    )
+    fiscal_year = FiscalYear(
+        start_date=date(2025, 1, 1), end_date=date(2025, 12, 31)
+    )
+    CompanyRepository(session).add_fiscal_year(company.company_id, fiscal_year)
+    year_model = session.query(Wirtschaftsjahr).one()
+    year_model.status = "CLOSED"
+    session.add(
+        BuchungModel(
+            booking_id=str(uuid4()),
+            wirtschaftsjahr_id=year_model.id,
+            booking_date=date(2025, 6, 1),
+            description="Ausgeglichene Buchungszeilen",
+            booking_type="REGULAR",
+            zeilen=[
+                Buchungszeile(
+                    position=0,
+                    account_number=person_account.account_number,
+                    side="DEBIT",
+                    amount=Decimal("100.00"),
+                ),
+                Buchungszeile(
+                    position=1,
+                    account_number=person_account.account_number,
+                    side="CREDIT",
+                    amount=Decimal("100.00"),
+                ),
+            ],
+        )
+    )
+    session.commit()
+
+    blocked = PersonAccountRepository(session).delete_account(
+        company_id=company.company_id, account_number="10000"
+    )
+
+    assert "Buchungen im Geschäftsjahr 2025/2025" in blocked["10000"]
+    session.expire_all()
+    assert session.query(Konto).filter_by(account_number="10000").one_or_none()
+    assert (
+        session.query(PersonenkontoZuordnung)
+        .filter_by(account_number="10000")
+        .one_or_none()
+    )
+
+
+def test_delete_person_account_rolls_back_assignment_when_account_deletion_fails(
+    database_session, monkeypatch
+):
+    session, company = database_session
+    PersonAccountRepository(session).create(
+        company_id=company.company_id,
+        role=PersonAccountRole.DEBITOR,
+        name="Kunde",
+        account_number="10000",
+    )
+
+    def fail_delete(*_args, **_kwargs):
+        raise RuntimeError("simulierter Löschfehler")
+
+    monkeypatch.setattr(ChartOfAccountsRepository, "delete_accounts", fail_delete)
+    with pytest.raises(RuntimeError, match="simulierter Löschfehler"):
+        PersonAccountRepository(session).delete_account(
+            company_id=company.company_id, account_number="10000"
+        )
+
+    session.expire_all()
+    assert session.query(Konto).filter_by(account_number="10000").one_or_none()
+    assert (
+        session.query(PersonenkontoZuordnung)
+        .filter_by(account_number="10000")
+        .one_or_none()
+    )

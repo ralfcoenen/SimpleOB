@@ -7,6 +7,9 @@ from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
+from simpleob.database.chart_of_accounts_repository import (
+    ChartOfAccountsRepository,
+)
 from simpleob.database.lock_error import DatabaseLockError
 from simpleob.database.models import (
     Buchung,
@@ -42,6 +45,11 @@ class BookingRepository:
         commit: bool = True,
     ) -> None:
         """Speichert eine Buchung."""
+
+        # Personenkontolöschungen verwenden dieselbe transaktionale Sperre.
+        ChartOfAccountsRepository(
+            self._session
+        ).lock_company_for_account_reference_change(company_id)
 
         fiscal_year_model = self._find_fiscal_year(
             company_id=company_id,
