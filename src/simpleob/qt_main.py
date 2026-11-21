@@ -1017,6 +1017,7 @@ def main() -> None:
                     ),
                     chart_of_accounts=chart_of_accounts,
                     accounts=accounts,
+                    account_roles=account_roles,
                 )
             )
 

@@ -15,6 +15,9 @@ from simpleob.accounting.hgb_financial_statement_position_provider import (
 from simpleob.accounting.mapper import AccountMapper
 from simpleob.domain.account import Account
 from simpleob.domain.account_type import AccountType
+from simpleob.domain.accounting_account_roles import (
+    AccountingAccountRoles,
+)
 from simpleob.domain.chart_of_accounts_template import (
     ChartOfAccountsTemplate,
 )
@@ -50,11 +53,17 @@ def create_financial_statement_context(
     income_statement: FinancialStatementPosition,
     chart_of_accounts: ChartOfAccountsTemplate,
     accounts: tuple[Account, ...],
+    account_roles: AccountingAccountRoles | None = None,
 ) -> FinancialStatementContext:
     """Erzeugt einen Abschlusskontext aus einem Kontenrahmen."""
 
     account_mapper = AccountMapper(
-        chart_of_accounts
+        chart_of_accounts,
+        bank_account_numbers=(
+            account_roles.bank_accounts
+            if account_roles is not None
+            else frozenset()
+        ),
     )
 
     statement_builder = FinancialStatementBuilder(

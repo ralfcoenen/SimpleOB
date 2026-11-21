@@ -5642,6 +5642,9 @@ class MainWindow(QMainWindow):
         ) = dialog.result
 
         try:
+            self._account_mapper.validate_bank_account_numbers(
+                account_roles.bank_accounts
+            )
             self._workspace.update_account_configuration(
                 control_accounts=control_accounts,
                 vat_accounts=vat_accounts,
@@ -5655,6 +5658,10 @@ class MainWindow(QMainWindow):
             )
             return
 
+        self._account_mapper.update_bank_account_numbers(
+            account_roles.bank_accounts
+        )
+
         self._opening_balance_account_number = (
             control_accounts.opening_balance_account
         )
@@ -5667,6 +5674,9 @@ class MainWindow(QMainWindow):
             control_accounts.depreciation_expense_account
         )
         self._vat_accounts = vat_accounts
+
+        self._invalidate_built_e_bilanz()
+        self._refresh_balance_sheet()
 
         QMessageBox.information(
             self,
@@ -5738,7 +5748,7 @@ class MainWindow(QMainWindow):
 
         try:
             chart_of_accounts, accounts = self._reload_chart_of_accounts()
-            control_accounts, vat_accounts, _account_roles = (
+            control_accounts, vat_accounts, account_roles = (
                 self._workspace.load_account_configuration()
             )
             financial_context = create_financial_statement_context(
@@ -5747,6 +5757,7 @@ class MainWindow(QMainWindow):
                 income_statement=self._income_statement,
                 chart_of_accounts=chart_of_accounts,
                 accounts=accounts,
+                account_roles=account_roles,
             )
             closing_accounts = ClosingAccounts(
                 income_summary_account=(

@@ -4,13 +4,25 @@ from decimal import Decimal
 
 import pytest
 
+from simpleob.accounting.account_balance import AccountBalance
 from simpleob.accounting.balance_sheet import BalanceSheet
+from simpleob.accounting.financial_statement_builder import (
+    FinancialStatementBuilder,
+)
 from simpleob.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
+from simpleob.accounting.hgb_financial_statement_position_provider import (
+    HgbFinancialStatementPositionProvider,
+)
+from simpleob.accounting.mapper import AccountMapper
+from simpleob.domain.account_mapping_rule import AccountMappingRule
+from simpleob.domain.account_type import AccountType
 from simpleob.domain.balance_sheet_presentation import (
     BalanceSheetPresentation,
 )
+from simpleob.domain.chart_of_accounts_template import ChartOfAccountsTemplate
+from simpleob.domain.template_account import TemplateAccount
 from simpleob.eric.bilanz_generation.gaap_ci_6_9_balance_sheet_values import (
     GaapCi69BalanceSheetValueBuilder,
 )
@@ -113,6 +125,45 @@ def test_builds_gaap_ci_values_from_hgb_balance_sheet() -> None:
     assert values[
         ("bs.eqLiab.equity.netIncome",)
     ] == Decimal("5000.00")
+
+
+def test_negative_bank_balance_maps_to_existing_bank_liability_taxonomy_fact():
+    assets, liabilities = create_hgb_balance_sheet_structure()
+    income_statement = create_hgb_income_statement_structure()
+    provider = HgbFinancialStatementPositionProvider((assets, liabilities))
+    account = TemplateAccount("198765", "Freies Zahlungskonto", AccountType.ASSET)
+    chart = ChartOfAccountsTemplate(
+        "Bankkonto mit freier Nummer",
+        (account,),
+        account_mapping_rules=(
+            AccountMappingRule(
+                "198765",
+                provider.get("HGB.266.AKTIVA.B.IV"),
+                None,
+            ),
+        ),
+    )
+    mapper = AccountMapper(
+        chart,
+        bank_account_numbers=frozenset({"198765"}),
+    )
+    amounts = FinancialStatementBuilder(mapper).build(
+        (AccountBalance("198765", credit=Decimal("375.00")),),
+        root_positions=(assets, liabilities),
+    )
+    balance_sheet = BalanceSheet(
+        assets=assets,
+        liabilities=liabilities,
+        amounts=amounts,
+    )
+
+    values = GaapCi69BalanceSheetValueBuilder.build(
+        balance_sheet=balance_sheet,
+        income_statement=income_statement,
+    )
+
+    assert values[("bs.eqLiab.liab.bank",)] == Decimal("375.00")
+    assert ("bs.ass.currAss.cashEquiv.bank",) not in values
 
 
 def test_zero_amounts_are_omitted() -> None:

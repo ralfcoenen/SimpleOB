@@ -6,6 +6,9 @@ from simpleob.accounting.account_balance import AccountBalance
 from simpleob.accounting.financial_statement_position import (
     FinancialStatementPosition,
 )
+from simpleob.accounting.hgb_financial_statement_position_provider import (
+    HgbFinancialStatementPositionProvider,
+)
 from simpleob.accounting.ledger import Ledger
 from simpleob.accounting.mapper import AccountMapper
 from simpleob.domain.account import Account
@@ -14,6 +17,9 @@ from simpleob.domain.account_type import AccountType
 from simpleob.domain.chart_of_accounts_template import ChartOfAccountsTemplate
 from simpleob.domain.person_account_role import PersonAccountRole
 from simpleob.domain.template_account import TemplateAccount
+from simpleob.hgb.balance_sheet_structure import (
+    create_hgb_balance_sheet_structure,
+)
 from simpleob.services.e_bilanz_account_detail_service import (
     EBilanzAccountDetailService,
 )
@@ -136,6 +142,53 @@ def test_person_account_detail_uses_role_mapped_hgb_position():
     assert debtor_detail.account_number == "10000"
     assert debtor_detail.account_description == "Kunde Beispiel"
     assert debtor_detail.balance == Decimal("135.79")
+
+
+def test_negative_configured_bank_uses_liability_position_in_e_bilanz_detail():
+    assets, liabilities = create_hgb_balance_sheet_structure()
+    provider = HgbFinancialStatementPositionProvider((assets, liabilities))
+    ledger = Ledger()
+    ledger.post("1100", "198765", Decimal("250.00"))
+    chart = ChartOfAccountsTemplate(
+        "Bankkonto mit freier Nummer",
+        (
+            TemplateAccount("1100", "Verrechnung", AccountType.ASSET),
+            TemplateAccount("198765", "Zahlungskonto", AccountType.ASSET),
+        ),
+        account_mapping_rules=(
+            AccountMappingRule(
+                "1100",
+                provider.get("HGB.266.AKTIVA.B.IV"),
+                None,
+            ),
+            AccountMappingRule(
+                "198765",
+                provider.get("HGB.266.AKTIVA.B.IV"),
+                None,
+            ),
+        ),
+    )
+    service = EBilanzAccountDetailService(
+        account_mapper=AccountMapper(
+            chart,
+            bank_account_numbers=frozenset({"198765"}),
+        ),
+        accounts=(
+            _account("1100", "Verrechnung"),
+            _account("198765", "Zahlungskonto"),
+        ),
+    )
+
+    details = service.build_for_e_bilanz(
+        pre_closing_ledger=Ledger(),
+        closed_ledger=ledger,
+    )
+    bank_detail = next(
+        detail for detail in details if detail.account_number == "198765"
+    )
+
+    assert bank_detail.position.code == "HGB.266.PASSIVA.C.2"
+    assert bank_detail.balance == Decimal("-250.00")
 
 
 def test_rejects_missing_account_description() -> None:

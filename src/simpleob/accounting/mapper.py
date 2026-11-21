@@ -26,6 +26,8 @@ class AccountMapper:
     def __init__(
         self,
         chart_of_accounts: ChartOfAccountsTemplate,
+        *,
+        bank_account_numbers: frozenset[str] = frozenset(),
     ) -> None:
         self._chart_of_accounts = chart_of_accounts
         assets, liabilities = create_hgb_balance_sheet_structure()
@@ -40,6 +42,93 @@ class AccountMapper:
                 "HGB.266.PASSIVA.C.4"
             ),
         }
+        self._bank_account_positions = {
+            "asset": position_provider.get(
+                "HGB.266.AKTIVA.B.IV"
+            ),
+            "liability": position_provider.get(
+                "HGB.266.PASSIVA.C.2"
+            ),
+        }
+        self._bank_account_numbers = frozenset()
+        self.update_bank_account_numbers(bank_account_numbers)
+
+    @property
+    def bank_account_numbers(self) -> frozenset[str]:
+        """Liefert die für diese Bilanzberechnung konfigurierten Bankkonten."""
+
+        return self._bank_account_numbers
+
+    def validate_bank_account_numbers(
+        self,
+        account_numbers: frozenset[str],
+    ) -> None:
+        """Prüft Bankrollen und individuelle HGB-Regeln auf Konflikte."""
+
+        if not isinstance(account_numbers, frozenset):
+            raise TypeError("bank account numbers must be a frozenset")
+
+        expected_positions = {
+            "Soll": self._bank_account_positions["asset"].code,
+            "Haben": self._bank_account_positions["liability"].code,
+        }
+        for number in sorted(account_numbers):
+            if not isinstance(number, str) or not number.isdigit():
+                raise ValueError(
+                    "Bankkontonummern müssen aus Ziffern bestehen."
+                )
+
+            try:
+                account = self._chart_of_accounts.get(number)
+            except UnknownAccountError as exc:
+                raise ValueError(
+                    f"Das als Bank konfigurierte Konto {number} "
+                    "fehlt im Kontenrahmen."
+                ) from exc
+
+            if account.account_type is not AccountType.ASSET:
+                raise ValueError(
+                    f"Das als Bank konfigurierte Konto {number} muss "
+                    "ein Aktivkonto sein."
+                )
+
+            if self._chart_of_accounts.is_person_account(number):
+                raise ValueError(
+                    f"Konflikt bei Konto {number}: Das Konto ist zugleich "
+                    "als Bank- und als Personenkonto klassifiziert."
+                )
+
+            for rule in self._chart_of_accounts.account_mapping_rules:
+                if rule.account_number != number:
+                    continue
+                for side, position, expected_code in (
+                    (
+                        "Soll",
+                        rule.debit_position,
+                        expected_positions["Soll"],
+                    ),
+                    (
+                        "Haben",
+                        rule.credit_position,
+                        expected_positions["Haben"],
+                    ),
+                ):
+                    if position is not None and position.code != expected_code:
+                        raise ValueError(
+                            f"Konflikt bei Bankkonto {number}: Die "
+                            f"individuelle HGB-{side}zuordnung "
+                            f"{position.code} widerspricht der Bankregel "
+                            f"{expected_code}."
+                        )
+
+    def update_bank_account_numbers(
+        self,
+        account_numbers: frozenset[str],
+    ) -> None:
+        """Übernimmt eine validierte, aktualisierte Bankkontenrolle."""
+
+        self.validate_bank_account_numbers(account_numbers)
+        self._bank_account_numbers = account_numbers
 
     def map_balance(
         self,
@@ -65,8 +154,14 @@ class AccountMapper:
                 role=role,
             )
 
-        if self._is_reserved_person_account_number(
-            balance.account_number
+        is_bank_account = (
+            balance.account_number in self._bank_account_numbers
+        )
+        if (
+            self._is_reserved_person_account_number(
+                balance.account_number
+            )
+            and not is_bank_account
         ):
             raise InvalidPersonAccountClassificationError(
                 f"Konto {balance.account_number} liegt im reservierten "
@@ -80,6 +175,19 @@ class AccountMapper:
                 f"Konto {balance.account_number} hat einen Nullsaldo und "
                 "keine HGB-Bilanzposition."
             )
+
+        if is_bank_account:
+            position_key = (
+                "asset"
+                if balance.debit_balance > ZERO
+                else "liability"
+            )
+            amount = (
+                balance.debit_balance
+                if position_key == "asset"
+                else balance.credit_balance
+            )
+            return self._bank_account_positions[position_key], amount
 
         for rule in self._chart_of_accounts.account_mapping_rules:
             if rule.account_number != balance.account_number:

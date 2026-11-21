@@ -85,6 +85,72 @@ def test_sums_multiple_account_balances_for_same_position() -> None:
         bank_position: Decimal("1500.00"),
     }
 
+
+def test_mixed_bank_balances_are_separated_by_side_without_netting() -> None:
+    assets, liabilities = create_hgb_balance_sheet_structure()
+    provider = HgbFinancialStatementPositionProvider((assets, liabilities))
+    bank_asset = provider.get("HGB.266.AKTIVA.B.IV")
+    bank_liability = provider.get("HGB.266.PASSIVA.C.2")
+    accounts = tuple(
+        TemplateAccount(number, name, AccountType.ASSET)
+        for number, name in (
+            ("198765", "Freies Bankkonto Guthaben"),
+            ("187654", "Freies Bankkonto Überziehung"),
+            ("176543", "Weiteres Bankkonto Überziehung"),
+        )
+    )
+    chart = ChartOfAccountsTemplate(
+        "Mehrere Bankkonten",
+        accounts,
+        account_mapping_rules=tuple(
+            AccountMappingRule(account.account_number, bank_asset, None)
+            for account in accounts
+        ),
+    )
+    balances = (
+        AccountBalance("198765", debit=Decimal("1200.00")),
+        AccountBalance("187654", credit=Decimal("300.00")),
+        AccountBalance("176543", debit=Decimal("50.00"), credit=Decimal("250.00")),
+    )
+    initial_balances = tuple(
+        (balance.account_number, balance.debit, balance.credit, balance.balance)
+        for balance in balances
+    )
+
+    amounts = FinancialStatementBuilder(
+        AccountMapper(
+            chart,
+            bank_account_numbers=frozenset(
+                {"198765", "187654", "176543"}
+            ),
+        )
+    ).build(balances, root_positions=(assets, liabilities))
+
+    assert amounts[bank_asset] == Decimal("1200.00")
+    assert amounts[bank_liability] == Decimal("500.00")
+    assert amounts[assets] == Decimal("1200.00")
+    assert amounts[liabilities] == Decimal("500.00")
+    assert tuple(
+        (balance.account_number, balance.debit, balance.credit, balance.balance)
+        for balance in balances
+    ) == initial_balances
+
+
+def test_zero_balance_bank_is_omitted_from_hgb_positions() -> None:
+    assets, liabilities = create_hgb_balance_sheet_structure()
+    account = TemplateAccount("198765", "Bankkonto", AccountType.ASSET)
+    chart = ChartOfAccountsTemplate("Nullsaldo", (account,))
+
+    amounts = FinancialStatementBuilder(
+        AccountMapper(chart, bank_account_numbers=frozenset({"198765"}))
+    ).build(
+        (AccountBalance("198765"),),
+        root_positions=(assets, liabilities),
+    )
+
+    assert amounts[assets] == Decimal("0.00")
+    assert amounts[liabilities] == Decimal("0.00")
+
 def test_aggregates_child_amounts_into_parent_position() -> None:
     cash_position = FinancialStatementPosition(
         code="HGB.266.AKTIVA.B.IV.1",

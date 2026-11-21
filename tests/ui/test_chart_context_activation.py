@@ -12,9 +12,16 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from simpleob.accounting.account_balance import AccountBalance
+from simpleob.accounting.financial_statement_position import FinancialStatementPosition
+from simpleob.accounting.mapper import AccountMapper
 from simpleob.domain.account import Account
+from simpleob.domain.account_mapping_rule import AccountMappingRule
 from simpleob.domain.account_type import AccountType
+from simpleob.domain.accounting_account_roles import AccountingAccountRoles
+from simpleob.domain.chart_of_accounts_template import ChartOfAccountsTemplate
 from simpleob.domain.template_account import TemplateAccount
+from simpleob.ui_qt import main_window as main_window_module
 from simpleob.ui_qt.booking_frame import BookingFrame
 from simpleob.ui_qt.main_window import MainWindow
 
@@ -82,15 +89,22 @@ def _activation_window(monkeypatch):
     window._refresh_balance_sheet = Mock()
     window._refresh_closing = Mock()
     window._refresh_e_bilanz_availability = Mock()
-    monkeypatch.setattr(
-        "simpleob.ui_qt.main_window.create_financial_statement_context",
-        lambda **_kwargs: SimpleNamespace(
+
+    financial_context_kwargs = {}
+
+    def create_context(**kwargs):
+        financial_context_kwargs.update(kwargs)
+        return SimpleNamespace(
             statement_builder="builder",
             income_statement="income-position",
             account_types={"1210": "asset"},
             account_mapper="mapper",
             accounts=accounts,
-        ),
+        )
+
+    monkeypatch.setattr(
+        "simpleob.ui_qt.main_window.create_financial_statement_context",
+        create_context,
     )
     monkeypatch.setattr(
         "simpleob.ui_qt.main_window.ClosingAccounts",
@@ -109,11 +123,18 @@ def _activation_window(monkeypatch):
         "simpleob.ui_qt.main_window.QMessageBox.critical",
         Mock(),
     )
-    return window, workspace, chart, accounts, selected
+    return window, workspace, chart, accounts, selected, financial_context_kwargs
 
 
 def test_activation_updates_context_and_unlocks_same_window(monkeypatch):
-    window, workspace, chart, accounts, selected = _activation_window(monkeypatch)
+    (
+        window,
+        workspace,
+        chart,
+        accounts,
+        selected,
+        financial_context_kwargs,
+    ) = _activation_window(monkeypatch)
     original_context = window._context
 
     window._activate_chart_changes()
@@ -123,6 +144,10 @@ def test_activation_updates_context_and_unlocks_same_window(monkeypatch):
     assert activation["accounts"] == accounts
     assert activation["account_mapper"] == "mapper"
     assert activation["income_summary_account_number"] == "9998"
+    assert (
+        financial_context_kwargs["account_roles"]
+        is workspace.load_account_configuration.return_value[2]
+    )
     assert window._chart_of_accounts is chart
     assert window._accounts == accounts
     assert window._context is original_context
@@ -135,7 +160,14 @@ def test_activation_updates_context_and_unlocks_same_window(monkeypatch):
 
 
 def test_failed_activation_keeps_booking_locked_and_can_be_retried(monkeypatch):
-    window, workspace, _chart, _accounts, _selected = _activation_window(monkeypatch)
+    (
+        window,
+        workspace,
+        _chart,
+        _accounts,
+        _selected,
+        _financial_context_kwargs,
+    ) = _activation_window(monkeypatch)
     workspace.load_account_configuration.side_effect = RuntimeError(
         "Konfiguration nicht verfügbar"
     )
@@ -172,3 +204,85 @@ def test_general_booking_frame_refreshes_account_choices_after_activation():
 
     assert simple_row.name_item.text() == "Forderungen neu"
     assert "1200 – Bank" in simple_row.completer.model().stringList()
+
+
+def test_account_configuration_updates_bank_role_for_next_balance_calculation(
+    monkeypatch,
+):
+    bank_position = FinancialStatementPosition(
+        "HGB.266.AKTIVA.B.IV", "Bankguthaben"
+    )
+    account = TemplateAccount("198765", "Zahlungskonto", AccountType.ASSET)
+    chart = ChartOfAccountsTemplate(
+        "Test",
+        (account,),
+        account_mapping_rules=(
+            AccountMappingRule("198765", bank_position, None),
+        ),
+    )
+    mapper = AccountMapper(chart)
+    roles = AccountingAccountRoles(
+        cash_accounts=frozenset(),
+        bank_accounts=frozenset({"198765"}),
+        general_rate_sales_accounts=frozenset(),
+    )
+    controls = SimpleNamespace(
+        opening_balance_account="9000",
+        depreciation_expense_account="4830",
+    )
+    vat_accounts = object()
+    workspace = Mock()
+    workspace.load_account_configuration.return_value = (
+        controls,
+        vat_accounts,
+        AccountingAccountRoles(
+            cash_accounts=frozenset(),
+            bank_accounts=frozenset(),
+            general_rate_sales_accounts=frozenset(),
+        ),
+    )
+
+    class Dialog:
+        result = (controls, vat_accounts, roles)
+
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def exec(self):
+            pass
+
+    class MessageBox:
+        @staticmethod
+        def information(*_args):
+            pass
+
+        @staticmethod
+        def critical(*_args):
+            raise AssertionError("Die Konfiguration muss gültig sein")
+
+    monkeypatch.setattr(main_window_module, "AccountConfigurationDialog", Dialog)
+    monkeypatch.setattr(main_window_module, "QMessageBox", MessageBox)
+    window = MainWindow.__new__(MainWindow)
+    QMainWindow.__init__(window)
+    window._workspace = workspace
+    window._accounts = (Account(account),)
+    window._account_mapper = mapper
+    window._opening_balance_account_number = "9000"
+    window._depreciation_expense_account_number = "4830"
+    window._invalidate_built_e_bilanz = Mock()
+    window._refresh_balance_sheet = Mock()
+
+    MainWindow._open_account_configuration(window)
+
+    workspace.update_account_configuration.assert_called_once_with(
+        control_accounts=controls,
+        vat_accounts=vat_accounts,
+        account_roles=roles,
+    )
+    window._refresh_balance_sheet.assert_called_once()
+    window._invalidate_built_e_bilanz.assert_called_once()
+    assert mapper.bank_account_numbers == frozenset({"198765"})
+    position, amount = mapper.map_balance(AccountBalance("198765", credit=100))
+    assert position.code == "HGB.266.PASSIVA.C.2"
+    assert amount == 100
+    window.close()
