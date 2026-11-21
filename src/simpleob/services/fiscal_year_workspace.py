@@ -3030,9 +3030,9 @@ class FiscalYearWorkspace:
         *,
         closing_service: ClosingService,
         statement_builder: FinancialStatementBuilder,
+        account_mapper: AccountMapper,
         income_statement_position: FinancialStatementPosition,
         account_types: dict[str, AccountType],
-        account_mapper: AccountMapper,
         accounts: tuple[Account, ...],
         income_summary_account_number: str,
     ) -> None:
@@ -3046,6 +3046,7 @@ class FiscalYearWorkspace:
         self._closing_workflow.update_accounting_context(
             closing_service=closing_service,
             statement_builder=statement_builder,
+            account_mapper=account_mapper,
             income_statement_position=income_statement_position,
             account_types=account_types,
         )

@@ -51,6 +51,7 @@ class FiscalYearClosingWorkflow:
         closing_service: ClosingService,
         posting_service: PostingService | None = None,
         statement_builder: FinancialStatementBuilder | None = None,
+        account_mapper: AccountMapper | None = None,
         income_statement_position: FinancialStatementPosition | None = None,
         account_types: dict[str, AccountType] | None = None,
         vat_reconciliation_service: VatReconciliationService | None = None,
@@ -75,8 +76,21 @@ class FiscalYearClosingWorkflow:
                     "angegeben werden."
                 )
 
+        if account_mapper is None and statement_builder is not None:
+            account_mapper = statement_builder.account_mapper
+        if (
+            account_mapper is not None
+            and statement_builder is not None
+            and statement_builder.account_mapper is not account_mapper
+        ):
+            raise ValueError(
+                "Der Jahresabschluss benötigt denselben Kontenmapper "
+                "im Finanzkontext und in der Abschlussprüfung."
+            )
+
         self._posting_service = posting_service
         self._statement_builder = statement_builder
+        self._account_mapper = account_mapper
         self._income_statement_position = income_statement_position
         self._account_types = account_types
         self._vat_reconciliation_service = (
@@ -88,13 +102,20 @@ class FiscalYearClosingWorkflow:
         *,
         closing_service: ClosingService,
         statement_builder: FinancialStatementBuilder,
+        account_mapper: AccountMapper,
         income_statement_position: FinancialStatementPosition,
         account_types: dict[str, AccountType],
     ) -> None:
         """Übernimmt einen neu geladenen Kontenrahmenkontext."""
 
+        if statement_builder.account_mapper is not account_mapper:
+            raise ValueError(
+                "Der Jahresabschluss benötigt denselben Kontenmapper "
+                "im Finanzkontext und in der Abschlussprüfung."
+            )
         self._closing_service = closing_service
         self._statement_builder = statement_builder
+        self._account_mapper = account_mapper
         self._income_statement_position = income_statement_position
         self._account_types = account_types
 
@@ -210,8 +231,13 @@ class FiscalYearClosingWorkflow:
                     "die transaktionale Neuberechnung erforderlich."
                 )
 
+            if self._account_mapper is None:
+                raise RuntimeError(
+                    "Für den Jahresabschluss ist ein Kontenmapper "
+                    "erforderlich."
+                )
             statement_builder = FinancialStatementBuilder(
-                AccountMapper(chart_of_accounts)
+                self._account_mapper
             )
             # Vor dem Abschluss jeden vorhandenen Saldo auf seine HGB-Position
             # prüfen. So werden Personenkonten integriert und zugleich weiterhin

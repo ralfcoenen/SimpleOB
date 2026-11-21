@@ -13,6 +13,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 
+from simpleob.accounting.account_balance import AccountBalance
 from simpleob.accounting.financial_statement_builder import (
     FinancialStatementBuilder,
 )
@@ -27,6 +28,9 @@ from simpleob.database.company_repository import CompanyRepository
 from simpleob.database.database import Base
 from simpleob.domain.account_type import AccountType
 from simpleob.domain.accounting_account_roles import AccountingAccountRoles
+from simpleob.domain.balance_sheet_presentation import (
+    BalanceSheetPresentation,
+)
 from simpleob.domain.booking import Booking
 from simpleob.domain.booking_line import BookingLine
 from simpleob.domain.booking_type import BookingType
@@ -227,6 +231,7 @@ def test_closes_fiscal_year_and_persists_closing_bookings() -> None:
             booking_repository=booking_repository,
             company_repository=company_repository,
             closing_service=closing_service,
+            account_mapper=AccountMapper(chart_of_accounts),
         )
 
         result = workflow.close(
@@ -271,6 +276,142 @@ def test_closes_fiscal_year_and_persists_closing_bookings() -> None:
     assert "Abschluss des Erlöskontos 8400" in descriptions
     assert "Abschluss des Aufwandskontos 4980" in descriptions
     assert "Abschluss des GuV-Kontos" in descriptions
+
+
+@pytest.mark.parametrize(
+    "presentation",
+    (
+        BalanceSheetPresentation.BEFORE_APPROPRIATION,
+        BalanceSheetPresentation.AFTER_APPROPRIATION,
+    ),
+)
+def test_closes_with_configured_bank_accounts_and_keeps_each_balance(
+    presentation: BalanceSheetPresentation,
+) -> None:
+    """Der Abschluss verwendet den Bankrollen-Mapper für beide Salden."""
+
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine)
+    company = Company(company_id=uuid4(), name="Bankabschluss UG")
+    fiscal_year = FiscalYear(
+        start_date=date(2026, 1, 1),
+        end_date=date(2026, 12, 31),
+    )
+    assets, liabilities = create_hgb_balance_sheet_structure()
+    income_statement_root = create_hgb_income_statement_structure()
+    provider = HgbFinancialStatementPositionProvider(
+        (assets, liabilities, income_statement_root)
+    )
+    csv_file = (
+        Path(__file__).resolve().parents[2]
+        / "src"
+        / "simpleob"
+        / "resources"
+        / "chart_of_accounts"
+        / "openbilanz_standard.csv"
+    )
+    standard_chart = CsvChartOfAccountsImporter(
+        position_provider=provider,
+    ).load(csv_file)
+    chart = ChartOfAccountsTemplate(
+        name=standard_chart.name,
+        accounts=standard_chart.accounts
+        + (
+            TemplateAccount("1800", "Bank", AccountType.ASSET),
+            TemplateAccount("1810", "Qonto", AccountType.ASSET),
+        ),
+        account_mapping_rules=standard_chart.account_mapping_rules,
+    )
+    account_roles = AccountingAccountRoles(
+        cash_accounts=frozenset(),
+        bank_accounts=frozenset({"1800", "1810"}),
+        general_rate_sales_accounts=frozenset(),
+    )
+    account_mapper = AccountMapper(
+        chart,
+        bank_account_numbers=account_roles.bank_accounts,
+    )
+    statement_builder = FinancialStatementBuilder(account_mapper)
+    account_types = {
+        account.account_number: account.account_type
+        for account in chart.accounts
+    }
+    booking = Booking(
+        booking_date=date(2026, 6, 1),
+        description="Bankbestände",
+        lines=(
+            BookingLine("1810", EntrySide.DEBIT, Decimal("5000.00")),
+            BookingLine("1800", EntrySide.CREDIT, Decimal("250.00")),
+            BookingLine("1600", EntrySide.CREDIT, Decimal("4750.00")),
+        ),
+    )
+    ledger = Ledger()
+    PostingService().post_booking(booking=booking, ledger=ledger)
+
+    amounts = statement_builder.build(
+        balances=ledger.balances(),
+        root_positions=(assets, liabilities),
+    )
+    asset_bank_position = provider.get("HGB.266.AKTIVA.B.IV")
+    liability_bank_position = provider.get("HGB.266.PASSIVA.C.2")
+    assert amounts[asset_bank_position] == Decimal("5000.00")
+    assert amounts[liability_bank_position] == Decimal("250.00")
+    with pytest.raises(
+        ValueError,
+        match="Konto 1800 ist keiner HGB-Abschlussposition zugeordnet",
+    ):
+        FinancialStatementBuilder(AccountMapper(chart)).build(
+            balances=(AccountBalance("1800", credit=Decimal("250.00")),)
+        )
+
+    with Session() as session:
+        company_repository = CompanyRepository(session)
+        booking_repository = BookingRepository(session)
+        company_repository.add(company)
+        company_repository.add_fiscal_year(company.company_id, fiscal_year)
+        booking_repository.add(
+            company_id=company.company_id,
+            fiscal_year=fiscal_year,
+            booking=booking,
+        )
+        workflow = FiscalYearClosingWorkflow(
+            session=session,
+            booking_repository=booking_repository,
+            company_repository=company_repository,
+            closing_service=ClosingService(
+                closing_accounts=ClosingAccounts(
+                    income_summary_account="8990",
+                    profit_account="8020",
+                    loss_account="8021",
+                )
+            ),
+            posting_service=PostingService(),
+            statement_builder=statement_builder,
+            account_mapper=account_mapper,
+            income_statement_position=income_statement_root,
+            account_types=account_types,
+        )
+        workflow.close(
+            company_id=company.company_id,
+            fiscal_year=fiscal_year,
+            income_statement=IncomeStatement(
+                income_statement=income_statement_root,
+                amounts={},
+            ),
+            ledger=Ledger(),
+            chart_of_accounts=chart,
+            closing_date=fiscal_year.end_date,
+            balance_sheet_presentation=presentation,
+        )
+
+    with Session() as session:
+        managed = CompanyRepository(session).get_managed_fiscal_years(
+            company.company_id
+        )
+
+    assert managed[0].status is FiscalYearStatus.CLOSED
+    assert managed[0].balance_sheet_presentation is presentation
 
 
 def test_closing_workflow_accepts_classified_person_account_balances():
@@ -399,6 +540,7 @@ def test_closing_workflow_blocks_unclassified_five_digit_account():
             booking_repository=booking_repository,
             company_repository=company_repository,
             closing_service=ClosingService(),
+            account_mapper=AccountMapper(chart),
         )
 
         with pytest.raises(
@@ -416,6 +558,21 @@ def test_closing_workflow_blocks_unclassified_five_digit_account():
                 chart_of_accounts=chart,
                 closing_date=date(2026, 12, 31),
             )
+
+    with Session() as session:
+        company_repository = CompanyRepository(session)
+        booking_repository = BookingRepository(session)
+        managed = company_repository.get_managed_fiscal_years(
+            company.company_id
+        )
+        persisted_bookings = booking_repository.list_for_fiscal_year(
+            company_id=company.company_id,
+            fiscal_year=fiscal_year,
+        )
+
+    assert managed[0].status is FiscalYearStatus.OPEN
+    assert persisted_bookings == ()
+
 
 def test_rolls_back_when_closing_booking_cannot_be_persisted() -> None:
     """Ein fehlgeschlagener Abschluss wird vollständig zurückgerollt."""
@@ -620,6 +777,7 @@ def test_rolls_back_when_closing_booking_cannot_be_persisted() -> None:
             booking_repository=failing_booking_repository,
             company_repository=company_repository,
             closing_service=closing_service,
+            account_mapper=AccountMapper(chart_of_accounts),
         )
 
         with pytest.raises(

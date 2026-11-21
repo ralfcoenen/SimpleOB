@@ -1058,6 +1058,9 @@ def main() -> None:
                 statement_builder=(
                     financial_statement_context.statement_builder
                 ),
+                account_mapper=(
+                    financial_statement_context.account_mapper
+                ),
                 income_statement_position=(
                     financial_statement_context.income_statement
                 ),

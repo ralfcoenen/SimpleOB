@@ -215,9 +215,9 @@ def test_activation_reloads_ledger_before_updating_chart_services(
     workspace.activate_chart_context(
         closing_service=closing_service,
         statement_builder=statement_builder,
+        account_mapper=account_mapper,
         income_statement_position=income_position,
         account_types=account_types,
-        account_mapper=account_mapper,
         accounts=accounts,
         income_summary_account_number="9998",
     )
@@ -226,6 +226,7 @@ def test_activation_reloads_ledger_before_updating_chart_services(
     closing_workflow.update_accounting_context.assert_called_once_with(
         closing_service=closing_service,
         statement_builder=statement_builder,
+        account_mapper=account_mapper,
         income_statement_position=income_position,
         account_types=account_types,
     )

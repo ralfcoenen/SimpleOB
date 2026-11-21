@@ -505,6 +505,7 @@ def test_closes_reference_scenario_and_persists_year_end() -> None:
             booking_repository=accounting.booking_repository,
             company_repository=accounting.company_repository,
             closing_service=closing_service,
+            account_mapper=AccountMapper(accounting.chart_of_accounts),
         )
 
         closing_result = workflow.close(
@@ -830,6 +831,7 @@ def test_reference_scenario_builds_valid_e_bilanz(
             booking_repository=accounting.booking_repository,
             company_repository=accounting.company_repository,
             closing_service=closing_service,
+            account_mapper=AccountMapper(accounting.chart_of_accounts),
         )
 
         closing_result = workflow.close(

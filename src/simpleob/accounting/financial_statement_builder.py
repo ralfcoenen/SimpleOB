@@ -13,6 +13,12 @@ class FinancialStatementBuilder:
     def __init__(self, mapper: AccountMapper) -> None:
         self._mapper = mapper
 
+    @property
+    def account_mapper(self) -> AccountMapper:
+        """Liefert den für diesen Builder konfigurierten Kontenmapper."""
+
+        return self._mapper
+
 
     def build(
         self,
