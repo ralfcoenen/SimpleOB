@@ -1,184 +1,154 @@
 # SimpleOB
 
-**SimpleOB** ist eine Desktop-Anwendung für Buchführung und E-Bilanz kleiner Kapitalgesellschaften. Sie kann ihre Daten in einer lokalen SQLite-Datenbank oder auf einem PostgreSQL-Server speichern.
-
-Das Projekt wird im Repository unter dem Entwicklungsnamen **OpenBilanz-UG** geführt. Der Name der ausgelieferten Anwendung ist **SimpleOB**.
+**SimpleOB** ist eine Desktop-Anwendung für die laufende Buchführung, den
+Jahresabschluss und die E-Bilanz kleiner Kapitalgesellschaften. Das Projekt
+wird im Repository unter dem Entwicklungsnamen **OpenBilanz-UG** geführt; die
+ausgelieferte Anwendung heißt **SimpleOB**.
 
 ## Aktueller Stand
 
-Aktuelle Version: **0.60.0**
+Aktuelle Projektversion: **0.62.0** (`pyproject.toml`).
 
-SimpleOB umfasst inzwischen insbesondere:
+SimpleOB bietet derzeit:
 
-- mandantenbezogene Buchführung
-- Geschäftsjahre und Jahresabschluss
-- Journal und Kontenführung
-- Summen- und Saldenliste
-- Bilanz nach § 266 HGB
-- Gewinn- und Verlustrechnung nach § 275 HGB
-- Anlagenbuchhaltung
-- Erfassung von Eingangs- und Ausgangsrechnungen sowie Gutschriften
-- Offene-Posten-Verwaltung mit Zahlungen, Verrechnungen, Rückerstattungen und Abstimmung
-- grundlegenden Workflow für Eröffnungsbilanzen
-- Umsatzsteuer- und Steuerkontenkonfiguration
-- E-Bilanz auf Basis der Taxonomie 6.9
-- XBRL-Erzeugung und -Validierung
-- ELSTER-/ERiC-Übermittlung
-- Testübermittlung mit ELSTER-Testzertifikat
-- informative Umsatzüberwachung zur Kleinunternehmerregelung nach § 19 UStG
-- Mandantensicherung und -übertragung im Format `.simpleob`
-- SQLite- und PostgreSQL-Datenhaltung
-- Datenbankmigrationen mit Alembic
-- PDF-Auswertungen
-- PySide6-Benutzeroberfläche
+- Mandanten- und Geschäftsjahrverwaltung sowie einfache Buchungssätze mit
+  Journal, Kontenübersicht, Eröffnungsbuchungen und Buchungsstorno.
+- Kontenverwaltung mit mandantenspezifischen Konten, HGB-Zuordnungen,
+  Steuerkonten und fachlichen Kontenrollen.
+- Geschäftspartnerstammdaten mit Debitoren- und Kreditoren-Personenkonten.
+  Ein Geschäftspartner kann beide Rollen besitzen; je Rolle wird ein eigenes
+  Konto mit eigener Kontonummer geführt. Debitorennummern liegen im Bereich
+  10000–69999, Kreditorennummern im Bereich 70000–99999.
+- Anlagenbuchhaltung einschließlich Abschreibungen, Anlagenabgängen und
+  steuerlichen AfA-Abweichungen.
+- Summen- und Saldenliste, Kontenauswertungen, Journal- und
+  Personenkontenberichte sowie HGB-Bilanz und Gewinn- und Verlustrechnung.
+- Jahresabschluss mit Prüfung, Umsatzsteuerverrechnung und
+  Ergebnisverwendungsabläufen.
+- E-Bilanz-Erzeugung mit Taxonomie 6.9, XBRL-Ausgabe und Arelle-Validierung.
+  Für die E-Bilanz sind derzeit UG (haftungsbeschränkt) und GmbH unterstützt.
+- ELSTER-Test- und Produktivübermittlung über ERiC, sofern das passende
+  ERiC-SDK, ein gültiges Zertifikat und die erforderlichen Stammdaten verfügbar
+  sind.
+- Mandantentransfer als `.simpleob`-Datei einschließlich Geschäftspartnern,
+  Personenkonten und Geschäftsjahren.
+- SQLite als lokale Datenbank sowie PostgreSQL für eine vorhandene,
+  eingerichtete Serverdatenbank.
 
-## Zielsetzung
+Die Kontenkonfiguration enthält die Rollen **Kasse**, **Bank**,
+**Umsatzerlöse allgemeiner Steuersatz**, **Umsatzsteuer-Vorauszahlungen**,
+**Umsatzsteuer laufendes Jahr**, **Umsatzsteuerforderungen Vorjahr** und
+**Umsatzsteuerverbindlichkeiten Vorjahr**. Sie beschreiben die fachliche
+Verwendung unabhängig von der Kontonummer. Ein Bankkonto mit
+Sollsaldo wird in der HGB-Bilanz unter B.IV ausgewiesen; ein Habensaldo wird
+als Verbindlichkeit unter C.2 dargestellt. Unterschiedliche Bankkonten werden
+nicht gegeneinander saldiert. Für gewöhnliche Bankverbindlichkeiten verwendet
+die E-Bilanz-Taxonomie 6.9 die Unterposition
+`bs.eqLiab.liab.bank.other`.
 
-SimpleOB ist als lokale Desktop-Anwendung für die Buchführung und den Jahresabschluss kleiner Kapitalgesellschaften konzipiert.
+Für unbebuchte Personenkonten ist eine gesonderte, bestätigungspflichtige
+Löschung verfügbar, wenn keine Buchungszeilen oder sonstigen sperrenden
+Referenzen bestehen. Der Geschäftspartner bleibt dabei erhalten.
 
-Ein Schwerpunkt liegt auf einem nachvollziehbaren durchgängigen Ablauf:
+**Nicht enthalten** sind in Version 0.62.0 die Erfassung von Ein- und
+Ausgangsrechnungen, Gutschriften, Anzahlungen und Leistungsvorgängen, eine
+Offene-Posten-Nebenbuchführung mit Zahlungszuordnungen sowie eine
+Umsatzüberwachung nach § 19 UStG. Debitoren- und Kreditorenkonten sind
+Hauptbuchkonten; sie bilden keine Rechnungs- oder Zahlungshistorie ab.
+
+## Arbeitsablauf
 
 ```text
-Buchungen
-    ↓
-Journal und Konten
-    ↓
-Summen- und Saldenliste
-    ↓
-Bilanz und GuV
-    ↓
+Buchungen und Anlagen
+        ↓
+Journal, Konten und Auswertungen
+        ↓
+HGB-Bilanz und Gewinn- und Verlustrechnung
+        ↓
 Jahresabschluss
-    ↓
+        ↓
 E-Bilanz / XBRL
-    ↓
-ERiC / ELSTER
+        ↓
+Arelle-Validierung und optional ERiC / ELSTER
 ```
 
-Die Anwendung soll dabei fachliche Buchhaltungslogik, HGB-Abschlusslogik und die technische E-Bilanz-/ELSTER-Übermittlung klar voneinander trennen.
+Die Anwendung trennt dabei Buchführung, HGB-Abschluss, E-Bilanz-Erzeugung
+und elektronische Übermittlung. Vor einer produktiven Übermittlung sollten
+Buchungen, Stammdaten und Abschlusswerte fachlich geprüft werden.
 
-## Technologie
+## Installation und Voraussetzungen
 
-SimpleOB basiert derzeit auf:
+Für macOS wird SimpleOB als eigenständige `SimpleOB.app` in einem
+Auslieferungspaket bereitgestellt. Das Paket wird derzeit ohne Apple
+Developer-ID-Signatur und Notarisierung ausgeliefert; macOS kann beim ersten
+Start deshalb eine Gatekeeper-Warnung anzeigen. Installieren Sie die Anwendung
+nur aus einer vertrauenswürdigen Bezugsquelle und folgen Sie bei Bedarf den
+Hinweisen im [Benutzerhandbuch](docs/SimpleOB_Benutzerhandbuch.md).
 
-- Python 3.12
-- PySide6
-- SQLAlchemy
-- Alembic
-- SQLite (Standard)
-- PostgreSQL (optionale Python-Abhängigkeit `postgresql`)
-- Arelle
-- ERiC
-- ReportLab
+SQLite ist die Standardoption und benötigt keinen separaten Datenbankserver.
+Für PostgreSQL ist ein erreichbarer, eingerichteter PostgreSQL-Server
+notwendig. Das macOS-Auslieferungspaket enthält den PostgreSQL-Treiber.
 
-Weitere verwendete Bibliotheken sind in `pyproject.toml` dokumentiert.
+Für die Entwicklung wird Python **3.12** benötigt. Das Projekt verwendet
+PySide6, SQLAlchemy, Alembic und Arelle. Für den macOS-Build muss ein zum
+Zielsystem passendes ERiC-SDK bereitgestellt werden; seine Komponenten werden
+in die App eingebunden. ELSTER-Funktionen stehen nur bereit, wenn ERiC in der
+Installation verfügbar ist. Die Zertifikats-PIN wird bei der Übermittlung
+eingegeben und nicht dauerhaft gespeichert. Für Testsendungen ist ein
+gültiges ELSTER-Testzertifikat, für produktive Sendungen ein dafür
+zugelassenes persönliches Zertifikat nötig.
 
-## Entwicklung
+## Datenhaltung und Sicherung
 
-Vorausgesetzt wird Python 3.12.
+SQLite speichert Daten lokal im SimpleOB-Anwendungsdatenverzeichnis.
+PostgreSQL-Daten liegen auf dem Server. SimpleOB migriert SQLite beim Start
+und legt vor erforderlichen Migrationen eine Sicherung an. PostgreSQL-Schema-
+aktualisierungen werden nicht automatisch ausgeführt und müssen administrativ
+geplant und vorab gesichert werden.
 
-Eine Entwicklungsumgebung kann beispielsweise so eingerichtet werden:
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
-
-python -m pip install --upgrade pip
-python -m pip install -e ".[dev]"
-```
-
-Für eine Entwicklungsinstallation mit PostgreSQL-Treiber verwenden Sie stattdessen:
-
-```bash
-python -m pip install -e ".[dev,postgresql]"
-```
-
-Die Anwendung kann anschließend aus der Entwicklungsumgebung gestartet werden:
-
-```bash
-simpleob
-```
-
-SQLite ist ohne zusätzlichen Datenbankserver nutzbar. PostgreSQL erfordert einen eingerichteten und erreichbaren PostgreSQL-Server; für eine Entwicklungsinstallation ist zusätzlich die optionale Abhängigkeit `postgresql` erforderlich. Das macOS-Auslieferungspaket enthält den PostgreSQL-Treiber.
-
-Die Tests werden mit `pytest` ausgeführt:
-
-```bash
-pytest
-```
-
-## macOS-Auslieferung
-
-Für macOS wird SimpleOB mit PyInstaller als eigenständige Anwendung gebaut.
-
-Das veröffentlichte macOS-Paket wird derzeit ohne Apple-Developer-ID-Signatur und ohne Notarisierung ausgeliefert. macOS kann deshalb beim ersten Start eine Gatekeeper-Warnung anzeigen oder das Öffnen zunächst blockieren. Hinweise zur Freigabe stehen im Benutzerhandbuch. Die Anwendung sollte nur aus einer vertrauenswürdigen Bezugsquelle installiert werden.
-
-Die Release-Werkzeuge befinden sich unter `packaging/macos/`.
-
-Für die einzelnen Release-Schritte stehen zur Verfügung:
-
-```text
-version_release.sh
-build.sh
-package_release.sh
-publish_release.sh
-```
-
-Ein Release kann bis zum fertig geprüften Auslieferungspaket vorbereitet werden mit:
-
-```bash
-packaging/macos/release.sh VERSION
-```
-
-Die eigentliche Veröffentlichung erfolgt bewusst getrennt vom Build- und Packaging-Prozess.
+Eine `.simpleob`-Datei überträgt die unterstützten Daten eines Mandanten,
+darunter Geschäftspartner, Personenkontenzuordnungen, Konten, Buchungen,
+Anlagen und Geschäftsjahre. Version 0.62.0 verwaltet keine separate
+OP-Nebenbuchhistorie. Eine `.simpleob`-Datei ersetzt keine vollständige
+SQLite- oder PostgreSQL-Datenbanksicherung. Anwendungsweite ELSTER-
+Einstellungen und Zertifikatspfade gehören nicht zum Mandantentransfer.
+Details stehen im [Abschnitt zur Mandantensicherung](docs/SimpleOB_Benutzerhandbuch.md#14-datenaustausch-und-mandantensicherung).
 
 ## Benutzerhandbuch
 
-Das Benutzerhandbuch befindet sich unter `docs/SimpleOB_Benutzerhandbuch.pdf`. Die bearbeitbare Quelle ist `docs/SimpleOB_Benutzerhandbuch.md`.
-
-Das PDF kann erzeugt werden mit:
+Die aktuelle Handbuchquelle ist
+[docs/SimpleOB_Benutzerhandbuch.md](docs/SimpleOB_Benutzerhandbuch.md). Sie
+beschreibt unter anderem Konten und Personenkonten, Jahresabschluss,
+Installation unter macOS, E-Bilanz und ELSTER sowie Mandantentransfer.
+Das PDF für die Auslieferung wird aus dieser Markdown-Quelle erzeugt mit:
 
 ```bash
 scripts/build_user_manual.sh
 ```
 
-Das Benutzerhandbuch enthält insbesondere Hinweise zu Installation und erstem Start unter macOS, Mandanten und Geschäftsjahren, Buchführung und Jahresabschluss, E-Bilanz, ELSTER-Zertifikat und ELSTER-Datenlieferant, Test- und Produktivübermittlung sowie Datenbankaktualisierungen.
+## Entwicklung
 
-Es beschreibt außerdem offene Posten, Zahlungen, Rückerstattungen, Mandantensicherungen und die informative Umsatzüberwachung zur Kleinunternehmerregelung samt ihren fachlichen Grenzen. Ergänzt sind die [PostgreSQL-Ersteinrichtung mit getrennten Rollen](docs/SimpleOB_Benutzerhandbuch.md#25-neue-postgresql-datenbank-anlegen) sowie die [Auswahl, Bearbeitung und Wiederverwendung eigener Kontenrahmenvorlagen](docs/SimpleOB_Benutzerhandbuch.md#kontenrahmen-vor-der-mandantenanlage-bearbeiten).
+Entwicklungsumgebung einrichten:
 
-## Datenhaltung, Sicherung und Aktualisierungen
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev]"
+```
 
-SimpleOB verwendet standardmäßig SQLite. Die Datenbank und Anwendungskonfiguration liegen lokal im benutzerspezifischen SimpleOB-Anwendungsdatenverzeichnis. Optional kann eine vorhandene, erreichbare PostgreSQL-Datenbank verwendet werden; deren Buchhaltungsdaten liegen auf dem Datenbankserver.
+Für die optionale PostgreSQL-Abhängigkeit:
 
-Bei SQLite führt SimpleOB erforderliche Datenbankmigrationen beim Start aus und legt vor einer notwendigen Migration automatisch eine Sicherung der bestehenden Datenbank an. Bei PostgreSQL prüft SimpleOB beim Start den Schema-Stand, migriert eine vorhandene Datenbank aber nicht automatisch. Eine notwendige PostgreSQL-Aktualisierung muss administrativ geplant und vorab gesichert werden.
+```bash
+python -m pip install -e ".[dev,postgresql]"
+```
 
-Eine `.simpleob`-Datei exportiert unterstützte Mandantendaten einschließlich der Geschäftsjahre und Einstellungen zur Kleinunternehmerregelung. Sie enthält derzeit weder Geschäftspartner noch separate OP- und Zahlungszuordnungsdaten und ist daher für Mandanten mit OP-Nutzung keine vollständige Sicherung oder Übertragung. Sie ersetzt auch keine vollständige Datenbanksicherung: SQLite muss lokal gesichert werden, PostgreSQL direkt auf dem Server. Anwendungsweite ELSTER-Einstellungen und Zertifikate werden nicht mit dem Mandanten exportiert. Umfang und Einschränkungen beschreibt das Benutzerhandbuch.
-
-## E-Bilanz und ELSTER
-
-Die E-Bilanz-Erzeugung basiert derzeit auf der **Taxonomie 6.9**.
-
-SimpleOB trennt dabei die fachliche Erzeugung der E-Bilanz von der technischen Übermittlung über ERiC/ELSTER.
-
-Für Testübermittlungen kann ein ELSTER-Testzertifikat verwendet werden. Für produktive Übermittlungen muss der Benutzer sein persönliches ELSTER-Zertifikat auswählen.
-
-Die Zertifikats-PIN wird nicht dauerhaft gespeichert.
-
-## Projektgrundsätze
-
-Bei der Entwicklung stehen insbesondere im Vordergrund:
-
-- nachvollziehbare Buchhaltungslogik
-- klare Trennung von Domänen-, Datenbank- und Benutzeroberflächenlogik
-- mandantenspezifische Konfiguration statt fest codierter Konten
-- kontrollierte Datenbankmigrationen
-- reproduzierbare Release-Prozesse
-- SQLite als Standard sowie optional PostgreSQL
-- möglichst geringe unnötige Komplexität
-
-E-Bilanz- und Taxonomiefunktionalität wird gezielt auf den für die technisch valide und tatsächlich übermittelbare E-Bilanz erforderlichen Umfang begrenzt.
+Die Anwendung kann anschließend mit `simpleob` gestartet werden. Die Tests
+werden mit `pytest` ausgeführt. Weitere verwendete Bibliotheken und
+Projektkonfigurationen stehen in `pyproject.toml`.
 
 ## Projektstatus
 
-SimpleOB befindet sich weiterhin in Entwicklung.
-
-Vor dem produktiven Einsatz sollten insbesondere die erzeugten Abschlüsse, E-Bilanz-Daten und ELSTER-Übermittlungen fachlich geprüft werden.
+SimpleOB befindet sich in Entwicklung. Automatisierte Prüfungen unterstützen
+die technische Zuverlässigkeit, ersetzen aber keine fachliche Prüfung der
+Buchführung, des Jahresabschlusses und der E-Bilanz.

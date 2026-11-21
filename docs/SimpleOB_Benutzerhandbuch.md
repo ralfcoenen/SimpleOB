@@ -1,6 +1,6 @@
 # SimpleOB – Benutzerhandbuch
 
-**Anwenderhandbuch für SimpleOB 0.60.1**
+**Anwenderhandbuch für SimpleOB 0.62.0**
 
 ## 1. Über SimpleOB
 
@@ -16,16 +16,20 @@ Zu den Funktionen gehören insbesondere:
 
 - Verwaltung von Mandanten und Geschäftsjahren,
 - Verwaltung eines mandantenspezifischen Kontenrahmens,
+- Verwaltung von Geschäftspartnern im Zusammenhang mit Debitoren- und
+  Kreditorenkonten,
 - Erfassung von Buchungen,
-- Erfassung von Rechnungen, Gutschriften und offenen Posten,
-- Zuordnung von Zahlungen, Verrechnung von Guthaben und Erfassung von Rückerstattungen,
 - Anlagenbuchhaltung,
 - Erstellung von Bilanz und Gewinn- und Verlustrechnung,
 - Unterstützung des Jahresabschlusses,
 - Erstellung der E-Bilanz,
 - Prüfung der E-Bilanz,
 - Testübermittlung und produktive Übermittlung der E-Bilanz über ELSTER,
-- informative Umsatzüberwachung zur Kleinunternehmerregelung nach § 19 UStG.
+- Kontenübersichten einschließlich Personenkontenberichten.
+
+SimpleOB verwaltet Debitoren- und Kreditorenkonten mit Geschäftspartnern.
+Eine Rechnungs- und Offene-Posten-Nebenbuchführung mit Zahlungszuordnungen
+ist in Version 0.62.0 nicht enthalten.
 
 SimpleOB ist eine Desktop-Anwendung. Die Buchhaltungsdaten liegen je nach
 Konfiguration entweder in einer lokalen SQLite-Datenbank oder auf einem
@@ -49,16 +53,15 @@ die Datenbank wechseln oder einen Mandanten vollständig löschen.
 
 Nach dem Öffnen stehen im Hauptfenster die Register **Konten**, **Journal**,
 **Buchen**, **Anlagen**, **Bilanz**, **GuV**, **Auswertungen**,
-**OP-Übersicht**, **OP-Abstimmung**, **Jahresabschluss** und **E-Bilanz** zur
-Verfügung. Die OP-Register werden angezeigt, wenn die zugehörigen Dienste
-verfügbar sind.
+**Jahresabschluss** und **E-Bilanz** zur Verfügung. **Auswertungen** enthält
+die Unterregister **Summen- und Saldenliste**, **Kontenauswertung**,
+**Journal** und **Personenkonten**.
 
-Über **Verwaltung** erreichen Sie die Unternehmensstammdaten, die Einstellungen
-zur Kleinunternehmerregelung, die Gesellschafterverwaltung, die
-Kontenkonfiguration und den Mandantenexport. **Einstellungen** enthält die
-ELSTER-Zertifikats- und Datenlieferantenangaben. Unter **Hilfe** finden Sie
-Datenschutz- und ERiC-Hinweise. Die Schaltfläche **Buchhaltung wechseln** führt
-zur Mandanten- und Geschäftsjahrauswahl zurück.
+Über **Verwaltung** erreichen Sie die Unternehmensstammdaten, die
+Gesellschafterverwaltung, die Kontenkonfiguration und den Mandantenexport.
+Die ELSTER-Einstellungen für Zertifikat und Datenlieferant öffnen Sie über
+**Einstellungen**. Unter **Hilfe** finden Sie Datenschutz- und ERiC-Hinweise.
+**Buchhaltung wechseln** führt zur Mandanten- und Geschäftsjahrauswahl zurück.
 
 
 ## 2. Installation unter macOS
@@ -381,12 +384,17 @@ Weitere Hinweise zu Start- und Datenbankproblemen enthält Kapitel 15.
 
 Für die Übermittlung einer E-Bilanz über ELSTER benötigt SimpleOB ein
 geeignetes ELSTER-Zertifikat sowie die erforderlichen Angaben zum
-Datenlieferanten.
+Datenlieferanten. Außerdem muss ein zur Anwendung passendes ERiC-SDK verfügbar
+und von der Installation eingebunden sein. Ohne diese technische Komponente
+ist eine ELSTER-Übermittlung nicht freigeschaltet.
 
 ### 5.1 ELSTER-Zertifikat
 
-Der Pfad zum ELSTER-Zertifikat wird in SimpleOB über die Einstellungen
-festgelegt.
+Der Pfad zu einem ELSTER-Zertifikat im unterstützten PFX-/P12-Format wird in
+SimpleOB über **Einstellungen → ELSTER-Zertifikat** festgelegt. Für
+Testsendungen ist ein für ELSTER-Testübertragungen gültiges Testzertifikat
+erforderlich; für produktive Übermittlungen benötigen Sie Ihr dafür
+zugelassenes persönliches Zertifikat.
 
 Der eingestellte Zertifikatspfad wird gespeichert und steht bei späteren
 Programmstarts wieder zur Verfügung.
@@ -394,23 +402,11 @@ Programmstarts wieder zur Verfügung.
 Das Zertifikat selbst wird dadurch nicht in die SimpleOB-Datenbank
 übernommen.
 
-Für Übungs- und Testzwecke wird mit SimpleOB zusätzlich das
-ELSTER-Testzertifikat
-
-`test-softidnr-pse.pfx`
-
-bereitgestellt. Das Testzertifikat wird als separate Datei zusammen mit
-SimpleOB ausgeliefert und nicht automatisch eingerichtet.
-
-Der Benutzer kann das Testzertifikat über denselben Einstellungsdialog
-auswählen, über den später auch das persönliche ELSTER-Zertifikat
-eingerichtet wird. Dadurch kann der vollständige Ablauf der
-Zertifikatseinrichtung vor einer produktiven Übermittlung praktisch
-erprobt werden.
-
-Das Testzertifikat ist ausschließlich für Testübermittlungen vorgesehen.
-Vor einer produktiven ELSTER-Übermittlung muss in SimpleOB das persönliche
-ELSTER-Zertifikat des Benutzers ausgewählt werden.
+SimpleOB liefert kein Testzertifikat mit aus. Das benötigte Zertifikat muss
+separat beschafft und im Einstellungsdialog ausgewählt werden. Test- und
+Produktivübermittlung sind unterschiedliche Versandarten; verwenden Sie für
+eine Testsendung ein Testzertifikat und für eine produktive Sendung ein dafür
+zugelassenes Zertifikat.
 
 ### 5.2 ELSTER-Datenlieferant
 
@@ -450,27 +446,13 @@ durchgeführt werden.
 Damit kann der technische Übermittlungsweg geprüft werden, ohne die
 E-Bilanz als produktive Übermittlung einzureichen.
 
-Für einen vollständigen Praxistest kann das mit SimpleOB ausgelieferte
-ELSTER-Testzertifikat
-
-`test-softidnr-pse.pfx`
-
-verwendet werden.
-
-Dazu wird das Testzertifikat zunächst unter
+Für die Testsendung muss ein gültiges ELSTER-Testzertifikat unter
 
 **Einstellungen → ELSTER-Zertifikat…**
 
-ausgewählt. Die Einrichtung erfolgt damit auf demselben Weg wie später
-bei einem persönlichen ELSTER-Zertifikat.
-
-Die PIN des mitgelieferten Testzertifikats lautet:
-
-**123456**
-
-Die PIN wird nicht in SimpleOB hinterlegt. Sie wird bei der
-Testübermittlung manuell in den von SimpleOB angezeigten PIN-Dialog
-eingegeben.
+ausgewählt sein. SimpleOB liefert in Version 0.62.0 kein Testzertifikat und
+keine Test-PIN mit. Die PIN des ausgewählten Zertifikats geben Sie bei der
+Übermittlung im PIN-Dialog ein; SimpleOB speichert sie nicht dauerhaft.
 
 Nach dem Praxistest sollte der Benutzer daran denken, vor einer
 produktiven Übermittlung das Testzertifikat durch sein persönliches
@@ -731,9 +713,9 @@ Die Einzelheiten dazu werden im folgenden Kapitel beschrieben.
 ### 6.7 Mandanten importieren und exportieren
 
 SimpleOB unterstützt den Export und Import der im `.simpleob`-Format
-abgebildeten Mandantendaten. Bei Mandanten mit OP-Verwaltung ist dieses Format
-in Version 0.60.1 keine vollständige Sicherung oder Übertragung; siehe
-Kapitel 14.2.
+abgebildeten Mandantendaten. Geschäftspartner und Personenkontenzuordnungen
+gehören zum Transfer; eine Rechnungs- oder OP-Nebenbuchhistorie gibt es in
+Version 0.62.0 nicht. Einzelheiten stehen in Kapitel 14.2.
 
 Den Export starten Sie im geöffneten Mandanten über **Verwaltung → Mandant
 exportieren …**. Den Import finden Sie im Startfenster unter **Mandant
@@ -748,16 +730,15 @@ seine Geschäftsjahre und die zugehörigen Daten aus der aktuell verwendeten
 Datenbank. Er steht für SQLite und PostgreSQL zur Verfügung.
 
 Vor der Löschung fordert SimpleOB Sie auf, einen Ordner für eine
-Mandantensicherung auszuwählen. Die Sicherung wird exportiert und auf
-Vollständigkeit geprüft, bevor die Löschung beginnen kann. Im anschließenden
+Mandantensicherung auszuwählen. Die Sicherung wird exportiert und durch einen
+Abgleich der unterstützten Mandantendaten auf Vollständigkeit geprüft, bevor
+die Löschung beginnen kann. Im anschließenden
 Bestätigungsdialog sehen Sie Mandantenname, Mandanten-ID und Sicherungspfad.
 Zur Bestätigung müssen Sie den vollständigen Mandantennamen exakt eingeben.
 Bei Abbruch, falscher Eingabe oder fehlgeschlagener oder unvollständiger
-Sicherung wird der Mandant nicht gelöscht. In Version 0.60.1 überträgt
-`.simpleob` keine Geschäftspartner und keine separaten OP-Nebenbuchdaten.
-Wenn solche Daten vorhanden sind, schlägt die Vollständigkeitsprüfung fehl und
-SimpleOB bricht die Löschung ab. Die Einschränkung des Formats ist in Kapitel
-14.2 beschrieben. Bewahren Sie eine erfolgreiche
+Sicherung wird der Mandant nicht gelöscht. Die Prüfung umfasst die Daten, die
+SimpleOB im Transferformat unterstützt; sie ist keine Prüfung auf eine
+zusätzliche OP-Nebenbuchhistorie. Bewahren Sie eine erfolgreiche
 `.simpleob`-Datei an einem sicheren Ort auf; sie kann die darin enthaltenen
 unterstützten Daten wiederherstellen.
 
@@ -906,13 +887,14 @@ können mehrere vollständige Zeilen mit **Cmd** oder **Shift** ausgewählt und
 gemeinsam gelöscht werden. Vor einer Mehrfachlöschung zeigt SimpleOB eine
 Bestätigung; **„Abbrechen“** ist die sichere Standardauswahl.
 
-SimpleOB verhindert die gesamte Löschung, wenn eines der ausgewählten Konten
-in Buchungen eines Geschäftsjahres, in System- oder Steuerkonten, in einer
-Kontenrolle oder in der Anlagenbuchhaltung verwendet wird. Die Prüfung
-umfasst alle Geschäftsjahre. Bei erfolgreicher Löschung werden die
-zugehörigen HGB- und Taxonomiezuordnungen ebenfalls entfernt. Eine
+Bei normalen Sachkonten verhindert SimpleOB die gesamte Löschung, wenn eines
+der ausgewählten Konten in Buchungen eines Geschäftsjahres, in System- oder
+Steuerkonten, in einer Kontenrolle oder in der Anlagenbuchhaltung verwendet
+wird. Die Prüfung umfasst alle Geschäftsjahre. Bei erfolgreicher Löschung
+werden die zugehörigen HGB- und Taxonomiezuordnungen ebenfalls entfernt. Eine
 Mehrfachlöschung wird vollständig oder gar nicht ausgeführt; mindestens ein
-Konto muss im Kontenrahmen verbleiben.
+Konto muss im Kontenrahmen verbleiben. Für Personenkonten gelten die
+gesonderten Regeln in Abschnitt 8.11.
 
 ### 8.2 Neues Konto anlegen
 
@@ -1029,8 +1011,8 @@ Konto fachlich für die betreffende Funktion vorgesehen ist.
 
 ### 8.7 Umsatzsteuerkonten
 
-Unter **„USt-Konten“** werden die Konten für die automatische
-Umsatzsteuerbehandlung festgelegt.
+Unter **„USt-Konten“** werden die Konten für die Umsatzsteuerfunktionen des
+Mandanten festgelegt.
 
 Konfiguriert werden:
 
@@ -1039,8 +1021,15 @@ Konfiguriert werden:
 - Umsatzsteuer 7 %,
 - Umsatzsteuer 19 %.
 
-SimpleOB verwendet diese Zuordnungen bei Buchungen, bei denen die
-entsprechende Umsatzsteuerbehandlung automatisch erfolgt.
+SimpleOB verwendet diese Zuordnungen unter anderem bei der Prüfung und
+gegebenenfalls vorgeschlagenen Verrechnung der Umsatzsteuerkonten im Rahmen
+des Jahresabschlusses. Sie lösen keine automatische Rechnungsbuchung aus;
+eine Rechnungserfassung ist in Version 0.62.0 nicht vorhanden.
+
+Für die Umsatzsteuerverrechnung sind zusätzlich die Rollen **Umsatzsteuer-
+Vorauszahlungen** und **Umsatzsteuer laufendes Jahr** in der
+Kontenkonfiguration erforderlich. Die Einrichtung und der Ablauf sind in
+Abschnitt 11.4 beschrieben.
 
 Die hier festgelegten Konten werden als technische Steuerungskonten
 behandelt und können nicht über die normale Kontenbearbeitung geändert
@@ -1053,19 +1042,35 @@ zugeordnet werden.
 
 Derzeit stehen folgende Rollen zur Verfügung:
 
-- Kasse,
-- Bank,
-- Umsatzerlöse allgemeiner Steuersatz.
+- **Kasse** (`CASH`),
+- **Bank** (`BANK`),
+- **Umsatzerlöse allgemeiner Steuersatz**,
+- **Umsatzsteuer-Vorauszahlungen**,
+- **Umsatzsteuer laufendes Jahr**,
+- **Umsatzsteuerforderungen Vorjahr** und
+- **Umsatzsteuerverbindlichkeiten Vorjahr**.
 
-Einer Rolle können mehrere Konten zugeordnet werden. Dadurch können
-beispielsweise mehrere Bankkonten oder mehrere Kassenkonten verwendet
-werden.
-
-Ein Konto darf jedoch nur einer dieser Rollen angehören.
+Kasse, Bank und Umsatzerlöse können jeweils mehreren Konten zugeordnet
+werden, etwa wenn mehrere Bankkonten geführt werden. Für die vier genannten
+Umsatzsteuerrollen ist jeweils höchstens ein Konto zulässig; sobald eine
+dieser Umsatzsteuerrollen konfiguriert ist, müssen die zusammengehörigen
+Umsatzsteuerrollen vollständig eingerichtet sein. Ein Konto kann nicht
+gleichzeitig mehreren Kontenrollen angehören.
 
 Die Kontenrollen ermöglichen SimpleOB, Konten nach ihrer tatsächlichen
 Funktion zu unterscheiden, ohne diese Funktion an eine bestimmte
-Kontonummer zu binden.
+Kontonummer zu binden. Insbesondere ist die Rolle **Bank** maßgeblich für den
+besonderen Bilanzausweis: Ein Bankkonto mit Sollsaldo wird unter HGB B.IV
+„Kassenbestand, Bundesbankguthaben, Guthaben bei Kreditinstituten und
+Schecks“ ausgewiesen. Ein Bankkonto mit Habensaldo wird einzeln als
+Verbindlichkeit unter HGB C.2 „Verbindlichkeiten gegenüber Kreditinstituten“
+ausgewiesen. Der positive Saldo anderer Bankkonten wird dabei nicht
+gegengerechnet. Bei der automatischen E-Bilanz-Zuordnung wird eine gewöhnliche
+Bankverbindlichkeit zusätzlich der Taxonomie-Unterposition
+`bs.eqLiab.liab.bank.other` zugeordnet. Eine gültige individuelle
+Taxonomiezuordnung hat Vorrang. Die Kontensalden und Buchungen werden
+durch diesen Ausweis nicht verändert. Die Sonderregel gilt nicht für Kassen-
+oder andere Aktivkonten.
 
 ### 8.9 HGB-Zuordnung und E-Bilanz-Zuordnung
 
@@ -1113,394 +1118,163 @@ Nach dem Anlegen oder Bearbeiten eines Kontos sollte die Buchhaltung
 geschlossen und erneut geöffnet werden, bevor mit dem geänderten
 Kontenrahmen weitergearbeitet wird.
 
+### 8.11 Geschäftspartner und Personenkonten
+
+Geschäftspartner und Personenkonten verwalten Sie im Arbeitsbereich
+**Konten**. Ein Geschäftspartner besitzt einen gemeinsamen Stammdatensatz
+und kann sowohl Debitor als auch Kreditor sein. Für jede Rolle wird ein
+eigenes Personenkonto mit eigener Kontonummer geführt.
+
+#### Personenkonto anlegen
+
+Wählen Sie in der Kontenübersicht **Neues Personenkonto**. Für einen neuen
+Geschäftspartner geben Sie die Stammdaten ein und wählen über die beiden
+unabhängigen Kontrollkästchen **Debitor** und **Kreditor** die gewünschten
+Rollen. Mindestens eine Rolle muss ausgewählt sein; beide können gleichzeitig
+aktiviert werden. Für jede gewählte Rolle zeigt der Dialog ein eigenes
+Kontonummernfeld mit einem automatischen Vorschlag an. Sie können den
+Vorschlag ändern; eine manuell eingegebene Nummer wird nicht stillschweigend
+durch einen neuen Vorschlag ersetzt. Die Nummer wird beim Speichern gegen den
+jeweiligen Nummernkreis geprüft. Bei einem neuen Geschäftspartner werden die
+Rollenkennzeichen entsprechend den ausgewählten Rollen gesetzt.
+
+Debitorennummern liegen zwischen **10000 und 69999**, Kreditorennummern
+zwischen **70000 und 99999**. Die Personenkonten werden dem Geschäftspartner
+zugeordnet. Bei der gleichzeitigen Anlage entstehen zwei Konten mit getrennten
+Nummern.
+
+#### Fehlende Rolle ergänzen
+
+Im selben Dialog können Sie einen vorhandenen Geschäftspartner auswählen,
+um eine noch fehlende Rolle und das dazugehörige Personenkonto anzulegen.
+Die Auswahlliste enthält die vorhandenen Geschäftspartner. Nach der Auswahl
+werden ihre vorhandenen Rollen und Kontonummern angezeigt. Bereits vorhandene
+Rollen sind aktiviert und gesperrt; nur eine bislang fehlende Rolle kann
+ausgewählt und ergänzt werden. Bereits vorhandene Personenkonten werden nicht
+erneut angelegt. **Neuen Geschäftspartner anlegen** bleibt unabhängig davon
+verfügbar.
+
+#### Bestehendes Personenkonto bearbeiten
+
+Wählen Sie in der Kontenübersicht das betreffende Personenkonto und öffnen
+Sie **Konto bearbeiten**. Die Kontoart und Kontonummer bleiben unverändert;
+die Nummer ist nicht bearbeitbar. Die Bezeichnung wird am gemeinsamen
+Geschäftspartner geführt und kann sich daher auf dessen weitere
+Personenkonten auswirken. Der Aktivstatus des ausgewählten Kontos kann
+bearbeitet werden.
+
+#### Personenkonto löschen
+
+Ein Personenkonto kann in der Kontenübersicht einzeln über **Konto löschen**
+und nach ausdrücklicher Bestätigung gelöscht werden. SimpleOB lässt dies nur
+zu, wenn keine Buchungszeile in einem gespeicherten Geschäftsjahr und keine
+sonstige sperrende fachliche Referenz auf das Konto verweist. Ein Saldo von
+null reicht nicht aus: Auch ein früher bebuchtes Konto kann nicht gelöscht
+werden. Die Prüfung umfasst auch abgeschlossene Geschäftsjahre.
+
+Besitzt der Geschäftspartner zusätzlich ein Konto der jeweils anderen Rolle,
+bleibt dieses erhalten. Auch der Geschäftspartner selbst und seine
+Rollenflags bleiben bestehen, selbst wenn sein letztes Personenkonto gelöscht
+wird. Eine freigewordene Kontonummer kann danach wieder vorgeschlagen werden.
+Die Löschung eines Personenkontos folgt damit nicht den Regeln für normale
+Sachkonten aus Abschnitt 8.1.
+
+#### Personenkontenübersicht und Kontenblatt
+
+Im Arbeitsbereich **Auswertungen → Personenkonten** finden Sie die
+Personenkontenübersicht und das Kontenblatt. Dort können Sie die vorhandenen
+Personenkonten mit **Alle Konten**, **Debitoren** oder **Kreditoren** filtern.
+Der Zeitraum kann innerhalb des geöffneten Geschäftsjahres eingestellt
+werden. In der Übersicht sehen Sie Anfangssaldo, Soll- und Habenumsatz sowie
+Endsaldo; durch Auswahl eines Kontos zeigen Sie dessen Kontenblatt an. Die
+Berichte werten Hauptbuchbuchungen aus. Eine Rechnungs- oder
+Offene-Posten-Nebenbuchführung mit Zahlungszuordnungen ist nicht Bestandteil
+von Version 0.62.0.
+
 
 ## 9. Buchungen
 
-Im Arbeitsbereich **„Buchen“** werden die laufenden Geschäftsvorfälle
-des geöffneten Geschäftsjahres erfasst.
+Im Arbeitsbereich **Buchen** werden die laufenden Geschäftsvorfälle des
+geöffneten Geschäftsjahres als einfache Buchungssätze erfasst. Eine
+Rechnungserfassung mit automatischer Umsatzsteuerberechnung sowie eine
+OP-Nebenbuchführung sind in Version 0.62.0 nicht enthalten.
 
-SimpleOB stellt dafür zwei Buchungsarten zur Verfügung:
-
-- Einfache Buchung,
-- Rechnung mit Umsatzsteuer.
-
-Die gewünschte Erfassungsart wird unter **„Buchungsart“** ausgewählt.
-
-Buchungen können nur in einem offenen Geschäftsjahr erfasst werden.
-Nach dem Abschluss eines Geschäftsjahres ist die Buchungserfassung
-gesperrt.
+Buchungen können nur in einem offenen Geschäftsjahr erfasst werden. Nach dem
+Abschluss eines Geschäftsjahres ist die Buchungserfassung gesperrt.
 
 ### 9.1 Einfache Buchung
 
-Die Buchungsart **„Einfache Buchung“** dient zur unmittelbaren Erfassung
-eines Buchungssatzes.
+Die Buchungsmaske dient zur unmittelbaren Erfassung eines Buchungssatzes.
+Im oberen Bereich werden Datum, Belegnummer und Buchungstext erfasst. Darunter
+werden die Buchungszeilen eingegeben. Für jede Zeile stehen Konto,
+Kontobezeichnung, Soll, Haben und – soweit zulässig – die Kennzeichnung
+**Einlage** zur Verfügung.
 
-Im oberen Bereich werden erfasst:
-
-- Datum,
-- Belegnummer,
-- Buchungstext.
-
-Darunter werden die einzelnen Buchungszeilen eingegeben.
-
-Für jede Buchungszeile stehen zur Verfügung:
-
-- Konto,
-- Kontoname,
-- Soll,
-- Haben,
-- Einlage.
-
-Das Konto kann über seine Kontonummer beziehungsweise über die
-angezeigte Kontobezeichnung ausgewählt werden. Bei der Eingabe unterstützt
-SimpleOB die Suche nach vorhandenen Konten.
-
-Für eine Buchungszeile wird der Betrag entweder im Soll oder im Haben
+Das Konto kann über die Kontonummer oder die Kontobezeichnung gesucht und
+gewählt werden. Pro Zeile wird der Betrag entweder im Soll oder im Haben
 eingetragen.
 
 ### 9.2 Mehrzeilige Buchungen
 
-Eine einfache Buchung kann aus mehr als zwei Buchungszeilen bestehen.
+Ein Buchungssatz kann aus mehreren Buchungszeilen bestehen. Nicht benötigte
+Zeilen lassen sich über **×** entfernen. Unter den Zeilen zeigt SimpleOB
+laufend die Summe Soll, die Summe Haben und die Differenz an. Soll und Haben
+müssen ausgeglichen sein, bevor Sie **Buchung übernehmen** wählen.
 
-SimpleOB fügt während der Erfassung die erforderlichen Buchungszeilen
-hinzu. Nicht benötigte Zeilen können über die Schaltfläche **„×“**
-entfernt werden.
-
-Unterhalb der Buchungszeilen zeigt SimpleOB laufend:
-
-- Summe Soll,
-- Summe Haben,
-- Differenz.
-
-Eine Buchung muss in Soll und Haben ausgeglichen sein, bevor sie
-übernommen werden kann.
-
-Mit **„Buchung übernehmen“** wird der vollständige Buchungssatz
-verbucht.
-
-Nach erfolgreicher Übernahme meldet SimpleOB:
-
-**„Buchung wurde übernommen.“**
-
-Die Eingabemaske wird anschließend für die nächste Buchung geleert.
+Nach erfolgreicher Übernahme meldet SimpleOB **Buchung wurde übernommen**,
+speichert den Buchungssatz und leert die Eingabemaske für die nächste Buchung.
+Journal, Kontensalden und daraus abgeleitete Auswertungen werden aktualisiert.
 
 ### 9.3 Beträge und Datum
 
-Beträge werden in deutscher Schreibweise eingegeben, beispielsweise:
-
-`1.234,56`
-
-Buchungsbeträge müssen größer als `0,00` sein.
-
-Das Buchungsdatum wird in der Oberfläche im Format `TT.MM.JJJJ`
-dargestellt. Gültige Datumseingaben werden von SimpleOB beim Verlassen
-des Feldes normalisiert.
+Beträge werden in deutscher Schreibweise eingegeben, zum Beispiel `1.234,56`.
+Buchungsbeträge müssen größer als `0,00` sein. Das Datum wird als
+`TT.MM.JJJJ` dargestellt und nach einer gültigen Eingabe normalisiert.
 
 ### 9.4 Kennzeichnung einer Einlage
 
-Bei bestimmten Eigenkapitalkonten kann in einer Habenzeile die
-Kennzeichnung **„Einlage“** verwendet werden.
+Bei dafür vorgesehenen Eigenkapitalkonten kann eine Habenzeile als **Einlage**
+gekennzeichnet werden. Diese Markierung wird für den
+Betriebsvermögensvergleich berücksichtigt. Verwenden Sie sie nur, wenn der
+Geschäftsvorfall tatsächlich eine entsprechende Einlage darstellt.
 
-Damit wird die betreffende Buchungszeile als Einlage für den
-Betriebsvermögensvergleich gekennzeichnet.
+### 9.5 Buchung übernehmen
 
-Die Kennzeichnung steht nur bei dafür vorgesehenen Konten und
-Buchungszeilen zur Verfügung.
+**Buchung übernehmen** wird verfügbar, wenn die erforderlichen Eingaben
+vollständig und gültig sind. Nach der Übernahme wird der Buchungssatz im
+geöffneten Geschäftsjahr gespeichert. Die Meldung **Buchung wurde übernommen**
+bestätigt den erfolgreichen Vorgang.
 
-Sie sollte nur gesetzt werden, wenn der betreffende Geschäftsvorfall
-tatsächlich eine entsprechende Einlage darstellt.
+### 9.6 Abgeschlossenes Geschäftsjahr
 
-### 9.5 Rechnungen mit Umsatzsteuer
+Nach dem Abschluss eines Geschäftsjahres können keine laufenden Buchungen mehr
+erfasst werden. SimpleOB zeigt den Hinweis:
 
-Für Rechnungen, bei denen SimpleOB die Umsatzsteuer automatisch
-berücksichtigen soll, wird als Buchungsart
-**„Rechnung mit Umsatzsteuer“** gewählt.
+**Das Geschäftsjahr ist abgeschlossen. Buchungen sind nicht mehr möglich.**
 
-Folgende Rechnungsarten stehen zur Verfügung:
+Der Jahresabschluss wird in Kapitel 11 beschrieben.
 
-- Eingangsrechnung,
-- Ausgangsrechnung,
-- Kundengutschrift,
-- Lieferantengutschrift.
+### 9.7 Abgrenzung zu Rechnungen und offenen Posten
 
-Für die Rechnung werden erfasst:
+Version 0.62.0 enthält keine Erfassung von Ein- oder Ausgangsrechnungen,
+Gutschriften, Anzahlungen oder Leistungsvorgängen. Ebenso gibt es keine
+OP-Nebenbuchführung, keine Zahlungszuordnung zu Rechnungen, keine
+OP-Abstimmung und keine Umsatzüberwachung nach § 19 UStG. Debitoren- und
+Kreditorenkonten sind Konten des Hauptbuchs; ihre Einrichtung führt nicht
+automatisch Rechnungs- oder Zahlungsdaten.
 
-- Rechnungsart,
-- Datum,
-- Belegnummer,
-- Buchungstext,
-- Gegenkonto.
+Buchungen auf Debitoren- oder Kreditorenkonten erfassen Sie wie jeden anderen
+Buchungssatz über **Buchen**. Eine Rechnungsreferenz oder Zahlung wird dadurch
+nicht als eigener OP-Vorgang verwaltet.
 
-Anschließend werden die einzelnen Rechnungspositionen eingegeben.
+### 9.8 Reguläre Buchung im Journal stornieren
 
-### 9.6 Rechnungspositionen
-
-Jede Rechnungsposition enthält:
-
-- Sachkonto,
-- Bruttobetrag,
-- Umsatzsteuersatz.
-
-Als Umsatzsteuersätze stehen zur Verfügung:
-
-- 0 %,
-- 7 %,
-- 19 %.
-
-Beim Anlegen einer Position ist 19 % voreingestellt.
-
-Über **„Position hinzufügen“** können weitere Rechnungspositionen
-angelegt werden.
-
-Über **„Letzte Position entfernen“** kann die zuletzt angelegte
-Position wieder entfernt werden. Mindestens eine Rechnungsposition
-bleibt erhalten.
-
-Dadurch können auch Rechnungen mit mehreren Sachkonten oder
-unterschiedlichen Umsatzsteuersätzen in einer Buchung erfasst werden.
-
-### 9.7 Gegenkonto
-
-Das Gegenkonto wird einmal für die gesamte Rechnung ausgewählt.
-
-Je nach Geschäftsvorfall kann dies beispielsweise ein Debitoren-,
-Kreditoren-, Bank- oder anderes geeignetes Gegenkonto sein.
-
-Das Gegenkonto darf nicht zugleich als Sachkonto derselben
-Rechnungsposition verwendet werden.
-
-SimpleOB bietet bei der Rechnungserfassung nur Konten an, die für
-diesen Buchungsweg zur Verfügung stehen. Die in der
-Kontenkonfiguration festgelegten technischen Umsatzsteuerkonten werden
-nicht als normale Sach- oder Gegenkonten angeboten.
-
-### 9.8 Eingangsrechnungen
-
-Für eine Eingangsrechnung wird die Rechnungsart
-**„Eingangsrechnung“** gewählt.
-
-Als Sachkonten der Rechnungspositionen sind dabei Aufwands- und
-Aktivkonten vorgesehen.
-
-Für jede Position wird der Bruttobetrag und der zutreffende
-Umsatzsteuersatz angegeben.
-
-SimpleOB erzeugt daraus die erforderliche Buchung unter Verwendung der
-in der Kontenkonfiguration hinterlegten Vorsteuerkonten.
-
-### 9.9 Ausgangsrechnungen
-
-Für eine Ausgangsrechnung wird die Rechnungsart
-**„Ausgangsrechnung“** gewählt.
-
-Die Rechnungspositionen enthalten das jeweilige Sachkonto, den
-Bruttobetrag und den Umsatzsteuersatz.
-
-SimpleOB erzeugt daraus die erforderliche Buchung unter Verwendung der
-in der Kontenkonfiguration hinterlegten Umsatzsteuerkonten.
-
-### 9.10 Gutschriften
-
-SimpleOB unterscheidet bei der Rechnungserfassung zwischen:
-
-- **Kundengutschrift**,
-- **Lieferantengutschrift**.
-
-Dadurch kann die umsatzsteuerliche Buchung einer Gutschrift über
-denselben Erfassungsbereich wie die zugehörigen Rechnungen vorgenommen
-werden.
-
-Bei Lieferantengutschriften sind für die Rechnungspositionen – wie bei
-Eingangsrechnungen – Aufwands- und Aktivkonten vorgesehen.
-
-### 9.11 Automatische Umsatzsteuerkonten
-
-Die für 7 % und 19 % hinterlegten Vorsteuer- und Umsatzsteuerkonten
-werden nicht bei jeder Rechnung manuell ausgewählt.
-
-SimpleOB verwendet dafür die unter **„Kontenkonfiguration“ →
-„USt-Konten“** festgelegten Konten.
-
-Dort werden getrennt konfiguriert:
-
-- Vorsteuer 7 %,
-- Vorsteuer 19 %,
-- Umsatzsteuer 7 %,
-- Umsatzsteuer 19 %.
-
-Bei Änderungen dieser Konten ist deshalb darauf zu achten, dass die
-ausgewählten Konten fachlich für die jeweilige Steuerfunktion bestimmt
-sind.
-
-### 9.12 Buchung übernehmen
-
-Die Schaltfläche **„Buchung übernehmen“** wird erst verfügbar, wenn die
-für den jeweiligen Buchungsweg erforderlichen Eingaben vollständig und
-gültig sind.
-
-Nach der Übernahme wird die Buchung im geöffneten Geschäftsjahr
-gespeichert. Die Kontensalden, das Journal sowie die daraus abgeleiteten
-Auswertungen werden anschließend aktualisiert.
-
-Die Meldung **„Buchung wurde übernommen.“** bestätigt die erfolgreiche
-Übernahme.
-
-### 9.13 Abgeschlossenes Geschäftsjahr
-
-Nach dem Abschluss eines Geschäftsjahres können keine weiteren
-laufenden Buchungen erfasst werden.
-
-SimpleOB sperrt sowohl die einfache Buchung als auch die
-Rechnungserfassung und zeigt den Hinweis:
-
-**„Das Geschäftsjahr ist abgeschlossen. Buchungen sind nicht mehr
-möglich.“**
-
-Der Abschluss eines Geschäftsjahres wird in Kapitel 11
-**„Jahresabschluss“** beschrieben.
-
-### 9.14 Offene Posten und Rechnungen
-
-Ausgangs- und Eingangsrechnungen werden in der Buchungsart
-**„Rechnung mit Umsatzsteuer“** erfasst. Geben Sie Geschäftspartner,
-Rechnungsnummer, Beleg- und Fälligkeitsdatum sowie die Rechnungspositionen an.
-Die Rechnung wird gebucht und als Forderungs- beziehungsweise
-Verbindlichkeits-OP geführt. Eine Kundengutschrift oder Lieferantengutschrift
-erzeugt entsprechend einen Guthaben-OP.
-
-Die Register **OP-Übersicht** und **OP-Abstimmung** ergänzen die Buchungsmaske.
-In der OP-Übersicht können Sie Kunden oder Lieferanten sowie offene,
-ausgeglichene oder alle Posten filtern. **Einzelposten** zeigt einzelne
-Rechnungen und Gutschriften; **Summen** fasst die Werte je Geschäftspartner
-und OP-Art zusammen. Über **Details** sehen Sie die Vorgänge eines Postens.
-Die Übersicht zeigt die aktuelle OP-Situation, keine historische
-Stichtagsauswertung.
-
-### 9.15 Zahlungen und Teilzahlungen zuordnen
-
-Im Register **Buchen** befindet sich oberhalb der Buchungserfassung die Gruppe
-**OP-Verwaltung**. Wählen Sie **Zahlung auf Rechnung erfassen …**, um eine
-Kunden- oder Lieferantenzahlung zu erfassen. Wählen Sie Zahlungsrichtung,
-Geschäftspartner und Bank- oder Kassenkonto. Erfassen Sie sowohl das
-tatsächliche Zahlungsdatum als auch das Buchungsdatum.
-
-Tragen Sie den Gesamtzahlungsbetrag ein und verteilen Sie ihn auf eine oder
-mehrere Rechnungen desselben Geschäftspartners und derselben Zahlungsrichtung.
-Die Zuordnung muss in Summe genau dem Zahlungsbetrag entsprechen.
-Teilzahlungen sind möglich: Der einer Rechnung zugewiesene Betrag kann kleiner
-als ihr offener Betrag sein. Weitere Zahlungen können später zugeordnet werden.
-Eine Zahlung auf mehrere Rechnungen wird anhand der einzelnen Zuordnungsbeträge
-aufgeteilt.
-
-Eine direkt über Bank oder Kasse erfasste Buchung erzeugt für sich allein keine
-Rechnungs-OP-Zahlungszuordnung. Für die nachfolgend beschriebene Auswertung zur
-Kleinunternehmerregelung muss eine Ausgangsrechnung deshalb als OP erfasst und
-die Zahlung über diesen Dialog zugeordnet werden.
-
-### 9.16 Guthaben verrechnen oder erstatten
-
-Mit **Guthaben mit Rechnung verrechnen …** können Sie ein Kunden- oder
-Lieferantenguthaben mit einer offenen Rechnung desselben Geschäftspartners
-verrechnen. Die Verrechnung erzeugt eine Umbuchung zwischen den OP-Konten,
-aber keine Bank- oder Kassenbewegung.
-
-Mit **Guthaben erstatten …** erfassen Sie eine tatsächliche Aus- oder
-Rückzahlung aus einem Guthaben, zum Beispiel aus einer Gutschrift oder einem
-Rechnungsstorno. Ein Rechnungsstorno selbst ist noch keine Auszahlung; eine
-tatsächliche Rückzahlung muss separat erfasst werden. Geben Sie den
-Erstattungsbetrag, das tatsächliche Zahlungs- beziehungsweise Erstattungsdatum
-und das Buchungsdatum an. Teilrückerstattungen sind bis zur Höhe des
-verfügbaren Guthabens möglich. Die Funktion
-**Guthabenrückerstattung zurücknehmen …** erfasst die Rücknahme einer bereits
-verbuchten Rückerstattung.
-
-### 9.17 Zahlungszuordnung korrigieren
-
-Mit **Zahlungszuordnung korrigieren …** können Sie eine bestehende Zuordnung
-ganz oder teilweise auf eine andere Rechnung desselben Geschäftspartners und
-derselben Zahlungsrichtung übertragen. Dazu sind ein Korrekturdatum, ein
-Buchungsdatum und eine Begründung erforderlich. Die ursprüngliche Bank- oder
-Kassenzahlung bleibt bestehen; die Korrektur selbst ist keine neue
-Geldbewegung.
-
-### 9.18 Rechnungen und Buchungen stornieren
-
-Eine stornierbare Rechnung kann in der **OP-Übersicht** über
-**Rechnung vollständig stornieren** aufgehoben werden. SimpleOB zeigt vorab
-eine Vorschau und verlangt ein Stornobuchungsdatum sowie einen Stornogrund.
-Ein Rechnungsstorno erzeugt die Gegenbuchung und einen zugehörigen
-Guthaben-OP; es löscht die ursprüngliche Rechnung nicht. Die Stornierbarkeit
-wird anhand des Postens und seiner Vorgänge geprüft.
-
-Im Register **Journal** steht außerdem **Buchung stornieren** für Buchungen zur
-Verfügung, die nach den Prüfregeln der Anwendung storniert werden können.
-Dabei wird eine Gegenbuchung erzeugt. Eine Buchung wird nicht aus dem Journal
-entfernt.
-
-### 9.19 OP-Abstimmung
-
-Im Register **OP-Abstimmung** vergleichen Sie zum gewählten Stichtag die Salden
-der OP-Sammelkonten im Hauptbuch mit den Salden der OP-Nebenbuchführung.
-Abweichungen, nicht zugeordnete Hauptbuchbewegungen und zeitlich ungeklärte
-historische Zahlungszuordnungskorrekturen werden zur Prüfung angezeigt. Die
-Abstimmung weist auf Klärungsbedarf hin; sie bucht keine Korrekturen
-automatisch.
-
-### 9.20 Umsatzüberwachung zur Kleinunternehmerregelung nach § 19 UStG
-
-Im Bereich **Buchen** zeigt die Gruppe **Umsatzüberwachung – vereinnahmte
-Kundenzahlungen** für das
-Vorjahr und das laufende Kalenderjahr Kundenzahlungen, Kundenrückerstattungen,
-externe Umsatzergänzungen, den Saldo einschließlich Ergänzung und – sofern
-bestimmbar – die angezeigte Umsatzgrenze. Die Kalenderjahre richten sich nach dem
-aktuellen Datum, nicht nach dem geöffneten Geschäftsjahr.
-
-Die OP-Auswertung berücksichtigt Kundenzahlungen anhand ihres tatsächlichen
-Zahlungsdatums und nur in Höhe des den Ausgangsrechnungen zugeordneten
-Betrags. Teilzahlungen und Zuordnungen einer Zahlung zu mehreren Rechnungen
-werden entsprechend ihrer Anteile berücksichtigt. Korrigierte Zuordnungen
-wirken entsprechend der anschließend gültigen OP-Zuordnung. Journalstornierte
-Zahlungen werden nicht als wirksame Zahlung gezählt.
-
-Tatsächlich ausgezahlte, in der OP-Verwaltung erfasste Rückerstattungen aus
-Kundengutschriften und Ausgangsrechnungsstornos werden im Kalenderjahr des
-Erstattungsdatums abgezogen. Eine Gutschrift oder Verrechnung ohne Auszahlung
-ist für sich allein keine Rückerstattung. Zurückgenommene Rückerstattungen
-werden nicht als Auszahlung berücksichtigt.
-
-Im Dialog **Verwaltung → Kleinunternehmerregelung** können Sie den Beginn der
-unternehmerischen Tätigkeit, externe Jahresumsätze für konkrete Kalenderjahre
-sowie einen dokumentierten Verzicht erfassen. Jahresbeträge bleiben ihrem
-Kalenderjahr zugeordnet. Externe Beträge werden zusätzlich zu den OP-Werten
-angezeigt und nicht in die OP-Summen übernommen. Fehlt der Tätigkeitsbeginn,
-leitet SimpleOB kein Gründungsjahr aus dem ersten Geschäftsjahr ab und kann
-die passende Grenze nicht bestimmen. Im Gründungsjahr wird 25.000 € angezeigt;
-für Folgejahre werden 25.000 € für das Vorjahr und 100.000 € für das laufende
-Jahr angezeigt.
-
-Bei dokumentiertem Verzicht wird der Informationsbereich zur
-Kleinunternehmerregelung ausgeblendet. Das
-Verzichtsdatum dokumentiert die eingegebene Angabe; SimpleOB übermittelt damit
-keine Erklärung und prüft nicht automatisch die steuerliche Wirksamkeit oder
-Fristen.
-
-Beim Verlassen eines Betragsfeldes einer Ausgangsrechnung kann eine Warnung
-erscheinen, wenn die Grenze bei angenommener vollständiger Vereinnahmung im
-laufenden Kalenderjahr voraussichtlich überschritten würde. Die Prognose setzt
-den eingegebenen Bruttobetrag einmal an; die Umsatzsteuer wird nicht nochmals
-hinzugerechnet. Die Warnung blockiert die Buchung nicht und ändert den
-Steuersatz nicht automatisch.
-
-Die Umsatzüberwachung ist eine informative Auswertung und keine vollständige
-steuerrechtliche Prüfung. Sie erfasst ausschließlich OP-zugeordnete
-Kundenzahlungen sowie eindeutig zuordenbare Rückerstattungen. Direktverkäufe
-über Bank oder Kasse ohne Rechnungs-OP, Anzahlungen ohne Rechnung und nicht
-eindeutig erkennbare Entgeltminderungen sind nicht vollständig enthalten.
-Erkannte direkte Erlösbuchungen können einen Hinweis auslösen, werden aber
-nicht zur überwachten Umsatzsumme addiert. Ausgangsrechnungen müssen für diese
-Auswertung grundsätzlich auf Ziel erfasst werden. Die Anzeige nimmt keine automatische
-Aktivierung oder Deaktivierung der Kleinunternehmerregelung und keine andere
-automatische Änderung der steuerlichen Behandlung vor.
+Im Register **Journal** können Sie eine ausgewählte reguläre Buchung über
+**Buchung stornieren** aufheben. Die Funktion ist nur bei einem offenen
+Geschäftsjahr verfügbar. SimpleOB fragt ein Stornodatum ab und zeigt die
+vorgesehene Gegenbuchung zur Prüfung an. Zum Buchen müssen Sie exakt
+**DURCHFÜHREN** eingeben. Die ursprüngliche Buchung bleibt im Journal
+erhalten; SimpleOB fügt eine separate Stornobuchung hinzu.
 
 ## 10. Anlagenbuchhaltung
 
@@ -1973,42 +1747,136 @@ Geschäftsjahr kann in diesem Zustand nicht abgeschlossen werden.
 Die Ursachen müssen zunächst beseitigt und die Prüfung anschließend
 erneut durchgeführt werden.
 
-### 11.4 Geschäftsjahr endgültig abschließen
+### 11.4 Umsatzsteuerverrechnung und endgültiger Jahresabschluss
 
-Nach erfolgreicher Plausibilitätsprüfung kann das Geschäftsjahr mit
+#### Umsatzsteuerverrechnung vorbereiten
 
-**Geschäftsjahr abschließen**
+Die Umsatzsteuerverrechnung ist ein eigener Buchungsschritt im noch offenen
+Geschäftsjahr. Sie können ihn im Arbeitsbereich **Jahresabschluss** über
+**Umsatzsteuerverrechnung vorschlagen** aufrufen. SimpleOB zeigt zunächst eine
+Vorschau; noch wird nichts gebucht.
 
-abgeschlossen werden.
+Die Konten werden in **Verwaltung → Kontenkonfiguration** festgelegt:
 
-Vor dem Abschluss zeigt SimpleOB eine ausdrückliche Sicherheitsabfrage.
+- Unter **USt-Konten**: Vorsteuer 7 %, Vorsteuer 19 %, Umsatzsteuer 7 % und
+  Umsatzsteuer 19 %.
+- Unter **Kontenrollen**: ein Konto für **Umsatzsteuer-Vorauszahlungen** und
+  ein Konto für **Umsatzsteuer laufendes Jahr**.
 
-Dabei wird darauf hingewiesen, dass
+Die Umsatzsteuerkonten, das Vorauszahlungskonto und das Verrechnungskonto
+müssen voneinander getrennt sein. Vorsteuer- und Vorauszahlungskonten müssen
+Aktivkonten, Umsatzsteuerkonten und das Konto **Umsatzsteuer laufendes Jahr**
+Passivkonten sein. Für das Verrechnungskonto müssen außerdem die HGB-
+Zuordnungen Soll B.II.4 und Haben C.8 eingerichtet sein. Die
+Kontenkonfiguration verlangt eine vollständige Zuordnung der
+Umsatzsteuerrollen einschließlich der Rollen für Vorjahresforderungen und
+-verbindlichkeiten. Diese beiden Vorjahreskonten werden von diesem
+Verrechnungsvorschlag selbst nicht als Quellkonten verrechnet.
 
-- das Geschäftsjahr endgültig abgeschlossen wird,
-- die Erfolgskonten abgeschlossen werden und
-- weitere Buchungen in diesem Geschäftsjahr anschließend gesperrt
-  sind.
+SimpleOB ermittelt die aktuellen Hauptbuchsalden der vier Vorsteuer- und
+Umsatzsteuerkonten sowie des Umsatzsteuer-Vorauszahlungskontos. Das Konto
+**Umsatzsteuer laufendes Jahr** ist das Verrechnungskonto; sein bisheriger
+Saldo wird in das Ergebnis einbezogen. Die Vorschau zeigt die beteiligten
+Konten mit Bezeichnung, Soll- und Habensaldo sowie Eröffnungsanteil. Außerdem
+zeigt sie die vorgeschlagenen Buchungssätze und den daraus resultierenden
+Saldo auf dem Verrechnungskonto:
 
-Der Vorgang wird nur durchgeführt, wenn die Sicherheitsabfrage
-bestätigt wird.
+- Ein Sollsaldo auf einem Quellkonto wird durch eine Habenbuchung auf diesem
+  Konto und eine Sollbuchung auf dem Verrechnungskonto ausgeglichen.
+- Ein Habensaldo auf einem Quellkonto wird durch eine Sollbuchung auf diesem
+  Konto und eine Habenbuchung auf dem Verrechnungskonto ausgeglichen.
+
+Für jedes Quellkonto mit Saldo entsteht ein eigener ausgeglichener
+Buchungssatz zum letzten Tag des Geschäftsjahres. Ein Sollsaldo auf dem
+Verrechnungskonto wird als Umsatzsteuerforderung, ein Habensaldo als
+Umsatzsteuerverbindlichkeit angezeigt. Bei einem Nullsaldo weist SimpleOB
+keine Forderung oder Verbindlichkeit aus. Sind alle Quellkonten bereits
+ausgeglichen, enthält die Vorschau keine neuen Buchungssätze und
+**Buchungen übernehmen** ist gesperrt.
+
+Nicht ausgeglichene Eröffnungswerte auf beteiligten Quell- oder
+Verrechnungskonten verhindern den Vorschlag. SimpleOB zeigt die betroffenen
+Konten und Beträge an; diese Werte müssen zunächst manuell geklärt oder
+ausgeglichen werden. Eine unvollständige oder ungeeignete Kontenkonfiguration
+wird ebenfalls mit einem Hinweis abgewiesen.
+
+Prüfen Sie die Vorschau und wählen Sie **Buchungen übernehmen**, um die
+Umbuchungen ausdrücklich zu bestätigen. Mit **Abbrechen** oder Schließen der
+Vorschau wird nichts gespeichert. Vor dem Speichern prüft SimpleOB unter
+Sperre erneut, ob das Geschäftsjahr offen ist und ob sich Buchungen oder
+Kontensalden seit der Vorschau geändert haben. Bei einem geänderten Stand
+wird der Vorschlag nicht gespeichert; rufen Sie die Vorschau erneut auf.
+Alle vorgeschlagenen Buchungen werden gemeinsam gespeichert. Bei einem Fehler
+werden sie vollständig zurückgerollt. Nach erfolgreicher Buchung aktualisiert
+SimpleOB Journal, Bilanz und Abschlussanzeige.
+
+Wird beim Abschlussversuch ein Saldo auf den Quellkonten gefunden, erscheint
+die Warnung **Umsatzsteuerkonten nicht verrechnet**. Das Verrechnungskonto
+selbst ist dabei kein Quellkonto und löst diese Warnung nicht aus. Von dort
+aus können Sie **Umsatzsteuerverrechnung aufrufen**, **Ohne Verrechnung
+fortfahren** oder **Abbrechen** wählen. Die Verrechnung wird nicht automatisch
+ausgeführt. Nach einer erfolgreichen Verrechnung bleibt das Geschäftsjahr
+offen; starten Sie den Abschluss anschließend erneut. Werden danach weitere
+Umsatzsteuerbuchungen erfasst, kann ein neuer Vorschlag erforderlich sein.
+
+#### Grenzen der Berechnung und Versteuerungsart
+
+Die Verrechnung übernimmt ausschließlich die im Hauptbuch vorhandenen
+Kontensalden. Sie berechnet weder Umsatzsteuer aus Rechnungen noch prüft sie
+Rechnungs-, Zahlungs- oder Voranmeldungszeiträume. Version 0.62.0 enthält
+keine Rechnungserfassung, keine OP-Nebenbuchführung und keine Zuordnung von
+Zahlungen zu Rechnungen.
+
+SimpleOB speichert und prüft bei dieser Funktion keine Soll- oder
+Ist-Versteuerungsart. Bei Soll-Versteuerung muss die Umsatzsteuer daher
+bereits im Hauptbuch für den sachlich zutreffenden Zeitraum gebucht sein.
+Ein Umsatzsteuersaldo aus einer noch nicht bezahlten Rechnung kann daher in
+die Vorschau eingehen, wenn er bereits auf dem Umsatzsteuerkonto gebucht ist.
+Bei Ist-Versteuerung kann die Funktion nicht feststellen, welche Zahlung zu
+welcher Rechnung gehört oder wann die Umsatzsteuer vereinnahmt wurde. In
+beiden Fällen müssen Sie selbst sicherstellen, dass die verwendeten
+Hauptbuchsalden nach der für Ihren Mandanten maßgeblichen Versteuerungsart
+und zeitlich korrekt gebucht sind. Die Vorschau ersetzt keine steuerliche
+Prüfung.
+
+#### Geschäftsjahr endgültig abschließen
+
+Nach erfolgreicher Plausibilitätsprüfung können Sie **Geschäftsjahr
+abschließen** wählen. Vor dem Abschluss prüft SimpleOB die Salden der
+Umsatzsteuer-, Vorsteuer- und Vorauszahlungskonten. Bei offenen Salden
+erscheint die oben beschriebene Warnung. Sie können die Verrechnung
+vorschlagen und ausführen, ohne Verrechnung fortfahren oder den Vorgang
+abbrechen.
+
+Danach zeigt SimpleOB eine ausdrückliche Sicherheitsabfrage. Sie weist darauf
+hin, dass das Geschäftsjahr endgültig abgeschlossen wird, die Erfolgskonten
+abgeschlossen werden und weitere Buchungen in diesem Geschäftsjahr gesperrt
+sind. Der Vorgang wird nur nach Bestätigung fortgesetzt.
+
+Anschließend wählen Sie im Dialog **Bilanzdarstellung** eine der beiden
+Abschlussvarianten:
+
+- **Variante A – vor Ergebnisverwendung**: Die Bilanz wird vor einer
+  Ergebnisverwendung dargestellt. Dies ist die Standardauswahl.
+- **Variante B – nach Ergebnisverwendung**: Die Bilanz berücksichtigt eine
+  gespeicherte Ergebnisverwendung. Dafür müssen die Bilanz vor der
+  Ergebnisverwendung und die berücksichtigten Buchungen ausgeglichen sein.
+
+Mit **Abbrechen** wird der Abschluss nicht fortgesetzt. Die Wahl der
+Bilanzdarstellung ändert die Trennung zwischen Debitoren- und
+Kreditorenkonten nicht.
 
 Nach erfolgreichem Abschluss zeigt SimpleOB:
 
 **Das Geschäftsjahr wurde erfolgreich abgeschlossen.**
 
-Der Status wechselt anschließend von
-
-**Geschäftsjahr: Offen**
-
-zu
-
+Der Status wechselt anschließend von **Geschäftsjahr: Offen** zu
 **Geschäftsjahr: Abgeschlossen**.
 
 > **Wichtig:** Ein abgeschlossenes Geschäftsjahr ist für weitere
 > Buchungen gesperrt. Vor dem endgültigen Abschluss sollten deshalb
-> Buchungen, Abschreibungen, Bilanz und Gewinn- und Verlustrechnung
-> sorgfältig geprüft werden.
+> Buchungen, Abschreibungen, Umsatzsteuerverrechnung, Bilanz und
+> Gewinn- und Verlustrechnung sorgfältig geprüft werden.
 
 ### 11.5 Auswirkungen des Jahresabschlusses
 
@@ -2436,16 +2304,24 @@ Der Jahresabschluss ist in Kapitel 11 beschrieben.
 Für die Erstellung einer E-Bilanz müssen insbesondere folgende
 Voraussetzungen erfüllt sein:
 
-- Für den Mandanten muss eine von SimpleOB unterstützte Rechtsform
-  hinterlegt sein.
+- Als Rechtsform werden für die E-Bilanz derzeit **UG
+  (haftungsbeschränkt)** und **GmbH** unterstützt.
 - Die erforderlichen Unternehmensstammdaten müssen vorhanden sein.
 - Das Geschäftsjahr muss abgeschlossen sein.
 - Eine Gewinn- und Verlustrechnung muss für das Geschäftsjahr
   vorliegen.
-- Die für das Geschäftsjahr benötigte E-Bilanz-Taxonomie muss
-  vollständig installiert sein.
-- Für eine ELSTER-Übermittlung müssen zusätzlich die in Kapitel 5
-  beschriebenen ELSTER-Einstellungen vorhanden sein.
+- Für die Erzeugung müssen die verwendete Taxonomie und die benötigten
+  Taxonomiezuordnungen verfügbar sein.
+- Für die Validierung muss die E-Bilanz zuvor erzeugt worden sein und die
+  Arelle-Validierungskomponente verfügbar sein.
+- Für eine ELSTER-Übermittlung müssen zusätzlich die Voraussetzungen aus
+  Kapitel 5 sowie ein kompatibles ERiC-SDK erfüllt sein.
+
+Die Vorbereitung, Erzeugung, Validierung und Übermittlung sind getrennte
+Schritte. Die **Vorbereitung** stellt die Abschlussdaten zusammen. Eine
+installierte Taxonomie allein bedeutet weder, dass die Erzeugung dieser
+Taxonomieversion unterstützt wird, noch dass die übermittelten Daten bereits
+validiert sind.
 
 Solange das Geschäftsjahr noch offen ist, zeigt SimpleOB:
 
@@ -2455,7 +2331,10 @@ erst nach dem Jahresabschluss vorbereitet werden.**
 ### 13.2 Taxonomie
 
 Im Bereich **Taxonomie und Status** zeigt SimpleOB die für das
-Geschäftsjahr benötigte Taxonomie und deren Installationsstatus an.
+Geschäftsjahr benötigte Taxonomie und deren Installationsstatus an. Die
+Taxonomieinstallation ist auch dann erreichbar, wenn noch keine Taxonomie
+installiert ist; sie ist nicht an die Freigabe der Erzeugungs- oder
+Übermittlungsaktionen gekoppelt.
 
 Mögliche Zustände sind:
 
@@ -2470,8 +2349,8 @@ Schaltfläche
 
 zur Verfügung.
 
-Damit installiert SimpleOB die für das ausgewählte Geschäftsjahr
-benötigte Taxonomie.
+Damit installiert SimpleOB eine Taxonomie, die SimpleOB für das ausgewählte
+Geschäftsjahr kennt.
 
 Für Taxonomie 6.9 verwendet SimpleOB das mit der Anwendung ausgelieferte
 lokale Archiv; dafür ist kein erneuter Download erforderlich. Alternativ
@@ -2481,6 +2360,16 @@ Paketstruktur, Version und erforderliche Entry-Points und zeigt die
 erkannte Version vor der Installation zur Bestätigung an. Manuell wird
 derzeit nur Taxonomie 6.9 installiert. Eine bereits vorhandene Installation
 wird nicht ersetzt.
+
+Die Anwendung unterstützt derzeit die **Erzeugung** von E-Bilanzen mit
+Taxonomie **6.9**. Installation und Erzeugungsunterstützung sind nicht
+gleichzusetzen: SimpleOB kann Taxonomien für andere Geschäftsjahre anzeigen
+oder installieren, ohne deren E-Bilanz-Erzeugung zu unterstützen. Prüfen Sie
+vor dem Arbeitsablauf, ob die erforderliche Taxonomieversion zur aktuell
+unterstützten Erzeugung gehört. Die Taxonomieauswahl ordnet derzeit
+Geschäftsjahren mit Beginn 2025 die Version 6.8, mit Beginn 2026 die Version
+6.9 und mit Beginn 2027 die Version 6.10 zu. Damit ist die E-Bilanz-Erzeugung
+in Version 0.62.0 derzeit für Geschäftsjahre mit Taxonomie 6.9 unterstützt.
 
 SimpleOB kann die Herkunft einer selbst ausgewählten Datei nicht
 kryptografisch verifizieren. Verwenden Sie dafür ausschließlich ein
@@ -2671,27 +2560,13 @@ Vor einer produktiven Übermittlung kann eine
 
 durchgeführt werden.
 
-Für einen vollständigen Praxistest kann das zusammen mit SimpleOB
-ausgelieferte ELSTER-Testzertifikat
-
-`test-softidnr-pse.pfx`
-
-verwendet werden.
-
-Das Testzertifikat wird nicht automatisch von SimpleOB eingerichtet.
-Der Benutzer wählt es zunächst unter
+Für eine Testsendung muss ein gültiges ELSTER-Testzertifikat ausgewählt sein.
+SimpleOB liefert kein Testzertifikat mit aus. Wählen Sie das Zertifikat unter
 
 **Einstellungen → ELSTER-Zertifikat…**
 
-aus. Damit wird derselbe Einrichtungsvorgang durchlaufen, der später
-auch für das persönliche ELSTER-Zertifikat erforderlich ist.
-
-Die PIN des Testzertifikats lautet:
-
-**123456**
-
-Sie wird nicht in SimpleOB gespeichert, sondern bei der Testübermittlung
-manuell in den PIN-Dialog eingegeben.
+aus. Die PIN wird bei der Übermittlung im PIN-Dialog abgefragt und nicht
+dauerhaft gespeichert.
 
 Bei der Testübermittlung handelt es sich um eine echte Verbindung zum
 ELSTER-Server.
@@ -2956,8 +2831,11 @@ Dazu gehören insbesondere:
 - Umsatzsteuerkonten,
 - Kontenrollen,
 - mandantenspezifische E-Bilanz-Zuordnungen,
-- Einstellungen zur Kleinunternehmerregelung mit Tätigkeitsbeginn, Verzichtsangabe und kalenderjahrbezogenen externen Umsatzergänzungen,
+- gegebenenfalls mit dem Mandanten gespeicherte technische Angaben zur
+  Kleinunternehmerregelung (daraus entsteht keine Umsatzüberwachung),
 - Gesellschafterdaten,
+- Geschäftspartner einschließlich der Kennzeichen Debitor und Kreditor,
+- Zuordnungen der Personenkonten zu Geschäftspartnern,
 - sämtliche in SimpleOB verwalteten Geschäftsjahre,
 - Buchungen und Buchungszeilen,
 - Verknüpfungen zwischen den Geschäftsjahren,
@@ -2969,16 +2847,11 @@ Dazu gehören insbesondere:
 - Buchungen zur Ergebnisverwendung und
 - erfasste Einlagen.
 
-**Einschränkung in Version 0.60.1:** Das `.simpleob`-Format enthält derzeit
-nicht die Geschäftspartner und separaten OP-Nebenbuchdaten wie Rechnungs-OPs, Zahlungen,
-Zahlungszuordnungen, Verrechnungen, Rückerstattungen und deren Korrekturen.
-Die zugehörigen Hauptbuchungen können im Export enthalten sein, bilden diese
-OP-Vorgänge aber nicht vollständig ab. Deshalb ist `.simpleob` für einen
-Mandanten mit genutzter OP-Verwaltung keine vollständige Sicherung oder
-Übertragung. Insbesondere kann die OP-basierte Umsatzüberwachung nach einem
-Import die bisherige Zahlungshistorie nicht wiederherstellen. Sichern Sie in
-diesem Fall zusätzlich die vollständige Datenbank und verwenden Sie für eine
-Übertragung der OP-Daten kein `.simpleob`-Archiv allein.
+Version 0.62.0 verwaltet keine Rechnungs- oder OP-Nebenbuchhistorie. Es gibt
+daher keine separaten Rechnungs-OPs, Zahlungszuordnungen, Verrechnungen oder
+Rückerstattungsvorgänge, die in einer `.simpleob`-Datei fehlen könnten.
+Hauptbuchbuchungen, Geschäftspartner und ihre Personenkontenzuordnungen sind
+Bestandteil des Transfers.
 
 Der Export beschränkt sich damit nicht auf das gerade ausgewählte
 Geschäftsjahr.
@@ -2993,9 +2866,9 @@ Die `.simpleob`-Datei enthält mandantenbezogene Daten.
 Anwendungsweite Einstellungen gehören dagegen nicht zum
 Mandantentransfer.
 
-Die mandantenbezogenen Einstellungen zur Kleinunternehmerregelung sind
-Bestandteil des Exports. Dazu gehören Tätigkeitsbeginn, dokumentierter
-Verzicht samt Datum und externe Umsatzergänzungen mit ihrem Kalenderjahr.
+Einzelne technische Datenfelder zur Kleinunternehmerregelung können im
+Mandantentransfer enthalten sein. Version 0.62.0 bietet jedoch keine
+bedienbare Umsatzüberwachung oder Verwaltung dieser Angaben als Funktion an.
 
 Insbesondere werden die in Kapitel 5 beschriebenen
 ELSTER-Einstellungen nicht als Bestandteil des Mandanten exportiert.
@@ -3110,9 +2983,8 @@ der Datenbank verbleibt.
 
 Die Exportfunktion sichert die im `.simpleob`-Format unterstützten Daten eines
 Mandanten einschließlich seiner Geschäftsjahre in einer einzelnen Datei.
-Bei Nutzung der OP-Verwaltung ist sie keine vollständige Sicherung; beachten
-Sie dazu die Einschränkung in Kapitel 14.2 und sichern Sie zusätzlich die
-gesamte Datenbank.
+Sie ist ein portabler Mandantenexport und ersetzt keine zusätzliche Sicherung
+der gesamten Datenbank oder Anwendungsumgebung.
 
 Eine solche Sicherung sollte insbesondere erstellt werden
 
@@ -3161,11 +3033,10 @@ ausschließlich auf eine einzige Sicherungsart zu vertrauen.
 Für die Übertragung eines Mandanten auf einen anderen Rechner kann
 folgender Ablauf verwendet werden:
 
-Dieser Ablauf eignet sich in Version 0.60.1 nicht zur vollständigen
-Übertragung von Geschäftspartner- oder OP-Daten. Wenn die OP-Verwaltung
-verwendet wurde, verwenden Sie `.simpleob` nicht als einzige
-Übertragungsmethode; die dazugehörige Einschränkung ist in Kapitel 14.2
-beschrieben.
+Der Transfer umfasst die Geschäftspartner und Personenkontenzuordnungen des
+Mandanten. Version 0.62.0 enthält keine OP-Nebenbuchhistorie. Richten Sie auf
+dem Zielrechner erforderliche lokale Datenbank- und ELSTER-Einstellungen
+gesondert ein.
 
 1. Den gewünschten Mandanten auf dem bisherigen Rechner öffnen.
 2. Den Mandanten als `.simpleob`-Datei exportieren.
@@ -3270,8 +3141,8 @@ geprüft werden:
 - ausgewählte Konten,
 - Soll- und Habenbeträge,
 - Ausgeglichenheit der Buchung,
-- Umsatzsteuerangaben bei Rechnungsbuchungen und
-- die für den Mandanten hinterlegte Kontenkonfiguration.
+- die Kontenkonfiguration, insbesondere die für den Mandanten festgelegten
+  Umsatzsteuerkonten und Kontenrollen.
 
 Bei automatisierten Buchungsvorgängen, beispielsweise Abschreibungen
 oder Ergebnisverwendungsbuchungen, sollten zusätzlich die in der
