@@ -1,5 +1,6 @@
 """Atomare Verwaltung mandantenspezifischer Personenkonten."""
 
+from collections.abc import Mapping
 from uuid import UUID
 
 from sqlalchemy.exc import IntegrityError
@@ -82,6 +83,36 @@ class PersonAccountRepository:
             )
         )
 
+    def partners_for_company(self, *, company_id: UUID) -> tuple[BusinessPartner, ...]:
+        """Liefert alle aktiven Partner als Kandidaten für eine Kontoergänzung."""
+        return self._partners.list_for_company(company_id)
+
+    def accounts_for_partner(
+        self, *, company_id: UUID, partner_id: UUID
+    ) -> tuple[PersonAccount, ...]:
+        """Lädt die bestehenden Personenkonten eines Geschäftspartners."""
+        company = self._company(company_id)
+        account_numbers = tuple(
+            row[0]
+            for row in self._session.query(PersonenkontoZuordnung.account_number)
+            .filter(
+                PersonenkontoZuordnung.mandant_id == company.id,
+                PersonenkontoZuordnung.partner_id == str(partner_id),
+            )
+            .order_by(PersonenkontoZuordnung.role)
+            .all()
+        )
+        return tuple(
+            person_account
+            for number in account_numbers
+            if (
+                person_account := self.get(
+                    company_id=company_id, account_number=number
+                )
+            )
+            is not None
+        )
+
     def create(
         self,
         *,
@@ -91,72 +122,174 @@ class PersonAccountRepository:
         account_number: str | None = None,
         partner_id: UUID | None = None,
     ) -> PersonAccount:
-        """Legt Partner, Konto und Zuordnung atomar an."""
+        """Legt ein Personenkonto an, ohne einem Partner eine Rolle hinzuzufügen."""
+        created = self._create_accounts(
+            company_id=company_id,
+            account_numbers={role: account_number},
+            name=name,
+            partner_id=partner_id,
+            allow_role_additions=False,
+        )
+        return created[0]
+
+    def create_many(
+        self,
+        *,
+        company_id: UUID,
+        account_numbers: Mapping[PersonAccountRole, str | None],
+        name: str,
+        partner_id: UUID | None = None,
+    ) -> tuple[PersonAccount, ...]:
+        """Legt ein oder zwei Rollen eines Partners in einer Transaktion an.
+
+        Bei vorhandenen Partnern werden ausdrücklich ausgewählte, noch fehlende
+        Rollenflags gemeinsam mit den Personenkonten gespeichert.
+        """
+        return self._create_accounts(
+            company_id=company_id,
+            account_numbers=account_numbers,
+            name=name,
+            partner_id=partner_id,
+            allow_role_additions=True,
+        )
+
+    def _create_accounts(
+        self,
+        *,
+        company_id: UUID,
+        account_numbers: Mapping[PersonAccountRole, str | None],
+        name: str,
+        partner_id: UUID | None,
+        allow_role_additions: bool,
+    ) -> tuple[PersonAccount, ...]:
         if not isinstance(company_id, UUID):
             raise TypeError("company_id must be a UUID")
-        if not isinstance(role, PersonAccountRole):
-            raise TypeError("role must be a PersonAccountRole")
+        if not isinstance(account_numbers, Mapping) or not account_numbers:
+            raise ValueError("Mindestens eine Personenkonto-Rolle muss ausgewählt sein.")
+        if any(not isinstance(role, PersonAccountRole) for role in account_numbers):
+            raise TypeError("account_numbers keys must be PersonAccountRole values")
+        if partner_id is not None and not isinstance(partner_id, UUID):
+            raise TypeError("partner_id must be a UUID or None")
         try:
             company = self._accounts._lock_company(company_id)
-            number = self.suggest_account_number(company_id=company_id, role=role) if account_number is None else self.validate_account_number(account_number, role)
-            # An explicit proposal is validated here too; the unique account constraint
-            # remains the final protection against a concurrent allocation.
-            self.validate_account_number(number, role)
+            roles = tuple(
+                role
+                for role in (PersonAccountRole.DEBITOR, PersonAccountRole.KREDITOR)
+                if role in account_numbers
+            )
+            numbers: dict[PersonAccountRole, str] = {}
+            for role in roles:
+                requested_number = account_numbers[role]
+                number = (
+                    self.suggest_account_number(company_id=company_id, role=role)
+                    if requested_number is None
+                    else self.validate_account_number(requested_number, role)
+                )
+                # Explicit and suggested numbers receive the same role validation.
+                numbers[role] = self.validate_account_number(number, role)
+            if len(set(numbers.values())) != len(numbers):
+                raise ValueError("Die Kontonummern müssen unterschiedlich sein.")
+
             if partner_id is None:
                 partner = BusinessPartner(
                     company_id=company_id,
                     name=name,
-                    is_customer=role is PersonAccountRole.DEBITOR,
-                    is_supplier=role is PersonAccountRole.KREDITOR,
+                    is_customer=PersonAccountRole.DEBITOR in roles,
+                    is_supplier=PersonAccountRole.KREDITOR in roles,
                 )
                 self._partners.add(partner, commit=False)
             else:
                 partner = self._partners.get(company_id=company_id, partner_id=partner_id)
                 if partner is None or not partner.is_active:
                     raise ValueError("Der ausgewählte Geschäftspartner ist nicht aktiv oder gehört nicht zu diesem Mandanten.")
-                has_role = (
-                    partner.is_customer
-                    if role is PersonAccountRole.DEBITOR
-                    else partner.is_supplier
-                )
-                if not has_role:
-                    label = "Debitoren" if role is PersonAccountRole.DEBITOR else "Kreditoren"
-                    raise ValueError(
-                        f"Der Geschäftspartner hat keine {label}rolle."
-                    )
-                existing_role_link = (
-                    self._session.query(PersonenkontoZuordnung.id)
+                existing_roles = {
+                    PersonAccountRole(row[0])
+                    for row in self._session.query(PersonenkontoZuordnung.role)
                     .filter(
                         PersonenkontoZuordnung.mandant_id == company.id,
                         PersonenkontoZuordnung.partner_id == str(partner.partner_id),
-                        PersonenkontoZuordnung.role == role.value,
                     )
-                    .one_or_none()
-                )
-                if existing_role_link is not None:
-                    label = "Debitoren" if role is PersonAccountRole.DEBITOR else "Kreditoren"
+                    .all()
+                }
+                duplicate_roles = existing_roles.intersection(roles)
+                if duplicate_roles:
+                    labels = tuple(
+                        "Debitor" if role is PersonAccountRole.DEBITOR else "Kreditor"
+                        for role in roles
+                        if role in duplicate_roles
+                    )
+                    if len(labels) == 1:
+                        raise ValueError(
+                            f"Der Geschäftspartner besitzt bereits ein {labels[0]}enkonto."
+                        )
                     raise ValueError(
-                        f"Der Geschäftspartner besitzt bereits ein {label}konto."
+                        "Der Geschäftspartner besitzt bereits Personenkonten als "
+                        f"{labels[0]} und {labels[1]}."
                     )
 
-            account_type = AccountType.ASSET if role is PersonAccountRole.DEBITOR else AccountType.LIABILITY
-            account = Account(
-                template=TemplateAccount(number, partner.name, account_type),
-                person_account_role=role,
-            )
-            # Personenkonten haben absichtlich keine individuelle HGB-Regel.
-            self._accounts.add_account(
-                company_id=company_id, account=account, mapping_rule=None, commit=False
-            )
-            link = PersonenkontoZuordnung(
-                mandant_id=company.id,
-                account_number=number,
-                partner_id=str(partner.partner_id),
-                role=role.value,
-            )
-            self._session.add(link)
+                added_debtor = PersonAccountRole.DEBITOR in roles
+                added_creditor = PersonAccountRole.KREDITOR in roles
+                missing_role = (
+                    added_debtor and not partner.is_customer
+                ) or (added_creditor and not partner.is_supplier)
+                if missing_role and not allow_role_additions:
+                    missing_role_label = (
+                        "Debitoren"
+                        if added_debtor and not partner.is_customer
+                        else "Kreditoren"
+                    )
+                    raise ValueError(f"Der Geschäftspartner hat keine {missing_role_label}rolle.")
+
+                partner = BusinessPartner(
+                    company_id=partner.company_id,
+                    partner_id=partner.partner_id,
+                    name=partner.name,
+                    is_customer=partner.is_customer or added_debtor,
+                    is_supplier=partner.is_supplier or added_creditor,
+                    is_active=partner.is_active,
+                )
+                partner_model = (
+                    self._session.query(Geschaeftspartner)
+                    .filter(
+                        Geschaeftspartner.mandant_id == company.id,
+                        Geschaeftspartner.partner_id == str(partner.partner_id),
+                    )
+                    .one()
+                )
+                partner_model.is_customer = partner.is_customer
+                partner_model.is_supplier = partner.is_supplier
+
+            created: list[PersonAccount] = []
+            for role in roles:
+                account_type = (
+                    AccountType.ASSET
+                    if role is PersonAccountRole.DEBITOR
+                    else AccountType.LIABILITY
+                )
+                account = Account(
+                    template=TemplateAccount(numbers[role], partner.name, account_type),
+                    person_account_role=role,
+                )
+                # Personenkonten haben absichtlich keine individuelle HGB-Regel.
+                self._accounts.add_account(
+                    company_id=company_id,
+                    account=account,
+                    mapping_rule=None,
+                    commit=False,
+                )
+                self._session.add(
+                    PersonenkontoZuordnung(
+                        mandant_id=company.id,
+                        account_number=numbers[role],
+                        partner_id=str(partner.partner_id),
+                        role=role.value,
+                    )
+                )
+                created.append(
+                    PersonAccount(account=account, partner=partner, role=role)
+                )
             self._session.commit()
-            return PersonAccount(account=account, partner=partner, role=role)
+            return tuple(created)
         except IntegrityError as exc:
             self._session.rollback()
             raise ValueError(

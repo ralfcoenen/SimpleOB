@@ -1,7 +1,14 @@
+from types import SimpleNamespace
+from unittest.mock import Mock
 from uuid import uuid4
 
 import pytest
-from PySide6.QtWidgets import QApplication, QLabel, QMessageBox
+from PySide6.QtWidgets import (
+    QAbstractItemView,
+    QApplication,
+    QMessageBox,
+    QTableWidget,
+)
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -12,6 +19,9 @@ from simpleob.database.person_account_repository import PersonAccountRepository
 from simpleob.domain.business_partner import BusinessPartner
 from simpleob.domain.company import Company
 from simpleob.domain.person_account_role import PersonAccountRole
+from simpleob.ui_qt import main_window as main_window_module
+from simpleob.ui_qt.account_table_helpers import AccountNumberTableWidgetItem
+from simpleob.ui_qt.main_window import MainWindow
 from simpleob.ui_qt.person_account_dialog import PersonAccountDialog
 
 
@@ -25,198 +35,224 @@ def _setup_repository():
     return app, engine, session, company, PersonAccountRepository(session)
 
 
-def test_dialog_creates_person_account_without_hgb_fields():
+@pytest.mark.parametrize(
+    ("roles", "is_customer", "is_supplier", "expected_numbers"),
+    [
+        (
+            (PersonAccountRole.DEBITOR,),
+            True,
+            False,
+            {PersonAccountRole.DEBITOR: "10000"},
+        ),
+        (
+            (PersonAccountRole.KREDITOR,),
+            False,
+            True,
+            {PersonAccountRole.KREDITOR: "70000"},
+        ),
+        (
+            (PersonAccountRole.DEBITOR, PersonAccountRole.KREDITOR),
+            True,
+            True,
+            {
+                PersonAccountRole.DEBITOR: "10000",
+                PersonAccountRole.KREDITOR: "70000",
+            },
+        ),
+    ],
+)
+def test_new_partner_is_created_with_selected_roles_and_numbers(
+    roles, is_customer, is_supplier, expected_numbers
+):
     app, engine, session, company, repository = _setup_repository()
     dialog = PersonAccountDialog(
-        None,
-        company_id=company.company_id,
-        role=PersonAccountRole.DEBITOR,
-        repository=repository,
+        None, company_id=company.company_id, repository=repository
     )
-    assert dialog._number.text() == "10000"
-    assert not any("HGB" in label.text() for label in dialog.findChildren(QLabel))
-    dialog._name.setText("Dialog Kunde")
+    dialog._role_checks[PersonAccountRole.DEBITOR].setChecked(
+        PersonAccountRole.DEBITOR in roles
+    )
+    dialog._role_checks[PersonAccountRole.KREDITOR].setChecked(
+        PersonAccountRole.KREDITOR in roles
+    )
+    dialog._name.setText("Gemeinsamer Partner")
+
     dialog._save()
+
     assert dialog.saved is not None
-    assert dialog.saved.account_number == "10000"
-    assert dialog.saved.partner.name == "Dialog Kunde"
+    assert len(dialog.saved_accounts) == len(roles)
+    assert {
+        account.role: account.account_number for account in dialog.saved_accounts
+    } == expected_numbers
+    assert dialog.saved.partner.is_customer is is_customer
+    assert dialog.saved.partner.is_supplier is is_supplier
+    assert len(repository.list_for_company(company_id=company.company_id)) == len(roles)
     session.close()
     engine.dispose()
     app.processEvents()
 
 
-def test_dialog_suggests_numbers_for_both_roles():
+def test_dialog_requires_at_least_one_role(monkeypatch):
     app, engine, session, company, repository = _setup_repository()
-    debtor = PersonAccountDialog(
-        None, company_id=company.company_id, role=PersonAccountRole.DEBITOR,
-        repository=repository,
-    )
-    creditor = PersonAccountDialog(
-        None, company_id=company.company_id, role=PersonAccountRole.KREDITOR,
-        repository=repository,
-    )
-    assert debtor._number.text() == "10000"
-    assert creditor._number.text() == "70000"
-    assert debtor._debtor_radio.isChecked()
-    assert creditor._creditor_radio.isChecked()
-    session.close()
-    engine.dispose()
-    app.processEvents()
-
-
-def test_role_switch_refreshes_automatic_suggestion():
-    app, engine, session, company, repository = _setup_repository()
-    partner_account = repository.create(
-        company_id=company.company_id,
-        role=PersonAccountRole.DEBITOR,
-        name="Kunde mit Debitorenkonto",
-    )
     dialog = PersonAccountDialog(
-        None, company_id=company.company_id, role=PersonAccountRole.KREDITOR,
-        repository=repository,
+        None, company_id=company.company_id, repository=repository
     )
-    dialog._debtor_radio.setChecked(True)
-    assert dialog._role is PersonAccountRole.DEBITOR
-    assert dialog._number.text() == "10001"
-    assert dialog._partner_choice.findData(str(partner_account.partner.partner_id)) == -1
+    dialog._role_checks[PersonAccountRole.DEBITOR].setChecked(False)
+    warnings = []
+    monkeypatch.setattr(
+        QMessageBox, "warning", lambda *args: warnings.append(args[-1])
+    )
+
+    dialog._save()
+
+    assert dialog.saved_accounts == ()
+    assert warnings and "mindestens ein" in warnings[0].lower()
+    assert repository.list_for_company(company_id=company.company_id) == ()
     session.close()
     engine.dispose()
     app.processEvents()
 
 
-def test_partner_choices_match_debtor_creditor_and_both_roles():
+def test_number_suggestions_are_independent_and_role_specific():
     app, engine, session, company, repository = _setup_repository()
-    partners = BusinessPartnerRepository(session)
-    debtor_only = BusinessPartner(
-        company_id=company.company_id,
-        name="Nur Debitor",
-        is_customer=True,
-        is_supplier=False,
-    )
-    creditor_only = BusinessPartner(
-        company_id=company.company_id,
-        name="Nur Kreditor",
-        is_customer=False,
-        is_supplier=True,
-    )
-    both_roles = BusinessPartner(
-        company_id=company.company_id,
-        name="Debitor und Kreditor",
-        is_customer=True,
-        is_supplier=True,
-    )
-    for partner in (debtor_only, creditor_only, both_roles):
-        partners.add(partner)
-
     dialog = PersonAccountDialog(
-        None,
-        company_id=company.company_id,
-        role=PersonAccountRole.DEBITOR,
-        repository=repository,
+        None, company_id=company.company_id, repository=repository
     )
-    debtor_ids = {
-        dialog._partner_choice.itemData(index)
-        for index in range(1, dialog._partner_choice.count())
-    }
-    assert debtor_ids == {
-        str(debtor_only.partner_id),
-        str(both_roles.partner_id),
-    }
 
-    dialog._creditor_radio.setChecked(True)
-    creditor_ids = {
-        dialog._partner_choice.itemData(index)
-        for index in range(1, dialog._partner_choice.count())
-    }
-    assert creditor_ids == {
-        str(creditor_only.partner_id),
-        str(both_roles.partner_id),
-    }
-    assert dialog._partner_choice.itemData(0) is None
-    session.close()
-    engine.dispose()
-    app.processEvents()
-
-
-def test_role_switch_resets_partner_selection_that_is_not_valid_for_new_role():
-    app, engine, session, company, repository = _setup_repository()
-    debtor = BusinessPartner(
-        company_id=company.company_id,
-        name="Nur Debitor",
-        is_customer=True,
-        is_supplier=False,
-    )
-    BusinessPartnerRepository(session).add(debtor)
-    dialog = PersonAccountDialog(
-        None,
-        company_id=company.company_id,
-        role=PersonAccountRole.DEBITOR,
-        repository=repository,
-    )
-    dialog._partner_choice.setCurrentIndex(
-        dialog._partner_choice.findData(str(debtor.partner_id))
-    )
-    assert dialog._partner_choice.currentData() == str(debtor.partner_id)
-
-    dialog._creditor_radio.setChecked(True)
-
-    assert dialog._partner_choice.currentIndex() == 0
-    assert dialog._partner_choice.currentData() is None
+    assert dialog._number_fields[PersonAccountRole.DEBITOR].text() == "10000"
+    assert dialog._number_fields[PersonAccountRole.KREDITOR].text() == ""
+    dialog._role_checks[PersonAccountRole.KREDITOR].setChecked(True)
+    assert dialog._number_fields[PersonAccountRole.KREDITOR].text() == "70000"
     session.close()
     engine.dispose()
     app.processEvents()
 
 
 @pytest.mark.parametrize(
-    ("role", "is_customer", "is_supplier"),
+    ("existing_role", "added_role", "existing_number", "added_number"),
     [
-        (PersonAccountRole.DEBITOR, True, False),
-        (PersonAccountRole.KREDITOR, False, True),
+        (
+            PersonAccountRole.DEBITOR,
+            PersonAccountRole.KREDITOR,
+            "10000",
+            "70000",
+        ),
+        (
+            PersonAccountRole.KREDITOR,
+            PersonAccountRole.DEBITOR,
+            "70000",
+            "10000",
+        ),
     ],
 )
-def test_new_partner_gets_only_the_selected_role(role, is_customer, is_supplier):
+def test_existing_partner_can_get_missing_role_without_changing_old_number(
+    existing_role, added_role, existing_number, added_number
+):
     app, engine, session, company, repository = _setup_repository()
-    dialog = PersonAccountDialog(
-        None,
+    existing = repository.create(
         company_id=company.company_id,
-        role=role,
-        repository=repository,
+        role=existing_role,
+        name="Vorhandener Partner",
+        account_number=existing_number,
     )
-    dialog._name.setText("Neuer Geschäftspartner")
+    dialog = PersonAccountDialog(
+        None, company_id=company.company_id, repository=repository
+    )
+    dialog._partner_choice.setCurrentIndex(
+        dialog._partner_choice.findData(str(existing.partner.partner_id))
+    )
+
+    existing_check = dialog._role_checks[existing_role]
+    added_check = dialog._role_checks[added_role]
+    assert existing_check.isChecked()
+    assert not existing_check.isEnabled()
+    assert dialog._number_fields[existing_role].text() == existing_number
+    assert dialog._number_fields[existing_role].isReadOnly()
+    assert not added_check.isChecked()
+    assert added_check.isEnabled()
+
+    added_check.setChecked(True)
+    assert dialog._number_fields[added_role].text() == added_number
     dialog._save()
 
-    assert dialog.saved is not None
-    assert dialog.saved.role is role
-    assert dialog.saved.partner.is_customer is is_customer
-    assert dialog.saved.partner.is_supplier is is_supplier
+    assert len(dialog.saved_accounts) == 1
+    assert dialog.saved_accounts[0].role is added_role
+    accounts = repository.accounts_for_partner(
+        company_id=company.company_id, partner_id=existing.partner.partner_id
+    )
+    assert {account.role: account.account_number for account in accounts} == {
+        existing_role: existing_number,
+        added_role: added_number,
+    }
     session.close()
     engine.dispose()
     app.processEvents()
 
 
-def test_manual_number_is_kept_or_replaced_only_after_confirmation(monkeypatch):
+def test_partner_without_account_for_existing_role_keeps_role_locked_and_gets_proposal():
     app, engine, session, company, repository = _setup_repository()
+    partner = BusinessPartner(
+        company_id=company.company_id,
+        name="Kunde ohne Personenkonto",
+        is_customer=True,
+        is_supplier=False,
+    )
+    BusinessPartnerRepository(session).add(partner)
     dialog = PersonAccountDialog(
-        None, company_id=company.company_id, role=PersonAccountRole.DEBITOR,
-        repository=repository,
+        None, company_id=company.company_id, repository=repository
     )
-    dialog._number.selectAll()
-    dialog._number.insert("12345")
-    assert dialog._number_is_manual
+    dialog._partner_choice.setCurrentIndex(
+        dialog._partner_choice.findData(str(partner.partner_id))
+    )
 
-    monkeypatch.setattr(
-        QMessageBox, "question", lambda *args: QMessageBox.StandardButton.No
-    )
-    dialog._creditor_radio.setChecked(True)
-    assert dialog._number.text() == "12345"
-    assert dialog._role is PersonAccountRole.KREDITOR
+    debtor_check = dialog._role_checks[PersonAccountRole.DEBITOR]
+    assert debtor_check.isChecked()
+    assert not debtor_check.isEnabled()
+    assert dialog._number_fields[PersonAccountRole.DEBITOR].text() == "10000"
+    assert not dialog._number_fields[PersonAccountRole.DEBITOR].isReadOnly()
+    assert not dialog._role_checks[PersonAccountRole.KREDITOR].isChecked()
+    session.close()
+    engine.dispose()
+    app.processEvents()
 
-    monkeypatch.setattr(
-        QMessageBox, "question", lambda *args: QMessageBox.StandardButton.Yes
+
+def test_existing_partner_with_both_accounts_displays_locked_numbers(monkeypatch):
+    app, engine, session, company, repository = _setup_repository()
+    debtor = BusinessPartner(
+        company_id=company.company_id,
+        name="Beide Rollen",
+        is_customer=True,
+        is_supplier=True,
     )
-    dialog._debtor_radio.setChecked(True)
-    assert dialog._number.text() == "10000"
-    assert not dialog._number_is_manual
+    BusinessPartnerRepository(session).add(debtor)
+    repository.create_many(
+        company_id=company.company_id,
+        account_numbers={
+            PersonAccountRole.DEBITOR: "10000",
+            PersonAccountRole.KREDITOR: "70000",
+        },
+        name=debtor.name,
+        partner_id=debtor.partner_id,
+    )
+    dialog = PersonAccountDialog(
+        None, company_id=company.company_id, repository=repository
+    )
+    dialog._partner_choice.setCurrentIndex(
+        dialog._partner_choice.findData(str(debtor.partner_id))
+    )
+
+    for role, number in (
+        (PersonAccountRole.DEBITOR, "10000"),
+        (PersonAccountRole.KREDITOR, "70000"),
+    ):
+        assert dialog._role_checks[role].isChecked()
+        assert not dialog._role_checks[role].isEnabled()
+        assert dialog._number_fields[role].text() == number
+        assert dialog._number_fields[role].isReadOnly()
+
+    warning = []
+    monkeypatch.setattr(QMessageBox, "warning", lambda *args: warning.append(args[-1]))
+    dialog._save()
+    assert warning and "fehlendes" in warning[0]
     session.close()
     engine.dispose()
     app.processEvents()
@@ -225,22 +261,55 @@ def test_manual_number_is_kept_or_replaced_only_after_confirmation(monkeypatch):
 def test_manual_number_is_validated_for_selected_role(monkeypatch):
     app, engine, session, company, repository = _setup_repository()
     dialog = PersonAccountDialog(
-        None, company_id=company.company_id, role=PersonAccountRole.DEBITOR,
-        repository=repository,
+        None, company_id=company.company_id, repository=repository
     )
-    dialog._number.setText("70000")
+    number = dialog._number_fields[PersonAccountRole.DEBITOR]
+    number.setText("70000")
     dialog._name.setText("Falscher Nummernkreis")
     warnings = []
-    monkeypatch.setattr(QMessageBox, "warning", lambda *args: warnings.append(args[-1]))
+    monkeypatch.setattr(
+        QMessageBox, "warning", lambda *args: warnings.append(args[-1])
+    )
+
     dialog._save()
+
     assert dialog.saved is None
     assert warnings and "Nummernkreis" in warnings[0]
+    assert repository.partners_for_company(company_id=company.company_id) == ()
     session.close()
     engine.dispose()
     app.processEvents()
 
 
-def test_editing_existing_account_keeps_role_immutable():
+def test_manual_numbers_within_each_role_range_are_saved(monkeypatch):
+    app, engine, session, company, repository = _setup_repository()
+    dialog = PersonAccountDialog(
+        None, company_id=company.company_id, repository=repository
+    )
+    dialog._number_fields[PersonAccountRole.DEBITOR].setText("12345")
+    dialog._role_checks[PersonAccountRole.KREDITOR].setChecked(True)
+    dialog._number_fields[PersonAccountRole.KREDITOR].setText("71234")
+    dialog._name.setText("Manueller Nummerntest")
+    warnings = []
+    monkeypatch.setattr(
+        QMessageBox, "warning", lambda *args: warnings.append(args[-1])
+    )
+
+    dialog._save()
+
+    assert warnings == []
+    assert {
+        account.role: account.account_number for account in dialog.saved_accounts
+    } == {
+        PersonAccountRole.DEBITOR: "12345",
+        PersonAccountRole.KREDITOR: "71234",
+    }
+    session.close()
+    engine.dispose()
+    app.processEvents()
+
+
+def test_editing_existing_account_keeps_role_and_number_immutable():
     app, engine, session, company, repository = _setup_repository()
     created = repository.create(
         company_id=company.company_id,
@@ -248,13 +317,66 @@ def test_editing_existing_account_keeps_role_immutable():
         name="Lieferant",
     )
     dialog = PersonAccountDialog(
-        None, company_id=company.company_id, role=created.role,
-        repository=repository, existing=created,
+        None,
+        company_id=company.company_id,
+        role=created.role,
+        repository=repository,
+        existing=created,
     )
-    assert dialog._debtor_radio is None
-    assert dialog._creditor_radio is None
+    assert dialog._role_checks == {}
     assert dialog._number.isReadOnly()
+    assert dialog._number.text() == created.account_number
     assert dialog._role is PersonAccountRole.KREDITOR
     session.close()
     engine.dispose()
+    app.processEvents()
+
+
+def test_main_window_refreshes_once_and_selects_all_created_accounts(monkeypatch):
+    app = QApplication.instance() or QApplication([])
+    accounts = (
+        SimpleNamespace(account_number="10000"),
+        SimpleNamespace(account_number="70000"),
+    )
+
+    class AcceptedDialog:
+        saved_accounts = accounts
+
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        @staticmethod
+        def exec():
+            return 1
+
+    monkeypatch.setattr(main_window_module, "PersonAccountDialog", AcceptedDialog)
+    table = QTableWidget(0, 1)
+    table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+    refresh_accounts = Mock()
+
+    def refresh_table():
+        refresh_accounts()
+        table.setRowCount(2)
+        table.setItem(0, 0, AccountNumberTableWidgetItem("10000"))
+        table.setItem(1, 0, AccountNumberTableWidgetItem("70000"))
+
+    window = SimpleNamespace(
+        _person_account_repository=object(),
+        _workspace=SimpleNamespace(is_open=True),
+        _context=SimpleNamespace(company=SimpleNamespace(company_id=uuid4())),
+        _activate_account_editing_mode=Mock(),
+        _reload_chart_of_accounts=Mock(return_value=(object(), ())),
+        _refresh_person_account_reports=Mock(),
+        _refresh_accounts=refresh_table,
+        _account_table=table,
+    )
+
+    MainWindow._open_new_person_account(window)
+
+    assert refresh_accounts.call_count == 1
+    assert {
+        table.item(index.row(), 0).text()
+        for index in table.selectionModel().selectedRows()
+    } == {"10000", "70000"}
+    table.close()
     app.processEvents()

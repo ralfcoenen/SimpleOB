@@ -100,6 +100,7 @@ from simpleob.ui_qt.account_editor_dialog import AccountEditorDialog
 from simpleob.ui_qt.account_table_helpers import (
     AccountNumberTableWidgetItem,
     select_account_row,
+    select_account_rows,
     set_default_account_sort,
 )
 from simpleob.ui_qt.balance_sheet_frame import BalanceSheetFrame
@@ -5019,13 +5020,19 @@ class MainWindow(QMainWindow):
             company_id=self._context.company.company_id,
             repository=repository,
         )
-        if dialog.exec() != QDialog.DialogCode.Accepted or dialog.saved is None:
+        if (
+            dialog.exec() != QDialog.DialogCode.Accepted
+            or not dialog.saved_accounts
+        ):
             return
         self._activate_account_editing_mode()
         self._chart_of_accounts, self._accounts = self._reload_chart_of_accounts()
         self._refresh_person_account_reports()
         self._refresh_accounts()
-        select_account_row(self._account_table, dialog.saved.account_number)
+        select_account_rows(
+            self._account_table,
+            tuple(account.account_number for account in dialog.saved_accounts),
+        )
 
     def _open_edit_account(self) -> None:
         """Öffnet den Dialog zum Bearbeiten des ausgewählten Kontos."""

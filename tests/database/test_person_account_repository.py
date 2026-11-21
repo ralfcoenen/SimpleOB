@@ -115,6 +115,120 @@ def test_creates_both_roles_for_one_partner_and_loads_without_hgb_mapping(databa
     assert next(account for account in accounts if account.number == "10000").person_account_role is PersonAccountRole.DEBITOR
 
 
+def test_create_many_creates_partner_and_both_person_accounts_atomically(
+    database_session,
+):
+    session, company = database_session
+    repository = PersonAccountRepository(session)
+
+    created = repository.create_many(
+        company_id=company.company_id,
+        account_numbers={
+            PersonAccountRole.DEBITOR: "10002",
+            PersonAccountRole.KREDITOR: "70002",
+        },
+        name="Doppelrolle GmbH",
+    )
+
+    assert tuple(account.role for account in created) == (
+        PersonAccountRole.DEBITOR,
+        PersonAccountRole.KREDITOR,
+    )
+    assert tuple(account.account_number for account in created) == (
+        "10002",
+        "70002",
+    )
+    assert created[0].partner.partner_id == created[1].partner.partner_id
+    assert created[0].partner.is_customer
+    assert created[0].partner.is_supplier
+    assert session.query(Geschaeftspartner).count() == 1
+    assert session.query(Konto).count() == 2
+    assert session.query(PersonenkontoZuordnung).count() == 2
+
+
+def test_create_many_adds_missing_role_without_changing_existing_account(
+    database_session,
+):
+    session, company = database_session
+    repository = PersonAccountRepository(session)
+    existing = repository.create(
+        company_id=company.company_id,
+        role=PersonAccountRole.DEBITOR,
+        name="Kunde",
+        account_number="10003",
+    )
+
+    added = repository.create_many(
+        company_id=company.company_id,
+        account_numbers={PersonAccountRole.KREDITOR: "70003"},
+        name="Kunde",
+        partner_id=existing.partner.partner_id,
+    )
+
+    assert len(added) == 1
+    assert added[0].role is PersonAccountRole.KREDITOR
+    partner = BusinessPartnerRepository(session).get(
+        company_id=company.company_id,
+        partner_id=existing.partner.partner_id,
+    )
+    assert partner is not None
+    assert partner.is_customer and partner.is_supplier
+    accounts = repository.accounts_for_partner(
+        company_id=company.company_id,
+        partner_id=existing.partner.partner_id,
+    )
+    assert {account.role: account.account_number for account in accounts} == {
+        PersonAccountRole.DEBITOR: "10003",
+        PersonAccountRole.KREDITOR: "70003",
+    }
+
+
+def test_create_many_rolls_back_role_update_and_first_account_if_second_fails(
+    database_session, monkeypatch
+):
+    session, company = database_session
+    repository = PersonAccountRepository(session)
+    partner = BusinessPartner(
+        company_id=company.company_id,
+        name="Nur Debitorrolle",
+        is_customer=True,
+        is_supplier=False,
+    )
+    BusinessPartnerRepository(session).add(partner)
+    original_add_account = ChartOfAccountsRepository.add_account
+    add_count = 0
+
+    def fail_on_second_account(self, **kwargs):
+        nonlocal add_count
+        add_count += 1
+        if add_count == 2:
+            raise RuntimeError("Fehler beim zweiten Personenkonto")
+        return original_add_account(self, **kwargs)
+
+    monkeypatch.setattr(ChartOfAccountsRepository, "add_account", fail_on_second_account)
+    with pytest.raises(RuntimeError, match="zweiten Personenkonto"):
+        repository.create_many(
+            company_id=company.company_id,
+            account_numbers={
+                PersonAccountRole.DEBITOR: "10004",
+                PersonAccountRole.KREDITOR: "70004",
+            },
+            name=partner.name,
+            partner_id=partner.partner_id,
+        )
+
+    session.expire_all()
+    persisted_partner = BusinessPartnerRepository(session).get(
+        company_id=company.company_id,
+        partner_id=partner.partner_id,
+    )
+    assert persisted_partner is not None
+    assert persisted_partner.is_customer
+    assert not persisted_partner.is_supplier
+    assert session.query(Konto).count() == 0
+    assert session.query(PersonenkontoZuordnung).count() == 0
+
+
 def test_orphaned_five_digit_account_is_not_silently_mapped_or_ignored(
     database_session,
 ):
