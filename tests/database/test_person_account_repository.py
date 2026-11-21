@@ -67,19 +67,27 @@ def database_session():
 def test_creates_both_roles_for_one_partner_and_loads_without_hgb_mapping(database_session):
     session, company = database_session
     repository = PersonAccountRepository(session)
+    partner = BusinessPartner(
+        company_id=company.company_id,
+        name="Beispiel GmbH",
+        is_customer=True,
+        is_supplier=True,
+    )
+    BusinessPartnerRepository(session).add(partner)
 
     debtor = repository.create(
         company_id=company.company_id,
         role=PersonAccountRole.DEBITOR,
         name="Beispiel GmbH",
         account_number="10000",
+        partner_id=partner.partner_id,
     )
     creditor = repository.create(
         company_id=company.company_id,
         role=PersonAccountRole.KREDITOR,
-        name="ignored when partner is reused",
+        name="Beispiel GmbH",
         account_number="70000",
-        partner_id=debtor.partner.partner_id,
+        partner_id=partner.partner_id,
     )
 
     assert debtor.partner.partner_id == creditor.partner.partner_id
@@ -281,6 +289,48 @@ def test_duplicate_number_and_partner_role_are_rejected(database_session):
     assert session.query(PersonenkontoZuordnung).count() == 1
 
 
+def test_existing_partner_cannot_be_assigned_a_missing_role_silently(
+    database_session,
+):
+    session, company = database_session
+    repository = PersonAccountRepository(session)
+    customer = BusinessPartner(
+        company_id=company.company_id,
+        name="Nur Debitor",
+        is_customer=True,
+        is_supplier=False,
+    )
+    BusinessPartnerRepository(session).add(customer)
+
+    assert tuple(
+        partner.partner_id
+        for partner in repository.available_partners(
+            company_id=company.company_id,
+            role=PersonAccountRole.DEBITOR,
+        )
+    ) == (customer.partner_id,)
+    assert repository.available_partners(
+        company_id=company.company_id,
+        role=PersonAccountRole.KREDITOR,
+    ) == ()
+
+    with pytest.raises(ValueError, match="keine Kreditorenrolle"):
+        repository.create(
+            company_id=company.company_id,
+            role=PersonAccountRole.KREDITOR,
+            name="Nur Debitor",
+            account_number="70000",
+            partner_id=customer.partner_id,
+        )
+    persisted = BusinessPartnerRepository(session).get(
+        company_id=company.company_id,
+        partner_id=customer.partner_id,
+    )
+    assert persisted is not None
+    assert persisted.is_customer
+    assert not persisted.is_supplier
+
+
 def test_cross_mandant_foreign_keys_and_role_number_constraint(database_session):
     session, company = database_session
     other = Company(company_id=uuid4(), name="Zweiter Mandant")
@@ -312,18 +362,26 @@ def test_cross_mandant_foreign_keys_and_role_number_constraint(database_session)
 def test_update_syncs_both_account_names_and_status_and_cannot_delete(database_session):
     session, company = database_session
     repository = PersonAccountRepository(session)
+    partner = BusinessPartner(
+        company_id=company.company_id,
+        name="Vorher",
+        is_customer=True,
+        is_supplier=True,
+    )
+    BusinessPartnerRepository(session).add(partner)
     debtor = repository.create(
         company_id=company.company_id,
         role=PersonAccountRole.DEBITOR,
         name="Vorher",
         account_number="10001",
+        partner_id=partner.partner_id,
     )
     creditor = repository.create(
         company_id=company.company_id,
         role=PersonAccountRole.KREDITOR,
         name="Vorher",
         account_number="70001",
-        partner_id=debtor.partner.partner_id,
+        partner_id=partner.partner_id,
     )
     repository.update(
         company_id=company.company_id,

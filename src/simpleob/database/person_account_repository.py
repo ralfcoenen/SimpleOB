@@ -2,8 +2,8 @@
 
 from uuid import UUID
 
-from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 from simpleob.database.business_partner_repository import BusinessPartnerRepository
 from simpleob.database.chart_of_accounts_repository import ChartOfAccountsRepository
@@ -75,6 +75,11 @@ class PersonAccountRepository:
             partner
             for partner in self._partners.list_for_company(company_id)
             if str(partner.partner_id) not in used_ids
+            and (
+                partner.is_customer
+                if role is PersonAccountRole.DEBITOR
+                else partner.is_supplier
+            )
         )
 
     def create(
@@ -86,7 +91,7 @@ class PersonAccountRepository:
         account_number: str | None = None,
         partner_id: UUID | None = None,
     ) -> PersonAccount:
-        """Legt Partner (oder dessen zweite Rolle), Konto und Zuordnung atomar an."""
+        """Legt Partner, Konto und Zuordnung atomar an."""
         if not isinstance(company_id, UUID):
             raise TypeError("company_id must be a UUID")
         if not isinstance(role, PersonAccountRole):
@@ -109,28 +114,30 @@ class PersonAccountRepository:
                 partner = self._partners.get(company_id=company_id, partner_id=partner_id)
                 if partner is None or not partner.is_active:
                     raise ValueError("Der ausgewählte Geschäftspartner ist nicht aktiv oder gehört nicht zu diesem Mandanten.")
-                if role is PersonAccountRole.DEBITOR and partner.is_customer:
-                    raise ValueError("Der Geschäftspartner besitzt bereits ein Debitorenkonto.")
-                if role is PersonAccountRole.KREDITOR and partner.is_supplier:
-                    raise ValueError("Der Geschäftspartner besitzt bereits ein Kreditorenkonto.")
-                partner = BusinessPartner(
-                    company_id=partner.company_id,
-                    partner_id=partner.partner_id,
-                    name=partner.name,
-                    is_customer=partner.is_customer or role is PersonAccountRole.DEBITOR,
-                    is_supplier=partner.is_supplier or role is PersonAccountRole.KREDITOR,
-                    is_active=partner.is_active,
+                has_role = (
+                    partner.is_customer
+                    if role is PersonAccountRole.DEBITOR
+                    else partner.is_supplier
                 )
-                partner_model = (
-                    self._session.query(Geschaeftspartner)
-                    .filter(
-                        Geschaeftspartner.mandant_id == company.id,
-                        Geschaeftspartner.partner_id == str(partner.partner_id),
+                if not has_role:
+                    label = "Debitoren" if role is PersonAccountRole.DEBITOR else "Kreditoren"
+                    raise ValueError(
+                        f"Der Geschäftspartner hat keine {label}rolle."
                     )
-                    .one()
+                existing_role_link = (
+                    self._session.query(PersonenkontoZuordnung.id)
+                    .filter(
+                        PersonenkontoZuordnung.mandant_id == company.id,
+                        PersonenkontoZuordnung.partner_id == str(partner.partner_id),
+                        PersonenkontoZuordnung.role == role.value,
+                    )
+                    .one_or_none()
                 )
-                partner_model.is_customer = partner.is_customer
-                partner_model.is_supplier = partner.is_supplier
+                if existing_role_link is not None:
+                    label = "Debitoren" if role is PersonAccountRole.DEBITOR else "Kreditoren"
+                    raise ValueError(
+                        f"Der Geschäftspartner besitzt bereits ein {label}konto."
+                    )
 
             account_type = AccountType.ASSET if role is PersonAccountRole.DEBITOR else AccountType.LIABILITY
             account = Account(
