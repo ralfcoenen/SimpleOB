@@ -174,6 +174,69 @@ def test_person_account_statement_uses_fiscal_opening_once_and_stable_order():
     assert report.ending_balance == Decimal("115.00")
 
 
+def test_person_account_summary_and_statement_include_unlinked_gl_postings():
+    company_id = uuid4()
+    _debtor, creditor = _person_accounts(company_id)
+    fiscal_year = FiscalYear(date(2025, 1, 1), date(2025, 12, 31))
+    journal = Journal()
+    journal.add(
+        _booking(
+            date(2025, 6, 16),
+            "70000",
+            EntrySide.DEBIT,
+            Decimal("210.78"),
+            text="Direkte Hauptbuchbuchung 1",
+        )
+    )
+    journal.add(
+        _booking(
+            date(2025, 6, 16),
+            "70000",
+            EntrySide.DEBIT,
+            Decimal("292.75"),
+            text="Direkte Hauptbuchbuchung 2",
+        )
+    )
+    service = ReportingService()
+
+    summary = service.person_account_summary(
+        ledger=Ledger(),
+        journal=journal,
+        fiscal_year=fiscal_year,
+        company_id=company_id,
+        person_accounts=(creditor,),
+        start_date=fiscal_year.start_date,
+        end_date=fiscal_year.end_date,
+        opening_balance_account_number="9000",
+    )
+    statement = service.person_account_statement(
+        journal=journal,
+        fiscal_year=fiscal_year,
+        company_id=company_id,
+        person_account=creditor,
+        start_date=fiscal_year.start_date,
+        end_date=fiscal_year.end_date,
+        has_opening_source=False,
+    )
+
+    row = summary.rows[0]
+    assert row.opening_balance == Decimal("0.00")
+    assert row.debit_turnover == Decimal("503.53")
+    assert row.credit_turnover == Decimal("0.00")
+    assert row.ending_balance == Decimal("503.53")
+    assert row.ending_debit_balance == Decimal("503.53")
+    assert statement.opening_balance == Decimal("0.00")
+    assert [line.debit for line in statement.lines] == [
+        Decimal("210.78"),
+        Decimal("292.75"),
+    ]
+    assert [line.running_balance for line in statement.lines] == [
+        Decimal("210.78"),
+        Decimal("503.53"),
+    ]
+    assert statement.ending_balance == row.ending_balance
+
+
 def test_person_account_march_period_includes_february_as_opening_once():
     company_id = uuid4()
     debtor, creditor = _person_accounts(company_id)

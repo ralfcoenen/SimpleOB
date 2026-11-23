@@ -2,7 +2,7 @@
 
 from datetime import date
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QSignalBlocker, Qt
 from PySide6.QtWidgets import (
     QComboBox,
     QHBoxLayout,
@@ -55,6 +55,11 @@ class PersonAccountReportsWidget(QWidget):
         self._accounts_by_number = {
             item.account.number: item for item in person_accounts
         }
+        self._refresh()
+
+    def refresh(self) -> None:
+        """Berechnet Übersicht und Kontenblatt aus dem aktuellen Journal neu."""
+
         self._refresh()
 
     def _create_ui(self) -> None:
@@ -155,6 +160,7 @@ class PersonAccountReportsWidget(QWidget):
         return start_date, end_date
 
     def _refresh(self, *_args: object) -> None:
+        selected_account_number = self._selected_account_number()
         if not self._person_accounts:
             self._summary = None
             self._overview_table.setRowCount(0)
@@ -185,6 +191,9 @@ class PersonAccountReportsWidget(QWidget):
             or (selected_role == "Debitoren" and row.role is PersonAccountRole.DEBITOR)
             or (selected_role == "Kreditoren" and row.role is PersonAccountRole.KREDITOR)
         )
+        selection_model = self._overview_table.selectionModel()
+        selection_blocker = QSignalBlocker(selection_model)
+        selection_model.clearSelection()
         self._overview_table.setRowCount(len(rows))
         for index, row in enumerate(rows):
             direction = (
@@ -210,6 +219,12 @@ class PersonAccountReportsWidget(QWidget):
                 if column == 1:
                     item.setData(Qt.ItemDataRole.UserRole, row.account_number)
                 self._overview_table.setItem(index, column, item)
+        if selected_account_number is not None:
+            for index, row in enumerate(rows):
+                if row.account_number == selected_account_number:
+                    self._overview_table.selectRow(index)
+                    break
+        del selection_blocker
         self._overview_table.resizeColumnsToContents()
         self._totals_label.setText(
             "Summen für die angezeigte Rolle: "
@@ -221,6 +236,17 @@ class PersonAccountReportsWidget(QWidget):
             f"Endsaldo Haben {self._amount(sum((row.ending_credit_balance for row in rows), start=0))}"
         )
         self._refresh_statement()
+
+    def _selected_account_number(self) -> str | None:
+        selected_rows = self._overview_table.selectionModel().selectedRows()
+        if not selected_rows:
+            return None
+        item = self._overview_table.item(selected_rows[0].row(), 1)
+        return (
+            item.data(Qt.ItemDataRole.UserRole)
+            if item is not None
+            else None
+        )
 
     def _refresh_statement(self) -> None:
         selected_rows = self._overview_table.selectionModel().selectedRows()

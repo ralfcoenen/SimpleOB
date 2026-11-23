@@ -3613,7 +3613,11 @@ class MainWindow(QMainWindow):
 
         self._refresh_journal()
 
-    def _refresh_journal(self) -> None:
+    def _refresh_journal(
+        self,
+        *,
+        refresh_person_account_reports: bool = True,
+    ) -> None:
         """Aktualisiert die Journalanzeige."""
 
         self._journal_table.setRowCount(0)
@@ -3698,6 +3702,10 @@ class MainWindow(QMainWindow):
                     )
 
                 first_line = False
+
+        reports_widget = getattr(self, "_reports_widget", None)
+        if refresh_person_account_reports and reports_widget is not None:
+            reports_widget.refresh_person_account_reports()
 
     def _request_german_date(
         self,
@@ -5858,7 +5866,7 @@ class MainWindow(QMainWindow):
             self._current_e_bilanz_arelle_valid = False
 
             self._refresh_accounts()
-            self._refresh_journal()
+            self._refresh_journal(refresh_person_account_reports=False)
             self._refresh_balance_sheet()
             self._refresh_closing()
             self._refresh_e_bilanz_availability()

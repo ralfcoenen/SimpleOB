@@ -154,7 +154,10 @@ def test_activation_updates_context_and_unlocks_same_window(monkeypatch):
     assert not window._account_editing_mode
     assert not window._activate_chart_button.isEnabled()
     assert window._refresh_accounts.called
-    assert window._refresh_journal.called
+    window._refresh_journal.assert_called_once_with(
+        refresh_person_account_reports=False
+    )
+    window._reports_widget.update_accounts.assert_called_once()
     assert window._refresh_balance_sheet.called
     selected.assert_called_once_with(window._account_table, "1210")
 

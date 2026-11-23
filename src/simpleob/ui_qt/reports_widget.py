@@ -113,6 +113,11 @@ class ReportsWidget(QWidget):
         if self._current_journal_report is not None:
             self._refresh_journal()
 
+    def refresh_person_account_reports(self) -> None:
+        """Aktualisiert beide Personenkontenansichten aus dem Workspace."""
+
+        self._person_accounts_tab.refresh()
+
     def _create_ui(self) -> None:
         """Erzeugt den Arbeitsbereich Auswertungen."""
 
