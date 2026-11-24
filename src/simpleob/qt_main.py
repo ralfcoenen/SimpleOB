@@ -146,6 +146,7 @@ from simpleob.ui_qt.database_configuration_dialog import (
     DatabaseConfigurationDialog,
 )
 from simpleob.ui_qt.eric_privacy_dialog import EricPrivacyDialog
+from simpleob.ui_qt.input_focus import install_select_all_on_focus
 from simpleob.ui_qt.main_window import MainWindow
 from simpleob.ui_qt.postgresql_password_dialog import (
     PostgreSQLPasswordDialog,
@@ -546,6 +547,7 @@ def main() -> None:
 
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
+    install_select_all_on_focus(app)
 
     startup_configuration = _load_startup_configuration()
     if startup_configuration is None:

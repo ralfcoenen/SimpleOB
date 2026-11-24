@@ -5,9 +5,10 @@ from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal, InvalidOperation
 
-from PySide6.QtCore import QEvent, QObject, Qt
-from PySide6.QtGui import QKeyEvent
+from PySide6.QtCore import QEvent, QObject, Qt, QTimer
+from PySide6.QtGui import QFontMetrics, QKeyEvent
 from PySide6.QtWidgets import (
+    QApplication,
     QCheckBox,
     QCompleter,
     QHBoxLayout,
@@ -21,7 +22,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from simpleob.amount_input import normalize_german_amount
+from simpleob.amount_input import format_german_amount
 from simpleob.date_input import GermanDateEdit
 from simpleob.domain.account import Account
 from simpleob.domain.account_display import account_display_name, account_name_with_role
@@ -310,6 +311,10 @@ class BookingFrame(QWidget):
                 QCompleter.CompletionMode.PopupCompletion
             )
             completer.setMaxVisibleItems(12)
+            self._configure_account_completer_popup(
+                row.account_entry,
+                completer,
+            )
             row.account_entry.setCompleter(completer)
             row.completer = completer
             current_account = next(
@@ -350,6 +355,10 @@ class BookingFrame(QWidget):
             QCompleter.CompletionMode.PopupCompletion
         )
         completer.setMaxVisibleItems(12)
+        self._configure_account_completer_popup(
+            account_entry,
+            completer,
+        )
 
         account_entry.setCompleter(completer)
 
@@ -441,6 +450,14 @@ class BookingFrame(QWidget):
         credit_entry.installEventFilter(self)
 
         debit_entry.textChanged.connect(
+            lambda _text, entry=debit_entry:
+            self._mark_amount_entry_unformatted(entry)
+        )
+        credit_entry.textChanged.connect(
+            lambda _text, entry=credit_entry:
+            self._mark_amount_entry_unformatted(entry)
+        )
+        debit_entry.textChanged.connect(
             lambda _text, row=booking_row:
             self._on_amount_changed(row)
         )
@@ -454,6 +471,48 @@ class BookingFrame(QWidget):
             self._remove_row(row)
         )
 
+    def _configure_account_completer_popup(
+        self,
+        account_entry: QLineEdit,
+        completer: QCompleter,
+    ) -> None:
+        """Gibt dem Konto-Popup Platz für Kontonummer und Kontoname."""
+
+        popup = completer.popup()
+        font_metrics = QFontMetrics(popup.font())
+        longest_entry_width = max(
+            (
+                font_metrics.horizontalAdvance(display_name)
+                for display_name in self._account_display_names
+            ),
+            default=0,
+        )
+        vertical_scrollbar_width = (
+            popup.verticalScrollBar().sizeHint().width()
+        )
+        desired_width = max(
+            450,
+            longest_entry_width
+            + vertical_scrollbar_width
+            + popup.frameWidth() * 2
+            + 16,
+        )
+
+        screen = account_entry.screen() or QApplication.primaryScreen()
+        if screen is not None:
+            available_width = max(
+                1,
+                screen.availableGeometry().width() - 4,
+            )
+            desired_width = min(desired_width, available_width)
+            popup.setMaximumWidth(available_width)
+
+        popup.setMinimumWidth(desired_width)
+        popup.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAsNeeded
+        )
+        popup.setTextElideMode(Qt.TextElideMode.ElideNone)
+
     def _create_amount_entry(self) -> QLineEdit:
         """Erzeugt ein Betragsfeld für Soll oder Haben."""
 
@@ -464,6 +523,7 @@ class BookingFrame(QWidget):
             Qt.AlignmentFlag.AlignRight
         )
         entry.setPlaceholderText("0,00")
+        entry.setProperty("amountNormalized", False)
         entry.editingFinished.connect(
             lambda entry=entry:
             self._normalize_amount_entry(entry)
@@ -482,14 +542,34 @@ class BookingFrame(QWidget):
         if not value:
             return
 
+        if entry.property("amountNormalized"):
+            return
+
         try:
-            normalized = normalize_german_amount(
-                value
+            normalized = format_german_amount(
+                self._parse_amount_value(value)
             )
         except ValueError:
             return
 
         entry.setText(normalized)
+        entry.setProperty("amountNormalized", True)
+
+    def focus_booking_date(self) -> None:
+        """Fokussiert das Datum und markiert den vorhandenen Wert."""
+
+        if not self._enabled or not self.isVisible():
+            return
+        self._booking_date_entry.setFocus()
+        self._booking_date_entry.selectAll()
+
+    @staticmethod
+    def _mark_amount_entry_unformatted(
+        entry: QLineEdit,
+    ) -> None:
+        """Kennzeichnet manuell geänderten Feldinhalt als rohe Eingabe."""
+
+        entry.setProperty("amountNormalized", False)
 
     def _update_contribution_checkbox(
         self,
@@ -566,6 +646,41 @@ class BookingFrame(QWidget):
         event: QEvent,
     ) -> bool:
         """Steuert Tab und Enter in den Buchungszeilen."""
+
+        if event.type() == QEvent.Type.Show:
+            row = self._row_for_widget(watched)
+            if row is not None and watched is row.completer.popup():
+                self._keep_completer_popup_on_screen(
+                    row.completer.popup(),
+                    row.account_entry,
+                )
+                QTimer.singleShot(
+                    0,
+                    lambda popup=row.completer.popup(),
+                    entry=row.account_entry:
+                    self._keep_completer_popup_on_screen(
+                        popup,
+                        entry,
+                    ),
+                )
+
+        if (
+            event.type() == QEvent.Type.KeyPress
+            and isinstance(event, QKeyEvent)
+        ):
+            row = self._row_for_widget(watched)
+            if row is not None and watched is row.account_entry:
+                QTimer.singleShot(
+                    0,
+                    lambda popup=row.completer.popup(),
+                    entry=row.account_entry:
+                    self._keep_completer_popup_on_screen(
+                        popup,
+                        entry,
+                    )
+                    if popup.isVisible()
+                    else None,
+                )
 
         if (
             event.type() != QEvent.Type.KeyPress
@@ -679,6 +794,45 @@ class BookingFrame(QWidget):
             watched,
             event,
         )
+
+    @staticmethod
+    def _keep_completer_popup_on_screen(
+        popup: QWidget,
+        account_entry: QLineEdit,
+    ) -> None:
+        """Verschiebt und begrenzt das Completer-Popup auf den Arbeitsbereich."""
+
+        screen = account_entry.screen() or popup.screen()
+        if screen is None:
+            return
+
+        available = screen.availableGeometry()
+        available_width = max(1, available.width() - 4)
+        available_height = max(1, available.height() - 4)
+        frame = popup.frameGeometry()
+        frame_width = frame.width()
+        frame_height = frame.height()
+        if frame_width > available_width:
+            popup.resize(
+                max(1, popup.width() - frame_width + available_width),
+                popup.height(),
+            )
+        if frame_height > available_height:
+            popup.resize(
+                popup.width(),
+                max(1, popup.height() - frame_height + available_height),
+            )
+
+        frame = popup.frameGeometry()
+        left = max(
+            available.left(),
+            min(frame.left(), available.left() + available_width - frame.width()),
+        )
+        top = max(
+            available.top(),
+            min(frame.top(), available.top() + available_height - frame.height()),
+        )
+        popup.move(left, top)
 
     def _row_for_widget(
         self,
@@ -805,24 +959,8 @@ class BookingFrame(QWidget):
     ) -> None:
         """Steuert Soll/Haben und aktualisiert die Buchung."""
 
-        debit_has_value = bool(
-            row.debit_entry.text().strip()
-        )
-        credit_has_value = bool(
-            row.credit_entry.text().strip()
-        )
-
-        if debit_has_value:
-            row.credit_entry.setEnabled(False)
-        elif credit_has_value:
-            row.debit_entry.setEnabled(False)
-        else:
-            row.debit_entry.setEnabled(
-                self._enabled
-            )
-            row.credit_entry.setEnabled(
-                self._enabled
-            )
+        row.debit_entry.setEnabled(self._enabled)
+        row.credit_entry.setEnabled(self._enabled)
 
         self._update_contribution_checkbox(row)
         self._ensure_trailing_empty_row()
@@ -914,13 +1052,19 @@ class BookingFrame(QWidget):
             try:
                 if debit_text:
                     amount = self._parse_amount(
-                        debit_text
+                        debit_text,
+                        normalized=bool(
+                            row.debit_entry.property("amountNormalized")
+                        ),
                     )
                     debit_total += amount
                     debit_lines += 1
                 else:
                     amount = self._parse_amount(
-                        credit_text
+                        credit_text,
+                        normalized=bool(
+                            row.credit_entry.property("amountNormalized")
+                        ),
                     )
                     credit_total += amount
                     credit_lines += 1
@@ -984,6 +1128,10 @@ class BookingFrame(QWidget):
 
         self._booking_date_entry.set_date(booking_date)
 
+        for row in self._rows:
+            self._normalize_amount_entry(row.debit_entry)
+            self._normalize_amount_entry(row.credit_entry)
+
         lines: list[BookingLine] = []
         equity_contribution_line_positions: list[int] = []
 
@@ -1012,7 +1160,10 @@ class BookingFrame(QWidget):
                             account_number=account.number,
                             side=EntrySide.DEBIT,
                             amount=self._parse_amount(
-                                debit_text
+                                debit_text,
+                                normalized=bool(
+                                    row.debit_entry.property("amountNormalized")
+                                ),
                             ),
                         )
                     )
@@ -1024,7 +1175,10 @@ class BookingFrame(QWidget):
                             account_number=account.number,
                             side=EntrySide.CREDIT,
                             amount=self._parse_amount(
-                                credit_text
+                                credit_text,
+                                normalized=bool(
+                                    row.credit_entry.property("amountNormalized")
+                                ),
                             ),
                         )
                     )
@@ -1066,6 +1220,7 @@ class BookingFrame(QWidget):
         self._status_label.setText(
             "Buchung wurde übernommen."
         )
+        self.focus_booking_date()
 
     def _resolve_account(
         self,
@@ -1117,8 +1272,6 @@ class BookingFrame(QWidget):
         self._clear_rows()
         self._append_empty_row()
 
-        self._voucher_no_entry.setFocus()
-
         self._on_form_changed()
 
     def _clear_rows(self) -> None:
@@ -1138,25 +1291,22 @@ class BookingFrame(QWidget):
     @staticmethod
     def _parse_amount(
         value: str,
+        *,
+        normalized: bool = False,
     ) -> Decimal:
         """Wandelt einen deutschen Geldbetrag in Decimal um."""
 
-        normalized = value.strip()
+        text = value.strip()
 
-        if not normalized:
+        if not text:
             raise ValueError(
                 "Der Buchungsbetrag fehlt."
             )
 
-        normalized = normalized.replace(".", "")
-        normalized = normalized.replace(",", ".")
-
-        try:
-            amount = Decimal(normalized)
-        except InvalidOperation as exc:
-            raise ValueError(
-                "Ungültiger Geldbetrag."
-            ) from exc
+        amount = BookingFrame._parse_amount_value(
+            text,
+            normalized=normalized,
+        )
 
         if amount <= ZERO:
             raise ValueError(
@@ -1166,6 +1316,32 @@ class BookingFrame(QWidget):
         return amount.quantize(
             Decimal("0.01")
         )
+
+    @staticmethod
+    def _parse_amount_value(
+        value: str,
+        *,
+        normalized: bool = False,
+    ) -> Decimal:
+        """Liest Ziffern als Cent und Kommawerte als ausdrückliche Beträge."""
+
+        text = value.strip()
+        if not text:
+            raise ValueError("Der Betrag darf nicht leer sein.")
+
+        try:
+            if "," in text:
+                amount = Decimal(
+                    text.replace(".", "").replace(",", ".")
+                )
+            elif not normalized and text.lstrip("+-").isdigit():
+                amount = Decimal(text) / Decimal("100")
+            else:
+                amount = Decimal(text.replace(".", ""))
+        except InvalidOperation as exc:
+            raise ValueError("Ungültiger Geldbetrag.") from exc
+
+        return amount.quantize(Decimal("0.01"))
 
     @staticmethod
     def _format_amount(

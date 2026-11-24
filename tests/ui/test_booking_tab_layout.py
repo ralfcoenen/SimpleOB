@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 from uuid import uuid4
 
+from PySide6.QtTest import QTest
 from PySide6.QtWidgets import (
     QApplication,
     QGroupBox,
@@ -8,6 +9,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QPushButton,
     QScrollArea,
+    QTabWidget,
     QWidget,
 )
 
@@ -122,3 +124,79 @@ def test_general_booking_account_choices_include_person_and_tax_accounts():
 
     window.close()
     app.processEvents()
+
+
+def test_booking_tab_open_and_successful_transfer_focus_and_select_date():
+    app = QApplication.instance() or QApplication([])
+    window = _booking_window()
+    notebook = QTabWidget()
+    notebook.addTab(QWidget(), "Andere Ansicht")
+    notebook.addTab(window._booking_tab, "Buchen")
+    window._notebook = notebook
+    notebook.currentChanged.connect(window._focus_booking_date_when_opened)
+    window.setCentralWidget(notebook)
+    window.show()
+    notebook.setCurrentIndex(1)
+    app.processEvents()
+
+    frame = window._booking_frame
+    date_entry = frame._booking_date_entry
+    assert app.focusWidget() is date_entry
+    assert date_entry.selectedText() == date_entry.text()
+
+    date_entry.setText("24.11.2026")
+    frame._description_entry.setText("Testbuchung")
+    debit_row = frame._rows[0]
+    debit_row.account_entry.setText("10000")
+    debit_row.debit_entry.setText("100")
+    credit_row = frame._rows[1]
+    credit_row.account_entry.setText("70000")
+    credit_row.credit_entry.setText("100")
+    frame._on_booking_created = lambda *_args: None
+    frame._create_booking()
+    app.processEvents()
+
+    assert app.focusWidget() is date_entry
+    assert date_entry.selectedText() == date_entry.text()
+
+    window.close()
+
+
+def test_account_completer_popup_expands_for_long_names_within_screen():
+    app = QApplication.instance() or QApplication([])
+    window = _booking_window()
+    frame = window._booking_frame
+    long_name = ("Kontobezeichnung mit ausführlicher Beschreibung " * 3).strip()
+    long_account = Account(
+        TemplateAccount("99999", long_name, AccountType.ASSET),
+    )
+    frame.update_accounts(
+        accounts=frame._accounts + (long_account,),
+        equity_contribution_account_numbers=frozenset(),
+    )
+    frame._rows[0].debit_entry.setText("1")
+    frame._rows[1].credit_entry.setText("1")
+    window.resize(760, 520)
+    window.show()
+    app.processEvents()
+
+    for row in frame._rows:
+        assert row.completer.popup().minimumWidth() > 450
+
+    row = frame._rows[0]
+    row.account_entry.setFocus()
+    QTest.keyClicks(row.account_entry, "999")
+    app.processEvents()
+
+    popup = row.completer.popup()
+    screen_geometry = row.account_entry.screen().availableGeometry()
+    popup_geometry = popup.frameGeometry()
+    assert popup.isVisible()
+    assert popup_geometry.width() > 450
+    assert popup.width() > row.account_entry.width()
+    assert popup_geometry.left() >= screen_geometry.left()
+    assert popup_geometry.right() <= screen_geometry.right()
+    assert popup_geometry.top() >= screen_geometry.top()
+    assert popup_geometry.bottom() <= screen_geometry.bottom()
+
+    window.close()

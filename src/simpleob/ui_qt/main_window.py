@@ -6,7 +6,7 @@ from decimal import Decimal
 from pathlib import Path
 from uuid import UUID
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -419,6 +419,23 @@ class MainWindow(QMainWindow):
 
         self._notebook.currentChanged.connect(
             self._reload_bookkeeping_data
+        )
+        self._notebook.currentChanged.connect(
+            self._focus_booking_date_when_opened
+        )
+
+    def _focus_booking_date_when_opened(
+        self,
+        tab_index: int,
+    ) -> None:
+        """Setzt beim Öffnen des Buchungsreiters den Fokus auf das Datum."""
+
+        if self._notebook.widget(tab_index) is not self._booking_tab:
+            return
+
+        QTimer.singleShot(
+            0,
+            self._booking_frame.focus_booking_date,
         )
 
     def _create_administration_controls(
