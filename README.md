@@ -7,12 +7,19 @@ ausgelieferte Anwendung heißt **SimpleOB**.
 
 ## Aktueller Stand
 
-Aktuelle Projektversion: **0.62.0** (`pyproject.toml`).
+Aktuelle Projektversion: **0.62.1** (`pyproject.toml`). Diese Dokumentation
+bereitet die geplante Veröffentlichung **0.63.0** vor. Die Neuerungen stehen
+in den [Release-Notes für 0.63.0](packaging/macos/release-notes/0.63.0.md).
 
 SimpleOB bietet derzeit:
 
 - Mandanten- und Geschäftsjahrverwaltung sowie einfache Buchungssätze mit
   Journal, Kontenübersicht, Eröffnungsbuchungen und Buchungsstorno.
+- CSV-Bankimport mit konfigurierbaren, mandantenübergreifend wiederverwendbaren
+  Importprofilen und einem geführten Einrichtungsassistenten. Umsätze werden
+  vor der Buchung geprüft; Bank- und Gegenkonten werden im geöffneten Mandanten
+  ausgewählt. Aufteilungen auf mehrere Gegenkonten und eine Duplikatsperre
+  unterstützen die ausdrücklich bestätigte Übernahme ins Journal.
 - Kontenverwaltung mit mandantenspezifischen Konten, HGB-Zuordnungen,
   Steuerkonten und fachlichen Kontenrollen.
 - Geschäftspartnerstammdaten mit Debitoren- und Kreditoren-Personenkonten.
@@ -35,6 +42,18 @@ SimpleOB bietet derzeit:
 - SQLite als lokale Datenbank sowie PostgreSQL für eine vorhandene,
   eingerichtete Serverdatenbank.
 
+Ein neues CSV-Profil wird in vier Schritten eingerichtet: Datei auswählen,
+Spalten zuordnen, Umsätze prüfen und Profil speichern. Ein gespeichertes Profil
+führt beim normalen Import nach erfolgreicher Dateiprüfung direkt zum
+Bankimport, ohne erneute Speicherung. Anpassungen für einen einzelnen Import
+bleiben temporär; **Profil bearbeiten …** ändert das Profil dauerhaft.
+Einzelheiten stehen im [Handbuch zum CSV-Bankimport](docs/SimpleOB_Benutzerhandbuch.md#99-bankumsätze-aus-csv-dateien-importieren).
+
+Der allgemeine CSV-Import wurde mit einer synthetischen Testdatei geprüft.
+Die Kompatibilität mit einem echten Qonto-CSV-Export ist noch nicht
+nachgewiesen; das mitgelieferte synthetische Qonto-Testprofil ist kein solcher
+Nachweis.
+
 Die Kontenkonfiguration enthält die Rollen **Kasse**, **Bank**,
 **Umsatzerlöse allgemeiner Steuersatz**, **Umsatzsteuer-Vorauszahlungen**,
 **Umsatzsteuer laufendes Jahr**, **Umsatzsteuerforderungen Vorjahr** und
@@ -50,7 +69,7 @@ Für unbebuchte Personenkonten ist eine gesonderte, bestätigungspflichtige
 Löschung verfügbar, wenn keine Buchungszeilen oder sonstigen sperrenden
 Referenzen bestehen. Der Geschäftspartner bleibt dabei erhalten.
 
-**Nicht enthalten** sind in Version 0.62.0 die Erfassung von Ein- und
+**Nicht enthalten** sind derzeit die Erfassung von Ein- und
 Ausgangsrechnungen, Gutschriften, Anzahlungen und Leistungsvorgängen, eine
 Offene-Posten-Nebenbuchführung mit Zahlungszuordnungen sowie eine
 Umsatzüberwachung nach § 19 UStG. Debitoren- und Kreditorenkonten sind
@@ -108,18 +127,20 @@ geplant und vorab gesichert werden.
 
 Eine `.simpleob`-Datei überträgt die unterstützten Daten eines Mandanten,
 darunter Geschäftspartner, Personenkontenzuordnungen, Konten, Buchungen,
-Anlagen und Geschäftsjahre. Version 0.62.0 verwaltet keine separate
-OP-Nebenbuchhistorie. Eine `.simpleob`-Datei ersetzt keine vollständige
-SQLite- oder PostgreSQL-Datenbanksicherung. Anwendungsweite ELSTER-
-Einstellungen und Zertifikatspfade gehören nicht zum Mandantentransfer.
+Anlagen, Geschäftsjahre und die Zuordnungen importierter Bankumsätze zu
+Buchungen. Eine separate OP-Nebenbuchhistorie wird nicht verwaltet. Eine
+`.simpleob`-Datei ersetzt keine vollständige SQLite- oder PostgreSQL-Datenbanksicherung. Anwendungsweite ELSTER-
+Einstellungen, Zertifikatspfade und die globale Datei `csv_import_profiles.json`
+gehören nicht zum Mandantentransfer.
 Details stehen im [Abschnitt zur Mandantensicherung](docs/SimpleOB_Benutzerhandbuch.md#14-datenaustausch-und-mandantensicherung).
 
 ## Benutzerhandbuch
 
 Die aktuelle Handbuchquelle ist
 [docs/SimpleOB_Benutzerhandbuch.md](docs/SimpleOB_Benutzerhandbuch.md). Sie
-beschreibt unter anderem Konten und Personenkonten, Jahresabschluss,
-Installation unter macOS, E-Bilanz und ELSTER sowie Mandantentransfer.
+beschreibt unter anderem Konten und Personenkonten, CSV-Bankimport mit
+Importprofilen, Jahresabschluss, Installation unter macOS, E-Bilanz und ELSTER
+sowie Mandantentransfer.
 Das PDF für die Auslieferung wird aus dieser Markdown-Quelle erzeugt mit:
 
 ```bash

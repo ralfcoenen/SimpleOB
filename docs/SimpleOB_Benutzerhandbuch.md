@@ -1,6 +1,6 @@
 # SimpleOB – Benutzerhandbuch
 
-**Anwenderhandbuch für SimpleOB 0.62.0**
+**Anwenderhandbuch für SimpleOB 0.63.0**
 
 ## 1. Über SimpleOB
 
@@ -19,6 +19,7 @@ Zu den Funktionen gehören insbesondere:
 - Verwaltung von Geschäftspartnern im Zusammenhang mit Debitoren- und
   Kreditorenkonten,
 - Erfassung von Buchungen,
+- CSV-Bankimport mit wiederverwendbaren, mandantenübergreifenden Importprofilen,
 - Anlagenbuchhaltung,
 - Erstellung von Bilanz und Gewinn- und Verlustrechnung,
 - Unterstützung des Jahresabschlusses,
@@ -29,7 +30,7 @@ Zu den Funktionen gehören insbesondere:
 
 SimpleOB verwaltet Debitoren- und Kreditorenkonten mit Geschäftspartnern.
 Eine Rechnungs- und Offene-Posten-Nebenbuchführung mit Zahlungszuordnungen
-ist in Version 0.62.0 nicht enthalten.
+ist in Version 0.63.0 nicht enthalten.
 
 SimpleOB ist eine Desktop-Anwendung. Die Buchhaltungsdaten liegen je nach
 Konfiguration entweder in einer lokalen SQLite-Datenbank oder auf einem
@@ -288,6 +289,16 @@ Anwendungseinstellungen werden unter anderem in folgender Datei gespeichert:
 
 Dazu gehört auch die Auswahl der verwendeten Datenbankverbindung.
 
+CSV-Importprofile werden getrennt davon in folgender Datei gespeichert:
+
+`~/Library/Application Support/SimpleOB/csv_import_profiles.json`
+
+Die Profile gelten für alle Mandanten desselben SimpleOB-Benutzers. Sie
+enthalten das CSV-Format und seine Zuordnungen, jedoch keine Bank-Sachkonten
+oder Zugangsdaten. Beziehen Sie diese Datei in Ihre persönliche Sicherung
+mit ein; sie gehört nicht zum mandantenbezogenen `.simpleob`-Export. Die
+Bedienung wird in Kapitel 9.9 beschrieben.
+
 Bei PostgreSQL werden die Zugangsdaten während der Anmeldung abgefragt.
 
 Die PIN des ELSTER-Zertifikats wird von SimpleOB nicht dauerhaft in dieser Konfigurationsdatei gespeichert.
@@ -450,7 +461,7 @@ Für die Testsendung muss ein gültiges ELSTER-Testzertifikat unter
 
 **Einstellungen → ELSTER-Zertifikat…**
 
-ausgewählt sein. SimpleOB liefert in Version 0.62.0 kein Testzertifikat und
+ausgewählt sein. SimpleOB liefert in Version 0.63.0 kein Testzertifikat und
 keine Test-PIN mit. Die PIN des ausgewählten Zertifikats geben Sie bei der
 Übermittlung im PIN-Dialog ein; SimpleOB speichert sie nicht dauerhaft.
 
@@ -715,7 +726,7 @@ Die Einzelheiten dazu werden im folgenden Kapitel beschrieben.
 SimpleOB unterstützt den Export und Import der im `.simpleob`-Format
 abgebildeten Mandantendaten. Geschäftspartner und Personenkontenzuordnungen
 gehören zum Transfer; eine Rechnungs- oder OP-Nebenbuchhistorie gibt es in
-Version 0.62.0 nicht. Einzelheiten stehen in Kapitel 14.2.
+Version 0.63.0 nicht. Einzelheiten stehen in Kapitel 14.2.
 
 Den Export starten Sie im geöffneten Mandanten über **Verwaltung → Mandant
 exportieren …**. Den Import finden Sie im Startfenster unter **Mandant
@@ -1024,7 +1035,7 @@ Konfiguriert werden:
 SimpleOB verwendet diese Zuordnungen unter anderem bei der Prüfung und
 gegebenenfalls vorgeschlagenen Verrechnung der Umsatzsteuerkonten im Rahmen
 des Jahresabschlusses. Sie lösen keine automatische Rechnungsbuchung aus;
-eine Rechnungserfassung ist in Version 0.62.0 nicht vorhanden.
+eine Rechnungserfassung ist in Version 0.63.0 nicht vorhanden.
 
 Für die Umsatzsteuerverrechnung sind zusätzlich die Rollen **Umsatzsteuer-
 Vorauszahlungen** und **Umsatzsteuer laufendes Jahr** in der
@@ -1189,7 +1200,7 @@ werden. In der Übersicht sehen Sie Anfangssaldo, Soll- und Habenumsatz sowie
 Endsaldo; durch Auswahl eines Kontos zeigen Sie dessen Kontenblatt an. Die
 Berichte werten Hauptbuchbuchungen aus. Eine Rechnungs- oder
 Offene-Posten-Nebenbuchführung mit Zahlungszuordnungen ist nicht Bestandteil
-von Version 0.62.0.
+von Version 0.63.0.
 
 
 ## 9. Buchungen
@@ -1197,7 +1208,7 @@ von Version 0.62.0.
 Im Arbeitsbereich **Buchen** werden die laufenden Geschäftsvorfälle des
 geöffneten Geschäftsjahres als einfache Buchungssätze erfasst. Eine
 Rechnungserfassung mit automatischer Umsatzsteuerberechnung sowie eine
-OP-Nebenbuchführung sind in Version 0.62.0 nicht enthalten.
+OP-Nebenbuchführung sind in Version 0.63.0 nicht enthalten.
 
 Buchungen können nur in einem offenen Geschäftsjahr erfasst werden. Nach dem
 Abschluss eines Geschäftsjahres ist die Buchungserfassung gesperrt.
@@ -1256,7 +1267,7 @@ Der Jahresabschluss wird in Kapitel 11 beschrieben.
 
 ### 9.7 Abgrenzung zu Rechnungen und offenen Posten
 
-Version 0.62.0 enthält keine Erfassung von Ein- oder Ausgangsrechnungen,
+Version 0.63.0 enthält keine Erfassung von Ein- oder Ausgangsrechnungen,
 Gutschriften, Anzahlungen oder Leistungsvorgängen. Ebenso gibt es keine
 OP-Nebenbuchführung, keine Zahlungszuordnung zu Rechnungen, keine
 OP-Abstimmung und keine Umsatzüberwachung nach § 19 UStG. Debitoren- und
@@ -1275,6 +1286,245 @@ Geschäftsjahr verfügbar. SimpleOB fragt ein Stornodatum ab und zeigt die
 vorgesehene Gegenbuchung zur Prüfung an. Zum Buchen müssen Sie exakt
 **DURCHFÜHREN** eingeben. Die ursprüngliche Buchung bleibt im Journal
 erhalten; SimpleOB fügt eine separate Stornobuchung hinzu.
+
+### 9.9 Bankumsätze aus CSV-Dateien importieren
+
+Über **Buchen → Bankumsätze importieren** öffnen Sie den
+**CSV-Importassistenten**. Verwenden Sie ein offenes Geschäftsjahr und prüfen
+Sie zuvor, dass im aktuellen Mandanten mindestens ein aktives Sachkonto mit
+der Kontenrolle **Bank** eingerichtet ist (Kapitel 8.8).
+
+Ein Importprofil beschreibt das Dateiformat: Spalten, Datums- und
+Zahlenformate, Betragsrichtung und Statuswerte. Es kann für alle Mandanten
+wiederverwendet werden. Das Bank-Sachkonto und die Gegenkonten wählen Sie
+anschließend für den geöffneten Mandanten aus; sie werden nicht im Profil
+gespeichert.
+
+> **Formatprüfung:** Der allgemeine CSV-Import wurde mit einer synthetischen
+> Testdatei geprüft. Die Kompatibilität mit einem echten Qonto-CSV-Export ist
+> noch nicht nachgewiesen. Das angebotene synthetische Qonto-Testprofil
+> bestätigt keine Kompatibilität mit originalen Qonto-Exporten.
+
+Die vier Verwendungswege unterscheiden sich:
+
+| Vorhaben | Vorgehen | Dauerhafte Speicherung |
+|---|---|---|
+| Neues Profil einrichten | Vier Schritte des Assistenten durchlaufen | Neues Profil speichern |
+| Gespeichertes Profil verwenden | Profil und Datei wählen, **Zum Bankimport** | Keine erneute Speicherung |
+| Zuordnung für einen Import ändern | Gespeichertes Profil wählen und Bearbeitungs-Checkbox aktivieren | Änderungen gelten nur für diesen Import |
+| Profil dauerhaft ändern | Im Bankimportdialog **Profil bearbeiten …** wählen | Bestehendes Profil ausdrücklich speichern |
+
+#### Neues Profil: Schritt 1 – CSV-Datei auswählen
+
+1. Lassen Sie **Gespeichertes Profil (optional)** auf **Neues Profil einrichten**.
+2. Wählen Sie **CSV-Datei auswählen …**.
+3. Stellen Sie **Spalten getrennt durch** und **Zeichencodierung** passend zur
+   Datei ein, beispielsweise Semikolon und UTF-8. Für UTF-8-Dateien mit
+   Dateikennung steht eine eigene Auswahl bereit.
+4. Bei geänderten Einstellungen wählen Sie **Kopfzeile einlesen / aktualisieren**.
+5. Prüfen Sie die erkannten Spaltennamen und wählen Sie **Weiter**.
+
+Die Datei benötigt eine Kopfzeile mit eindeutigen, nichtleeren Spaltennamen.
+Der Dateiname wird im Eingabefeld angezeigt; den vollständigen Pfad erhalten
+Sie über den Tooltip. Bei einer nicht lesbaren Datei oder einer ungültigen
+Kopfzeile erscheint eine Fehlermeldung.
+
+#### Neues Profil: Schritt 2 – CSV-Spalten zuordnen
+
+Die Zuordnungstabelle zeigt für jedes Feld die Bedeutung in SimpleOB, die
+zugeordnete CSV-Spalte und eine kurze Erklärung. Vorschläge anhand erkannter
+Spaltennamen müssen geprüft werden. Optionale Felder können auf
+**Nicht übernehmen (optional)** bleiben. Eine CSV-Spalte darf nicht mehreren
+Feldern gleichzeitig zugeordnet werden.
+
+| Feld in SimpleOB | Zuordnung |
+|---|---|
+| Transaktions-ID | Erforderlich: eindeutige externe Umsatzkennung der Bank |
+| Buchungsdatum | Erforderlich: Buchungstag des Umsatzes |
+| Währung | Erforderlich: Währungskürzel, beispielsweise EUR |
+| Transaktionsdatum | Optional: Datum des ursprünglichen Zahlungsvorgangs |
+| Zahlungspartner | Optional: Empfänger oder Absender |
+| Verwendungszweck | Optional: Referenz oder Beschreibung |
+| Betrag bzw. Zahlungseingang und Zahlungsausgang | Erforderlich entsprechend dem gewählten Betragsmodell |
+| Buchungsstatus | Erforderlich, sofern nicht ausdrücklich das Fehlen einer Statusspalte bestätigt wird |
+
+Unterhalb der Tabelle legen Sie das **Betragsmodell** und die **Vorzeichen**
+fest:
+
+- **Eine Betragsspalte mit positiven und negativen Werten:** Wählen Sie, ob
+  positive Werte Zahlungseingänge oder Zahlungsausgänge bedeuten. Bei
+  **Positive Werte sind Zahlungseingänge** wird beispielsweise `119,00` als
+  Eingang und `-119,00` als Ausgang interpretiert.
+- **Getrennte Spalten für Zahlungseingang und Zahlungsausgang:** Ordnen Sie
+  beide Spalten zu. Pro Zeile muss genau eine einen positiven Betrag
+  enthalten; die andere darf leer oder null sein. Negative Werte in diesen
+  Spalten und gleichzeitig gefüllte positive Eingangs- und Ausgangsbeträge
+  sind unzulässig.
+
+Stellen Sie **Datumsformat**, **Dezimaltrennzeichen** und
+**Tausendertrennzeichen** passend zur Datei ein. CSV-Beträge werden als
+vollständige Dezimalbeträge mit genau zwei Nachkommastellen gelesen, nicht
+als Cent-Eingabe der Buchungsmaske. Nullbeträge und ungültig gruppierte
+Tausender werden zurückgewiesen.
+
+Ordnen Sie die CSV-Statuswerte ihrer Bedeutung zu, beispielsweise:
+
+| Status in der CSV-Datei | Bedeutung in SimpleOB |
+|---|---|
+| gebucht | Abgewickelt – buchbar |
+| vorgemerkt | Vorgemerkt / nicht buchbar |
+
+Weitere Statuswerte können über **Weiteren Statuswert zuordnen** ergänzt
+werden. Für nicht zugeordnete Werte wählen Sie, ob ein Fehler gemeldet oder
+der Umsatz als nicht buchbar behandelt werden soll. Bei Bedarf kann die
+Groß-/Kleinschreibung unterschieden werden. Fehlt eine Statusspalte, ist die
+Option **Keine Statusspalte: Ich bestätige, dass alle Umsätze endgültig
+abgewickelt sind.** ausdrücklich zu aktivieren. Ohne diese Bestätigung wird
+kein abgeschlossener Status angenommen.
+
+Wählen Sie **Weiter**, um die Datei mit den festgelegten Einstellungen zu
+prüfen. Es findet noch keine Buchung statt.
+
+#### Neues Profil: Schritt 3 – Bankumsätze prüfen
+
+Die Vorschau zeigt Buchungsdatum, Zahlungspartner, Verwendungszweck, den
+interpretierten Betrag mit Vorzeichen und den Buchungsstatus. Die
+Zusammenfassung unterscheidet buchbare und vorgemerkte beziehungsweise nicht
+buchbare Umsätze.
+
+Wählen Sie einen Umsatz aus, um dessen externe Transaktionskennung und
+CSV-Zeilennummer sowie Originalwerte und interpretierte Werte zu vergleichen.
+Prüfen Sie insbesondere Zahlungsrichtung, Datum und Status. Noch wird kein
+Umsatz in das Journal übernommen. Als „buchbar“ bezeichnet die Vorschau hier
+den abgewickelten Status; die Prüfung auf bereits importierte Umsätze folgt
+im Bankimportdialog.
+
+Bei Konvertierungs- oder Zeilenfehlern zeigt SimpleOB die betroffenen
+CSV-Zeilennummern an. Eine fehlerhafte Datei wird nicht teilweise für die
+Buchung freigegeben. Korrigieren Sie die Datei oder gehen Sie über
+**Zurück** zur Zuordnung. Nach Änderungen wird eine alte Vorschau verworfen.
+Auch eine nach der Prüfung veränderte CSV-Datei muss erneut geprüft werden.
+
+#### Neues Profil: Schritt 4 – Profil speichern
+
+Geben Sie einen verständlichen **Profilnamen** ein. Für eine neue Quelle
+schlägt SimpleOB daraus eine gültige **Dauerhafte Quellenkennung** vor,
+beispielsweise `test_development` für `Test_Development`. Eine manuell
+bearbeitete Kennung wird bei weiteren Namensänderungen nicht überschrieben.
+Ist eine vorgeschlagene Kennung bereits vorhanden, muss ihre Wiederverwendung
+bewusst ausgewählt werden.
+
+Die Quellenkennung bildet zusammen mit der externen Transaktions-ID den
+Namensraum für die Duplikatprüfung innerhalb eines Mandanten. Verwenden Sie
+für weitere Dateiformate derselben Quelle dieselbe Kennung. Eine neue
+Kennung erhält eine getrennte Duplikatprüfung und muss ausdrücklich bestätigt
+werden. Vorhandene Quellenkennungen werden durch Umbenennen nicht geändert.
+
+Prüfen Sie die kompakte Zusammenfassung und wählen Sie
+**Profil speichern und zum Bankimport**. Erst jetzt wird das Profil
+dauerhaft gespeichert und der bestehende Bankimportdialog mit den geprüften
+Umsätzen geöffnet. Das Speichern eines Profils ist noch keine Buchung.
+
+#### Gespeichertes Profil ohne erneute Speicherung verwenden
+
+1. Öffnen Sie **Bankumsätze importieren** und wählen Sie das gespeicherte Profil.
+2. Lassen Sie **Spaltenzuordnung und Formate vor der Prüfung bearbeiten**
+   deaktiviert.
+3. Wählen Sie die neue CSV-Datei und anschließend **Zum Bankimport**.
+
+Die Datei wird mit dem gespeicherten Profil interpretiert und validiert.
+Bei Erfolg erscheinen direkt die Buchungsvorschläge im Bankimportdialog.
+Zuordnungsseite, gesonderte Assistenten-Vorschau und Speicherseite werden
+übersprungen. Das Profil bleibt unverändert und muss nicht erneut gespeichert
+werden. Prüfen Sie die Vorschläge vor der Buchung im Bankimportdialog.
+
+Passt die Datei nicht zum Profil, erscheint eine Fehlermeldung. Es werden
+keine unvollständigen Buchungsvorschläge übernommen. Aktivieren Sie bei Bedarf
+die Bearbeitungs-Checkbox, um die Zuordnung für diesen Import zu korrigieren.
+
+#### Zuordnung nur für einen Import temporär ändern
+
+Wählen Sie ein gespeichertes Profil und aktivieren Sie
+**Spaltenzuordnung und Formate vor der Prüfung bearbeiten**. Nach der
+Dateiauswahl können Sie die vorhandenen Zuordnungen und Formate anpassen.
+Prüfen Sie anschließend die interpretierten Umsätze und wählen Sie
+**Zum Bankimport**.
+
+Diese Änderungen gelten nur für den aktuellen Import. Eine Speicherseite
+wird nicht angeboten und das gespeicherte Profil bleibt unverändert. Die
+bestehende Quellenkennung bleibt erhalten. Bei einer geänderten Zuordnung
+der Transaktions-ID erscheint eine Warnung: Andere Kennungen können dazu
+führen, dass bereits importierte Umsätze erneut buchbar erscheinen.
+
+#### Gespeichertes Profil dauerhaft bearbeiten
+
+Im Bankimportdialog wählen Sie das gewünschte Profil und
+**Profil bearbeiten …**. Dort stehen auch **Neues Profil …** und
+**CSV-Importassistent …** für weitere Importe zur Verfügung.
+
+Die ausdrückliche Profilbearbeitung führt durch Dateiauswahl, Zuordnung und
+Umsatzprüfung bis zur Speicherseite. Änderungen werden erst mit
+**Profil speichern und zum Bankimport** dauerhaft übernommen. Die
+Quellenkennung eines bestehenden Profils ist dabei gesperrt und bleibt auch
+bei einer Umbenennung erhalten. Eine geänderte Transaktions-ID-Zuordnung muss
+zusätzlich bestätigt werden. Beim Abbrechen des Assistenten vor dem Speichern
+werden die Änderungen nicht übernommen.
+
+#### Bankkonto, Gegenkonten und Aufteilungen festlegen
+
+Im Dialog **Bankumsätze importieren** werden die geprüften Umsätze angezeigt.
+Im Reiter **CSV-Originalwerte** können Sie die Quelldaten erneut ansehen.
+Die Auswahl des **Bank-Sachkontos** gilt für den geöffneten Mandanten und
+wird nicht im Importprofil gespeichert. Angeboten werden aktive Konten, die
+in dessen Kontenkonfiguration die Rolle **Bank** besitzen.
+
+1. Wählen Sie das **Bank-Sachkonto**.
+2. Wählen Sie je zu übernehmendem Umsatz das **Gegenkonto** und prüfen Sie
+   Buchungsdatum und Buchungstext. Diese beiden Angaben können hier noch
+   bearbeitet werden.
+3. Soll ein Umsatz auf mehrere Gegenkonten verteilt werden, öffnen Sie
+   **Aufteilen …**. Wählen Sie je Gegenbuchungszeile ein Konto und einen
+   positiven Teilbetrag. Über **Gegenbuchungszeile hinzufügen** legen Sie
+   weitere Zeilen an. Die Teilbeträge müssen zusammen dem absoluten
+   Bankbetrag entsprechen; eine verbleibende Differenz sperrt die Übernahme.
+4. Markieren Sie die gewünschten gültigen Umsätze in **Übernehmen**.
+5. Wählen Sie **Ausgewählte Umsätze buchen …** und bestätigen Sie die
+   anschließende Frage zur Speicherung im Hauptbuch ausdrücklich.
+
+Nur ausgewählte, vollständig validierte Vorschläge werden gebucht.
+Vorgemerkte beziehungsweise nicht abgewickelte Umsätze sind nicht auswählbar.
+Das Einlesen oder Prüfen einer Datei, die Kontoauswahl und das Speichern eines
+Profils lösen für sich keine Buchung aus.
+
+Nach erfolgreicher Übernahme zeigt die Zeile die zugehörige Buchung an;
+Journal und Auswertungen werden aktualisiert. Fehler bei der Übernahme werden
+an der jeweiligen Zeile angezeigt. Prüfen Sie bei gemischtem Ergebnis,
+welche Umsätze bereits übernommen wurden, bevor Sie einen Import wiederholen.
+
+#### Duplikaterkennung und Fehlerfälle
+
+Die Duplikatsperre verwendet den Mandanten, die dauerhafte Quellenkennung und
+die externe Transaktions-ID. Bereits übernommene Umsätze werden als
+**Bereits übernommen** gekennzeichnet und sind nicht auswählbar. Die Sperre
+wird auch beim tatsächlichen Buchen geprüft. Buchung und externe Zuordnung
+werden gemeinsam gespeichert; ein Fehler darf keine Zuordnung ohne Buchung
+hinterlassen.
+
+- Eine doppelte Transaktions-ID innerhalb derselben CSV-Datei ist ein
+  Importfehler; es werden daraus keine Buchungsvorschläge freigegeben.
+- Eine fehlgeschlagene Duplikatprüfung gibt den betroffenen Umsatz nicht zum
+  Buchen frei.
+- Manuell erfasste Buchungen besitzen keine externe Importkennung. SimpleOB
+  kann auf eine **mögliche manuelle Doppelbuchung** anhand von Datum,
+  Bankkonto, Betrag und Zahlungsrichtung hinweisen; dieser Hinweis ersetzt
+  keine eigene Prüfung und ist keine automatische Sperre.
+- Eine andere Quellenkennung oder anders zugeordnete externe IDs können die
+  Wiedererkennung verhindern. Legen Sie deshalb nicht für jeden Import eine
+  neue Quelle an und prüfen Sie Warnungen zur ID-Zuordnung sorgfältig.
+
+Die externen Zuordnungen gehören zur `.simpleob`-Mandantensicherung und
+bleiben nach einer Wiederherstellung für die Duplikatprüfung verfügbar.
+Die globalen Importprofile werden separat gesichert (Kapitel 3.4 und 14.3).
 
 ## 10. Anlagenbuchhaltung
 
@@ -1823,7 +2073,7 @@ Umsatzsteuerbuchungen erfasst, kann ein neuer Vorschlag erforderlich sein.
 
 Die Verrechnung übernimmt ausschließlich die im Hauptbuch vorhandenen
 Kontensalden. Sie berechnet weder Umsatzsteuer aus Rechnungen noch prüft sie
-Rechnungs-, Zahlungs- oder Voranmeldungszeiträume. Version 0.62.0 enthält
+Rechnungs-, Zahlungs- oder Voranmeldungszeiträume. Version 0.63.0 enthält
 keine Rechnungserfassung, keine OP-Nebenbuchführung und keine Zuordnung von
 Zahlungen zu Rechnungen.
 
@@ -2369,7 +2619,7 @@ vor dem Arbeitsablauf, ob die erforderliche Taxonomieversion zur aktuell
 unterstützten Erzeugung gehört. Die Taxonomieauswahl ordnet derzeit
 Geschäftsjahren mit Beginn 2025 die Version 6.8, mit Beginn 2026 die Version
 6.9 und mit Beginn 2027 die Version 6.10 zu. Damit ist die E-Bilanz-Erzeugung
-in Version 0.62.0 derzeit für Geschäftsjahre mit Taxonomie 6.9 unterstützt.
+in Version 0.63.0 derzeit für Geschäftsjahre mit Taxonomie 6.9 unterstützt.
 
 SimpleOB kann die Herkunft einer selbst ausgewählten Datei nicht
 kryptografisch verifizieren. Verwenden Sie dafür ausschließlich ein
@@ -2838,6 +3088,8 @@ Dazu gehören insbesondere:
 - Zuordnungen der Personenkonten zu Geschäftspartnern,
 - sämtliche in SimpleOB verwalteten Geschäftsjahre,
 - Buchungen und Buchungszeilen,
+- externe Zuordnungen importierter Bankumsätze zu ihren Buchungen zur
+  Wiederherstellung der Duplikatsperre,
 - Verknüpfungen zwischen den Geschäftsjahren,
 - Anlagegüter,
 - Anlagenbewegungen,
@@ -2847,7 +3099,7 @@ Dazu gehören insbesondere:
 - Buchungen zur Ergebnisverwendung und
 - erfasste Einlagen.
 
-Version 0.62.0 verwaltet keine Rechnungs- oder OP-Nebenbuchhistorie. Es gibt
+Version 0.63.0 verwaltet keine Rechnungs- oder OP-Nebenbuchhistorie. Es gibt
 daher keine separaten Rechnungs-OPs, Zahlungszuordnungen, Verrechnungen oder
 Rückerstattungsvorgänge, die in einer `.simpleob`-Datei fehlen könnten.
 Hauptbuchbuchungen, Geschäftspartner und ihre Personenkontenzuordnungen sind
@@ -2864,10 +3116,14 @@ Geschäftsjahre werden in die Mandantensicherung aufgenommen.
 Die `.simpleob`-Datei enthält mandantenbezogene Daten.
 
 Anwendungsweite Einstellungen gehören dagegen nicht zum
-Mandantentransfer.
+Mandantentransfer. Dazu zählen die globalen CSV-Importprofile in
+`csv_import_profiles.json`. Sichern Sie diese Datei gesondert; sie enthält
+keine mandantenbezogenen Bank-Sachkonten. Die bereits gespeicherten externen
+Banktransaktionszuordnungen sind dagegen Bestandteil der Mandantensicherung
+und bleiben für die Duplikatprüfung erhalten.
 
 Einzelne technische Datenfelder zur Kleinunternehmerregelung können im
-Mandantentransfer enthalten sein. Version 0.62.0 bietet jedoch keine
+Mandantentransfer enthalten sein. Version 0.63.0 bietet jedoch keine
 bedienbare Umsatzüberwachung oder Verwaltung dieser Angaben als Funktion an.
 
 Insbesondere werden die in Kapitel 5 beschriebenen
@@ -3034,7 +3290,7 @@ Für die Übertragung eines Mandanten auf einen anderen Rechner kann
 folgender Ablauf verwendet werden:
 
 Der Transfer umfasst die Geschäftspartner und Personenkontenzuordnungen des
-Mandanten. Version 0.62.0 enthält keine OP-Nebenbuchhistorie. Richten Sie auf
+Mandanten. Version 0.63.0 enthält keine OP-Nebenbuchhistorie. Richten Sie auf
 dem Zielrechner erforderliche lokale Datenbank- und ELSTER-Einstellungen
 gesondert ein.
 
