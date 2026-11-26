@@ -5,8 +5,6 @@ from decimal import Decimal
 from pathlib import Path
 from uuid import uuid4
 
-import pytest
-
 from simpleob.accounting.account_balance import AccountBalance
 from simpleob.accounting.financial_statement_builder import (
     FinancialStatementBuilder,
@@ -70,10 +68,9 @@ from simpleob.taxonomy.mapping_set import TaxonomyMappingSet
 from simpleob.taxonomy.resolver import TaxonomyResolver
 from simpleob.taxonomy.taxonomy import TaxonomyVersion
 from simpleob.taxonomy.unit import TaxonomyUnit
+from tests.taxonomy_resources import taxonomy_entry_point, taxonomy_test_root
 
-TAXONOMY_ROOT = Path(
-    "data/taxonomy"
-).resolve()
+TAXONOMY_ROOT = taxonomy_test_root()
 
 DE_GAAP_CI_NAMESPACE = (
     "http://www.xbrl.de/taxonomies/"
@@ -95,12 +92,8 @@ def test_exported_xbrl_instance_is_validated_by_arelle(
 ) -> None:
     """Eine von OpenbilanzUG erzeugte XBRL-Instanz wird von Arelle geprüft."""
 
-    version_root = TAXONOMY_ROOT / "6.8"
+    taxonomy_entry_point('6.8')
 
-    if not version_root.is_dir():
-        pytest.skip(
-            "Taxonomy 6.8 is not installed locally"
-        )
 
     resolver = TaxonomyResolver(
         root=TAXONOMY_ROOT
@@ -195,12 +188,8 @@ def test_exported_xbrl_instance_with_balance_sheet_and_income_statement(
 ) -> None:
     """Bilanz- und GuV-Facts aus dem echten Taxonomiemodell sind valide."""
 
-    version_root = TAXONOMY_ROOT / "6.8"
+    taxonomy_entry_point('6.8')
 
-    if not version_root.is_dir():
-        pytest.skip(
-            "Taxonomy 6.8 is not installed locally"
-        )
 
     resolver = TaxonomyResolver(
         root=TAXONOMY_ROOT
@@ -320,12 +309,8 @@ def test_financial_statement_positions_are_exported_to_valid_xbrl(
 ) -> None:
     """Abschlusspositionen werden über Mapping und FactBuilder valide exportiert."""
 
-    version_root = TAXONOMY_ROOT / "6.8"
+    taxonomy_entry_point('6.8')
 
-    if not version_root.is_dir():
-        pytest.skip(
-            "Taxonomy 6.8 is not installed locally"
-        )
 
     resolver = TaxonomyResolver(
         root=TAXONOMY_ROOT
@@ -477,12 +462,8 @@ def test_combined_gcd_and_gaap_ci_instance_is_validated_by_arelle(
 ) -> None:
     """GCD- und GAAP-CI-Facts werden gemeinsam valide exportiert."""
 
-    version_root = TAXONOMY_ROOT / "6.8"
+    taxonomy_entry_point('6.8')
 
-    if not version_root.is_dir():
-        pytest.skip(
-            "Taxonomy 6.8 is not installed locally"
-        )
 
     resolver = TaxonomyResolver(
         root=TAXONOMY_ROOT
@@ -658,12 +639,8 @@ def test_combined_69_instance_with_report_element_is_validated_by_arelle(
 ) -> None:
     """GCD-Tuple und GAAP-CI-Facts der Taxonomie 6.9 sind valide."""
 
-    version_root = TAXONOMY_ROOT / "6.9"
+    taxonomy_entry_point('6.9')
 
-    if not version_root.is_dir():
-        pytest.skip(
-            "Taxonomy 6.9 is not installed locally"
-        )
 
     gcd_namespace = (
         "http://www.xbrl.de/taxonomies/"
@@ -891,7 +868,6 @@ def test_combined_69_instance_with_report_element_is_validated_by_arelle(
         exporter = XbrlExporter()
 
 
-
         xml = exporter.export(
             contexts={
                 "ctx-instant-2026": instant_context,
@@ -1008,12 +984,8 @@ def test_combined_610_instance_with_report_element_is_validated_by_arelle(
 ) -> None:
     """GCD-Tuple und GAAP-CI-Facts der Taxonomie 6.10 sind valide."""
 
-    version_root = TAXONOMY_ROOT / "6.10"
+    taxonomy_entry_point('6.10')
 
-    if not version_root.is_dir():
-        pytest.skip(
-            "Taxonomy 6.10 is not installed locally"
-        )
 
     gcd_namespace = (
         "http://www.xbrl.de/taxonomies/"
@@ -1335,12 +1307,8 @@ def test_gaap_ci_69_builds_facts_from_real_hgb_statement_pipeline(
 ) -> None:
     """HGB-Abschlusswerte werden über das Mapping zu validem GAAP-CI-XBRL."""
 
-    version_root = TAXONOMY_ROOT / "6.9"
+    taxonomy_entry_point('6.9')
 
-    if not version_root.is_dir():
-        pytest.skip(
-            "Taxonomy 6.9 is not installed locally"
-        )
 
     resolver = TaxonomyResolver(
         root=TAXONOMY_ROOT

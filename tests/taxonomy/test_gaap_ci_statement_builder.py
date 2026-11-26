@@ -2,7 +2,6 @@
 
 from datetime import date
 from decimal import Decimal
-from pathlib import Path
 
 import pytest
 
@@ -16,6 +15,7 @@ from simpleob.taxonomy.arelle_adapter import ArelleAdapter
 from simpleob.taxonomy.gaap_ci_statement_builder import (
     GaapCiStatementBuilder,
 )
+from tests.taxonomy_resources import taxonomy_entry_point
 
 TEST_ENTITY_SCHEME = "http://www.bundesfinanzministerium.de"
 
@@ -38,16 +38,8 @@ def _positions_by_code(*roots):
 def test_builds_gaap_ci_statement_from_hgb_amounts() -> None:
     """HGB-Bilanz und GuV werden gemeinsam zu GAAP-CI-Facts."""
 
-    entry_point = Path(
-    "/tmp/openbilanz-taxonomy/6.9/"
-    "de-gaap-ci-2025-04-01/"
-    "de-gaap-ci-2025-04-01-shell-fiscal.xsd"
-    )
+    entry_point = taxonomy_entry_point("6.9")
 
-    if not entry_point.is_file():
-        pytest.skip(
-            "Taxonomy 6.9 is not installed locally"
-        )
     assets, liabilities = create_hgb_balance_sheet_structure()
     income_statement = create_hgb_income_statement_structure()
 

@@ -2,7 +2,6 @@
 
 from datetime import date
 from decimal import Decimal
-from pathlib import Path
 from uuid import uuid4
 
 import pytest
@@ -32,17 +31,10 @@ from simpleob.taxonomy.gcd_company_identifiers import (
 from simpleob.taxonomy.gcd_report_profile import GcdReportProfile
 from simpleob.taxonomy.resolver import TaxonomyResolver
 from simpleob.taxonomy.taxonomy import TaxonomyVersion
+from tests.taxonomy_resources import taxonomy_entry_point, taxonomy_test_root
 
-TAXONOMY_ROOT = Path(
-    "data/taxonomy"
-).resolve()
+TAXONOMY_ROOT = taxonomy_test_root()
 
-GCD_69_ENTRY_POINT = (
-    TAXONOMY_ROOT
-    / "6.9"
-    / "de-gcd-2025-04-01"
-    / "de-gcd-2025-04-01-shell.xsd"
-)
 
 TEST_ENTITY_SCHEME = "urn:openbilanz:company-id"
 
@@ -50,18 +42,10 @@ TEST_ENTITY_SCHEME = "urn:openbilanz:company-id"
 @pytest.mark.integration
 def test_standard_69_values_can_be_resolved_against_profile() -> None:
     """Standarddaten lassen sich vollständig gegen das 6.9-Profil auflösen."""
+    GCD_69_ENTRY_POINT = taxonomy_entry_point("6.9", kind="gcd")
 
-    version_root = TAXONOMY_ROOT / "6.9"
+    taxonomy_entry_point('6.9')
 
-    if not version_root.is_dir():
-        pytest.skip(
-            "Taxonomy 6.9 is not installed locally"
-        )
-
-    if not GCD_69_ENTRY_POINT.is_file():
-        pytest.skip(
-            "Taxonomy 6.9 GCD entry point is not installed locally"
-        )
 
     profile = create_profile_6_9()
 

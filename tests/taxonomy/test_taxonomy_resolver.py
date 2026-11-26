@@ -8,21 +8,16 @@ import pytest
 from simpleob.domain.fiscal_year import FiscalYear
 from simpleob.taxonomy.resolver import TaxonomyResolver
 from simpleob.taxonomy.taxonomy import TaxonomyVersion
+from tests.taxonomy_resources import taxonomy_entry_point, taxonomy_test_root
 
-TAXONOMY_ROOT = Path(
-    "/tmp/openbilanz-taxonomy"
-)
+TAXONOMY_ROOT = taxonomy_test_root()
 
 
 def test_resolver_finds_gaap_ci_fiscal_entry_point() -> None:
     """Der GAAP-CI-Fiscal-Entry-Point wird gefunden."""
 
-    version_root = TAXONOMY_ROOT / "6.9"
+    taxonomy_entry_point('6.9')
 
-    if not version_root.is_dir():
-        pytest.skip(
-            "Taxonomy 6.9 is not installed locally"
-        )
 
     resolver = TaxonomyResolver(
         root=TAXONOMY_ROOT
@@ -32,22 +27,16 @@ def test_resolver_finds_gaap_ci_fiscal_entry_point() -> None:
         TaxonomyVersion.V6_9
     )
 
-    assert entry_point == Path(
-        "/tmp/openbilanz-taxonomy/6.9/"
-        "de-gaap-ci-2025-04-01/"
-        "de-gaap-ci-2025-04-01-shell-fiscal.xsd"
-    )
+    assert entry_point.is_file()
+    assert entry_point.is_relative_to(TAXONOMY_ROOT / "6.9")
+    assert entry_point.name == "de-gaap-ci-2025-04-01-shell-fiscal.xsd"
 
 
 def test_resolver_finds_gaap_ci_fiscal_entry_point_for_6_8() -> None:
     """Der Resolver findet auch die tiefer verschachtelte Taxonomie 6.8."""
 
-    version_root = TAXONOMY_ROOT / "6.8"
+    taxonomy_entry_point('6.8')
 
-    if not version_root.is_dir():
-        pytest.skip(
-            "Taxonomy 6.8 is not installed locally"
-        )
 
     resolver = TaxonomyResolver(
         root=TAXONOMY_ROOT
@@ -57,24 +46,16 @@ def test_resolver_finds_gaap_ci_fiscal_entry_point_for_6_8() -> None:
         TaxonomyVersion.V6_8
     )
 
-    assert entry_point == Path(
-        "/tmp/openbilanz-taxonomy/6.8/"
-        "german-gaap-taxonomy-v6.8-2024-04-01/"
-        "xbrl/"
-        "de-gaap-ci-2024-04-01/"
-        "de-gaap-ci-2024-04-01-shell-fiscal.xsd"
-    )
+    assert entry_point.is_file()
+    assert entry_point.is_relative_to(TAXONOMY_ROOT / "6.8")
+    assert entry_point.name == "de-gaap-ci-2024-04-01-shell-fiscal.xsd"
 
 
 def test_resolver_finds_gaap_ci_fiscal_entry_point_for_6_10() -> None:
     """Der Resolver findet die Taxonomie 6.10."""
 
-    version_root = TAXONOMY_ROOT / "6.10"
+    taxonomy_entry_point('6.10')
 
-    if not version_root.is_dir():
-        pytest.skip(
-            "Taxonomy 6.10 is not installed locally"
-        )
 
     resolver = TaxonomyResolver(
         root=TAXONOMY_ROOT
@@ -84,21 +65,15 @@ def test_resolver_finds_gaap_ci_fiscal_entry_point_for_6_10() -> None:
         TaxonomyVersion.V6_10
     )
 
-    assert entry_point == Path(
-        "/tmp/openbilanz-taxonomy/6.10/"
-        "de-gaap-ci-2026-04-01/"
-        "de-gaap-ci-2026-04-01-shell-fiscal.xsd"
-    )
+    assert entry_point.is_file()
+    assert entry_point.is_relative_to(TAXONOMY_ROOT / "6.10")
+    assert entry_point.name == "de-gaap-ci-2026-04-01-shell-fiscal.xsd"
 
 def test_resolver_finds_entry_point_for_fiscal_year() -> None:
     """Ein Geschäftsjahr wird auf den passenden Entry-Point aufgelöst."""
 
-    version_root = TAXONOMY_ROOT / "6.9"
+    taxonomy_entry_point('6.9')
 
-    if not version_root.is_dir():
-        pytest.skip(
-            "Taxonomy 6.9 is not installed locally"
-        )
 
     fiscal_year = FiscalYear(
         start_date=date(2026, 1, 1),
@@ -113,11 +88,9 @@ def test_resolver_finds_entry_point_for_fiscal_year() -> None:
         fiscal_year
     )
 
-    assert entry_point == Path(
-        "/tmp/openbilanz-taxonomy/6.9/"
-        "de-gaap-ci-2025-04-01/"
-        "de-gaap-ci-2025-04-01-shell-fiscal.xsd"
-    )
+    assert entry_point.is_file()
+    assert entry_point.is_relative_to(TAXONOMY_ROOT / "6.9")
+    assert entry_point.name == "de-gaap-ci-2025-04-01-shell-fiscal.xsd"
     
 @pytest.mark.parametrize(
     ("start_date", "end_date", "version"),
@@ -146,12 +119,8 @@ def test_resolver_uses_correct_taxonomy_for_fiscal_year(
 ) -> None:
     """Geschäftsjahre werden der richtigen Taxonomieversion zugeordnet."""
 
-    version_root = TAXONOMY_ROOT / version.value
+    taxonomy_entry_point(version.value)
 
-    if not version_root.is_dir():
-        pytest.skip(
-            f"Taxonomy {version.value} is not installed locally"
-        )
 
     fiscal_year = FiscalYear(
         start_date=start_date,

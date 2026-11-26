@@ -53,6 +53,7 @@ from simpleob.taxonomy.gcd_company_identifiers import (
 )
 from simpleob.taxonomy.resolver import TaxonomyResolver
 from simpleob.taxonomy.taxonomy import TaxonomyVersion
+from tests.taxonomy_resources import taxonomy_entry_point, taxonomy_test_root
 
 STANDARD_CHART_PATH = (
     Path(__file__).resolve().parents[2]
@@ -64,10 +65,7 @@ STANDARD_CHART_PATH = (
 )
 
 
-
-TAXONOMY_ROOT = Path(
-    "/tmp/openbilanz-taxonomy"
-)
+TAXONOMY_ROOT = taxonomy_test_root()
 
 TEST_ENTITY_SCHEME = (
     "http://www.bundesfinanzministerium.de"
@@ -802,12 +800,8 @@ def test_reference_scenario_builds_valid_e_bilanz(
 ) -> None:
     """Der persistente Referenzabschluss erzeugt eine valide E-Bilanz."""
 
-    version_root = TAXONOMY_ROOT / "6.10"
+    taxonomy_entry_point('6.10')
 
-    if not version_root.is_dir():
-        pytest.skip(
-            "Taxonomy 6.10 is not installed locally"
-        )
 
     with _create_session() as session:
         accounting = _build_reference_accounting(

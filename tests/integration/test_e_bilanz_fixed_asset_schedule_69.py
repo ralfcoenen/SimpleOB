@@ -27,10 +27,9 @@ from simpleob.taxonomy.entry_point import TaxonomyEntryPoint
 from simpleob.taxonomy.gcd_company_data import GcdCompanyData
 from simpleob.taxonomy.resolver import TaxonomyResolver
 from simpleob.taxonomy.taxonomy import TaxonomyVersion
+from tests.taxonomy_resources import taxonomy_entry_point, taxonomy_test_root
 
-TAXONOMY_ROOT = Path(
-    "data/taxonomy"
-).resolve()
+TAXONOMY_ROOT = taxonomy_test_root()
 
 TEST_ENTITY_SCHEME = (
     "http://www.bundesfinanzministerium.de"
@@ -67,12 +66,8 @@ def test_e_bilanz_69_builds_and_validates_fixed_asset_schedule(
 ) -> None:
     """Anlagenspiegel und GCD-Mussfeld werden mit Arelle validiert."""
 
-    version_root = TAXONOMY_ROOT / "6.9"
+    taxonomy_entry_point('6.9')
 
-    if not version_root.is_dir():
-        pytest.skip(
-            "Taxonomy 6.9 is not installed locally"
-        )
 
     gcd_namespace = (
         "http://www.xbrl.de/taxonomies/"

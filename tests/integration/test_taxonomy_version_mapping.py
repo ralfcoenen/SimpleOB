@@ -1,8 +1,5 @@
 """Integrationstests für Mapping über mehrere Taxonomieversionen."""
 
-from pathlib import Path
-
-import pytest
 
 from simpleob.accounting.financial_statement_position import (
     FinancialStatementPosition,
@@ -11,30 +8,16 @@ from simpleob.accounting.statement_category import StatementCategory
 from simpleob.taxonomy.arelle_adapter import ArelleAdapter
 from simpleob.taxonomy.mapping import TaxonomyMappingRule
 from simpleob.taxonomy.mapping_set import TaxonomyMappingSet
+from tests.taxonomy_resources import taxonomy_entry_point
 
 
 def test_mapping_is_valid_for_taxonomy_6_8_and_6_9() -> None:
     """Dasselbe Mapping kann gegen 6.8 und 6.9 geprüft werden."""
 
-    entry_point_6_8 = Path(
-        "/tmp/openbilanz-taxonomy/6.8/"
-        "german-gaap-taxonomy-v6.8-2024-04-01/"
-        "xbrl/"
-        "de-gaap-ci-2024-04-01/"
-        "de-gaap-ci-2024-04-01-shell-fiscal.xsd"
-    )
+    entry_point_6_8 = taxonomy_entry_point("6.8")
 
-    entry_point_6_9 = Path(
-        "/tmp/openbilanz-taxonomy/6.9/"
-        "de-gaap-ci-2025-04-01/"
-        "de-gaap-ci-2025-04-01-shell-fiscal.xsd"
-    )
+    entry_point_6_9 = taxonomy_entry_point("6.9")
 
-    if not entry_point_6_8.is_file():
-        pytest.skip("Taxonomy 6.8 is not installed locally")
-
-    if not entry_point_6_9.is_file():
-        pytest.skip("Taxonomy 6.9 is not installed locally")
 
     position = FinancialStatementPosition(
         code="HGB.266.AKTIVA.A",
@@ -79,25 +62,10 @@ def test_mapping_is_valid_for_taxonomy_6_8_and_6_9() -> None:
 def test_mapping_detects_concept_removed_between_6_8_and_6_9() -> None:
     """Ein in 6.9 entfallenes Mapping-Ziel wird erkannt."""
 
-    entry_point_6_8 = Path(
-        "/tmp/openbilanz-taxonomy/6.8/"
-        "german-gaap-taxonomy-v6.8-2024-04-01/"
-        "xbrl/"
-        "de-gaap-ci-2024-04-01/"
-        "de-gaap-ci-2024-04-01-shell-fiscal.xsd"
-    )
+    entry_point_6_8 = taxonomy_entry_point("6.8")
 
-    entry_point_6_9 = Path(
-        "/tmp/openbilanz-taxonomy/6.9/"
-        "de-gaap-ci-2025-04-01/"
-        "de-gaap-ci-2025-04-01-shell-fiscal.xsd"
-    )
+    entry_point_6_9 = taxonomy_entry_point("6.9")
 
-    if not entry_point_6_8.is_file():
-        pytest.skip("Taxonomy 6.8 is not installed locally")
-
-    if not entry_point_6_9.is_file():
-        pytest.skip("Taxonomy 6.9 is not installed locally")
 
     position = FinancialStatementPosition(
         code="TEST.REMOVED.CONCEPT",

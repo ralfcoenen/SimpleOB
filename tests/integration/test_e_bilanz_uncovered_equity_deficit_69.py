@@ -1,6 +1,5 @@
 """Integrationstest des HGB-Fehlbetragsausweises in Taxonomie 6.9."""
 
-import os
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
@@ -35,22 +34,9 @@ from simpleob.taxonomy.gcd_company_data_mapper import (
 )
 from simpleob.taxonomy.resolver import TaxonomyResolver
 from simpleob.taxonomy.taxonomy import TaxonomyVersion
+from tests.taxonomy_resources import taxonomy_entry_point, taxonomy_test_root
 
-_DEFAULT_TAXONOMY_ROOT = Path("data/taxonomy").resolve()
-_USER_TAXONOMY_ROOT = (
-    Path.home()
-    / "Library/Application Support/SimpleOB/taxonomy"
-)
-TAXONOMY_ROOT = Path(
-    os.environ.get(
-        "SIMPLEOB_TAXONOMY_ROOT",
-        str(
-            _DEFAULT_TAXONOMY_ROOT
-            if (_DEFAULT_TAXONOMY_ROOT / "6.9").is_dir()
-            else _USER_TAXONOMY_ROOT
-        ),
-    )
-)
+TAXONOMY_ROOT = taxonomy_test_root()
 
 
 def _positions_by_code(*roots) -> dict[str, FinancialStatementPosition]:
@@ -82,8 +68,8 @@ def test_negative_equity_deficit_xbrl_and_arelle_validation(
 ) -> None:
     """Bilanzfacts und BVV verwenden die getrennten Roh-/Ausweiswerte."""
 
-    if not (TAXONOMY_ROOT / "6.9").is_dir():
-        pytest.skip("Taxonomie 6.9 ist lokal nicht installiert")
+    taxonomy_entry_point("6.9")
+    taxonomy_entry_point("6.9", kind="gcd")
 
     assets, liabilities = create_hgb_balance_sheet_structure()
     income_statement_root = create_hgb_income_statement_structure()

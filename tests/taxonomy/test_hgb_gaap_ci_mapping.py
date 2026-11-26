@@ -1,6 +1,5 @@
 """Tests für das HGB-zu-GAAP-CI-Mapping."""
 
-from pathlib import Path
 
 import pytest
 
@@ -14,6 +13,7 @@ from simpleob.taxonomy.arelle_adapter import ArelleAdapter
 from simpleob.taxonomy.hgb_gaap_ci_mapping import (
     create_hgb_gaap_ci_mapping,
 )
+from tests.taxonomy_resources import taxonomy_entry_point
 
 
 def test_hgb_gaap_ci_mapping_contains_expected_rules() -> None:
@@ -73,17 +73,8 @@ def test_hgb_gaap_ci_mapping_contains_expected_rules() -> None:
 def test_hgb_gaap_ci_mapping_is_valid_for_taxonomy_6_8() -> None:
     """Alle produktiven Mapping-Ziele existieren in Taxonomie 6.8."""
 
-    entry_point = Path(
-        "/tmp/openbilanz-taxonomy/6.8/"
-        "german-gaap-taxonomy-v6.8-2024-04-01/"
-        "xbrl/de-gaap-ci-2024-04-01/"
-        "de-gaap-ci-2024-04-01-shell-fiscal.xsd"
-    )
+    entry_point = taxonomy_entry_point("6.8")
 
-    if not entry_point.is_file():
-        pytest.skip(
-            "Taxonomy 6.8 is not installed locally"
-        )
 
     assets, liabilities = (
         create_hgb_balance_sheet_structure()
@@ -114,40 +105,17 @@ def test_hgb_gaap_ci_mapping_is_valid_for_taxonomy_6_8() -> None:
         adapter.close()
 
     assert result.is_valid
-    assert result.valid_count == 86
+    assert result.valid_count == 88
     assert result.missing_count == 0
     assert result.missing_concept_names == ()
     
-@pytest.mark.parametrize(
-    "entry_point",
-    (
-        Path(
-            "/tmp/openbilanz-taxonomy/6.8/"
-            "german-gaap-taxonomy-v6.8-2024-04-01/"
-            "xbrl/de-gaap-ci-2024-04-01/"
-            "de-gaap-ci-2024-04-01-shell-fiscal.xsd"
-        ),
-        Path(
-            "/tmp/openbilanz-taxonomy/6.9/"
-            "de-gaap-ci-2025-04-01/"
-            "de-gaap-ci-2025-04-01-shell-fiscal.xsd"
-        ),
-        Path(
-            "/tmp/openbilanz-taxonomy/6.10/"
-            "de-gaap-ci-2026-04-01/"
-            "de-gaap-ci-2026-04-01-shell-fiscal.xsd"
-        ),
-    ),
-)
+@pytest.mark.parametrize("version", ("6.8", "6.9", "6.10"))
 def test_hgb_gaap_ci_mapping_is_valid_for_supported_taxonomies(
-    entry_point: Path,
+    version: str,
 ) -> None:
     """Alle produktiven Mapping-Ziele existieren in unterstützten Taxonomien."""
+    entry_point = taxonomy_entry_point(version)
 
-    if not entry_point.is_file():
-        pytest.skip(
-            f"Taxonomy is not installed locally: {entry_point}"
-        )
 
     assets, liabilities = (
         create_hgb_balance_sheet_structure()
@@ -182,7 +150,7 @@ def test_hgb_gaap_ci_mapping_is_valid_for_supported_taxonomies(
         f"{result.missing_concept_names}"
     )
 
-    assert result.valid_count == 86
+    assert result.valid_count == 88
     assert result.missing_count == 0
 
 

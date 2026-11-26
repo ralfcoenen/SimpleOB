@@ -39,10 +39,9 @@ from simpleob.taxonomy.gcd_shareholder import (
 )
 from simpleob.taxonomy.resolver import TaxonomyResolver
 from simpleob.taxonomy.taxonomy import TaxonomyVersion
+from tests.taxonomy_resources import taxonomy_entry_point, taxonomy_test_root
 
-TAXONOMY_ROOT = Path(
-    "/tmp/openbilanz-taxonomy"
-)
+TAXONOMY_ROOT = taxonomy_test_root()
 
 TEST_ENTITY_SCHEME = (
     "http://www.bundesfinanzministerium.de"
@@ -70,12 +69,8 @@ def test_builds_complete_e_bilanz_and_validates_with_arelle(
 ) -> None:
     """GCD und HGB-Abschluss werden zu valider E-Bilanz-XBRL."""
 
-    version_root = TAXONOMY_ROOT / "6.10"
+    taxonomy_entry_point('6.10')
 
-    if not version_root.is_dir():
-        pytest.skip(
-            "Taxonomy 6.10 is not installed locally"
-        )
 
     gcd_namespace = (
         "http://www.xbrl.de/taxonomies/"
@@ -349,12 +344,8 @@ def test_nil_facts_do_not_announce_ev_or_bvv(
 ) -> None:
     """NIL-Mussfelder allein kündigen EV oder BVV nicht an."""
 
-    version_root = TAXONOMY_ROOT / "6.10"
+    taxonomy_entry_point('6.10')
 
-    if not version_root.is_dir():
-        pytest.skip(
-            "Taxonomy 6.10 is not installed locally"
-        )
 
     gcd_namespace = (
         "http://www.xbrl.de/taxonomies/"

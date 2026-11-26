@@ -4,8 +4,6 @@ from decimal import Decimal
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
-import pytest
-
 from simpleob.exporter.xbrl_export import XbrlExporter
 from simpleob.taxonomy.concept import (
     TaxonomyBalance,
@@ -36,6 +34,7 @@ from simpleob.taxonomy.resolver import TaxonomyResolver
 from simpleob.taxonomy.taxonomy import TaxonomyVersion
 from simpleob.taxonomy.text_fact import TaxonomyTextFact
 from simpleob.taxonomy.unit import TaxonomyUnit
+from tests.taxonomy_resources import taxonomy_entry_point, taxonomy_test_root
 
 DE_GAAP_CI_NAMESPACE = (
     "http://www.xbrl.de/taxonomies/"
@@ -122,16 +121,10 @@ def test_xbrl_exporter_serializes_instance() -> None:
 def test_xbrl_exporter_uses_real_taxonomy_entry_point() -> None:
     """Der Exporter verwendet Metadaten eines realen GAAP-CI-Entry-Points."""
 
-    taxonomy_root = Path(
-        "/tmp/openbilanz-taxonomy"
-    )
+    taxonomy_root = taxonomy_test_root()
 
-    version_root = taxonomy_root / "6.8"
+    taxonomy_entry_point('6.8')
 
-    if not version_root.is_dir():
-        pytest.skip(
-            "Taxonomy 6.8 is not installed locally"
-        )
 
     resolver = TaxonomyResolver(
         root=taxonomy_root

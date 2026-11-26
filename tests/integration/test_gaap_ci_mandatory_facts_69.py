@@ -2,7 +2,6 @@
 
 from datetime import date
 from decimal import Decimal
-from pathlib import Path
 
 import pytest
 
@@ -21,10 +20,9 @@ from simpleob.taxonomy.gaap_ci_mandatory_fact_completer import (
 from simpleob.taxonomy.resolver import TaxonomyResolver
 from simpleob.taxonomy.taxonomy import TaxonomyVersion
 from simpleob.taxonomy.unit import TaxonomyUnit
+from tests.taxonomy_resources import taxonomy_entry_point, taxonomy_test_root
 
-TAXONOMY_ROOT = Path(
-    "data/taxonomy"
-).resolve()
+TAXONOMY_ROOT = taxonomy_test_root()
 
 TEST_ENTITY_SCHEME = (
     "http://www.bundesfinanzministerium.de"
@@ -35,12 +33,8 @@ TEST_ENTITY_SCHEME = (
 def test_gaap_ci_69_completes_real_corporation_mandatory_facts() -> None:
     """Echte 6.9-KSt-Mussfelder werden vollständig als NIL ergänzt."""
 
-    version_root = TAXONOMY_ROOT / "6.9"
+    taxonomy_entry_point('6.9')
 
-    if not version_root.is_dir():
-        pytest.skip(
-            "Taxonomy 6.9 is not installed locally"
-        )
 
     resolver = TaxonomyResolver(
         root=TAXONOMY_ROOT

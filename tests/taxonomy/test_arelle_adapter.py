@@ -3,8 +3,6 @@
 from decimal import Decimal
 from pathlib import Path
 
-import pytest
-
 from simpleob.taxonomy.arelle_adapter import ArelleAdapter
 from simpleob.taxonomy.calculation import (
     TaxonomyCalculationRelation,
@@ -25,33 +23,17 @@ from simpleob.taxonomy.model import TaxonomyModel
 from simpleob.taxonomy.presentation_set import (
     TaxonomyPresentationSet,
 )
-
-ENTRY_POINT = Path(
-    "/tmp/openbilanz-taxonomy/6.8/"
-    "german-gaap-taxonomy-v6.8-2024-04-01/"
-    "xbrl/"
-    "de-gaap-ci-2024-04-01/"
-    "de-gaap-ci-2024-04-01-shell-fiscal.xsd"
-)
+from tests.taxonomy_resources import taxonomy_entry_point
 
 INVALID_INSTANCE = Path(
     "tests/fixtures/invalid_xbrl_instance.xbrl"
 )
 
 
-def require_taxonomy() -> None:
-    """Überspringt den Test, wenn die lokale Taxonomie fehlt."""
-
-    if not ENTRY_POINT.is_file():
-        pytest.skip(
-            "German GAAP taxonomy 6.8 is not installed locally"
-        )
-
-
 def test_arelle_adapter_loads_taxonomy() -> None:
     """Der Adapter lädt eine Taxonomie über Arelle."""
+    ENTRY_POINT = taxonomy_entry_point("6.8", kind="gaap-ci")
 
-    require_taxonomy()
 
     adapter = ArelleAdapter()
 
@@ -74,8 +56,8 @@ def test_arelle_adapter_loads_taxonomy() -> None:
 
 def test_arelle_adapter_validates_taxonomy() -> None:
     """Der Adapter validiert eine Taxonomie über Arelle."""
+    ENTRY_POINT = taxonomy_entry_point("6.8", kind="gaap-ci")
 
-    require_taxonomy()
 
     adapter = ArelleAdapter()
 
@@ -109,8 +91,8 @@ def test_arelle_adapter_reports_validation_errors() -> None:
 
 def test_arelle_adapter_returns_taxonomy_concept() -> None:
     """Der Adapter überführt ein Arelle-Concept ins Openbilanz-Modell."""
+    ENTRY_POINT = taxonomy_entry_point("6.8", kind="gaap-ci")
 
-    require_taxonomy()
 
     adapter = ArelleAdapter()
 
@@ -150,8 +132,8 @@ def test_arelle_adapter_returns_taxonomy_concept() -> None:
 
 def test_arelle_adapter_returns_none_for_unknown_concept() -> None:
     """Ein unbekanntes Concept wird nicht gefunden."""
+    ENTRY_POINT = taxonomy_entry_point("6.8", kind="gaap-ci")
 
-    require_taxonomy()
 
     adapter = ArelleAdapter()
 
@@ -168,8 +150,8 @@ def test_arelle_adapter_returns_none_for_unknown_concept() -> None:
 
 def test_arelle_adapter_returns_concept_set() -> None:
     """Der Adapter überführt Arelle-Concepts in ein ConceptSet."""
+    ENTRY_POINT = taxonomy_entry_point("6.8", kind="gaap-ci")
 
-    require_taxonomy()
 
     adapter = ArelleAdapter()
 
@@ -212,8 +194,8 @@ def test_arelle_adapter_returns_concept_set() -> None:
 
 def test_arelle_adapter_concept_set_contains_valid_concepts() -> None:
     """Das ConceptSet enthält nur berichtbare XBRL-Items mit ID."""
+    ENTRY_POINT = taxonomy_entry_point("6.8", kind="gaap-ci")
 
-    require_taxonomy()
 
     adapter = ArelleAdapter()
 
@@ -247,8 +229,8 @@ def test_arelle_adapter_concept_set_contains_valid_concepts() -> None:
 
 def test_arelle_adapter_returns_standard_label() -> None:
     """Der Adapter liefert das deutsche Standardlabel eines Concepts."""
+    ENTRY_POINT = taxonomy_entry_point("6.8", kind="gaap-ci")
 
-    require_taxonomy()
 
     adapter = ArelleAdapter()
 
@@ -289,8 +271,8 @@ def test_arelle_adapter_returns_standard_label() -> None:
 
 def test_arelle_adapter_returns_label_set() -> None:
     """Der Adapter überführt deutsche Standardlabels in ein LabelSet."""
+    ENTRY_POINT = taxonomy_entry_point("6.8", kind="gaap-ci")
 
-    require_taxonomy()
 
     adapter = ArelleAdapter()
 
@@ -323,8 +305,8 @@ def test_arelle_adapter_returns_label_set() -> None:
 
 def test_arelle_adapter_returns_presentation_set() -> None:
     """Der Adapter überführt Presentation-Beziehungen in ein PresentationSet."""
+    ENTRY_POINT = taxonomy_entry_point("6.8", kind="gaap-ci")
 
-    require_taxonomy()
 
     adapter = ArelleAdapter()
 
@@ -366,8 +348,8 @@ def test_arelle_adapter_returns_presentation_set() -> None:
 
 def test_arelle_adapter_returns_calculation_set() -> None:
     """Der Adapter überführt Calculation-Beziehungen in ein CalculationSet."""
+    ENTRY_POINT = taxonomy_entry_point("6.8", kind="gaap-ci")
 
-    require_taxonomy()
 
     adapter = ArelleAdapter()
 
@@ -410,8 +392,8 @@ def test_arelle_adapter_returns_calculation_set() -> None:
 
 def test_arelle_adapter_returns_taxonomy_model() -> None:
     """Der Adapter baut ein vollständiges TaxonomyModel aus Arelle-Daten."""
+    ENTRY_POINT = taxonomy_entry_point("6.8", kind="gaap-ci")
 
-    require_taxonomy()
 
     adapter = ArelleAdapter()
 

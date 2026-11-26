@@ -2,7 +2,6 @@
 
 from datetime import date
 from decimal import Decimal
-from pathlib import Path
 from uuid import uuid4
 
 import pytest
@@ -36,10 +35,9 @@ from simpleob.taxonomy.gcd_company_data_mapper import (
     GcdCompanyDataMapper,
 )
 from simpleob.taxonomy.resolver import TaxonomyResolver
+from tests.taxonomy_resources import taxonomy_entry_point, taxonomy_test_root
 
-TAXONOMY_ROOT = Path(
-    "data/taxonomy"
-).resolve()
+TAXONOMY_ROOT = taxonomy_test_root()
 
 TEST_ENTITY_SCHEME = (
     "http://www.bundesfinanzministerium.de"
@@ -90,12 +88,8 @@ def test_e_bilanz_69_validates_supported_legal_forms(
 ) -> None:
     """UG und GmbH werden mit Taxonomie 6.9 valide erzeugt."""
 
-    version_root = TAXONOMY_ROOT / "6.9"
+    taxonomy_entry_point('6.9')
 
-    if not version_root.is_dir():
-        pytest.skip(
-            "Taxonomy 6.9 is not installed locally"
-        )
 
     assets, liabilities = (
         create_hgb_balance_sheet_structure()

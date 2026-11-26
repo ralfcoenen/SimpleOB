@@ -1,28 +1,18 @@
 """Smoke-Test für die direkte Arelle-Python-API."""
 
-from pathlib import Path
 
-import pytest
 from arelle import Cntlr
 
-ENTRY_POINT = Path(
-    "/tmp/openbilanz-taxonomy/6.8/"
-    "german-gaap-taxonomy-v6.8-2024-04-01/"
-    "xbrl/"
-    "de-gaap-ci-2024-04-01/"
-    "de-gaap-ci-2024-04-01-shell-fiscal.xsd"
-)
+from tests.taxonomy_resources import taxonomy_entry_point
 
 
 def test_arelle_loads_taxonomy() -> None:
     """Arelle lädt die deutsche E-Bilanz-Taxonomie 6.8."""
+    ENTRY_POINT = taxonomy_entry_point("6.8", kind="gaap-ci")
 
-    if not ENTRY_POINT.is_file():
-        pytest.skip(
-            "German GAAP taxonomy 6.8 is not installed locally"
-        )
 
     controller = Cntlr.Cntlr()
+    controller.webCache.workOffline = True
 
     try:
         model_xbrl = controller.modelManager.load(
