@@ -1,5 +1,6 @@
 """Dialog zur Prüfung und bestätigten Übernahme von Bankumsätzen."""
 
+import csv
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
@@ -12,7 +13,6 @@ from PySide6.QtWidgets import (
     QDateEdit,
     QDialog,
     QDialogButtonBox,
-    QFileDialog,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -38,8 +39,13 @@ from simpleob.domain.bank_transaction import (
 )
 from simpleob.domain.entry_side import EntrySide
 from simpleob.importers.bank_csv_errors import BankCsvImportError
-from simpleob.importers.qonto_csv_importer import QontoCsvImporter
+from simpleob.importers.profile_csv_importer import ProfileCsvImporter
+from simpleob.services.csv_import_profile_store import (
+    CsvImportProfileError,
+    CsvImportProfileStore,
+)
 from simpleob.ui_qt.booking_frame import BookingFrame
+from simpleob.ui_qt.csv_import_profile_dialog import CsvImportProfileDialog
 
 
 class CounterBookingLinesDialog(QDialog):
@@ -212,10 +218,11 @@ class CounterBookingLinesDialog(QDialog):
 
 
 class BankTransactionImportDialog(QDialog):
-    """Liest das synthetische Testformat und zeigt editierbare Vorschläge."""
+    """Liest CSV anhand globaler Profile und zeigt editierbare Vorschläge."""
 
     _COLUMNS = ("Übernehmen", "Buchungsdatum", "Zahlungspartner", "Referenz",
-                "Betrag", "Gegenkonto", "Buchungstext", "Importstatus")
+                "Betrag", "Gegenkonto", "Buchungstext", "Importstatus",
+                "Transaktions-ID", "CSV-Status", "Transaktionsdatum")
 
     def __init__(
         self,
@@ -227,10 +234,14 @@ class BankTransactionImportDialog(QDialog):
         duplicate_lookup: Callable[[BankTransaction], object | None],
         post_proposal: Callable[..., object],
         journal=(),
+        profile_store: CsvImportProfileStore | None = None,
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Bankumsätze importieren")
         self.resize(1250, 650)
+        self._profile_store = profile_store if profile_store is not None else CsvImportProfileStore()
+        self._profiles = self._profile_store.load()
+        self._csv_path: Path | None = None
         self._accounts = tuple(account for account in accounts if account.is_active)
         self._amount_entry_factory = amount_entry_factory
         self._account_by_number = {account.number: account for account in self._accounts}
@@ -248,16 +259,26 @@ class BankTransactionImportDialog(QDialog):
         self._success_count = 0
 
         layout = QVBoxLayout(self)
-        self._synthetic_notice = QLabel(
-            "Hinweis: Der Parser unterstützt derzeit ausschließlich ein synthetisches "
-            "Testformat. Eine Kompatibilität mit dem originalen Qonto-Export ist nicht bestätigt."
-        )
+        profile_row = QHBoxLayout()
+        profile_row.addWidget(QLabel("CSV-Importprofil (alle Mandanten):"))
+        self._profile_combo = QComboBox()
+        for profile in self._profiles:
+            self._profile_combo.addItem(profile.name, profile)
+        profile_row.addWidget(self._profile_combo, 1)
+        self._new_profile_button = QPushButton("Neues Profil …")
+        self._edit_profile_button = QPushButton("Profil bearbeiten …")
+        self._new_profile_button.clicked.connect(lambda: self._edit_profile(new=True))
+        self._edit_profile_button.clicked.connect(lambda: self._edit_profile(new=False))
+        profile_row.addWidget(self._new_profile_button)
+        profile_row.addWidget(self._edit_profile_button)
+        layout.addLayout(profile_row)
+        self._synthetic_notice = QLabel()
         self._synthetic_notice.setWordWrap(True)
         layout.addWidget(self._synthetic_notice)
 
         file_row = QHBoxLayout()
         self._file_name = QLabel("Keine Datei ausgewählt")
-        self._choose_file_button = QPushButton("CSV-Datei auswählen …")
+        self._choose_file_button = QPushButton("CSV-Importassistent …")
         self._choose_file_button.clicked.connect(self._choose_file)
         file_row.addWidget(self._choose_file_button)
         file_row.addWidget(self._file_name, 1)
@@ -296,7 +317,12 @@ class BankTransactionImportDialog(QDialog):
         self._table.setColumnWidth(4, 110)
         self._table.setColumnWidth(5, 350)
         self._table.setColumnWidth(6, 220)
-        layout.addWidget(self._table, 1)
+        self._raw_table = QTableWidget()
+        self._raw_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        tabs = QTabWidget()
+        tabs.addTab(self._table, "Interpretierte Umsätze / Buchungsvorschläge")
+        tabs.addTab(self._raw_table, "CSV-Originalwerte")
+        layout.addWidget(tabs, 1)
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
         self._post_button = QPushButton("Ausgewählte Umsätze buchen …")
@@ -305,6 +331,8 @@ class BankTransactionImportDialog(QDialog):
         buttons.addButton(self._post_button, QDialogButtonBox.ButtonRole.AcceptRole)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
+        self._profile_combo.currentIndexChanged.connect(self._profile_changed)
+        self._profile_changed()
 
     @property
     def success_count(self) -> int:
@@ -315,16 +343,115 @@ class BankTransactionImportDialog(QDialog):
     def transactions(self) -> tuple[BankTransaction, ...]:
         return tuple(self._transactions[row] for row in sorted(self._transactions))
 
-    def load_csv(self, path: Path) -> None:
-        """Liest eine Datei ausschließlich über den vorhandenen Parser."""
+    def _clear_preview(self):
         self._table.setRowCount(0)
+        self._raw_table.clear()
+        self._raw_table.setRowCount(0)
         self._proposals.clear()
         self._transactions.clear()
         self._row_blocked_reasons.clear()
+        self._counter_combos.clear()
+        self._counter_summary_labels.clear()
+        self._counter_split_buttons.clear()
         self._errors = ()
+        self._error_label.clear()
+        self._update_post_enabled()
+
+    def _profile_changed(self, *_args):
+        self._clear_preview()
+        profile = self._profile_combo.currentData()
+        self._edit_profile_button.setEnabled(profile is not None)
+        self._choose_file_button.setEnabled(True)
+        self._summary.setText("Profil geändert. CSV-Datei auswählen und neu einlesen." if profile else "Bitte zuerst ein Profil erstellen.")
+        self._synthetic_notice.setText(
+            "Synthetisches Qonto-Testformat: Kompatibilität mit originalen Qonto-Exporten ist nicht bestätigt."
+            if profile and profile.import_source.value == "qonto_csv" else
+            "CSV-Datei und Interpretation vor der Buchungsübernahme prüfen."
+        )
+
+    def start_import_assistant(self, *, profile=None, csv_path=None, edit_mapping=False, persist_profile=False):
+        """Führt den Assistenten aus und übernimmt nur die dort geprüften Umsätze."""
+        self._clear_preview()
+        try:
+            latest = self._profile_store.load()
+            assistant = CsvImportProfileDialog(
+                parent=self, profile=profile, profiles=latest, csv_path=csv_path,
+                profile_store=self._profile_store, edit_mapping=edit_mapping,
+                persist_profile=persist_profile,
+            )
+            if assistant.exec() != QDialog.DialogCode.Accepted or assistant.profile is None:
+                return False
+            self._profiles = self._profile_store.load()
+        except CsvImportProfileError as exc:
+            self._error_label.setText(str(exc))
+            return False
+        self._profile_combo.blockSignals(True)
+        self._profile_combo.clear()
+        for saved in self._profiles:
+            self._profile_combo.addItem(saved.name, saved)
+        selected = next(index for index, saved in enumerate(self._profiles) if saved.profile_id == assistant.profile.profile_id)
+        self._profile_combo.setCurrentIndex(selected)
+        self._profile_combo.blockSignals(False)
+        self._profile_changed()
+        self._csv_path = assistant._csv_path
+        self._file_name.setText(self._csv_path.name)
+        self._show_checked_original_values(assistant.transactions)
+        self._load_transactions(assistant.transactions)
+        return True
+
+    def _edit_profile(self, *, new):
+        self.start_import_assistant(
+            profile=None if new else self._profile_combo.currentData(),
+            csv_path=self._csv_path, edit_mapping=True, persist_profile=not new,
+        )
+
+    def _show_checked_original_values(self, transactions):
+        self._raw_table.clear()
+        if not transactions:
+            self._raw_table.setRowCount(0)
+            return
+        self._raw_table.setColumnCount(len(transactions[0].source_record.headers) + 1)
+        self._raw_table.setHorizontalHeaderLabels(["CSV-Zeile", *transactions[0].source_record.headers])
+        self._raw_table.setRowCount(len(transactions))
+        for row, transaction in enumerate(transactions):
+            record = transaction.source_record
+            for column, value in enumerate([str(record.line_number), *record.values]):
+                item = QTableWidgetItem(value)
+                item.setToolTip(value)
+                self._raw_table.setItem(row, column, item)
+
+    def _show_original_values(self, path, profile):
+        with path.open(encoding=profile.encoding, newline="") as stream:
+            reader = csv.reader(stream, delimiter=profile.delimiter, strict=True)
+            headers = next(reader, [])
+            self._raw_table.setColumnCount(len(headers) + 1)
+            self._raw_table.setHorizontalHeaderLabels(["CSV-Zeile", *headers])
+            for values in reader:
+                if not values:
+                    continue
+                row = self._raw_table.rowCount()
+                self._raw_table.insertRow(row)
+                if len(values) + 1 > self._raw_table.columnCount():
+                    self._raw_table.setColumnCount(len(values) + 1)
+                for column, value in enumerate([str(reader.line_num), *values]):
+                    self._raw_table.setItem(row, column, QTableWidgetItem(value))
+
+    def load_csv(self, path: Path) -> None:
+        """Liest ausschließlich mit dem aktuell ausgewählten Profil."""
+        self._clear_preview()
+        self._csv_path = path
+        profile = self._profile_combo.currentData()
+        if profile is None:
+            self._error_label.setText("Bitte zuerst ein CSV-Importprofil auswählen.")
+            return
         self._file_name.setText(path.name)
         try:
-            transactions = QontoCsvImporter().load(path)
+            try:
+                self._show_original_values(path, profile)
+            except (OSError, UnicodeError, csv.Error):
+                # Die strenge Parserprüfung liefert die für die Übernahme maßgeblichen Fehler.
+                pass
+            transactions = ProfileCsvImporter(profile).load(path)
         except BankCsvImportError as exc:
             self._errors = exc.errors
             self._error_label.setText("\n".join(exc.errors))
@@ -335,6 +462,11 @@ class BankTransactionImportDialog(QDialog):
             self._update_post_enabled()
             return
 
+        self._show_checked_original_values(transactions)
+        self._load_transactions(transactions)
+
+    def _load_transactions(self, transactions):
+        """Verwendet für direkte Importe und den Assistenten dieselben Vorschläge."""
         self._error_label.clear()
         proposal_by_id = {
             proposal.transaction.external_transaction_id: proposal
@@ -361,6 +493,7 @@ class BankTransactionImportDialog(QDialog):
                     if not str(duplicate_id).startswith("Prüfung fehlgeschlagen:"):
                         duplicate_count += 1
             if proposal is not None:
+                proposal.bank_account_number = self._bank_account_combo.currentData()
                 self._proposals[row] = proposal
             self._add_row(row, transaction, proposal, duplicate_id)
 
@@ -375,14 +508,7 @@ class BankTransactionImportDialog(QDialog):
         self._update_post_enabled()
 
     def _choose_file(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Bankumsätze auswählen",
-            "",
-            "CSV-Dateien (*.csv);;Alle Dateien (*)",
-        )
-        if path:
-            self.load_csv(Path(path))
+        self.start_import_assistant(profile=self._profile_combo.currentData())
 
     def _add_row(
         self,
@@ -417,7 +543,10 @@ class BankTransactionImportDialog(QDialog):
 
         self._set_text(row, 2, transaction.counterparty or "")
         self._set_text(row, 3, transaction.reference or "")
-        self._set_text(row, 4, format_german_amount(transaction.amount))
+        self._set_text(row, 4, ("+" if transaction.amount > 0 else "") + format_german_amount(transaction.amount))
+        self._set_text(row, 8, transaction.external_transaction_id)
+        self._set_text(row, 9, transaction.transaction_status)
+        self._set_text(row, 10, transaction.transaction_date.isoformat() if transaction.transaction_date else "")
 
         contra = QComboBox()
         contra.addItem("Konto auswählen …", None)

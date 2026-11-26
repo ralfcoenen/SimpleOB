@@ -2213,7 +2213,8 @@ class MainWindow(QMainWindow):
             )
             return
 
-        dialog.exec()
+        if dialog.start_import_assistant():
+            dialog.exec()
 
     def _post_bank_booking_proposal(
         self,

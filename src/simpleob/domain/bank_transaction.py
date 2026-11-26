@@ -5,14 +5,27 @@ from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum
 from re import fullmatch
+from typing import ClassVar
 
 from simpleob.domain.money import to_decimal
 
 
-class BankImportSource(str, Enum):
-    """Unterstützte Importquellen."""
+class BankImportSource(str):
+    """Stabile, erweiterbare Kennung eines externen Transaktions-ID-Namensraums."""
 
-    QONTO_CSV = "qonto_csv"
+    QONTO_CSV: ClassVar["BankImportSource"]
+
+    def __new__(cls, value: str):
+        if not isinstance(value, str) or not fullmatch(r"[a-z][a-z0-9_.-]{0,127}", value):
+            raise ValueError("Ungültige Importquellenkennung.")
+        return super().__new__(cls, value)
+
+    @property
+    def value(self) -> str:
+        return str(self)
+
+
+BankImportSource.QONTO_CSV = BankImportSource("qonto_csv")
 
 
 class TransactionImportStatus(str, Enum):

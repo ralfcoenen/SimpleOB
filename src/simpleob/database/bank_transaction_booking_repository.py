@@ -38,6 +38,8 @@ class BankTransactionBookingRepository:
         external_transaction_id: str,
     ) -> UUID | None:
         """Liefert die Buchungs-ID, wenn der Umsatz bereits übernommen wurde."""
+        if not isinstance(import_source, BankImportSource):
+            raise TypeError("import_source muss eine BankImportSource sein.")
         company = self._company(company_id)
         model = (
             self._session.query(BankTransactionBooking)

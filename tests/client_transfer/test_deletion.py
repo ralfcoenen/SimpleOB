@@ -568,7 +568,8 @@ def test_client_delete_backup_roundtrips_person_accounts_without_touching_other_
     restored_engine.dispose()
 
 
-def test_bank_links_survive_delete_backup_restore_and_block_duplicates(populated, tmp_path):
+@pytest.mark.parametrize("source_value", ("qonto_csv", "custom.bank-v1"))
+def test_bank_links_survive_delete_backup_restore_and_block_duplicates(populated, tmp_path, source_value):
     from simpleob.database.bank_transaction_booking_repository import (
         BankTransactionBookingRepository,
     )
@@ -581,7 +582,7 @@ def test_bank_links_survive_delete_backup_restore_and_block_duplicates(populated
     from tests.services.test_bank_booking_import_service import _proposal
 
     engine, transfer, other, service = populated
-    source = BankImportSource.QONTO_CSV
+    source = BankImportSource(source_value)
     booking_id = transfer.client.fiscal_years[0].bookings[0].booking_id
     other_booking_id = other.client.fiscal_years[0].bookings[0].booking_id
     with Session(engine) as session:
@@ -613,12 +614,14 @@ def test_bank_links_survive_delete_backup_restore_and_block_duplicates(populated
         assert repository.booking_id_for(company_id=transfer.client.company_id,
             import_source=source, external_transaction_id="TX-1") == booking_id
         year = archived.client.fiscal_years[0]
+        proposal = _proposal(contra_account="1000")
+        proposal.transaction = replace(proposal.transaction, import_source=source)
         with pytest.raises(DuplicateBankTransactionError):
             BankBookingImportService(
                 booking_repository=BookingRepository(session),
                 transaction_booking_repository=repository,
             ).confirm_and_post(
-                _proposal(contra_account="1000"),
+                proposal,
                 company=Company(transfer.client.company_id, transfer.client.master_data.name),
                 fiscal_year=FiscalYear(year.start_date, year.end_date),
                 bank_account_numbers=frozenset({"1200"}), confirmed=True,
