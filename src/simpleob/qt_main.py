@@ -32,6 +32,9 @@ from simpleob.core.eric_privacy_acknowledgement import (
     save_eric_privacy_acknowledgement,
 )
 from simpleob.core.product import ERIC_MANUFACTURER_ID
+from simpleob.database.bank_transaction_booking_repository import (
+    BankTransactionBookingRepository,
+)
 from simpleob.database.booking_repository import BookingRepository
 from simpleob.database.chart_of_accounts_repository import (
     ChartOfAccountsRepository,
@@ -703,6 +706,9 @@ def main() -> None:
         )
 
         booking_repository = BookingRepository(session)
+        bank_transaction_booking_repository = (
+            BankTransactionBookingRepository(session)
+        )
         person_account_repository = PersonAccountRepository(session)
         posting_service = PostingService()
 
@@ -744,6 +750,7 @@ def main() -> None:
                 chart_of_accounts_repository
             ),
             booking_repository=booking_repository,
+            bank_transaction_booking_repository=bank_transaction_booking_repository,
             shareholder_repository=shareholder_repository,
             fixed_asset_repository=fixed_asset_repository,
             fixed_asset_movement_repository=(
@@ -773,6 +780,7 @@ def main() -> None:
                 chart_of_accounts_repository
             ),
             booking_repository=booking_repository,
+            bank_transaction_booking_repository=bank_transaction_booking_repository,
             shareholder_repository=shareholder_repository,
             fixed_asset_repository=fixed_asset_repository,
             fixed_asset_movement_repository=(
@@ -1129,6 +1137,9 @@ def main() -> None:
             workspace = FiscalYearWorkspace(
                 context=context,
                 booking_repository=booking_repository,
+                bank_transaction_booking_repository=(
+                    bank_transaction_booking_repository
+                ),
                 company_repository=company_repository,
                 profit_appropriation_annual_data_repository=(
                     profit_appropriation_annual_data_repository

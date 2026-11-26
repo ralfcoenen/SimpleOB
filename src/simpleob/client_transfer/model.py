@@ -5,8 +5,10 @@ from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from uuid import UUID
 
+from simpleob.domain.bank_transaction import BankImportSource
+
 CLIENT_TRANSFER_FORMAT_NAME = "SimpleOB Client Transfer"
-CLIENT_TRANSFER_FORMAT_VERSION = 2
+CLIENT_TRANSFER_FORMAT_VERSION = 3
 LEGACY_CLIENT_TRANSFER_FORMAT_VERSION = 1
 
 
@@ -107,6 +109,7 @@ class ClientTransferFormat:
 
         if self.version not in (
             LEGACY_CLIENT_TRANSFER_FORMAT_VERSION,
+            2,
             CLIENT_TRANSFER_FORMAT_VERSION,
         ):
             raise ValueError(
@@ -1554,6 +1557,23 @@ class ClientTransferFixedAsset:
 
 
 @dataclass(frozen=True, slots=True)
+class ClientTransferBankTransactionBooking:
+    """Portable externe Bankkennung mit fachlicher Buchungsreferenz."""
+
+    import_source: str
+    external_transaction_id: str
+    booking_id: UUID
+
+    def __post_init__(self) -> None:
+        BankImportSource(self.import_source)
+        object.__setattr__(self, "external_transaction_id", _validate_required_text(
+            self.external_transaction_id, field_name="external_transaction_id"
+        ))
+        if not isinstance(self.booking_id, UUID):
+            raise TypeError("booking_id must be a UUID")
+
+
+@dataclass(frozen=True, slots=True)
 class ClientTransferClient:
     """Portable Daten eines SimpleOB-Mandanten."""
 
@@ -1595,6 +1615,7 @@ class ClientTransferClient:
     kr_settings: ClientTransferKrSettings | None = None
     business_partners: tuple[ClientTransferBusinessPartner, ...] = ()
     person_accounts: tuple[ClientTransferPersonAccount, ...] = ()
+    bank_transaction_bookings: tuple[ClientTransferBankTransactionBooking, ...] = ()
 
     def __post_init__(self) -> None:
         if not isinstance(self.company_id, UUID):
@@ -1618,6 +1639,7 @@ class ClientTransferClient:
             raise TypeError("kr_settings must be ClientTransferKrSettings or None")
 
         for field_name, expected_type in (
+            ("bank_transaction_bookings", ClientTransferBankTransactionBooking),
             ("business_partners", ClientTransferBusinessPartner),
             ("person_accounts", ClientTransferPersonAccount),
         ):

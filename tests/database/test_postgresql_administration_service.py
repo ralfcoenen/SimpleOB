@@ -131,7 +131,7 @@ def test_pre_cleanup_revision_accepts_owned_legacy_open_item_tables(tmp_path):
         connection,
         migration_role="simpleob_migrator",
         current_revision="2f8c41d7a6b3",
-        head_revision=OPEN_ITEM_CLEANUP_REVISION,
+        head_revision="b8b9c0d5a2f1",
     )
 
 
@@ -176,7 +176,7 @@ def test_pre_cleanup_revision_accepts_owned_sequence_of_legacy_table(tmp_path):
         connection,
         migration_role="simpleob_migrator",
         current_revision="a6d18f2c94b7",
-        head_revision=OPEN_ITEM_CLEANUP_REVISION,
+        head_revision="b8b9c0d5a2f1",
     )
 
 
@@ -230,7 +230,7 @@ def test_ownership_verification_fails_closed_for_invalid_legacy_objects(
             _ownership_rows(row),
             migration_role="simpleob_migrator",
             current_revision=current_revision,
-            head_revision=OPEN_ITEM_CLEANUP_REVISION,
+            head_revision="b8b9c0d5a2f1",
         )
 
 
@@ -239,19 +239,19 @@ def test_legacy_allowlist_uses_alembic_ancestry_including_merge_history(tmp_path
 
     assert service._legacy_open_item_tables_are_present(
         current_revision="a6d18f2c94b7",
-        head_revision=OPEN_ITEM_CLEANUP_REVISION,
+        head_revision="b8b9c0d5a2f1",
     )
     assert service._legacy_open_item_tables_are_present(
         current_revision="2f8c41d7a6b3",
-        head_revision=OPEN_ITEM_CLEANUP_REVISION,
+        head_revision="b8b9c0d5a2f1",
     )
     assert not service._legacy_open_item_tables_are_present(
         current_revision=OPEN_ITEM_CLEANUP_REVISION,
-        head_revision=OPEN_ITEM_CLEANUP_REVISION,
+        head_revision="b8b9c0d5a2f1",
     )
     assert not service._legacy_open_item_tables_are_present(
         current_revision="unknown_revision",
-        head_revision=OPEN_ITEM_CLEANUP_REVISION,
+        head_revision="b8b9c0d5a2f1",
     )
     assert not service._legacy_open_item_tables_are_present(
         current_revision="2f8c41d7a6b3",

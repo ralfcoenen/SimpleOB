@@ -13,6 +13,7 @@ from simpleob.client_transfer.model import (
     ClientTransferAccount,
     ClientTransferAccountRoles,
     ClientTransferApplication,
+    ClientTransferBankTransactionBooking,
     ClientTransferBooking,
     ClientTransferBookingLine,
     ClientTransferBookingLineReference,
@@ -919,6 +920,14 @@ def _equity_contribution_from_dict(
     )
 
 
+def _bank_transaction_booking_from_dict(data: JsonObject) -> ClientTransferBankTransactionBooking:
+    return ClientTransferBankTransactionBooking(
+        import_source=_require_string(data.get("import_source"), field_name="import_source"),
+        external_transaction_id=_require_string(data.get("external_transaction_id"), field_name="external_transaction_id"),
+        booking_id=_parse_uuid(data.get("booking_id"), field_name="booking_id"),
+    )
+
+
 def _client_from_dict(
     data: JsonObject,
 ) -> ClientTransferClient:
@@ -927,6 +936,15 @@ def _client_from_dict(
     kr_settings_value = data.get("kr_settings")
 
     return ClientTransferClient(
+        bank_transaction_bookings=tuple(
+            _bank_transaction_booking_from_dict(
+                _require_object(item, field_name="client.bank_transaction_bookings item")
+            )
+            for item in _require_list(
+                data.get("bank_transaction_bookings", []),
+                field_name="client.bank_transaction_bookings",
+            )
+        ),
         company_id=_parse_uuid(
             data.get("company_id"),
             field_name="client.company_id",

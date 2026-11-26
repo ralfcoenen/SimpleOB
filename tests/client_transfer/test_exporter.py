@@ -83,6 +83,7 @@ def _build_repositories() -> dict[str, Mock]:
         "company_repository": Mock(),
         "chart_of_accounts_repository": Mock(),
         "booking_repository": Mock(),
+        "bank_transaction_booking_repository": Mock(),
         "shareholder_repository": Mock(),
         "fixed_asset_repository": Mock(),
         "fixed_asset_movement_repository": Mock(),
@@ -92,6 +93,7 @@ def _build_repositories() -> dict[str, Mock]:
         "profit_appropriation_posting_repository": Mock(),
         "equity_contribution_repository": Mock(),
     }
+    repositories["bank_transaction_booking_repository"].list_for_company.return_value = ()
     repositories["company_repository"].get_kr_settings.return_value = None
     return repositories
 
@@ -215,6 +217,7 @@ def _build_exporter(
         chart_of_accounts_repository=(
             repositories["chart_of_accounts_repository"]
         ),
+        bank_transaction_booking_repository=repositories["bank_transaction_booking_repository"],
         booking_repository=(
             repositories["booking_repository"]
         ),

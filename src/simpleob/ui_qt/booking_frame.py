@@ -531,6 +531,10 @@ class BookingFrame(QWidget):
 
         return entry
 
+    def create_amount_entry(self) -> QLineEdit:
+        """Erzeugt ein wiederverwendbares Betragsfeld mit Buchungsmaskenlogik."""
+        return self._create_amount_entry()
+
     def _normalize_amount_entry(
         self,
         entry: QLineEdit,

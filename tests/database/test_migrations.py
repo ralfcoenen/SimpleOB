@@ -10,7 +10,8 @@ from sqlalchemy.exc import IntegrityError
 
 BASELINE_REVISION = "7392d6cc6892"
 PRE_OPEN_ITEM_CLEANUP_REVISION = "2f8c41d7a6b3"
-HEAD_REVISION = "a9c6e3b17d42"
+PRE_BANK_IMPORT_HEAD_REVISION = "a9c6e3b17d42"
+HEAD_REVISION = "b8b9c0d5a2f1"
 OPEN_ITEM_TABLES = {
     "zahlungszuordnungskorrekturereignisse",
     "zahlungszuordnungskorrekturen",
@@ -518,7 +519,7 @@ def test_open_item_cleanup_downgrade_is_explicitly_refused(
     with pytest.raises(RuntimeError, match="OP-Tabellenmigration ist irreversibel"):
         command.downgrade(config, PRE_OPEN_ITEM_CLEANUP_REVISION)
 
-    assert _current_revision(database_path) == HEAD_REVISION
+    assert _current_revision(database_path) == PRE_BANK_IMPORT_HEAD_REVISION
 
 
 def test_model_metadata_excludes_all_open_item_tables() -> None:

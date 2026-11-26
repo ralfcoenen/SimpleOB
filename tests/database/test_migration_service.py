@@ -19,7 +19,7 @@ from simpleob.database.migration_service import (
 BASELINE_REVISION = "7392d6cc6892"
 PRE_CORRECTION_BOOKING_DATE_REVISION = "7d0c4a28b9f1"
 PRE_OPEN_ITEM_CLEANUP_REVISION = "2f8c41d7a6b3"
-HEAD_REVISION = "a9c6e3b17d42"
+HEAD_REVISION = "b8b9c0d5a2f1"
 
 
 def _application_config(
@@ -93,6 +93,14 @@ def test_new_database_is_upgraded_to_head(
     assert _current_revision(database_file) == (
         HEAD_REVISION
     )
+    with sqlite3.connect(database_file) as connection:
+        tables = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            )
+        }
+    assert "bank_transaction_bookings" in tables
     assert not _backup_file(database_file).exists()
 
 

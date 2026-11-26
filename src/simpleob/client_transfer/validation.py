@@ -69,6 +69,19 @@ def validate_client_transfer_references(
                     reference_name="booking line",
                 )
 
+    if client.bank_transaction_bookings and transfer.format.version < 3:
+        raise ValueError("Bankimport-Zuordnungen benötigen Transferformatversion 3.")
+    external_ids = set()
+    linked_bookings = set()
+    for link in client.bank_transaction_bookings:
+        if link.booking_id not in bookings_by_id:
+            raise ValueError("Bankimport-Zuordnung verweist auf eine unbekannte Buchung.")
+        key = (link.import_source, link.external_transaction_id)
+        if key in external_ids or link.booking_id in linked_bookings:
+            raise ValueError("Doppelte Bankimport-Zuordnung im Mandantentransfer.")
+        external_ids.add(key)
+        linked_bookings.add(link.booking_id)
+
     _validate_account_references(
         client=client,
         account_numbers=account_numbers,

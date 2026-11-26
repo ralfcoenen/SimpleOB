@@ -80,6 +80,8 @@ def test_booking_tab_only_exposes_general_booking_and_keeps_compact_layout():
     app.processEvents()
 
     groups = {group.title() for group in window.findChildren(QGroupBox)}
+    assert window._bank_import_button.text() == "Bankumsätze importieren"
+    assert window._bank_import_button.isVisible()
     assert "Neue Buchung" in groups
     assert "OP-Verwaltung" not in groups
     assert not any("Umsatzüberwachung" in title for title in groups)

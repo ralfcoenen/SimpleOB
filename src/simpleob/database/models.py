@@ -546,6 +546,34 @@ class Buchung(Base):
     )
 
 
+class BankTransactionBooking(Base):
+    """Eindeutige Verknüpfung eines Bankimports mit einer Buchung."""
+
+    __tablename__ = "bank_transaction_bookings"
+    __table_args__ = (
+        UniqueConstraint(
+            "mandant_id",
+            "import_source",
+            "external_transaction_id",
+            name="uq_bank_transaction_booking_external_id",
+        ),
+        UniqueConstraint(
+            "booking_id",
+            name="uq_bank_transaction_booking_booking_id",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    mandant_id: Mapped[int] = mapped_column(
+        ForeignKey("mandanten.id"), nullable=False
+    )
+    import_source: Mapped[str] = mapped_column(String, nullable=False)
+    external_transaction_id: Mapped[str] = mapped_column(String, nullable=False)
+    booking_id: Mapped[str] = mapped_column(
+        ForeignKey("buchungen.booking_id"), nullable=False
+    )
+
+
 class Buchungszeile(Base):
     """Persistierte Zeile einer Buchung."""
 

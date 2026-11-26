@@ -19,6 +19,9 @@ from simpleob.accounting.ledger import Ledger
 from simpleob.accounting.mapper import AccountMapper
 from simpleob.accounting.trial_balance import TrialBalance
 from simpleob.core.context import ApplicationContext
+from simpleob.database.bank_transaction_booking_repository import (
+    BankTransactionBookingRepository,
+)
 from simpleob.database.booking_repository import BookingRepository
 from simpleob.database.chart_of_accounts_repository import (
     ChartOfAccountsRepository,
@@ -62,6 +65,8 @@ from simpleob.domain.accounting_control_accounts import (
 from simpleob.domain.balance_sheet_presentation import (
     BalanceSheetPresentation,
 )
+from simpleob.domain.bank_booking_proposal import BankBookingProposal
+from simpleob.domain.bank_transaction import BankImportSource
 from simpleob.domain.booking import Booking
 from simpleob.domain.booking_line import BookingLine
 from simpleob.domain.booking_type import BookingType
@@ -137,6 +142,7 @@ from simpleob.reporting.person_account_report import (
 from simpleob.reporting.trial_balance_report import (
     TrialBalanceReport,
 )
+from simpleob.services.bank_booking_import_service import BankBookingImportService
 from simpleob.services.closing_consistency_service import (
     ClosingConsistencyService,
 )
@@ -233,6 +239,9 @@ class FiscalYearWorkspace:
         ) = None,
         shareholder_repository: ShareholderRepository | None = None,
         chart_of_accounts_repository: ChartOfAccountsRepository | None = None,
+        bank_transaction_booking_repository: (
+            BankTransactionBookingRepository | None
+        ) = None,
         posting_service: PostingService,
         reporting_service: ReportingService | None = None,
         closing_workflow: FiscalYearClosingWorkflow,
@@ -297,6 +306,9 @@ class FiscalYearWorkspace:
         )
         self._chart_of_accounts_repository = (
             chart_of_accounts_repository
+        )
+        self._bank_transaction_booking_repository = (
+            bank_transaction_booking_repository
         )
         self._posting_service = posting_service
         self._reporting_service = (
@@ -1002,6 +1014,83 @@ class FiscalYearWorkspace:
             raise
 
         self.reload()
+
+    def post_bank_booking_proposal(
+        self,
+        proposal: BankBookingProposal,
+        *,
+        confirmed: bool,
+    ) -> Booking:
+        """Übernimmt einen bestätigten Bankvorschlag und aktualisiert Journal/Ledger."""
+        transaction_repository = self._bank_transaction_booking_repository
+        if transaction_repository is None:
+            raise RuntimeError(
+                "Die Bankimport-Persistenz ist nicht konfiguriert."
+            )
+        if self._chart_of_accounts_repository is None:
+            raise RuntimeError(
+                "Die Kontenrahmenverwaltung ist nicht konfiguriert."
+            )
+        transaction_was_active = self._booking_repository.has_active_transaction
+        try:
+            account_roles = self._chart_of_accounts_repository.load_account_roles(
+                self._context.company.company_id
+            )
+        finally:
+            if not transaction_was_active:
+                self._booking_repository.rollback()
+        if account_roles is None:
+            raise RuntimeError("Die Kontenrollen des Mandanten konnten nicht geladen werden.")
+
+        booking = BankBookingImportService(
+            booking_repository=self._booking_repository,
+            transaction_booking_repository=transaction_repository,
+        ).confirm_and_post(
+            proposal,
+            company=self._context.company,
+            fiscal_year=self._context.fiscal_year,
+            bank_account_numbers=account_roles.bank_accounts,
+            confirmed=confirmed,
+        )
+        self.reload()
+        return booking
+
+    def bank_account_numbers(self) -> frozenset[str]:
+        """Liefert konfigurierte Bankkonten ohne eine Lesetransaktion offen zu lassen."""
+        if self._chart_of_accounts_repository is None:
+            raise RuntimeError("Die Kontenrahmenverwaltung ist nicht konfiguriert.")
+        transaction_was_active = self._booking_repository.has_active_transaction
+        try:
+            account_roles = self._chart_of_accounts_repository.load_account_roles(
+                self._context.company.company_id
+            )
+        finally:
+            if not transaction_was_active:
+                self._booking_repository.rollback()
+        if account_roles is None:
+            raise RuntimeError("Die Kontenrollen des Mandanten konnten nicht geladen werden.")
+        return account_roles.bank_accounts
+
+    def bank_transaction_booking_id(
+        self,
+        *,
+        import_source: BankImportSource,
+        external_transaction_id: str,
+    ) -> UUID | None:
+        """Liefert eine bereits zugeordnete Buchung und bereinigt eigene Lesetransaktionen."""
+        repository = self._bank_transaction_booking_repository
+        if repository is None:
+            raise RuntimeError("Die Bankimport-Persistenz ist nicht konfiguriert.")
+        transaction_was_active = self._booking_repository.has_active_transaction
+        try:
+            return repository.booking_id_for(
+                company_id=self._context.company.company_id,
+                import_source=import_source,
+                external_transaction_id=external_transaction_id,
+            )
+        finally:
+            if not transaction_was_active:
+                self._booking_repository.rollback()
 
     def _post_booking_with_equity_contributions(
         self,

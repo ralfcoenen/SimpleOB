@@ -14,6 +14,9 @@ from simpleob.client_transfer.model import (
 from simpleob.client_transfer.validation import (
     validate_client_transfer_references,
 )
+from simpleob.database.bank_transaction_booking_repository import (
+    BankTransactionBookingRepository,
+)
 from simpleob.database.booking_repository import (
     BookingRepository,
 )
@@ -35,6 +38,7 @@ from simpleob.database.fixed_asset_movement_repository import (
 from simpleob.database.fixed_asset_repository import (
     FixedAssetRepository,
 )
+from simpleob.database.person_account_repository import PersonAccountRepository
 from simpleob.database.profit_appropriation_annual_data_repository import (
     ProfitAppropriationAnnualDataRepository,
 )
@@ -47,7 +51,6 @@ from simpleob.database.shareholder_repository import (
 from simpleob.database.tax_depreciation_adjustment_repository import (
     TaxDepreciationAdjustmentRepository,
 )
-from simpleob.database.person_account_repository import PersonAccountRepository
 from simpleob.domain.account import Account
 from simpleob.domain.account_mapping_rule import (
     AccountMappingRule,
@@ -62,10 +65,11 @@ from simpleob.domain.accounting_control_accounts import (
 from simpleob.domain.balance_sheet_presentation import (
     BalanceSheetPresentation,
 )
-from simpleob.domain.business_partner import BusinessPartner
+from simpleob.domain.bank_transaction import BankImportSource
 from simpleob.domain.booking import Booking
 from simpleob.domain.booking_line import BookingLine
 from simpleob.domain.booking_type import BookingType
+from simpleob.domain.business_partner import BusinessPartner
 from simpleob.domain.company import Company
 from simpleob.domain.company_master_data import (
     CompanyMasterData,
@@ -91,6 +95,7 @@ from simpleob.domain.fixed_asset_status import (
     FixedAssetStatus,
 )
 from simpleob.domain.kr_settings import KrAnnualTurnoverAddition, KrSettings
+from simpleob.domain.person_account_role import PersonAccountRole
 from simpleob.domain.profit_appropriation_annual_data import (
     ProfitAppropriationAnnualData,
 )
@@ -100,7 +105,6 @@ from simpleob.domain.profit_appropriation_posting import (
 from simpleob.domain.profit_appropriation_posting_type import (
     ProfitAppropriationPostingType,
 )
-from simpleob.domain.person_account_role import PersonAccountRole
 from simpleob.domain.shareholder import Shareholder
 from simpleob.domain.template_account import TemplateAccount
 from simpleob.domain.vat_accounts import VatAccounts
@@ -115,6 +119,7 @@ class ClientTransferImporter:
         company_repository: CompanyRepository,
         chart_of_accounts_repository: ChartOfAccountsRepository,
         booking_repository: BookingRepository,
+        bank_transaction_booking_repository: BankTransactionBookingRepository,
         shareholder_repository: ShareholderRepository,
         fixed_asset_repository: FixedAssetRepository,
         fixed_asset_movement_repository: (
@@ -140,6 +145,7 @@ class ClientTransferImporter:
             chart_of_accounts_repository
         )
         self._booking_repository = booking_repository
+        self._bank_transaction_booking_repository = bank_transaction_booking_repository
         self._shareholder_repository = (
             shareholder_repository
         )
@@ -310,6 +316,15 @@ class ClientTransferImporter:
             self._save_bookings(
                 transfer=transfer
             )
+
+            for link in transfer.client.bank_transaction_bookings:
+                self._bank_transaction_booking_repository.add(
+                    company_id=company_id,
+                    import_source=BankImportSource(link.import_source),
+                    external_transaction_id=link.external_transaction_id,
+                    booking_id=link.booking_id,
+                    commit=False,
+                )
 
             self._save_fixed_asset_movements(
                 transfer=transfer,

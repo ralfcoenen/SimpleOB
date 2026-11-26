@@ -1,3 +1,4 @@
+
 """Roundtrip-Tests für den portablen Mandantentransfer."""
 
 from dataclasses import replace
@@ -60,6 +61,9 @@ from simpleob.client_transfer.model import (
 from simpleob.client_transfer.serialization import (
     client_transfer_from_dict,
     client_transfer_to_dict,
+)
+from simpleob.database.bank_transaction_booking_repository import (
+    BankTransactionBookingRepository,
 )
 from simpleob.database.booking_repository import (
     BookingRepository,
@@ -166,6 +170,7 @@ def _build_repositories(
     session: Session,
 ) -> dict[str, object]:
     return {
+        "bank_transaction_booking_repository": BankTransactionBookingRepository(session),
         "company_repository": CompanyRepository(
             session
         ),
@@ -233,6 +238,7 @@ def _build_importer(
                 "chart_of_accounts_repository"
             ]
         ),
+        bank_transaction_booking_repository=repositories["bank_transaction_booking_repository"],
         booking_repository=(
             repositories["booking_repository"]
         ),
@@ -290,6 +296,7 @@ def _build_exporter(
                 "chart_of_accounts_repository"
             ]
         ),
+        bank_transaction_booking_repository=repositories["bank_transaction_booking_repository"],
         booking_repository=(
             repositories["booking_repository"]
         ),

@@ -18,6 +18,9 @@ from simpleob.client_transfer.archive import write_verified_client_backup
 from simpleob.client_transfer.exporter import ClientTransferExporter
 from simpleob.client_transfer.importer import ClientTransferImporter
 from simpleob.client_transfer.model import ClientTransfer
+from simpleob.database.bank_transaction_booking_repository import (
+    BankTransactionBookingRepository,
+)
 from simpleob.database.booking_repository import BookingRepository
 from simpleob.database.chart_of_accounts_repository import ChartOfAccountsRepository
 from simpleob.database.client_deletion_repository import (
@@ -36,6 +39,7 @@ from simpleob.database.fixed_asset_movement_repository import (
     FixedAssetMovementRepository,
 )
 from simpleob.database.fixed_asset_repository import FixedAssetRepository
+from simpleob.database.person_account_repository import PersonAccountRepository
 from simpleob.database.profit_appropriation_annual_data_repository import (
     ProfitAppropriationAnnualDataRepository,
 )
@@ -46,7 +50,6 @@ from simpleob.database.shareholder_repository import ShareholderRepository
 from simpleob.database.tax_depreciation_adjustment_repository import (
     TaxDepreciationAdjustmentRepository,
 )
-from simpleob.database.person_account_repository import PersonAccountRepository
 
 
 class ClientDeletionCommitUnknown(RuntimeError):
@@ -67,6 +70,7 @@ def _transfer_repositories(session: Session) -> dict:
         "company_repository": CompanyRepository(session),
         "chart_of_accounts_repository": ChartOfAccountsRepository(session),
         "booking_repository": BookingRepository(session),
+        "bank_transaction_booking_repository": BankTransactionBookingRepository(session),
         "shareholder_repository": ShareholderRepository(session),
         "fixed_asset_repository": FixedAssetRepository(session),
         "fixed_asset_movement_repository": FixedAssetMovementRepository(session),

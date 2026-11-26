@@ -35,6 +35,7 @@ from simpleob.client_transfer.model import (
     ClientTransferVatAccounts,
 )
 from simpleob.client_transfer.serialization import (
+    client_transfer_from_dict,
     client_transfer_from_json,
     client_transfer_to_dict,
     client_transfer_to_json,
@@ -246,7 +247,7 @@ def test_unsupported_format_version_is_rejected() -> None:
     transfer = _build_transfer()
     data = client_transfer_to_dict(transfer)
 
-    data["format"]["version"] = 3
+    data["format"]["version"] = 4
 
     text = json.dumps(data)
 
@@ -501,3 +502,26 @@ def test_complete_transfer_json_roundtrip() -> None:
     restored = client_transfer_from_json(text)
 
     assert restored == transfer
+
+
+@pytest.mark.parametrize("invalid", ("unknown_booking", "duplicate_external_id", "duplicate_booking", "old_format"))
+def test_bank_import_links_reject_invalid_transfer_references(invalid):
+    from uuid import uuid4
+
+    from tests.client_transfer.test_roundtrip import _build_rich_transfer
+
+    data = client_transfer_to_dict(_build_rich_transfer())
+    data["format"]["version"] = 3
+    bookings = [booking for year in data["client"]["fiscal_years"] for booking in year["bookings"]]
+    link = {"import_source": "qonto_csv", "external_transaction_id": "TX-1", "booking_id": bookings[0]["booking_id"]}
+    data["client"]["bank_transaction_bookings"] = [link]
+    if invalid == "unknown_booking":
+        link["booking_id"] = str(uuid4())
+    elif invalid == "duplicate_external_id":
+        data["client"]["bank_transaction_bookings"].append({**link, "booking_id": bookings[1]["booking_id"]})
+    elif invalid == "duplicate_booking":
+        data["client"]["bank_transaction_bookings"].append({**link, "external_transaction_id": "TX-2"})
+    else:
+        data["format"]["version"] = 2
+    with pytest.raises(ValueError, match="Bankimport"):
+        client_transfer_from_dict(data)

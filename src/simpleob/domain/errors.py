@@ -11,6 +11,10 @@ class DuplicateBookingError(DomainError):
     """Wird ausgelöst, wenn eine Buchung bereits im Journal enthalten ist."""
 
 
+class DuplicateBankTransactionError(DomainError):
+    """Ein externer Bankumsatz wurde für diesen Mandanten bereits gebucht."""
+
+
 class UnbalancedBookingError(DomainError):
     """Wird ausgelöst, wenn eine Buchung nicht ausgeglichen ist."""
 

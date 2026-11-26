@@ -1,3 +1,4 @@
+
 """Tests für den portablen Mandantenimport."""
 
 from datetime import date, datetime, timezone
@@ -43,6 +44,9 @@ from simpleob.client_transfer.model import (
     ClientTransferTaxDepreciationAdjustment,
     ClientTransferTaxonomyMapping,
     ClientTransferVatAccounts,
+)
+from simpleob.database.bank_transaction_booking_repository import (
+    BankTransactionBookingRepository,
 )
 from simpleob.database.booking_repository import (
     BookingRepository,
@@ -400,6 +404,7 @@ def test_importer_restores_client_base_data() -> None:
                 chart_repository
             ),
             booking_repository=booking_repository,
+            bank_transaction_booking_repository=BankTransactionBookingRepository(session),
             shareholder_repository=shareholder_repository,
             fixed_asset_repository=fixed_asset_repository,
             fixed_asset_movement_repository=(
@@ -637,6 +642,7 @@ def test_importer_rejects_existing_company_id() -> None:
                 chart_repository
             ),
             booking_repository=booking_repository,
+            bank_transaction_booking_repository=BankTransactionBookingRepository(session),
             shareholder_repository=shareholder_repository,
             fixed_asset_repository=fixed_asset_repository,
             fixed_asset_movement_repository=(
@@ -761,6 +767,7 @@ def test_importer_rolls_back_complete_import_on_error(
                 chart_repository
             ),
             booking_repository=booking_repository,
+            bank_transaction_booking_repository=BankTransactionBookingRepository(session),
             shareholder_repository=shareholder_repository,
             fixed_asset_repository=fixed_asset_repository,
             fixed_asset_movement_repository=(
@@ -999,6 +1006,7 @@ def test_importer_restores_booking_and_reversal() -> None:
                 chart_repository
             ),
             booking_repository=booking_repository,
+            bank_transaction_booking_repository=BankTransactionBookingRepository(session),
             shareholder_repository=shareholder_repository,
             fixed_asset_repository=fixed_asset_repository,
             fixed_asset_movement_repository=(
@@ -1224,6 +1232,7 @@ def test_importer_restores_shareholder() -> None:
                 chart_repository
             ),
             booking_repository=booking_repository,
+            bank_transaction_booking_repository=BankTransactionBookingRepository(session),
             shareholder_repository=(
                 shareholder_repository
             ),
@@ -1429,6 +1438,7 @@ def test_importer_restores_fixed_asset() -> None:
                 chart_repository
             ),
             booking_repository=booking_repository,
+            bank_transaction_booking_repository=BankTransactionBookingRepository(session),
             shareholder_repository=(
                 shareholder_repository
             ),
@@ -1739,6 +1749,7 @@ def test_importer_restores_fixed_asset_movements() -> None:
                 chart_repository
             ),
             booking_repository=booking_repository,
+            bank_transaction_booking_repository=BankTransactionBookingRepository(session),
             shareholder_repository=(
                 shareholder_repository
             ),
@@ -2029,6 +2040,7 @@ def test_importer_restores_fixed_asset_depreciation_with_tax_adjustment(
                 chart_repository
             ),
             booking_repository=booking_repository,
+            bank_transaction_booking_repository=BankTransactionBookingRepository(session),
             shareholder_repository=(
                 shareholder_repository
             ),
@@ -2301,6 +2313,7 @@ def test_importer_restores_profit_appropriation_data_and_posting(
                 chart_repository
             ),
             booking_repository=booking_repository,
+            bank_transaction_booking_repository=BankTransactionBookingRepository(session),
             shareholder_repository=(
                 shareholder_repository
             ),
@@ -2550,6 +2563,7 @@ def test_importer_restores_equity_contribution(
                 chart_repository
             ),
             booking_repository=booking_repository,
+            bank_transaction_booking_repository=BankTransactionBookingRepository(session),
             shareholder_repository=(
                 shareholder_repository
             ),

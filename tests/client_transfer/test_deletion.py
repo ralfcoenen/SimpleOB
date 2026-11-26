@@ -566,3 +566,63 @@ def test_client_delete_backup_roundtrips_person_accounts_without_touching_other_
         assert restored.partner.partner_id == source_person.partner.partner_id
         assert restored.partner.name == "Sicherungsdebitor"
     restored_engine.dispose()
+
+
+def test_bank_links_survive_delete_backup_restore_and_block_duplicates(populated, tmp_path):
+    from simpleob.database.bank_transaction_booking_repository import (
+        BankTransactionBookingRepository,
+    )
+    from simpleob.database.booking_repository import BookingRepository
+    from simpleob.domain.bank_transaction import BankImportSource
+    from simpleob.domain.company import Company
+    from simpleob.domain.errors import DuplicateBankTransactionError
+    from simpleob.domain.fiscal_year import FiscalYear
+    from simpleob.services.bank_booking_import_service import BankBookingImportService
+    from tests.services.test_bank_booking_import_service import _proposal
+
+    engine, transfer, other, service = populated
+    source = BankImportSource.QONTO_CSV
+    booking_id = transfer.client.fiscal_years[0].bookings[0].booking_id
+    other_booking_id = other.client.fiscal_years[0].bookings[0].booking_id
+    with Session(engine) as session:
+        repository = BankTransactionBookingRepository(session)
+        for client, linked_id in ((transfer.client, booking_id), (other.client, other_booking_id)):
+            repository.add(company_id=client.company_id, import_source=source,
+                           external_transaction_id="TX-1", booking_id=linked_id)
+    with engine.connect() as connection:
+        other_before = ClientDeletionRepository(connection).capture(other.client.company_id)
+        before = ClientDeletionRepository(connection).capture(transfer.client.company_id)
+
+    path = tmp_path / "bank-backup.simpleob"
+    _delete(populated, path)
+    with engine.connect() as connection:
+        repository = ClientDeletionRepository(connection)
+        assert not repository.capture(transfer.client.company_id)["bank_transaction_bookings"]
+        assert repository.capture(other.client.company_id) == other_before
+    archived = read_client_transfer_archive(path)
+    assert archived.format.version == 3
+    assert archived.client.bank_transaction_bookings[0].booking_id == booking_id
+
+    # Restore through the actual archive/import path, with enforced SQLite FKs.
+    with Session(engine) as session:
+        repositories = _transfer_repositories(session)
+        ClientTransferImporter(**repositories).import_transfer(
+            transfer=archived, position_provider=_build_position_provider(),
+        )
+        repository = BankTransactionBookingRepository(session)
+        assert repository.booking_id_for(company_id=transfer.client.company_id,
+            import_source=source, external_transaction_id="TX-1") == booking_id
+        year = archived.client.fiscal_years[0]
+        with pytest.raises(DuplicateBankTransactionError):
+            BankBookingImportService(
+                booking_repository=BookingRepository(session),
+                transaction_booking_repository=repository,
+            ).confirm_and_post(
+                _proposal(contra_account="1000"),
+                company=Company(transfer.client.company_id, transfer.client.master_data.name),
+                fiscal_year=FiscalYear(year.start_date, year.end_date),
+                bank_account_numbers=frozenset({"1200"}), confirmed=True,
+            )
+    with engine.connect() as connection:
+        after = ClientDeletionRepository(connection).capture(transfer.client.company_id)
+        assert ClientDeletionRepository.canonical(after) == ClientDeletionRepository.canonical(before)

@@ -64,6 +64,7 @@ from simpleob.domain.account_type import AccountType
 from simpleob.domain.balance_sheet_presentation import (
     BalanceSheetPresentation,
 )
+from simpleob.domain.bank_booking_proposal import BankBookingProposal
 from simpleob.domain.booking_type import BookingType
 from simpleob.domain.chart_of_accounts_template import (
     ChartOfAccountsTemplate,
@@ -104,6 +105,9 @@ from simpleob.ui_qt.account_table_helpers import (
     set_default_account_sort,
 )
 from simpleob.ui_qt.balance_sheet_frame import BalanceSheetFrame
+from simpleob.ui_qt.bank_transaction_import_dialog import (
+    BankTransactionImportDialog,
+)
 from simpleob.ui_qt.booking_frame import BookingFrame
 from simpleob.ui_qt.closing_frame import ClosingFrame
 from simpleob.ui_qt.company_master_data_dialog import (
@@ -2074,6 +2078,10 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(10)
 
+        self._bank_import_button = QPushButton("Bankumsätze importieren")
+        self._bank_import_button.clicked.connect(self._open_bank_import_dialog)
+        layout.addWidget(self._bank_import_button, alignment=Qt.AlignmentFlag.AlignLeft)
+
         booking_group = QGroupBox("Neue Buchung")
         booking_layout = QVBoxLayout(booking_group)
 
@@ -2142,6 +2150,8 @@ class MainWindow(QMainWindow):
         enabled = self._workspace.is_open and not self._account_editing_mode
 
         self._booking_frame.set_enabled(enabled)
+        if hasattr(self, "_bank_import_button"):
+            self._bank_import_button.setEnabled(enabled)
         if hasattr(self, "_new_person_account_button"):
             self._new_person_account_button.setEnabled(
                 enabled and self._person_account_repository is not None
@@ -2178,6 +2188,48 @@ class MainWindow(QMainWindow):
         self._refresh_accounts()
         self._refresh_journal()
         self._refresh_balance_sheet()
+
+    def _open_bank_import_dialog(self) -> None:
+        """Öffnet die Importvorschau und aktualisiert nach Übernahmen die Anzeige."""
+        try:
+            bank_account_numbers = self._workspace.bank_account_numbers()
+            dialog = BankTransactionImportDialog(
+                parent=self,
+                accounts=self._booking_frame._accounts,
+                amount_entry_factory=self._booking_frame.create_amount_entry,
+                bank_account_numbers=bank_account_numbers,
+                duplicate_lookup=lambda transaction: self._workspace.bank_transaction_booking_id(
+                    import_source=transaction.import_source,
+                    external_transaction_id=transaction.external_transaction_id,
+                ),
+                post_proposal=self._post_bank_booking_proposal,
+                journal=self._workspace.journal.bookings,
+            )
+        except Exception as exc:
+            QMessageBox.critical(
+                self,
+                "Bankimport nicht verfügbar",
+                str(exc),
+            )
+            return
+
+        dialog.exec()
+
+    def _post_bank_booking_proposal(
+        self,
+        proposal: BankBookingProposal,
+        *,
+        confirmed: bool,
+    ):
+        """Übernimmt einen Vorschlag und aktualisiert die bestehende UI-Anzeige."""
+        booking = self._workspace.post_bank_booking_proposal(
+            proposal,
+            confirmed=confirmed,
+        )
+        self._refresh_accounts()
+        self._refresh_journal()
+        self._refresh_balance_sheet()
+        return booking
 
     def _create_fixed_assets_tab(self) -> None:
         """Erzeugt den Arbeitsbereich Anlagen."""

@@ -10,10 +10,11 @@ from simpleob.client_transfer.model import (
     ClientTransferAccount,
     ClientTransferAccountRoles,
     ClientTransferApplication,
+    ClientTransferBankTransactionBooking,
     ClientTransferBooking,
     ClientTransferBookingLine,
-    ClientTransferBusinessPartner,
     ClientTransferBookingLineReference,
+    ClientTransferBusinessPartner,
     ClientTransferClient,
     ClientTransferControlAccounts,
     ClientTransferEquityContribution,
@@ -38,6 +39,9 @@ from simpleob.client_transfer.validation import (
     validate_client_transfer_references,
 )
 from simpleob.core.version import get_application_version
+from simpleob.database.bank_transaction_booking_repository import (
+    BankTransactionBookingRepository,
+)
 from simpleob.database.booking_repository import (
     BookingRepository,
 )
@@ -59,6 +63,7 @@ from simpleob.database.fixed_asset_movement_repository import (
 from simpleob.database.fixed_asset_repository import (
     FixedAssetRepository,
 )
+from simpleob.database.person_account_repository import PersonAccountRepository
 from simpleob.database.profit_appropriation_annual_data_repository import (
     ProfitAppropriationAnnualDataRepository,
 )
@@ -71,7 +76,6 @@ from simpleob.database.shareholder_repository import (
 from simpleob.database.tax_depreciation_adjustment_repository import (
     TaxDepreciationAdjustmentRepository,
 )
-from simpleob.database.person_account_repository import PersonAccountRepository
 from simpleob.domain.kr_settings import KrSettings
 
 
@@ -90,6 +94,7 @@ class ClientTransferExporter:
         company_repository: CompanyRepository,
         chart_of_accounts_repository: ChartOfAccountsRepository,
         booking_repository: BookingRepository,
+        bank_transaction_booking_repository: BankTransactionBookingRepository,
         shareholder_repository: ShareholderRepository,
         fixed_asset_repository: FixedAssetRepository,
         fixed_asset_movement_repository: FixedAssetMovementRepository,
@@ -111,6 +116,7 @@ class ClientTransferExporter:
             chart_of_accounts_repository
         )
         self._booking_repository = booking_repository
+        self._bank_transaction_booking_repository = bank_transaction_booking_repository
         self._shareholder_repository = shareholder_repository
         self._fixed_asset_repository = fixed_asset_repository
         self._fixed_asset_movement_repository = (
@@ -421,14 +427,21 @@ class ClientTransferExporter:
                 for reference in contributions
             )
 
+        bank_links = tuple(
+            ClientTransferBankTransactionBooking(source, external_id, booking_id)
+            for source, external_id, booking_id in (
+                self._bank_transaction_booking_repository.list_for_company(company_id)
+            )
+        )
         transfer = ClientTransfer(
-            format=ClientTransferFormat(),
+            format=ClientTransferFormat(version=3 if bank_links else 2),
             application=ClientTransferApplication(
                 name="SimpleOB",
                 version=get_application_version(),
             ),
             exported_at=datetime.now().astimezone(),
             client=ClientTransferClient(
+                bank_transaction_bookings=bank_links,
                 company_id=company_id,
                 master_data=ClientTransferMasterData(
                     name=master_data.company.name,

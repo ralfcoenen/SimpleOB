@@ -20,6 +20,7 @@ CLIENT_TABLE_NAMES = frozenset(
         "kontenrollen",
         "wirtschaftsjahre",
         "buchungen",
+        "bank_transaction_bookings",
         "buchungszeilen",
         "gesellschafter",
         "anlagegueter",
@@ -280,8 +281,12 @@ class ClientDeletionRepository:
                 ]
                 result[table.name] = sorted(converted, key=repr)
                 continue
+            # Fachliche UUID-Verweise bleiben erhalten; nur technische IDs
+            # werden durch die Identität ihres Ziels ersetzt.
             fk_columns = {
-                fk.parent.name: fk.column.table.name for fk in table.foreign_keys
+                fk.parent.name: fk.column.table.name
+                for fk in table.foreign_keys
+                if fk.column.name == "id"
             }
             for row in captured[table.name]:
                 converted.append(

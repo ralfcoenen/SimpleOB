@@ -19,12 +19,18 @@ from simpleob.database.models import (
     PersonenkontoZuordnung,
     Wirtschaftsjahr,
 )
+from simpleob.domain.account import Account
+from simpleob.domain.account_type import AccountType
 from simpleob.domain.booking import Booking
 from simpleob.domain.booking_line import BookingLine
 from simpleob.domain.booking_type import BookingType
+from simpleob.domain.booking_validator import BookingValidator
+from simpleob.domain.chart_of_accounts import ChartOfAccounts
 from simpleob.domain.entry_side import EntrySide
 from simpleob.domain.fiscal_year import FiscalYear
 from simpleob.domain.fiscal_year_status import FiscalYearStatus
+from simpleob.domain.person_account_role import PersonAccountRole
+from simpleob.domain.template_account import TemplateAccount
 
 
 class BookingRepository:
@@ -43,13 +49,26 @@ class BookingRepository:
         fiscal_year: FiscalYear,
         booking: Booking,
         commit: bool = True,
+        validate_accounts: bool = False,
+        required_bank_account_number: str | None = None,
     ) -> None:
         """Speichert eine Buchung."""
 
         # Personenkontolöschungen verwenden dieselbe transaktionale Sperre.
-        ChartOfAccountsRepository(
-            self._session
-        ).lock_company_for_account_reference_change(company_id)
+        chart_of_accounts_repository = ChartOfAccountsRepository(self._session)
+        chart_of_accounts_repository.lock_company_for_account_reference_change(
+            company_id
+        )
+
+        if required_bank_account_number is not None:
+            account_roles = chart_of_accounts_repository.load_account_roles(company_id)
+            if (
+                account_roles is None
+                or required_bank_account_number not in account_roles.bank_accounts
+            ):
+                raise ValueError(
+                    "Das ausgewählte Sachkonto ist keinem Bankkonto des Mandanten zugeordnet."
+                )
 
         fiscal_year_model = self._find_fiscal_year(
             company_id=company_id,
@@ -76,6 +95,14 @@ class BookingRepository:
             raise ValueError(
                 "Das Buchungsdatum liegt außerhalb "
                 "des Geschäftsjahres."
+            )
+
+        if not isinstance(validate_accounts, bool):
+            raise TypeError("validate_accounts muss bool sein.")
+        if validate_accounts:
+            self._validate_booking_accounts(
+                mandant_id=fiscal_year_model.mandant_id,
+                booking=booking,
             )
 
         if booking.booking_type is BookingType.REGULAR:
@@ -221,6 +248,51 @@ class BookingRepository:
         """Verwirft die aktuelle Datenbanktransaktion."""
 
         self._session.rollback()
+
+    @property
+    def has_active_transaction(self) -> bool:
+        """Gibt an, ob die zugrunde liegende Session gerade eine Transaktion hat."""
+        return self._session.in_transaction()
+
+    def _validate_booking_accounts(
+        self,
+        *,
+        mandant_id: int,
+        booking: Booking,
+    ) -> None:
+        """Wendet den bestehenden BookingValidator auf den Mandantenkontenrahmen an."""
+        account_models = (
+            self._session.query(Konto)
+            .filter(Konto.mandant_id == mandant_id)
+            .order_by(Konto.account_number)
+            .all()
+        )
+        person_roles = {
+            row.account_number: PersonAccountRole(row.role)
+            for row in self._session.query(PersonenkontoZuordnung)
+            .filter(PersonenkontoZuordnung.mandant_id == mandant_id)
+            .all()
+        }
+        accounts = []
+        for model in account_models:
+            try:
+                account_type = AccountType[model.account_type]
+            except KeyError as exc:
+                raise ValueError(
+                    f"Unbekannter gespeicherter Kontotyp: {model.account_type!r}"
+                ) from exc
+            accounts.append(
+                Account(
+                    template=TemplateAccount(
+                        account_number=model.account_number,
+                        name=model.name,
+                        account_type=account_type,
+                    ),
+                    is_active=model.is_active,
+                    person_account_role=person_roles.get(model.account_number),
+                )
+            )
+        BookingValidator(ChartOfAccounts(accounts=tuple(accounts))).validate(booking)
 
     def require_open_fiscal_year(
         self,

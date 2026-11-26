@@ -33,7 +33,7 @@ def test_hgb_gaap_ci_mapping_contains_expected_rules() -> None:
         income_statement=income_statement,
     )
 
-    assert len(mapping_set.rules) == 86
+    assert len(mapping_set.rules) == 88
 
     rules_by_code = {
         rule.position.code: rule
